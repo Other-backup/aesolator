@@ -72,12 +72,7 @@ index 791d07d..a53478c 100644
 +        int colorRes = switch (profile.type) {
 +            case CONTENT_TYPE_WINE -> isDarkMode ? R.color.contents_lane_wine_dark : R.color.contents_lane_wine;
 +            case CONTENT_TYPE_PROTON -> isDarkMode ? R.color.contents_lane_proton_dark : R.color.contents_lane_proton;
-+            case CONTENT_TYPE_VULKAN_DRIVER, CONTENT_TYPE_VULKAN_SDK ->
-+                    isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
-+            case CONTENT_TYPE_TURNIP_DRIVER ->
-+                    isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
-+            case CONTENT_TYPE_OPENGL_DRIVER ->
-+                    isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
++            case CONTENT_TYPE_VULKAN_SDK -> resolveVulkanFamilyAccentColor(profile);
 +            case CONTENT_TYPE_DGVOODOO ->
 +                    isDarkMode ? R.color.contents_lane_dgvoodoo_dark : R.color.contents_lane_dgvoodoo;
 +            case CONTENT_TYPE_DXVK -> isDarkMode ? R.color.contents_lane_dxvk_dark : R.color.contents_lane_dxvk;
@@ -85,6 +80,20 @@ index 791d07d..a53478c 100644
 +            default -> fallbackRes;
 +        };
 +        return ContextCompat.getColor(requireContext(), colorRes);
++    }
++
++    private int resolveVulkanFamilyAccentColor(ContentProfile profile) {
++        String category = profile.getDisplayCategory();
++        String source = profile.source != null ? profile.source : "";
++        String version = profile.versionName != null ? profile.versionName : "";
++        String laneHint = (category + " " + source + " " + version).toLowerCase();
++        if (laneHint.contains("turnip")) {
++            return isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
++        }
++        if (laneHint.contains("opengl") || laneHint.contains("zink")) {
++            return isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
++        }
++        return isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
 +    }
 +
 +    private GradientDrawable buildCategoryBadgeBackground(int accentColor) {
