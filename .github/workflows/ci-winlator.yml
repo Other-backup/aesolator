@@ -127,19 +127,11 @@ jobs:
           Workflow run: ${{ github.run_id }}
           EOF_NOTES
 
-      - name: Validate split release token
-        if: github.event_name != 'pull_request'
-        env:
-          AEO_RELEASE_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}
-        run: |
-          set -euxo pipefail
-          test -n "${AEO_RELEASE_TOKEN}"
-
       - name: Publish to Winlator release
         if: github.event_name != 'pull_request'
         uses: ncipollo/release-action@v1
         with:
-          token: ${{ secrets.AEO_RELEASE_TOKEN }}
+          token: ${{ secrets.AEO_RELEASE_TOKEN || github.token }}
           owner: ${{ env.APP_RELEASE_OWNER }}
           repo: ${{ env.APP_RELEASE_REPO }}
           tag: winlator-latest
