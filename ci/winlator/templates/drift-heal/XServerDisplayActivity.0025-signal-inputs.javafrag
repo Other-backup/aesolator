@@ -1,0 +1,25 @@
+        String signalLaunchKind = shortcut != null ? "shortcut_launch" : "container_launch";
+        if (forensicMode) signalLaunchKind = "forensic_" + signalLaunchKind;
+        String signalPrecheckReason = runtimeNormalization != null && runtimeNormalization.hasDrift()
+                ? "normalization_applied"
+                : "normalization_clean";
+        String signalPrecheckFallback = runtimeNormalization != null && runtimeNormalization.hasDrift()
+                ? "normalized_env_overlay"
+                : "none";
+        RuntimeSignalContract.putSignalInputMarkers(
+                envVars,
+                forensicRouteSource,
+                signalLaunchKind,
+                signalPrecheckReason,
+                signalPrecheckFallback
+        );
+        ForensicLogger.logEvent(this, "info", "RUNTIME_SIGNAL_INPUTS_PREPARED", forensicTraceId, "setup_xenvironment",
+                "runtime signal input markers prepared",
+                ForensicLogger.fields(
+                        "route", forensicRouteSource,
+                        "signal_input_route", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_ROUTE),
+                        "signal_input_launch_kind", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_LAUNCH_KIND),
+                        "signal_input_precheck_reason", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_PRECHECK_REASON),
+                        "signal_input_precheck_fallback", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK),
+                        "env_hash", ForensicLogger.hashEnvVars(envVars)));
+

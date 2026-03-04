@@ -1,0 +1,40 @@
+        String signalPolicy = "runtime_profile=" + runtimeProfile
+                + ";emulator=" + emulator
+                + ";dx_policy=" + envVars.get("AERO_DX_POLICY_STACK")
+                + ";runtime_flavor=" + envVars.get("AERO_RUNTIME_FLAVOR");
+        String signalSources = "route=" + forensicRouteSource
+                + ";wine=" + (container != null ? container.getWineVersion() : "")
+                + ";box64_preset=" + box64Preset
+                + ";fexcore_preset=" + fexcorePreset
+                + ";layout_mode=" + envVars.get("AERO_UPSCALE_LAYOUT_MODE");
+        String runtimePresetGuardReason = !isEmpty(runtimeProfile)
+                ? "runtime_profile_resolved"
+                : "runtime_profile_missing";
+        String upscalerBindingGuardReason = envVars.get("AERO_UPSCALE_LAYOUT_REASON");
+        if (isEmpty(upscalerBindingGuardReason)) {
+            upscalerBindingGuardReason = envVars.get("AERO_DX_POLICY_REASON");
+        }
+        if (isEmpty(upscalerBindingGuardReason)) {
+            upscalerBindingGuardReason = envVars.get("AERO_UPSCALE_PROTON_FSR_REASON");
+        }
+        RuntimeSignalContract.putSignalPolicyMarkers(
+                envVars,
+                signalPolicy,
+                signalSources,
+                runtimePresetGuardReason,
+                upscalerBindingGuardReason
+        );
+
+        if (forensicMode || !isEmpty(forensicTraceId)) {
+            ForensicLogger.logEvent(context, "info", "RUNTIME_SIGNAL_POLICY_APPLIED", forensicTraceId, "launcher",
+                    "runtime signal policy markers applied",
+                    ForensicLogger.fields(
+                            "signal_policy", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_POLICY),
+                            "signal_sources", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_SOURCES),
+                            "signal_decision_hash", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_DECISION_HASH),
+                            "runtime_preset_guard_reason", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_RUNTIME_PRESET_GUARD_REASON),
+                            "upscaler_binding_guard_reason", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_UPSCALER_BINDING_GUARD_REASON),
+                            "signal_input_route", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_ROUTE),
+                            "signal_input_launch_kind", RuntimeSignalContract.get(envVars, RuntimeSignalContract.WINLATOR_SIGNAL_INPUT_LAUNCH_KIND)));
+        }
+

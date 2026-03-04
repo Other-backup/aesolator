@@ -1,0 +1,137 @@
+    private void loadContentList() {
+        List<ContentProfile> profiles = getVisibleProfilesForCurrentType();
+        if (profiles == null || profiles.isEmpty()) {
+            emptyText.setVisibility(View.VISIBLE);
+            recyclerView.setVisibility(View.GONE);
+        } else {
+            emptyText.setVisibility(View.GONE);
+            recyclerView.setVisibility(View.VISIBLE);
+            recyclerView.setAdapter(new ContentItemAdapter(profiles));
+        }
+    }
+
+    private class ContentItemAdapter extends RecyclerView.Adapter<ContentItemAdapter.ViewHolder> {
+        private final List<ContentProfile> data;
+
+        private static class ViewHolder extends RecyclerView.ViewHolder {
+            private final ImageView ivIcon;
+            private final TextView tvVersionName;
+            private final TextView tvVersionCode;
+            private final TextView tvSource;
+            private final ImageButton ibMenu;
+            private final Button btDownload;
+            private final ProgressBar progressBar;
+
+            public ViewHolder(@NonNull View view) {
+                super(view);
+
+                ivIcon = view.findViewById(R.id.IVIcon);
+                tvVersionName = view.findViewById(R.id.TVVersionName);
+                tvVersionCode = view.findViewById(R.id.TVVersionCode);
+                tvSource = view.findViewById(R.id.TVSource);
+                ibMenu = view.findViewById(R.id.BTMenu);
+                btDownload = view.findViewById(R.id.BTDownload);
+                progressBar = view.findViewById(R.id.Progress);
+            }
+        }
+
+        public ContentItemAdapter(List<ContentProfile> data) {
+            this.data = data;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new ContentItemAdapter.ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.content_list_item, parent, false));
+        }
+
+        @Override
+        public void onViewRecycled(@NonNull ViewHolder holder) {
+            holder.ibMenu.setOnClickListener(null);
+            holder.btDownload.setOnClickListener(null);
+            super.onViewRecycled(holder);
+        }
+
+        @SuppressLint("StringFormatInvalid")
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            final ContentProfile profile = data.get(position);
+
+            int iconId = switch (profile.type) {
+                case CONTENT_TYPE_WINE -> R.drawable.icon_wine;
+                case CONTENT_TYPE_PROTON -> R.drawable.icon_wine;
+                default -> R.drawable.icon_settings;
+            };
+            holder.ivIcon.setBackground(getContext().getDrawable(iconId));
+
+            holder.tvVersionName.setText(buildProfileTitleLine(profile));
+            holder.tvVersionCode.setText(buildProfileMetaLine(profile));
+            String sourceLine = buildProfileSourceLine(profile);
+            holder.tvSource.setText(sourceLine);
+            holder.tvSource.setVisibility(View.VISIBLE);
+            boolean remoteDownloadable = profile.isRemoteDownloadable();
+            boolean downloadActive = isRemoteDownloadActive(profile);
+            holder.ibMenu.setVisibility(remoteDownloadable ? View.GONE : View.VISIBLE);
+            holder.ibMenu.setOnClickListener(v -> {
+                PopupMenu selectionMenu = new PopupMenu(getContext(), holder.ibMenu);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    selectionMenu.setForceShowIcon(true);
+                selectionMenu.inflate(R.menu.content_popup_menu);
+                selectionMenu.setOnMenuItemClickListener(item -> {
+                    int itemId = item.getItemId();
+                    if (itemId == R.id.content_info) {
+                        new ContentInfoDialog(getContext(), profile).show();
+                    } else if (itemId == R.id.remove_content) {
+                        ContentDialog.confirm(getContext(), R.string.do_you_want_to_remove_this_content, () -> {
+                            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                                ContainerManager containerManager = new ContainerManager(getContext());
+                                for (Container container : containerManager.getContainers()) {
+                                    if (container.getWineVersion().equals(ContentsManager.getEntryName(profile))) {
+                                        ContentDialog.alert(getContext(), String.format(getString(R.string.unable_to_remove_content_since_container_using), container.getName()), null);
+                                        return;
+                                    }
+                                }
+                            }
+                            manager.removeContent(profile);
+                            loadContentList();
+                        });
+                    }
+                    return true;
+                });
+                selectionMenu.show();
+            });
+            holder.btDownload.setText(R.string.download_package);
+            holder.progressBar.setVisibility(downloadActive ? View.VISIBLE : View.GONE);
+            holder.btDownload.setVisibility(remoteDownloadable && !downloadActive ? View.VISIBLE : View.GONE);
+            holder.btDownload.setOnClickListener(v -> {
+                Activity activity = getActivity();
+                if (activity == null || !remoteDownloadable || downloadActive) return;
+
+                File output = buildManagedRemoteDownloadFile(profile);
+                if (output.exists()) FileUtils.delete(output);
+
+                setRemoteDownloadActive(profile, true);
+                notifyDataSetChanged();
+
+                HttpUtils.download(activity, profile.remoteUrl, output, success -> {
+                    setRemoteDownloadActive(profile, false);
+                    notifyDataSetChanged();
+                    if (!success) {
+                        deleteManagedRemoteDownload(output);
+                        AppUtils.showToast(getContext(), R.string.unable_to_download_file);
+                        return;
+                    }
+
+                    Intent intent = new Intent();
+                    intent.setData(Uri.parse(output.getAbsolutePath()));
+                    onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);
+                });
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return data.size();
+        }
+    }
+}

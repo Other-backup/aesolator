@@ -1,0 +1,46 @@
+        boolean useDRI3 = preferences.getBoolean("use_dri3", true);
+        if (!useDRI3) {
+            envVars.put("MESA_VK_WSI_DEBUG", "sw");
+        }
+
+        boolean enableVulkanApiDump = preferences.getBoolean("enable_vulkan_api_dump", false);
+        boolean enableVulkanLoaderDebug = preferences.getBoolean("enable_vulkan_loader_debug", false);
+        boolean enableVulkanValidation = preferences.getBoolean("enable_vulkan_validation", false);
+        File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
+        File wineWrapperIcd = new File(imageFs.getWineShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
+        String wrapperIcdPath = wineWrapperIcd.isFile() ? wineWrapperIcd.getAbsolutePath() : imageFsWrapperIcd.getAbsolutePath();
+        String vulkanDriverSource = wineWrapperIcd.isFile() ? "wcp_embedded" : "imagefs_root";
+        envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
+        envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+        envVars.put("GALLIUM_DRIVER", "zink");
+        if (enableVulkanApiDump) {
+            File apiDumpFile = WinlatorLogUtils.createTimestampedLogFile(this, "vulkan_api_dump");
+            appendUniqueEnvValue(envVars, "VK_INSTANCE_LAYERS", "VK_LAYER_LUNARG_api_dump");
+            envVars.put("VK_LUNARG_API_DUMP_FILE", "1");
+            envVars.put("VK_APIDUMP_LOG_FILENAME", apiDumpFile.getAbsolutePath());
+            envVars.put("VK_APIDUMP_FLUSH", "1");
+        }
+        if (enableVulkanValidation) {
+            appendUniqueEnvValue(envVars, "VK_INSTANCE_LAYERS", "VK_LAYER_KHRONOS_validation");
+        }
+        if (enableVulkanLoaderDebug || enableVulkanValidation) {
+            envVars.put("VK_LOADER_DEBUG", "error,warn,layer,driver");
+        }
+        envVars.put("AERO_VULKAN_DRIVER_FILES", wrapperIcdPath);
+        envVars.put("AERO_VULKAN_DRIVER_SOURCE", vulkanDriverSource);
+        envVars.put("AERO_VULKAN_SUPPORTED_LANES", "1.1,1.2,1.3,1.4");
+        envVars.put("AERO_VULKAN_INSTANCE_LAYERS", envVars.get("VK_INSTANCE_LAYERS"));
+        envVars.put("AERO_VULKAN_API_DUMP", enableVulkanApiDump ? "1" : "0");
+        envVars.put("AERO_VULKAN_VALIDATION", enableVulkanValidation ? "1" : "0");
+        envVars.put("AERO_VULKAN_LOADER_DEBUG", envVars.get("VK_LOADER_DEBUG"));
+        ForensicLogger.logEvent(this, "info", "VULKAN_POLICY_APPLIED", forensicTraceId, "graphics_driver",
+                "Vulkan loader policy prepared",
+                ForensicLogger.fields(
+                        "driver_files", wrapperIcdPath,
+                        "driver_source", vulkanDriverSource,
+                        "supported_lanes", envVars.get("AERO_VULKAN_SUPPORTED_LANES"),
+                        "instance_layers", envVars.get("VK_INSTANCE_LAYERS"),
+                        "api_dump", enableVulkanApiDump ? "1" : "0",
+                        "validation", enableVulkanValidation ? "1" : "0",
+                        "loader_debug", envVars.get("VK_LOADER_DEBUG")));
+

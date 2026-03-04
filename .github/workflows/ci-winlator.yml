@@ -1,0 +1,150 @@
+name: Build Winlator ARM64EC (no-embedded-runtimes)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "ci/winlator/**"
+      - ".github/workflows/ci-winlator.yml"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      winlator_ref:
+        description: "Winlator Ludashi git ref (use 'latest' for upstream HEAD)"
+        required: false
+        default: "latest"
+      runtime_release_tag:
+        description: "Release tag containing runtime WCP assets"
+        required: false
+        default: "freewine11-arm64ec-latest"
+
+concurrency:
+  group: winlator-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  WINLATOR_OUTPUT_DIR: ${{ github.workspace }}/out/winlator
+  WINLATOR_LUDASHI_REPO: https://github.com/StevenMXZ/Winlator-Ludashi.git
+  WINLATOR_LUDASHI_REF: ${{ github.event.inputs.winlator_ref || 'latest' }}
+  WINLATOR_PATCH_PREFLIGHT: "1"
+  RUNTIME_RELEASE_REPO: kosoymiki/wcp-runtime-lanes
+  GRAPHICS_RELEASE_REPO: kosoymiki/wcp-graphics-lanes
+  RUNTIME_RELEASE_TAG: ${{ github.event.inputs.runtime_release_tag || 'freewine11-arm64ec-latest' }}
+  APP_RELEASE_OWNER: kosoymiki
+  APP_RELEASE_REPO: aeolator
+  PREFIX_PACK_URL: https://raw.githubusercontent.com/GameNative/bionic-prefix-files/main/prefixPack-arm64ec.txz
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;35.0.0" \
+            "ndk;29.0.14206865" \
+            "cmake;3.22.1"
+
+      - name: Install host build deps
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bash curl git git-lfs python3 tar xz-utils zstd unzip zip rsync file
+
+      - name: Validate Winlator patch-stack contracts
+        run: |
+          set -euxo pipefail
+          bash ci/winlator/run-reflective-audits.sh
+
+      - name: Build Winlator Ludashi fork APK (debug, no embedded runtimes)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          bash ci/winlator/ci-build-winlator-ludashi.sh
+
+      - name: Upload Winlator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: by.aero.so.benchmark-debug-0.9c+
+          path: |
+            out/winlator/*.apk
+            out/winlator/SHA256SUMS
+            out/winlator/logs/**
+            out/winlator/logs/patch-stack-preflight.log
+            docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md
+            docs/PATCH_STACK_REFLECTIVE_AUDIT.md
+            docs/PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Prepare Winlator release notes
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euxo pipefail
+          cat > RELEASE_NOTES.md <<EOF_NOTES
+          Ae.solator (0.9c+ line / rolling)
+
+          RU:
+          - APK package: by.aero.so.benchmark
+          - Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)
+          - Turnip UI: latest + version picker support
+          - Forensic logging and diagnostics improvements are included in this patch line
+          - Includes patch-stack audit reports: PATCH_STACK_REFLECTIVE_AUDIT.md + PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md
+
+          EN:
+          - APK package: by.aero.so.benchmark
+          - Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)
+          - Turnip UI: latest + version picker support
+          - Forensic logging and diagnostics improvements are included in this patch line
+          - Includes patch-stack audit reports: PATCH_STACK_REFLECTIVE_AUDIT.md + PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md
+
+          Commit: ${{ github.sha }}
+          Workflow run: ${{ github.run_id }}
+          EOF_NOTES
+
+      - name: Validate split release token
+        if: github.event_name != 'pull_request'
+        env:
+          AEO_RELEASE_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}
+        run: |
+          set -euxo pipefail
+          test -n "${AEO_RELEASE_TOKEN}"
+
+      - name: Publish to Winlator release
+        if: github.event_name != 'pull_request'
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.AEO_RELEASE_TOKEN }}
+          owner: ${{ env.APP_RELEASE_OWNER }}
+          repo: ${{ env.APP_RELEASE_REPO }}
+          tag: winlator-latest
+          name: Ae.solator Latest (0.9c+ line)
+          allowUpdates: true
+          prerelease: true
+          removeArtifacts: true
+          artifacts: out/winlator/*.apk,out/winlator/SHA256SUMS,docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md,docs/PATCH_STACK_REFLECTIVE_AUDIT.md,docs/PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md
+          artifactErrorsFailBuild: true
+          bodyFile: RELEASE_NOTES.md
