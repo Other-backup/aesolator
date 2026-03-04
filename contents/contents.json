@@ -25,13 +25,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "Vulkan SDK",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "vulkan-sdk-arm64-latest",
     "artifactName": "vulkan-sdk-arm64.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vulkan-sdk-arm64-latest/vulkan-sdk-arm64.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vulkan-sdk-arm64-latest/SHA256SUMS-vulkan-sdk-arm64.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/vulkan-sdk-arm64.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/SHA256SUMS-vulkan-sdk-arm64.txt"
   },
   {
     "type": "VulkanSDK",
@@ -42,13 +42,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "Vulkan SDK",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "vulkan-sdk-x86_64-latest",
     "artifactName": "vulkan-sdk-x86_64.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vulkan-sdk-x86_64-latest/vulkan-sdk-x86_64.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vulkan-sdk-x86_64-latest/SHA256SUMS-vulkan-sdk-x86_64.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/vulkan-sdk-x86_64.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/SHA256SUMS-vulkan-sdk-x86_64.txt"
   },
   {
     "type": "DXVK",
@@ -59,13 +59,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "DXVK",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "dxvk-gplasync-latest",
     "artifactName": "dxvk-gplasync.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dxvk-gplasync-latest/dxvk-gplasync.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dxvk-gplasync-latest/SHA256SUMS-dxvk-gplasync.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dxvk-gplasync-latest/dxvk-gplasync.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dxvk-gplasync-latest/SHA256SUMS-dxvk-gplasync.txt"
   },
   {
     "type": "DXVK",
@@ -76,13 +76,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "DXVK",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "dxvk-gplasync-arm64ec-latest",
     "artifactName": "dxvk-gplasync-arm64ec.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dxvk-gplasync-arm64ec-latest/dxvk-gplasync-arm64ec.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dxvk-gplasync-arm64ec-latest/SHA256SUMS-dxvk-gplasync-arm64ec.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dxvk-gplasync-arm64ec-latest/dxvk-gplasync-arm64ec.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dxvk-gplasync-arm64ec-latest/SHA256SUMS-dxvk-gplasync-arm64ec.txt"
   },
   {
     "type": "VKD3D",
@@ -93,13 +93,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "VKD3D",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "vkd3d-proton-latest",
     "artifactName": "vkd3d-proton.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vkd3d-proton-latest/vkd3d-proton.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vkd3d-proton-latest/SHA256SUMS-vkd3d-proton.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vkd3d-proton-latest/vkd3d-proton.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vkd3d-proton-latest/SHA256SUMS-vkd3d-proton.txt"
   },
   {
     "type": "VKD3D",
@@ -110,13 +110,13 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "VKD3D",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "vkd3d-proton-arm64ec-latest",
     "artifactName": "vkd3d-proton-arm64ec.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vkd3d-proton-arm64ec-latest/vkd3d-proton-arm64ec.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/vkd3d-proton-arm64ec-latest/SHA256SUMS-vkd3d-proton-arm64ec.txt"
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vkd3d-proton-arm64ec-latest/vkd3d-proton-arm64ec.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vkd3d-proton-arm64ec-latest/SHA256SUMS-vkd3d-proton-arm64ec.txt"
   },
   {
     "type": "TurnipDriver",
@@ -140,17 +140,17 @@
     "internalType": "dgvoodoo",
     "verName": "2.86.5",
     "verCode": 0,
-    "description": "Ae dgVoodoo latest upstream wrapper ZIP (Contents lane)",
+    "description": "Ae dgVoodoo latest upstream wrapper WCP (Contents lane)",
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "dgVoodoo",
-    "sourceRepo": "kosoymiki/wcp-graphics-lanes",
+    "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
     "releaseTag": "dgvoodoo-latest",
-    "artifactName": "dgvoodoo-latest.zip",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dgvoodoo-latest/dgvoodoo-latest.zip",
-    "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/dgvoodoo-latest/SHA256SUMS-dgvoodoo-latest.txt"
+    "artifactName": "dgvoodoo.wcp",
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/dgvoodoo.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/SHA256SUMS-dgvoodoo.txt"
   },
   {
     "type": "OpenGLDriver",

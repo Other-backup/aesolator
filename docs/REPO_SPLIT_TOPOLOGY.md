@@ -1,37 +1,40 @@
 # Repo Split Topology
 
-This document defines the mandatory split between source/control and release lanes.
+Final delivery split for Ae.solator.
 
 ## Repositories
 
-- `kosoymiki/winlator-wine-proton-arm64ec-wcp`
-  - Control repo: CI scripts, patch-base, docs, `contents/contents.json`.
-  - Must not be used as a runtime/graphics release artifact host.
-- `kosoymiki/freewine11`
-  - Native FreeWine source tree repository.
-  - Primary development branch: `main` (mirrors local `freewine11-main`).
 - `kosoymiki/aesolator`
-  - Ae.solator APK release repository (`winlator-latest` lane).
-- `kosoymiki/wcp-runtime-lanes`
-  - Runtime WCP release repository.
-  - Active tag: `freewine11-arm64ec-latest`.
+  - Android app source + APK release lane (`winlator-latest`).
+- `kosoymiki/freewine11`
+  - Native FreeWine source tree.
+- `kosoymiki/wcp-runtime-lanes` (**WCP Archive**)
+  - WCP release host for:
+    - `freewine11-arm64ec-latest`
+    - `vulkan-sdk-arm64-latest`
+    - `vulkan-sdk-x86_64-latest`
+    - `dxvk-gplasync-latest`
+    - `dxvk-gplasync-arm64ec-latest`
+    - `vkd3d-proton-latest`
+    - `vkd3d-proton-arm64ec-latest`
+    - `dgvoodoo-latest`
 - `kosoymiki/wcp-graphics-lanes`
-  - Graphics/Vulkan WCP+ZIP release repository.
-  - Active tags: `aeturnip-arm64-latest`, `aeopengl-driver-arm64-latest`,
-    `dgvoodoo-latest`, `dxvk-gplasync-latest`, `dxvk-gplasync-arm64ec-latest`,
-    `vkd3d-proton-latest`, `vkd3d-proton-arm64ec-latest`,
-    `vulkan-sdk-arm64-latest`, `vulkan-sdk-x86_64-latest`.
+  - Graphics build/control + release host for:
+    - `aeturnip-arm64-latest`
+    - `aeopengl-driver-arm64-latest`
+  - Build owner for archive lane:
+    - `dgvoodoo-latest` (published to `wcp-runtime-lanes`)
+- `kosoymiki/winlator-wine-proton-arm64ec-wcp`
+  - Legacy monorepo, archived-only history.
 
 ## Contract Rules
 
-1. `contents/contents.json` and `ci/winlator/artifact-source-map.json` must reference only split release repos.
-2. Legacy runtime lanes (`proton-ge10`, `protonwine10`) are removed from active overlay and active workflows.
-3. Any new package lane must declare `sourceRepo` to its dedicated release repo.
-4. Release cleanup must remove stale WCP assets from control-repo releases.
+1. `contents/contents.json` and artifact maps must use the real release owner per lane.
+2. DXVK/VKD3D/VulkanSDK must route to `wcp-runtime-lanes`.
+3. Turnip/OpenGL lanes route to `wcp-graphics-lanes`; dgVoodoo WCP routes to `wcp-runtime-lanes`.
+4. Legacy monorepo is excluded from active release routing.
 
-## Migration Status
+## Status
 
-- Split repos are created and active.
-- FreeWine source tree is tracked independently in `freewine11`.
-- Workflows are routed to split release repos.
-- Remaining task: keep archival docs as history only; do not treat them as active release topology.
+- Split ownership is active.
+- Remaining work is app/device behavioral QA, not repo routing.

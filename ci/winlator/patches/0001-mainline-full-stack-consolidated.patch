@@ -6319,7 +6319,7 @@ index 020d9e8..47a5958 100644
 -            tvWebpage.setText(Html.fromHtml("<a href=\"https://www.winlator.org\">winlator.org</a>", Html.FROM_HTML_MODE_LEGACY));
 -            tvWebpage.setMovementMethod(LinkMovementMethod.getInstance());
 +            TextView tvWebpage = dialog.findViewById(R.id.TVWebpage);
-+            tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/winlator-wine-proton-arm64ec-wcp\">github.com/kosoymiki/winlator-wine-proton-arm64ec-wcp</a>", Html.FROM_HTML_MODE_LEGACY));
++            tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/aesolator\">github.com/kosoymiki/aesolator</a>", Html.FROM_HTML_MODE_LEGACY));
 +            tvWebpage.setMovementMethod(LinkMovementMethod.getInstance());
  
              ((TextView) dialog.findViewById(R.id.TVAppVersion)).setText(getString(R.string.version) + " " + pInfo.versionName);
@@ -6333,7 +6333,7 @@ index 020d9e8..47a5958 100644
 -                    "Wine (<a href=\"https://www.winehq.org\">winehq.org</a>)",
 -                    "Box64 (<a href=\"https://github.com/ptitSeb/box64\">github.com/ptitSeb/box64</a>)",
 +            String creditsAndThirdPartyAppsHTML = String.join("<br />",
-+                    "Ae.solator distribution and patch-base integration by this fork (<a href=\"https://github.com/kosoymiki/winlator-wine-proton-arm64ec-wcp\">repository</a>)",
++                    "Ae.solator distribution and patch-base integration by this fork (<a href=\"https://github.com/kosoymiki/aesolator\">repository</a>)",
 +                    "Big Picture Mode Music by",
 +                    "Dale Melvin Blevens III (Fumer)",
 +                    "---",
@@ -12352,7 +12352,7 @@ index b700f14..a634aa7 100644
 +public class ContentsManager {
 +    public static final String PROFILE_NAME = "profile.json";
 +    public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
-+    public static final String REMOTE_WINE_PROTON_OVERLAY = "https://raw.githubusercontent.com/kosoymiki/winlator-wine-proton-arm64ec-wcp/main/contents/contents.json";
++    public static final String REMOTE_WINE_PROTON_OVERLAY = "https://raw.githubusercontent.com/kosoymiki/aesolator/main/contents/contents.json";
      public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
              "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
              "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -140708,7 +140708,7 @@ index a940cf7..6d61201 100644
 +    <string name="fetch_latest_turnip">Browse Turnip versions (latest + history)</string>
 +    <string name="turnip_open_catalog">Open Turnip catalog</string>
 +    <string name="install_turnip_local_zip">Install local Turnip ZIP</string>
-+    <string name="install_dgvoodoo_local_zip">Import local dgVoodoo ZIP</string>
++    <string name="install_dgvoodoo_local_zip">Import local dgVoodoo package</string>
 +    <string name="turnip_pipeline_config">Turnip lane policy</string>
 +    <string name="turnip_pipeline_summary">Sources: %1$s • Channel: %2$s • Max rows: %3$d</string>
 +    <string name="turnip_pipeline_summary_placeholder">Turnip lane is loading...</string>
@@ -140809,7 +140809,7 @@ index a940cf7..6d61201 100644
 +    <string name="dgvoodoo_arch_x64">x64</string>
 +    <string name="dgvoodoo_package_state_missing">missing</string>
 +    <string name="dgvoodoo_package_state_ready">ready (%1$s)</string>
-+    <string name="dgvoodoo_import_message">Select a full official dgVoodoo ZIP. Ae.solator imports it locally and stages wrapper files next to the target EXE at launch time instead of bundling it globally.</string>
++    <string name="dgvoodoo_import_message">Select a full dgVoodoo package archive. Ae.solator imports it locally and stages wrapper files next to the target EXE at launch time instead of bundling it globally.</string>
 +    <string name="dgvoodoo_import_success">dgVoodoo imported: %1$s</string>
 +    <string name="dgvoodoo_import_failed">Failed to import dgVoodoo. Select a full official ZIP package.</string>
 +    <string name="driver_catalog_community_turnip_header">Community Turnip builds (GitHub)</string>

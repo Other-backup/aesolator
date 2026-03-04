@@ -39,7 +39,7 @@ EXPECTED_DISPLAY_BY_TYPE = {
     "DXVK": "DXVK",
     "VKD3D": "VKD3D",
 }
-TARGET_REPO = "kosoymiki/winlator-wine-proton-arm64ec-wcp"
+TARGET_REPO = "kosoymiki/aesolator"
 RUNTIME_RELEASE_REPO = "kosoymiki/wcp-runtime-lanes"
 GRAPHICS_RELEASE_REPO = "kosoymiki/wcp-graphics-lanes"
 TARGET_RELEASE_REPO_BY_INTERNAL = {
@@ -47,12 +47,12 @@ TARGET_RELEASE_REPO_BY_INTERNAL = {
     "proton": RUNTIME_RELEASE_REPO,
     "protonge": RUNTIME_RELEASE_REPO,
     "protonwine": RUNTIME_RELEASE_REPO,
-    "vulkansdk": GRAPHICS_RELEASE_REPO,
+    "vulkansdk": RUNTIME_RELEASE_REPO,
     "turnip": GRAPHICS_RELEASE_REPO,
     "freedreno": GRAPHICS_RELEASE_REPO,
-    "dgvoodoo": GRAPHICS_RELEASE_REPO,
-    "dxvk": GRAPHICS_RELEASE_REPO,
-    "vkd3d": GRAPHICS_RELEASE_REPO,
+    "dgvoodoo": RUNTIME_RELEASE_REPO,
+    "dxvk": RUNTIME_RELEASE_REPO,
+    "vkd3d": RUNTIME_RELEASE_REPO,
 }
 TARGET_OVERLAY_URL = (
     "https://raw.githubusercontent.com/"
@@ -61,67 +61,18 @@ TARGET_OVERLAY_URL = (
 TARGET_HUB_PROFILES_URL = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json"
 
 WORKFLOW_EXPECTATIONS = {
-    ".github/workflows/ci-arm64ec-wine.yml": {
-        "WCP_VERSION_CODE": "\"1\"",
-        "WCP_CHANNEL": "nightly",
-        "WCP_DELIVERY": "remote",
-        "WCP_PROFILE_TYPE": "Wine",
-        "WCP_DISPLAY_CATEGORY": "Wine",
-        "WCP_RELEASE_TAG": "freewine11-arm64ec-latest",
-        "WCP_SOURCE_REPO": "kosoymiki/wcp-runtime-lanes",
-    },
-    ".github/workflows/ci-vulkan-sdk-arm.yml": {
-        "WCP_VERSION_CODE": "\"1\"",
-        "WCP_CHANNEL": "stable",
-        "WCP_DELIVERY": "remote",
-        "WCP_PROFILE_TYPE": "VulkanSDK",
-        "WCP_DISPLAY_CATEGORY": "Vulkan SDK",
-        "WCP_SOURCE_REPO": "kosoymiki/wcp-graphics-lanes",
-        "VULKAN_SDK_LATEST_JSON_URL": "https://vulkan.lunarg.com/sdk/latest/linux.json",
-        "VULKAN_SDK_LINUX_SDK_URL": "https://sdk.lunarg.com/sdk/download/latest/linux/vulkan-sdk.tar.xz",
-    },
-    ".github/workflows/ci-graphics-drivers.yml": {
-        "AETURNIP_SOURCE_REPO": "kosoymiki/wcp-graphics-lanes",
-        "AEOPENGL_SOURCE_REPO": "kosoymiki/wcp-graphics-lanes",
-        "AEDXVK_SOURCE_REPO": "kosoymiki/wcp-graphics-lanes",
-        "AEVKD3D_SOURCE_REPO": "kosoymiki/wcp-graphics-lanes",
-        "MESA_SOURCE_GIT_URL": "https://gitlab.freedesktop.org/mesa/mesa.git",
-        "AETURNIP_VERSION_NAME": "rolling-arm64",
-        "AEOPENGL_VERSION_NAME": "rolling-arm64",
-        "DGVOODOO_LATEST_RELEASE_API": "https://api.github.com/repos/dege-diosg/dgVoodoo2/releases/latest",
-        "DGVOODOO_VERSION_NAME": "2.86.5",
-        "DXVK_GPLASYNC_GIT_URL": "https://gitlab.com/Ph42oN/dxvk-gplasync.git",
-        "DXVK_UPSTREAM_GIT_URL": "https://github.com/doitsujin/dxvk.git",
-        "AEDXVK_GENERIC_VERSION_NAME": "2.7.1-1-gplasync",
-        "AEDXVK_ARM64EC_VERSION_NAME": "2.7.1-1-gplasync-arm64ec",
-        "VKD3D_PROTON_GIT_URL": "https://github.com/HansKristian-Work/vkd3d-proton.git",
-        "AEVKD3D_GENERIC_VERSION_NAME": "3.0b",
-        "AEVKD3D_ARM64EC_VERSION_NAME": "3.0b-arm64ec",
+    ".github/workflows/ci-winlator.yml": {
+        "RUNTIME_RELEASE_REPO": "kosoymiki/wcp-runtime-lanes",
+        "GRAPHICS_RELEASE_REPO": "kosoymiki/wcp-graphics-lanes",
+        "APP_RELEASE_REPO": "aesolator",
     },
 }
 
 WORKFLOW_REQUIRED_TOKENS = {
-    ".github/workflows/ci-vulkan-sdk-arm.yml": [
-        "WCP_RELEASE_TAG: vulkan-sdk-arm64-latest",
-        "WCP_RELEASE_TAG: vulkan-sdk-x86_64-latest",
-        "VULKAN_SDK_LAYOUT_ARCH: arm64",
-        "VULKAN_SDK_LAYOUT_ARCH: x86_64",
-        "Build Vulkan SDK ARM64 WCP contents package",
-        "Build Vulkan SDK x86_64 WCP contents package",
-    ],
-    ".github/workflows/ci-graphics-drivers.yml": [
-        "AETURNIP_RELEASE_TAG: aeturnip-arm64-latest",
-        "AEOPENGL_RELEASE_TAG: aeopengl-driver-arm64-latest",
-        "DGVOODOO_RELEASE_TAG: dgvoodoo-latest",
-        "release_tag: dxvk-gplasync-latest",
-        "release_tag: dxvk-gplasync-arm64ec-latest",
-        "release_tag: vkd3d-proton-latest",
-        "release_tag: vkd3d-proton-arm64ec-latest",
-        "Build AeTurnip ARM64 ZIP driver",
-        "Build AeOpenGLDriver ARM64 ZIP overlay",
-        "Build dgVoodoo latest ZIP mirror",
-        "Build AeDXVK GPLAsync source WCP",
-        "Build AeVKD3D-Proton source WCP",
+    ".github/workflows/ci-winlator.yml": [
+        "Build Winlator Ludashi fork APK",
+        "Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)",
+        "tag: winlator-latest",
     ],
 }
 
@@ -140,7 +91,7 @@ ARTIFACT_EXPECTED_ENTRIES = {
     "aevkd3dproton": {"internalType": "vkd3d", "artifactName": "vkd3d-proton.wcp"},
     "aevkd3dprotonarm64ec": {"internalType": "vkd3d", "artifactName": "vkd3d-proton-arm64ec.wcp"},
     "aeturniparm64": {"internalType": "turnip", "artifactName": "aeturnip-arm64.zip"},
-    "dgvoodoolatest": {"internalType": "dgvoodoo", "artifactName": "dgvoodoo-latest.zip"},
+    "dgvoodoolatest": {"internalType": "dgvoodoo", "artifactName": "dgvoodoo.wcp"},
     "aeopengldriverarm64": {"internalType": "freedreno", "artifactName": "aeopengl-driver-arm64.zip"},
 }
 
@@ -268,7 +219,7 @@ def check_contents_schema(
         if not release_tag.endswith("-latest"):
             fail(f"entry[{idx}] releaseTag must end with -latest: {release_tag}", failures)
 
-        if internal_type in {"turnip", "freedreno", "dgvoodoo"}:
+        if internal_type in {"turnip", "freedreno"}:
             if not artifact_name.endswith(".zip"):
                 fail(f"entry[{idx}] artifactName must end with .zip; got {artifact_name}", failures)
         else:

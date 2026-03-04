@@ -43,12 +43,12 @@ EXPECTED_SOURCE_REPO_BY_INTERNAL = {
     "proton": RUNTIME_RELEASE_REPO,
     "protonge": RUNTIME_RELEASE_REPO,
     "protonwine": RUNTIME_RELEASE_REPO,
-    "vulkansdk": GRAPHICS_RELEASE_REPO,
+    "vulkansdk": RUNTIME_RELEASE_REPO,
     "turnip": GRAPHICS_RELEASE_REPO,
     "freedreno": GRAPHICS_RELEASE_REPO,
-    "dgvoodoo": GRAPHICS_RELEASE_REPO,
-    "dxvk": GRAPHICS_RELEASE_REPO,
-    "vkd3d": GRAPHICS_RELEASE_REPO,
+    "dgvoodoo": RUNTIME_RELEASE_REPO,
+    "dxvk": RUNTIME_RELEASE_REPO,
+    "vkd3d": RUNTIME_RELEASE_REPO,
 }
 
 
@@ -245,7 +245,7 @@ def main() -> None:
             fail(f"entry {idx} sha256Url must use sourceRepo release lane ({source_repo}): {sha256_url}")
         if f"/{release_tag}/" not in sha256_url:
             fail(f"entry {idx} sha256Url must use matching releaseTag {release_tag}: {sha256_url}")
-        if type_key in {"turnipdriver", "opengldriver", "dgvoodoo"}:
+        if type_key in {"turnipdriver", "opengldriver"}:
             if not artifact_name.endswith(".zip"):
                 fail(f"entry {idx} artifactName must end with .zip for {type_name}: {artifact_name}")
         else:
