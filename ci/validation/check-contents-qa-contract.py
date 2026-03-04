@@ -91,7 +91,8 @@ ARTIFACT_EXPECTED_ENTRIES = {
     "aevkd3dproton": {"internalType": "vkd3d", "artifactName": "vkd3d-proton.wcp"},
     "aevkd3dprotonarm64ec": {"internalType": "vkd3d", "artifactName": "vkd3d-proton-arm64ec.wcp"},
     "aeturniparm64": {"internalType": "turnip", "artifactName": "aeturnip-arm64.zip"},
-    "dgvoodoolatest": {"internalType": "dgvoodoo", "artifactName": "dgvoodoo.wcp"},
+    "dgvoodoox86_64": {"internalType": "dgvoodoo", "artifactName": "dgvoodoo-x86_64.wcp"},
+    "dgvoodooarm64ec": {"internalType": "dgvoodoo", "artifactName": "dgvoodoo-arm64ec.wcp"},
     "aeopengldriverarm64": {"internalType": "freedreno", "artifactName": "aeopengl-driver-arm64.zip"},
 }
 
@@ -293,15 +294,29 @@ def check_contents_schema(
             )
         else:
             dgvoodoo_arches = set()
+            dgvoodoo_release_tags = set()
+            dgvoodoo_artifact_names = set()
             for row in dgvoodoo_entries:
                 ver_name = str(row.get("verName", "")).strip().lower()
                 if ver_name.endswith("-x86_64"):
                     dgvoodoo_arches.add("x86_64")
                 elif ver_name.endswith("-arm64ec"):
                     dgvoodoo_arches.add("arm64ec")
+                dgvoodoo_release_tags.add(str(row.get("releaseTag", "")).strip())
+                dgvoodoo_artifact_names.add(str(row.get("artifactName", "")).strip())
             if dgvoodoo_arches != {"x86_64", "arm64ec"}:
                 fail(
                     f"dgvoodoo verName lanes must cover exactly x86_64 and arm64ec; got {sorted(dgvoodoo_arches)}",
+                    failures,
+                )
+            if len(dgvoodoo_release_tags) != 2:
+                fail(
+                    "dgvoodoo split lanes must use distinct releaseTag values (x86_64 and arm64ec)",
+                    failures,
+                )
+            if len(dgvoodoo_artifact_names) != 2:
+                fail(
+                    "dgvoodoo split lanes must use distinct artifactName values (x86_64 and arm64ec)",
                     failures,
                 )
 

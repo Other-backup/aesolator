@@ -17,13 +17,14 @@ Final delivery split for Ae.solator.
     - `dxvk-gplasync-arm64ec-latest`
     - `vkd3d-proton-latest`
     - `vkd3d-proton-arm64ec-latest`
-    - `dgvoodoo-latest`
+    - `dgvoodoo-x86_64-latest`
+    - `dgvoodoo-arm64ec-latest`
 - `kosoymiki/wcp-graphics-lanes`
   - Graphics build/control + release host for:
     - `aeturnip-arm64-latest`
     - `aeopengl-driver-arm64-latest`
   - Build owner for archive lane:
-    - `dgvoodoo-latest` (published to `wcp-runtime-lanes`)
+    - `dgvoodoo-x86_64-latest` / `dgvoodoo-arm64ec-latest` (published to `wcp-runtime-lanes`)
 - `kosoymiki/winlator-wine-proton-arm64ec-wcp`
   - Legacy monorepo, archived-only history.
 

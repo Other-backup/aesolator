@@ -147,10 +147,10 @@
     "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
-    "releaseTag": "dgvoodoo-latest",
-    "artifactName": "dgvoodoo.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/dgvoodoo.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/SHA256SUMS-dgvoodoo.txt"
+    "releaseTag": "dgvoodoo-x86_64-latest",
+    "artifactName": "dgvoodoo-x86_64.wcp",
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-x86_64-latest/dgvoodoo-x86_64.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-x86_64-latest/SHA256SUMS-dgvoodoo-x86_64.txt"
   },
   {
     "type": "DgVoodoo",
@@ -164,10 +164,10 @@
     "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",
-    "releaseTag": "dgvoodoo-latest",
-    "artifactName": "dgvoodoo.wcp",
-    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/dgvoodoo.wcp",
-    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/SHA256SUMS-dgvoodoo.txt"
+    "releaseTag": "dgvoodoo-arm64ec-latest",
+    "artifactName": "dgvoodoo-arm64ec.wcp",
+    "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-arm64ec-latest/dgvoodoo-arm64ec.wcp",
+    "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-arm64ec-latest/SHA256SUMS-dgvoodoo-arm64ec.txt"
   },
   {
     "type": "OpenGLDriver",

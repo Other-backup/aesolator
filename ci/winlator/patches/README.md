@@ -30,7 +30,7 @@ The patch base is currently eight-patch mainline:
   - closes current upstream drift where `0001` references these classes but upstream does not ship them yet
 - `0004-mainline-dgvoodoo-wcp-dev64-bridge.patch`
   - extends `DgVoodooManager` import path to accept `ZIP` and `WCP` archives (`.wcp/.wcp.xz/.wcp.zst`)
-  - keeps dgVoodoo Contents lane manageable when artifact source is `dgvoodoo.wcp` from WCP Archive
+  - keeps dgVoodoo Contents lanes manageable when artifact source is split WCP lanes (`dgvoodoo-x86_64.wcp`, `dgvoodoo-arm64ec.wcp`) from WCP Archive
   - adds runtime directory probing for `Release/arm64`, `Release/arm64ec`, and `Release/x64` layouts (`dgVoodoo2_*_dev64.zip`)
 - `0005-mainline-ui-forensic-nav-hotfix.patch`
   - fixes side navigation regression by restoring deterministic drawer behavior for dialog-only items

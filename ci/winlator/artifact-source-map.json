@@ -56,11 +56,17 @@
       "remoteUrl": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/aeturnip-arm64-latest/aeturnip-arm64.zip",
       "sha256Url": "https://github.com/kosoymiki/wcp-graphics-lanes/releases/download/aeturnip-arm64-latest/SHA256SUMS-aeturnip-arm64.txt"
     },
-    "dgvoodoolatest": {
+    "dgvoodoox86_64": {
       "kind": "wcp",
-      "description": "Latest upstream dgVoodoo WCP mirrored as a Contents lane",
-      "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/dgvoodoo.wcp",
-      "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-latest/SHA256SUMS-dgvoodoo.txt"
+      "description": "Latest upstream dgVoodoo WCP mirrored as a Contents lane (x86_64)",
+      "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-x86_64-latest/dgvoodoo-x86_64.wcp",
+      "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-x86_64-latest/SHA256SUMS-dgvoodoo-x86_64.txt"
+    },
+    "dgvoodooarm64ec": {
+      "kind": "wcp",
+      "description": "Latest upstream dgVoodoo WCP mirrored as a Contents lane (arm64ec)",
+      "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-arm64ec-latest/dgvoodoo-arm64ec.wcp",
+      "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/dgvoodoo-arm64ec-latest/SHA256SUMS-dgvoodoo-arm64ec.txt"
     },
     "aeopengldriverarm64": {
       "kind": "zip",
