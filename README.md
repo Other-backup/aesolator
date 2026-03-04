@@ -23,13 +23,15 @@ Android application repository for Ae.solator (`by.aero.so.benchmark`).
 - `kosoymiki/wcp-graphics-lanes`: Turnip/OpenGL provider lanes + build owner for dgVoodoo archive lane.
 - `kosoymiki/winlator-wine-proton-arm64ec-wcp`: legacy archived history only.
 
+Legacy donor runtime lanes are not active in Ae.solator.
+
 ## Main Workflow
 
 - `.github/workflows/ci-winlator.yml`
   - builds APK from native app source stored directly in this repo,
   - publishes APK release lane in this repo.
 
-Patch-stack scripts under `ci/winlator/patches` remain as legacy tooling only; they are no longer the primary CI build path.
+Patch-stack scripts under `ci/winlator/patches` remain legacy tooling; `check-patch-stack.sh` now validates folded native-source feature parity by default.
 
 ## Local Build
 

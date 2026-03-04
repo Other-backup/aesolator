@@ -10,6 +10,7 @@ TMP_DIR=""
 : "${WINLATOR_PATCH_FROM:=}"
 : "${WINLATOR_PATCH_TO:=}"
 : "${WINLATOR_PATCH_SANITIZE:=1}"
+: "${WINLATOR_NATIVE_SOURCE_MODE:=1}"
 
 log() { printf '[patch-stack-check] %s\n' "$*"; }
 fail() { printf '[patch-stack-check][error] %s\n' "$*" >&2; exit 1; }
@@ -28,11 +29,15 @@ Optional env:
   WINLATOR_PATCH_FROM=NNNN   First patch number in the apply window.
   WINLATOR_PATCH_TO=NNNN     Last patch number in the apply window.
   WINLATOR_PATCH_SANITIZE=1  Remove stray .rej/.orig hunks from patch files.
+  WINLATOR_NATIVE_SOURCE_MODE=1  Validate folded native-source contract (default).
+  WINLATOR_NATIVE_SOURCE_MODE=0  Force legacy clone+apply patch validation.
 EOF
 }
 
 cleanup() {
-  [[ -n "${TMP_DIR}" && -d "${TMP_DIR}" ]] && rm -rf "${TMP_DIR}"
+  if [[ -n "${TMP_DIR}" && -d "${TMP_DIR}" ]]; then
+    rm -rf "${TMP_DIR}"
+  fi
 }
 trap cleanup EXIT
 
@@ -43,6 +48,7 @@ trap cleanup EXIT
 [[ -z "${WINLATOR_PATCH_FROM}" || "${WINLATOR_PATCH_FROM}" =~ ^[0-9]{4}$ ]] || fail "WINLATOR_PATCH_FROM must be empty or NNNN"
 [[ -z "${WINLATOR_PATCH_TO}" || "${WINLATOR_PATCH_TO}" =~ ^[0-9]{4}$ ]] || fail "WINLATOR_PATCH_TO must be empty or NNNN"
 [[ "${WINLATOR_PATCH_SANITIZE}" =~ ^[01]$ ]] || fail "WINLATOR_PATCH_SANITIZE must be 0 or 1"
+[[ "${WINLATOR_NATIVE_SOURCE_MODE}" =~ ^[01]$ ]] || fail "WINLATOR_NATIVE_SOURCE_MODE must be 0 or 1"
 
 SRC_DIR="$(cd -- "${SRC_DIR}" && pwd)"
 PATCH_DIR="$(cd -- "${PATCH_DIR}" && pwd)"
@@ -67,6 +73,14 @@ bash "${ROOT_DIR}/ci/winlator/validate-patch-sequence.sh" "${PATCH_DIR}"
 if [[ "${WINLATOR_PATCH_SANITIZE}" == "1" ]]; then
   log "Sanitizing patch stack before apply-check"
   bash "${ROOT_DIR}/ci/winlator/sanitize-patch-stack.sh" "${PATCH_DIR}"
+fi
+
+PATCH_COUNT="$(find "${PATCH_DIR}" -maxdepth 1 -name '*.patch' | wc -l | tr -d ' ')"
+if [[ "${WINLATOR_NATIVE_SOURCE_MODE}" == "1" ]]; then
+  log "Native-source mode: validating folded feature contract instead of legacy patch apply"
+  bash "${ROOT_DIR}/ci/winlator/check-native-folded-contract.sh" "${SRC_DIR}"
+  log "Folded feature contract passed (${PATCH_COUNT} legacy patches represented in source)"
+  exit 0
 fi
 
 TMP_DIR="$(mktemp -d /tmp/winlator_patch_stack_check_XXXXXX)"

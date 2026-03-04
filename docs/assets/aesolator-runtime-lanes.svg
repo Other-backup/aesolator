@@ -28,8 +28,8 @@
 
   <rect width="1600" height="560" rx="30" fill="url(#canvas)"/>
 
-  <text x="800" y="62" text-anchor="middle" fill="#f8fafc" font-size="38" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Ae.solator Build Lanes</text>
-  <text x="800" y="95" text-anchor="middle" fill="#cbd5e1" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">single visual map for releases, runtime payloads and forensic gates</text>
+  <text x="800" y="62" text-anchor="middle" fill="#f8fafc" font-size="38" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Ae.solator Runtime Lanes</text>
+  <text x="800" y="95" text-anchor="middle" fill="#cbd5e1" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">active release map for APK, FreeWine runtime and graphics components</text>
 
   <rect x="80" y="150" width="340" height="160" rx="22" fill="url(#apk)" filter="url(#soft)"/>
   <text x="250" y="208" text-anchor="middle" fill="#fff" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Winlator APK</text>
@@ -37,19 +37,19 @@
   <text x="250" y="270" text-anchor="middle" fill="#fff7ed" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">tags: winlator-latest / v0.9c</text>
 
   <rect x="470" y="150" width="330" height="160" rx="22" fill="url(#wine)" filter="url(#soft)"/>
-  <text x="635" y="208" text-anchor="middle" fill="#082032" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Wine 11</text>
-  <text x="635" y="240" text-anchor="middle" fill="#17324d" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">wine-11-arm64ec.wcp</text>
-  <text x="635" y="270" text-anchor="middle" fill="#17324d" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">latest + wcp-stable</text>
+  <text x="635" y="208" text-anchor="middle" fill="#082032" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">FreeWine Core</text>
+  <text x="635" y="240" text-anchor="middle" fill="#17324d" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">freewine11-arm64ec-latest</text>
+  <text x="635" y="270" text-anchor="middle" fill="#17324d" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">WCP Archive release</text>
 
   <rect x="850" y="150" width="330" height="160" rx="22" fill="url(#ge)" filter="url(#soft)"/>
-  <text x="1015" y="208" text-anchor="middle" fill="#042a21" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Proton GE10</text>
-  <text x="1015" y="240" text-anchor="middle" fill="#0b3f32" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">proton-ge10-arm64ec.wcp</text>
-  <text x="1015" y="270" text-anchor="middle" fill="#0b3f32" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">latest + wcp-stable</text>
+  <text x="1015" y="208" text-anchor="middle" fill="#042a21" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">DXVK + VKD3D</text>
+  <text x="1015" y="240" text-anchor="middle" fill="#0b3f32" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">aedxvkgplasync / aevkd3dproton</text>
+  <text x="1015" y="270" text-anchor="middle" fill="#0b3f32" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">arm64 + arm64ec lanes</text>
 
   <rect x="1230" y="150" width="300" height="160" rx="22" fill="url(#gn)" filter="url(#soft)"/>
-  <text x="1380" y="208" text-anchor="middle" fill="#08283a" font-size="27" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">ProtonWine10</text>
-  <text x="1380" y="240" text-anchor="middle" fill="#113651" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">GameNative ARM64EC</text>
-  <text x="1380" y="270" text-anchor="middle" fill="#113651" font-size="16" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">latest + wcp-stable</text>
+  <text x="1380" y="208" text-anchor="middle" fill="#08283a" font-size="27" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Vulkan SDK + dgVoodoo</text>
+  <text x="1380" y="240" text-anchor="middle" fill="#113651" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">vulkansdk + dgvoodoo-x86_64/arm64ec</text>
+  <text x="1380" y="270" text-anchor="middle" fill="#113651" font-size="16" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">WCP Archive release</text>
 
   <path d="M420 230 H470" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
   <path d="M800 230 H850" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
@@ -60,5 +60,5 @@
 
   <rect x="110" y="370" width="1380" height="120" rx="18" fill="#071726" stroke="#3b82f6" stroke-opacity="0.35"/>
   <text x="800" y="418" text-anchor="middle" fill="#e2e8f0" font-size="24" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Pipeline accents</text>
-  <text x="800" y="448" text-anchor="middle" fill="#cbd5e1" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">Reflective audits  |  Patch-base contract  |  Contents QA  |  WCP parity  |  Final-stage strict gates</text>
+  <text x="800" y="448" text-anchor="middle" fill="#cbd5e1" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">Reflective audits  |  Contents multi-source  |  WCP parity  |  Forensic sync  |  Final-stage strict gates</text>
 </svg>
