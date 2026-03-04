@@ -34,7 +34,6 @@ index d61aada..d0dd291 100644
 -        android:label="Winlator CMOD"
 -        android:icon="@mipmap/ic_launcher"
 +    <application
-+        android:name="com.winlator.cmod.AeSolatorApplication"
 +        android:label="@string/app_name"
 +        android:icon="@mipmap/ic_launcher"
          android:roundIcon="@mipmap/ic_launcher_round"
