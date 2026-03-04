@@ -66,7 +66,8 @@ ensure_adrenotools_tree() {
   log "adrenotools source missing, fetching ${AEO_ADRENOTOOLS_REPO}@${AEO_ADRENOTOOLS_REF}"
   rm -rf "${adrenotools_dir}"
   mkdir -p "$(dirname "${adrenotools_dir}")"
-  git clone --depth 1 --branch "${AEO_ADRENOTOOLS_REF}" "${AEO_ADRENOTOOLS_REPO}" "${adrenotools_dir}" \
+  git clone --depth 1 --branch "${AEO_ADRENOTOOLS_REF}" --recurse-submodules --shallow-submodules \
+    "${AEO_ADRENOTOOLS_REPO}" "${adrenotools_dir}" \
     || fail "Unable to fetch adrenotools source from ${AEO_ADRENOTOOLS_REPO}@${AEO_ADRENOTOOLS_REF}"
   [[ -f "${adrenotools_dir}/CMakeLists.txt" ]] || fail "Fetched adrenotools tree is invalid (missing CMakeLists.txt)"
 }
