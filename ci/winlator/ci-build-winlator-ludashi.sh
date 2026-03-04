@@ -9,6 +9,8 @@ DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLEC
 
 : "${WINLATOR_GRADLE_TASK:=assembleDebug}"
 : "${WINLATOR_APK_BASENAME:=by.aero.so.benchmark-debug}"
+: "${AEO_ADRENOTOOLS_REPO:=https://github.com/Pipetto-crypto/libadrenotools.git}"
+: "${AEO_ADRENOTOOLS_REF:=main}"
 
 log() { printf '[winlator-ci] %s\n' "$*"; }
 fail() { printf '[winlator-ci][error] %s\n' "$*" >&2; exit 1; }
@@ -50,6 +52,23 @@ require_native_tree() {
   [[ -f "${SRC_DIR}/settings.gradle" ]] || fail "Native source tree missing settings.gradle in ${SRC_DIR}"
   [[ -f "${SRC_DIR}/app/build.gradle" ]] || fail "Native source tree missing app/build.gradle in ${SRC_DIR}"
   [[ -f "${SRC_DIR}/gradlew" ]] || fail "Native source tree missing gradlew in ${SRC_DIR}"
+}
+
+ensure_adrenotools_tree() {
+  local adrenotools_dir
+  adrenotools_dir="${SRC_DIR}/app/src/main/cpp/adrenotools"
+
+  if [[ -f "${adrenotools_dir}/CMakeLists.txt" ]]; then
+    log "adrenotools source present: ${adrenotools_dir}"
+    return 0
+  fi
+
+  log "adrenotools source missing, fetching ${AEO_ADRENOTOOLS_REPO}@${AEO_ADRENOTOOLS_REF}"
+  rm -rf "${adrenotools_dir}"
+  mkdir -p "$(dirname "${adrenotools_dir}")"
+  git clone --depth 1 --branch "${AEO_ADRENOTOOLS_REF}" "${AEO_ADRENOTOOLS_REPO}" "${adrenotools_dir}" >/dev/null 2>&1 \
+    || fail "Unable to fetch adrenotools source from ${AEO_ADRENOTOOLS_REPO}@${AEO_ADRENOTOOLS_REF}"
+  [[ -f "${adrenotools_dir}/CMakeLists.txt" ]] || fail "Fetched adrenotools tree is invalid (missing CMakeLists.txt)"
 }
 
 capture_source_metadata() {
@@ -108,6 +127,7 @@ main() {
 
   require_native_tree
   prepare_layout
+  ensure_adrenotools_tree
   capture_source_metadata
   configure_app_version_env
   build_apk

@@ -623,6 +623,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="diagnostics_section_adb">Live ADB Diagnostics</string>
     <string name="diagnostics_adb_label">ADB command for live logs</string>
     <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|dgvoodoo|turnip|opengl|aero_|aesolator"</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="diagnostics_saved">Forensic profile saved</string>
     <string name="install_drivers">Install Drivers</string>
     <string name="install_drivers_local">Install Local Driver</string>
