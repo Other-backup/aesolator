@@ -179,7 +179,7 @@
         <i><b>WineD3D</b></i> is a translation layer for DirectX 1-11 to OpenGL.<br /><br />
         <i><b>DXVK</b></i> is a translation layer for Direct3D 9-11 to Vulkan.<br /><br />
         <i><b>VKD3D</b></i> is a translation layer for Direct3D 12 API to Vulkan.<br /><br />
-        <i><b>CNC DDraw</b></i> is an implementation of DirectDraw for better compatibility with classic games.
+        Legacy DirectDraw/D3D1-7/Glide is routed through dgVoodoo runtime lanes.
     ]]></string>
     <string name="box64_env_var_help__dynarec_safeflags"><![CDATA[
         Handling of flags on CALL/RET opcodes<br /><br />
@@ -613,9 +613,9 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="fexcore_preset">FEXCore Preset</string>
     <string name="adrenotools_gpu_drivers">Graphics Center</string>
     <string name="diagnostics">Forensic Center</string>
-    <string name="diagnostics_hint">Single forensic control plane: runtime Wine/Box64 logs, DRI3 toggle, and quick ADB command for live diagnostics.</string>
+    <string name="diagnostics_hint">Single forensic control plane for active lanes: FreeWine/Box64 logs, DXVK/VKD3D/dgVoodoo routing, Turnip/OpenGL paths, DRI3 toggle, and live ADB diagnostics.</string>
     <string name="diagnostics_adb_label">ADB command for live logs</string>
-    <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|turnip|aesolator"</string>
+    <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|dgvoodoo|turnip|opengl|aero_|aesolator"</string>
     <string name="diagnostics_saved">Forensic profile saved</string>
     <string name="install_drivers">Install Drivers</string>
     <string name="install_drivers_local">Install Local Driver</string>
@@ -627,7 +627,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="dll_emulator">32bit Emulator</string>
     <string name="open_with_android_browser">Open Android Browser in Wine</string>
     <string name="share_android_clipboard">Share Android Clipboard with Wine</string>
-    <string name="ddraw_wrapper">Legacy DDraw Wrapper</string>
     <string name="fexcore_version">FEXCore Version</string>
     <string name="graphics_driver_max_device_memory">Max Device Memory</string>
     <string name="graphics_driver_sync_frame">Sync Every Frame</string>

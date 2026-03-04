@@ -1003,8 +1003,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         if (dxwrapper.contains("dxvk")) {
             String dxvkWrapper = "dxvk-" + dxwrapperConfig.get("version");
             String vkd3dWrapper = "vkd3d-" + dxwrapperConfig.get("vkd3dVersion");
-            String ddrawrapper = dxwrapperConfig.get("ddrawrapper");
-            dxwrapper = dxvkWrapper + ";" + vkd3dWrapper + ";" + ddrawrapper;
+            dxwrapper = dxvkWrapper + ";" + vkd3dWrapper;
         }
 
         if (!dxwrapper.equals(container.getExtra("dxwrapper"))) {
@@ -1657,9 +1656,9 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         if (dxwrapper.contains("dxvk")) {
             Log.d(TAG, "Extracting DXVK wrapper files, version: " + dxwrapper);
 
-            String dxvkWrapper = dxwrapper.split(";")[0];
-            String vkd3dWrapper = dxwrapper.split(";")[1];
-            String ddrawrapper = dxwrapper.split(";")[2];
+            String[] wrapperParts = dxwrapper.split(";");
+            String dxvkWrapper = wrapperParts.length > 0 ? wrapperParts[0] : "";
+            String vkd3dWrapper = wrapperParts.length > 1 ? wrapperParts[1] : "vkd3d-None";
             ContentProfile dxvkProfile = contentsManager.getProfileByEntryName(dxvkWrapper);
             if (dxvkProfile != null) {
                 Log.d(TAG, "Applying user-defined DXVK content profile: " + dxvkWrapper);
@@ -1689,20 +1688,9 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 }
             }
 
-            Log.d(TAG, "Extracting nglide wrapper");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir, onExtractFileListener);
-
-            if (ddrawrapper.contains("None")) {
-                Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
-                restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
-            }
-            else {
-                if (ddrawrapper.equals("cnc-ddraw"))
-                    envVars.put("CNC_DDRAW_CONFIG_FILE", "C:\\windows\\syswow64\\ddraw.ini");
-
-                Log.d(TAG, "Extracting ddrawrapper " + ddrawrapper);
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/" + ddrawrapper + ".tzst", windowsDir, onExtractFileListener);
-            }
+            // Legacy DDraw wrapper payloads are deprecated in DXVK lane.
+            // DDraw/D3D1-7/Glide routing is handled by dedicated dgVoodoo lanes when selected.
+            restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
 
             Log.d(TAG, "Finished extraction of DXVK wrapper files, version: " + dxwrapper);
         } else if (dxwrapper.contains("wined3d")) {

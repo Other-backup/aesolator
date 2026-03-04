@@ -21,7 +21,7 @@ This runbook defines the device-side automation loop for the Winlator matrix:
 - `ci/winlator/forensic-adb-core-upscale-loop.sh`
   - non-breaking single-runtime loop for Warcraft III / upscale black-screen work (`freewine11`, baseline `freewine11`).
 - `ci/winlator/adb-network-source-diagnostics.sh`
-  - probes source endpoints (GitHub/raw/gamenative/artifact URLs) from device context and captures proxy/private-DNS/connectivity diagnostics for VPN triage.
+  - probes active source endpoints (GitHub releases/raw for `aesolator`, `wcp-runtime-lanes`, `wcp-graphics-lanes`) from device context and captures proxy/private-DNS/connectivity diagnostics for VPN triage.
 
 ## Quick Start
 

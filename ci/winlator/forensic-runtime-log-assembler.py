@@ -211,7 +211,8 @@ def infer_conflict_library(conflict: str) -> str:
     for token, library in (
         ("dxvk", "dxvk"),
         ("vkd3d", "vkd3d"),
-        ("ddraw", "ddraw"),
+        ("dgvoodoo", "dgvoodoo"),
+        ("ddraw", "dgvoodoo"),
         ("turnip", "turnip"),
         ("layout", "layout"),
         ("translator", "translator"),

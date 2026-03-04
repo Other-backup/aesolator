@@ -46,9 +46,9 @@ EOF
   : > "${dir}/forensics-jsonl-tail.txt"
 }
 
-mk_scenario "gamenative104" "3" "1" "1" "bionic-native" "1"
-mk_scenario "wine11" "1" "1" "0" "bionic-native" "0"
-mk_scenario "protonwine10" "2" "1" "1" "glibc_wrapped" "1"
+mk_scenario "freewine11" "3" "1" "1" "bionic-native" "1"
+mk_scenario "freewine-hang" "1" "1" "0" "bionic-native" "0"
+mk_scenario "alt-runtime" "2" "1" "1" "glibc_wrapped" "1"
 mk_scenario "guarded" "4" "1" "0" "bionic-native" "0" "runtime_class_guard_failed"
 
 out_prefix="${tmp_dir}/out/runtime-mismatch-matrix"
@@ -56,7 +56,7 @@ mkdir -p "$(dirname -- "${out_prefix}")"
 
 if python3 "${ROOT_DIR}/ci/winlator/forensic-runtime-mismatch-matrix.py" \
   --input "${tmp_dir}" \
-  --baseline-label gamenative104 \
+  --baseline-label freewine11 \
   --output-prefix "${out_prefix}" \
   --fail-on-mismatch; then
   fail "expected --fail-on-mismatch to return non-zero"
@@ -67,7 +67,7 @@ fi
 
 if python3 "${ROOT_DIR}/ci/winlator/forensic-runtime-mismatch-matrix.py" \
   --input "${tmp_dir}" \
-  --baseline-label gamenative104 \
+  --baseline-label freewine11 \
   --output-prefix "${out_prefix}" \
   --fail-on-severity-at-or-above medium; then
   fail "expected --fail-on-severity-at-or-above medium to return non-zero"
@@ -78,7 +78,7 @@ fi
 
 python3 "${ROOT_DIR}/ci/winlator/forensic-runtime-mismatch-matrix.py" \
   --input "${tmp_dir}" \
-  --baseline-label gamenative104 \
+  --baseline-label freewine11 \
   --output-prefix "${out_prefix}" >/dev/null
 
 python3 - "${out_prefix}.json" "${out_prefix}.summary.txt" <<'PY'
@@ -92,15 +92,15 @@ summary_path = Path(sys.argv[2])
 payload = json.loads(json_path.read_text(encoding="utf-8"))
 rows = {row["label"]: row for row in payload["rows"]}
 
-assert rows["gamenative104"]["status"] == "baseline"
-assert rows["wine11"]["status"] == "hang_after_submit"
-assert rows["wine11"]["severity"] == "high"
-assert rows["wine11"]["severity_rank"] == "3"
-assert "GuestProgramLauncherComponent.java" in rows["wine11"]["patch_hint"]
-assert rows["protonwine10"]["status"] == "runtime_class_mismatch"
-assert rows["protonwine10"]["severity"] == "high"
-assert rows["protonwine10"]["severity_rank"] == "3"
-assert "wcp_common.sh" in rows["protonwine10"]["patch_hint"]
+assert rows["freewine11"]["status"] == "baseline"
+assert rows["freewine-hang"]["status"] == "hang_after_submit"
+assert rows["freewine-hang"]["severity"] == "high"
+assert rows["freewine-hang"]["severity_rank"] == "3"
+assert "GuestProgramLauncherComponent.java" in rows["freewine-hang"]["patch_hint"]
+assert rows["alt-runtime"]["status"] == "runtime_class_mismatch"
+assert rows["alt-runtime"]["severity"] == "high"
+assert rows["alt-runtime"]["severity_rank"] == "3"
+assert "wcp_common.sh" in rows["alt-runtime"]["patch_hint"]
 assert rows["guarded"]["status"] == "runtime_guard_blocked"
 assert rows["guarded"]["severity"] == "high"
 assert rows["guarded"]["severity_rank"] == "3"

@@ -93,21 +93,6 @@
         </LinearLayout>
 
         <TextView
-            android:id="@+id/TVLegacyDdrawWrapper"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ddraw_wrapper"
-            android:visibility="gone" />
-
-        <Spinner
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:id="@+id/SDDRAWrapper"
-            android:entries="@array/ddrawrapper_entries"
-            android:spinnerMode="dialog"
-            android:visibility="gone" />
-
-        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/frame_rate" />

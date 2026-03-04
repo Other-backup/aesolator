@@ -42,11 +42,11 @@ WRAPPER_COMPONENT_CLASS = {
         "wrapper-artifact-integrity",
         "ci/lib/wcp_common.sh + ci/ci-build.sh (VKD3D payload path)",
     ),
-    "ddraw": (
-        "wrapper_ddraw_missing",
+    "dgvoodoo": (
+        "wrapper_dgvoodoo_missing",
         "high",
         "wrapper-artifact-integrity",
-        "ci/lib/wcp_common.sh + winlator runtime wrapper payload layout",
+        "ci/lib/wcp_common.sh + winlator runtime dgvoodoo payload layout",
     ),
 }
 
@@ -61,10 +61,15 @@ CONFLICT_SIGNATURE_HINTS = {
         "vkd3d-artifact-source",
         "ci/lib/wcp_common.sh + ci/ci-build.sh (VKD3D source selection and payload staging)",
     ),
+    "dgvoodoo_artifact_source_unset": (
+        "high",
+        "dgvoodoo-artifact-source",
+        "ci/lib/wcp_common.sh + runtime dgvoodoo payload source selection",
+    ),
     "ddraw_artifact_source_unset": (
         "high",
-        "ddraw-artifact-source",
-        "ci/lib/wcp_common.sh + runtime wrapper payload source selection",
+        "dgvoodoo-artifact-source",
+        "ci/lib/wcp_common.sh + runtime dgvoodoo payload source selection",
     ),
     "layout_libs_missing_for_dxvk": (
         "high",
@@ -146,7 +151,7 @@ def parse_pipe_tokens(payload: str) -> list[str]:
 
 
 def classify_wrapper_missing(missing_components: list[str]) -> tuple[str, str, str, str] | None:
-    wrappers = [key for key in ("dxvk", "vkd3d", "ddraw") if key in missing_components]
+    wrappers = [key for key in ("dxvk", "vkd3d", "dgvoodoo") if key in missing_components]
     if not wrappers:
         return None
     if len(wrappers) == 1:
@@ -184,8 +189,11 @@ def discover_scenarios(root: Path) -> list[Path]:
 
 def choose_baseline(rows: list[dict[str, str]], baseline_label: str) -> dict[str, str]:
     alias_map = {
-        "steven104": "gamenative104",
-        "gamenative104": "steven104",
+        "steven104": "freewine11",
+        "gamenative104": "freewine11",
+        "protonwine10": "freewine11",
+        "wine11": "freewine11",
+        "freewine11": "gamenative104",
     }
     if baseline_label:
         for row in rows:
@@ -332,7 +340,8 @@ def parse_scenario(scenario_dir: Path) -> dict[str, str]:
         "logging_has_turnip": "1" if coverage_map.get("turnip", "0") == "1" else "0",
         "logging_has_dxvk": "1" if coverage_map.get("dxvk", "0") == "1" else "0",
         "logging_has_vkd3d": "1" if coverage_map.get("vkd3d", "0") == "1" else "0",
-        "logging_has_ddraw": "1" if coverage_map.get("ddraw", "0") == "1" else "0",
+        "logging_has_dgvoodoo": "1" if (coverage_map.get("dgvoodoo", "0") == "1" or coverage_map.get("ddraw", "0") == "1") else "0",
+        "logging_has_ddraw": "1" if (coverage_map.get("dgvoodoo", "0") == "1" or coverage_map.get("ddraw", "0") == "1") else "0",
         "logging_has_layout": "1" if coverage_map.get("layout", "0") == "1" else "0",
         "logging_has_translator": "1" if coverage_map.get("translator", "0") == "1" else "0",
         "logging_has_loader": "1" if coverage_map.get("loader", "0") == "1" else "0",
@@ -411,7 +420,7 @@ def classify_row(row: dict[str, str], baseline: dict[str, str]) -> tuple[str, st
         severity = "medium"
         if any(
             core in missing.split(",")
-            for core in ("x11", "turnip", "dxvk", "vkd3d", "layout", "translator", "loader")
+            for core in ("x11", "turnip", "dxvk", "vkd3d", "dgvoodoo", "layout", "translator", "loader")
         ):
             severity = "high"
         return (
@@ -490,7 +499,7 @@ def write_markdown(path: Path, rows: list[dict[str, str]], baseline: dict[str, s
     lines.append("")
     lines.append("- `component_conflict_count` = `RUNTIME_LIBRARY_COMPONENT_CONFLICT + RUNTIME_LIBRARY_CONFLICT_DETECTED`.")
     lines.append("- `logging_missing_components` is derived from `runtime_logging_required` vs `runtime_logging_coverage`.")
-    lines.append("- Missing wrapper components (`dxvk`, `vkd3d`, `ddraw`) are emitted as explicit `wrapper_*_missing` statuses.")
+    lines.append("- Missing wrapper components (`dxvk`, `vkd3d`, `dgvoodoo`) are emitted as explicit `wrapper_*_missing` statuses.")
     lines.append("- Known conflict signatures from `AERO_LIBRARY_CONFLICTS` are mapped to targeted reconciliation `patch_hint` values.")
     lines.append("- This matrix is sourced from scenario logcat + forensics JSONL tails from adb capture.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -548,7 +557,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Directory produced by forensic-adb-complete-matrix.sh")
     parser.add_argument(
         "--baseline-label",
-        default="gamenative104",
+        default="freewine11",
         help="Scenario label used as baseline. Falls back to first scenario if missing.",
     )
     parser.add_argument(

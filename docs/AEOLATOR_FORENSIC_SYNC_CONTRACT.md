@@ -2,7 +2,11 @@
 
 ## Scope
 
-Unified CI forensic capture for `ci/wine11-arm64ec/run-*.sh` and `ci/proton11-ge-arm64ec/run-*.sh`.
+Unified CI forensic capture for active Ae.solator lanes:
+
+- `aesolator` app runtime diagnostics,
+- `wcp-runtime-lanes` package lanes (`freewine11`, `dxvk`, `vkd3d`, `dgvoodoo`, `vulkansdk`),
+- `wcp-graphics-lanes` provider lanes (`turnip`, `opengl`).
 
 ## Enable/Disable
 
@@ -58,7 +62,7 @@ Every event includes:
 ```bash
 AEO_FORENSIC_ENABLE=1 \
 AEO_FORENSIC_ROOT=/tmp/aesolator-forensics-smoke \
-bash ci/wine11-arm64ec/run-core-transfer-gates.sh
+bash ci/winlator/forensic-adb-runtime-contract.sh
 ```
 
 Then inspect:

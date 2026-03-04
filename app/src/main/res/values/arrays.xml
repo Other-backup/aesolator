@@ -39,9 +39,6 @@
         <item>WineD3D</item>
         <item>DXVK+VKD3D</item>
     </string-array>
-    <string-array name="ddrawrapper_entries">
-        <item>None</item>
-    </string-array>
     <string-array name="dxvk_version_entries">
         <item>1.11.1-sarek</item>
         <item>1.10.3-arm64ec-async</item>

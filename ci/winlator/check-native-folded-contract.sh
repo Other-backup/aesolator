@@ -33,8 +33,9 @@ has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/ContentsFragment.jav
 
 log "Checking folded wrapper/runtime markers"
 has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java" "DXVK + VKD3D"
-has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java" "String ddrawrapper = dxwrapper.split(\";\")[2];"
-has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java" "CNC_DDRAW_CONFIG_FILE"
+has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java" "config.put(\"ddrawrapper\", \"none\")"
+has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java" "dxwrapper = dxvkWrapper + \";\" + vkd3dWrapper;"
+has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java" "Legacy DDraw wrapper payloads are deprecated in DXVK lane."
 has_pattern "${SRC_DIR}/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java" "REMOTE_PROFILES_AE"
 
 log "Folded native-source contract is satisfied"

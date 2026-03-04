@@ -39,7 +39,7 @@ def classify_row(row: dict[str, str], baseline: dict[str, str]) -> tuple[str, st
             "ntdll_export_mismatch",
             "high",
             "ntdll-spec-export-contract",
-            "ci/gamenative/patchsets/28c3a06/android/patches/dlls_ntdll_ntdll_spec_ntuserpfn.patch + ci/gamenative/apply-android-patchset.sh",
+            "freewine11 source tree ntdll export contract + runtime package consistency checks",
         )
 
     if row.get("fatal_unimplemented_shgetfolderpathw") == "1":
@@ -47,7 +47,7 @@ def classify_row(row: dict[str, str], baseline: dict[str, str]) -> tuple[str, st
             "shell32_contract_mismatch",
             "high",
             "shell32-export-or-impl-contract",
-            "ci/validation/check-gamenative-patch-contract.sh + runtime package consistency checks",
+            "freewine11 source tree shell32 contract + runtime package consistency checks",
         )
 
     mismatch_reason = row.get("runtime_mismatch_reason", "-").strip().lower()
@@ -216,8 +216,11 @@ def discover_scenarios(root: Path) -> list[Path]:
 
 def choose_baseline(rows: list[dict[str, str]], baseline_label: str) -> dict[str, str]:
     alias_map = {
-        "steven104": "gamenative104",
-        "gamenative104": "steven104",
+        "steven104": "freewine11",
+        "gamenative104": "freewine11",
+        "wine11": "freewine11",
+        "protonwine10": "freewine11",
+        "freewine11": "gamenative104",
     }
     if baseline_label:
         for row in rows:
@@ -316,7 +319,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Directory produced by forensic-adb-complete-matrix.sh")
     parser.add_argument(
         "--baseline-label",
-        default="gamenative104",
+        default="freewine11",
         help="Scenario label used as baseline. Falls back to the first scenario if missing.",
     )
     parser.add_argument(

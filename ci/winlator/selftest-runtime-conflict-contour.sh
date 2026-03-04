@@ -29,7 +29,7 @@ EOF
 AERO_RUNTIME_SUBSYSTEMS_SHA256=11111111111111111111111111111111
 AERO_LIBRARY_COMPONENT_STREAM_SHA256=22222222222222222222222222222222
 AERO_RUNTIME_LOGGING_MODE=strict
-AERO_RUNTIME_LOGGING_REQUIRED=x11,turnip,dxvk,vkd3d,ddraw,layout,translator,loader
+AERO_RUNTIME_LOGGING_REQUIRED=x11,turnip,dxvk,vkd3d,dgvoodoo,layout,translator,loader
 AERO_RUNTIME_LOGGING_COVERAGE=${coverage}
 AERO_RUNTIME_LOGGING_COVERAGE_SHA256=33333333333333333333333333333333
 AERO_RUNTIME_DISTRIBUTION=ae.solator
@@ -46,19 +46,19 @@ EOF
   : > "${dir}/logcat-runtime-conflict-contour.txt"
 }
 
-mk_scenario "gamenative104" "4" "x11=1;turnip=1;dxvk=1;vkd3d=1;ddraw=1;layout=1;translator=1;loader=1"
-mk_scenario "dxvk-gap" "1" "x11=1;turnip=1;dxvk=0;vkd3d=1;ddraw=1;layout=1;translator=1;loader=1"
-mk_scenario "vkd3d-gap" "2" "x11=1;turnip=1;dxvk=1;vkd3d=0;ddraw=1;layout=1;translator=1;loader=1"
-mk_scenario "ddraw-gap" "3" "x11=1;turnip=1;dxvk=1;vkd3d=1;ddraw=0;layout=1;translator=1;loader=1"
-mk_scenario "multi-gap" "5" "x11=1;turnip=1;dxvk=0;vkd3d=0;ddraw=1;layout=1;translator=1;loader=1"
-mk_scenario "signature-gap" "6" "x11=1;turnip=1;dxvk=1;vkd3d=1;ddraw=1;layout=1;translator=1;loader=1" "dxvk_artifact_source_unset" "1"
+mk_scenario "freewine11" "4" "x11=1;turnip=1;dxvk=1;vkd3d=1;dgvoodoo=1;layout=1;translator=1;loader=1"
+mk_scenario "dxvk-gap" "1" "x11=1;turnip=1;dxvk=0;vkd3d=1;dgvoodoo=1;layout=1;translator=1;loader=1"
+mk_scenario "vkd3d-gap" "2" "x11=1;turnip=1;dxvk=1;vkd3d=0;dgvoodoo=1;layout=1;translator=1;loader=1"
+mk_scenario "dgvoodoo-gap" "3" "x11=1;turnip=1;dxvk=1;vkd3d=1;dgvoodoo=0;layout=1;translator=1;loader=1"
+mk_scenario "multi-gap" "5" "x11=1;turnip=1;dxvk=0;vkd3d=0;dgvoodoo=1;layout=1;translator=1;loader=1"
+mk_scenario "signature-gap" "6" "x11=1;turnip=1;dxvk=1;vkd3d=1;dgvoodoo=1;layout=1;translator=1;loader=1" "dxvk_artifact_source_unset" "1"
 
 out_prefix="${tmp_dir}/out/runtime-conflict-contour"
 mkdir -p "$(dirname -- "${out_prefix}")"
 
 if python3 "${ROOT_DIR}/ci/winlator/forensic-runtime-conflict-contour.py" \
   --input "${tmp_dir}" \
-  --baseline-label gamenative104 \
+  --baseline-label freewine11 \
   --output-prefix "${out_prefix}" \
   --fail-on-severity-at-or-above high; then
   fail "expected --fail-on-severity-at-or-above high to return non-zero"
@@ -69,7 +69,7 @@ fi
 
 python3 "${ROOT_DIR}/ci/winlator/forensic-runtime-conflict-contour.py" \
   --input "${tmp_dir}" \
-  --baseline-label gamenative104 \
+  --baseline-label freewine11 \
   --output-prefix "${out_prefix}" >/dev/null
 
 python3 - "${out_prefix}.json" "${out_prefix}.summary.txt" <<'PY'
@@ -83,8 +83,8 @@ summary_path = Path(sys.argv[2])
 payload = json.loads(json_path.read_text(encoding="utf-8"))
 rows = {row["label"]: row for row in payload["rows"]}
 
-assert rows["gamenative104"]["status"] == "baseline"
-assert rows["gamenative104"]["severity"] == "info"
+assert rows["freewine11"]["status"] == "baseline"
+assert rows["freewine11"]["severity"] == "info"
 
 assert rows["dxvk-gap"]["status"] == "wrapper_dxvk_missing"
 assert rows["dxvk-gap"]["severity"] == "high"
@@ -94,9 +94,9 @@ assert rows["vkd3d-gap"]["status"] == "wrapper_vkd3d_missing"
 assert rows["vkd3d-gap"]["severity"] == "high"
 assert rows["vkd3d-gap"]["severity_rank"] == "3"
 
-assert rows["ddraw-gap"]["status"] == "wrapper_ddraw_missing"
-assert rows["ddraw-gap"]["severity"] == "high"
-assert rows["ddraw-gap"]["severity_rank"] == "3"
+assert rows["dgvoodoo-gap"]["status"] == "wrapper_dgvoodoo_missing"
+assert rows["dgvoodoo-gap"]["severity"] == "high"
+assert rows["dgvoodoo-gap"]["severity_rank"] == "3"
 
 assert rows["multi-gap"]["status"] == "wrapper_multi_missing"
 assert rows["multi-gap"]["severity"] == "high"
@@ -111,7 +111,7 @@ assert rows["signature-gap"]["library_conflict_signatures"] == "dxvk_artifact_so
 assert rows["signature-gap"]["library_conflict_signature_count"] == "1"
 
 summary = summary_path.read_text(encoding="utf-8")
-assert "status_counts=baseline:1,component_conflict_dxvk_artifact_source_unset:1,wrapper_ddraw_missing:1,wrapper_dxvk_missing:1,wrapper_multi_missing:1,wrapper_vkd3d_missing:1" in summary
+assert "status_counts=baseline:1,component_conflict_dxvk_artifact_source_unset:1,wrapper_dgvoodoo_missing:1,wrapper_dxvk_missing:1,wrapper_multi_missing:1,wrapper_vkd3d_missing:1" in summary
 assert "severity_counts=high:5,info:1" in summary
 PY
 
