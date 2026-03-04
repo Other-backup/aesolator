@@ -12,76 +12,168 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:id="@+id/TVForensicHint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/diagnostics_hint" />
-
-            <View style="@style/HorizontalLine" />
-
-            <CheckBox
-                android:id="@+id/CBForensicWineDebug"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/enable_wine_debug" />
-
-            <CheckBox
-                android:id="@+id/CBForensicBox64Logs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/enable_box64_logs" />
-
-            <CheckBox
-                android:id="@+id/CBForensicDRI3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/use_dri3_extension" />
-
-            <View style="@style/HorizontalLine" />
-
-            <TextView
-                android:id="@+id/TVAdbCommandLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/diagnostics_adb_label" />
-
-            <TextView
-                android:id="@+id/TVAdbCommand"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="6dp"
-                android:paddingBottom="10dp"
-                android:text="@string/diagnostics_adb_command"
-                android:textIsSelectable="true"
-                android:textStyle="bold" />
+            android:padding="14dp">
 
             <LinearLayout
+                android:id="@+id/LLForensicPolicyCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/forensic_panel_background"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <Button
-                    android:id="@+id/BTCopyAdbCommand"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/TVPolicyTitle"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/copy" />
+                    android:text="@string/diagnostics_policy_title"
+                    android:textStyle="bold" />
 
-                <Space
-                    android:layout_width="10dp"
-                    android:layout_height="0dp" />
-
-                <Button
-                    android:id="@+id/BTSaveForensic"
-                    style="@style/ButtonPositive"
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/TVForensicHint"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/save" />
+                    android:layout_marginTop="6dp"
+                    android:text="@string/diagnostics_hint" />
+
+                <TextView
+                    android:id="@+id/TVPolicySubtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/diagnostics_policy_subtitle" />
+
+                <TextView
+                    android:id="@+id/TVPolicyBadgeFreeWine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/forensic_badge_background"
+                    android:text="@string/diagnostics_policy_badge_freewine"
+                    android:textColor="@color/forensic_badge_text"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/TVPolicyBadgeDxvk"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/forensic_badge_background"
+                    android:text="@string/diagnostics_policy_badge_dxvk_vkd3d"
+                    android:textColor="@color/forensic_badge_text"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/TVPolicyBadgeDgVoodoo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/forensic_badge_background"
+                    android:text="@string/diagnostics_policy_badge_dgvoodoo"
+                    android:textColor="@color/forensic_badge_text"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/LLForensicTogglesCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/forensic_panel_background"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/TVTogglesTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/diagnostics_section_toggles"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicWineDebug"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/enable_wine_debug" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicBox64Logs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_box64_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicDRI3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_dri3_extension" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/LLForensicAdbCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/forensic_panel_background"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/TVAdbSectionTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/diagnostics_section_adb"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/TVAdbCommandLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/diagnostics_adb_label" />
+
+                <TextView
+                    android:id="@+id/TVAdbCommand"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/forensic_command_background"
+                    android:paddingLeft="10dp"
+                    android:paddingTop="8dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/diagnostics_adb_command"
+                    android:textIsSelectable="true"
+                    android:textStyle="bold"
+                    android:typeface="monospace" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTCopyAdbCommand"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/copy" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/BTSaveForensic"
+                        style="@style/ButtonPositive"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/save" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

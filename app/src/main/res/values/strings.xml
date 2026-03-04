@@ -614,6 +614,13 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="adrenotools_gpu_drivers">Graphics Center</string>
     <string name="diagnostics">Forensic Center</string>
     <string name="diagnostics_hint">Single forensic control plane for active lanes: FreeWine/Box64 logs, DXVK/VKD3D/dgVoodoo routing, Turnip/OpenGL paths, DRI3 toggle, and live ADB diagnostics.</string>
+    <string name="diagnostics_policy_title">Active Runtime Policy</string>
+    <string name="diagnostics_policy_subtitle">Legacy APIs (DDraw/D3D1-7/Glide) are routed through dgVoodoo lanes. DXVK/VKD3D handles modern Direct3D paths.</string>
+    <string name="diagnostics_policy_badge_freewine">FreeWine11</string>
+    <string name="diagnostics_policy_badge_dxvk_vkd3d">DXVK + VKD3D</string>
+    <string name="diagnostics_policy_badge_dgvoodoo">dgVoodoo legacy route</string>
+    <string name="diagnostics_section_toggles">Runtime Telemetry Toggles</string>
+    <string name="diagnostics_section_adb">Live ADB Diagnostics</string>
     <string name="diagnostics_adb_label">ADB command for live logs</string>
     <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|dgvoodoo|turnip|opengl|aero_|aesolator"</string>
     <string name="diagnostics_saved">Forensic profile saved</string>
