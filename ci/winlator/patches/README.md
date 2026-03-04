@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently seven-patch mainline:
+The patch base is currently eight-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -47,6 +47,9 @@ The patch base is currently seven-patch mainline:
 - `0007-graphics-center-color-polish.patch`
   - improves Graphics Center visual polish by adding per-lane accent colors and a category badge in Contents rows
   - fixes icon rendering path (`setImageResource` + tint) to avoid inconsistent list item paint in light/dark themes
+- `0008-forensic-capture-command-compat.patch`
+  - restores `ForensicConfig.buildCaptureCommand(Context, Snapshot)` compatibility for MainActivity forensic dialog
+  - maps legacy call path to current issue-capture command builder to keep forensic UX and CI compile stable
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
 2026 after apply/build verification. Current `0002`, `0003`, and `0004` are bounded restore

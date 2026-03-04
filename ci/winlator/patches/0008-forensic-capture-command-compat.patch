@@ -1,0 +1,16 @@
+diff --git a/app/src/main/java/com/winlator/cmod/core/ForensicConfig.java b/app/src/main/java/com/winlator/cmod/core/ForensicConfig.java
+index 2763029..89d03e9 100644
+--- a/app/src/main/java/com/winlator/cmod/core/ForensicConfig.java
++++ b/app/src/main/java/com/winlator/cmod/core/ForensicConfig.java
+@@ -224,6 +224,11 @@ public final class ForensicConfig {
+                 + " --bundle-dir <out-dir>";
+     }
+ 
++    public static String buildCaptureCommand(Context context, Snapshot snapshot) {
++        boolean preferRoot = snapshot != null && snapshot.enableRootCapture && isRootBinaryPresent();
++        return buildIssueCaptureCommand(context, preferRoot);
++    }
++
+     public static String buildIssueBrowseCommand(Context context) {
+         return "adb shell run-as "
+                 + context.getPackageName()
