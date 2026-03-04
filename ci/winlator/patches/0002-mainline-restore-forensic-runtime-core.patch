@@ -650,8 +650,8 @@ index 0000000..3a03abb
 +            sb.append("\n````\n");
 +        }
 +        sb.append("\n## ADB follow-up\n\n````bash\n");
-+        sb.append(ForensicConfig.buildIssueCaptureCommand(context, config.enableRootCapture))
-+                .replace(" --bundle-dir <out-dir>", " --bundle-dir <host-out-dir>");
++        sb.append(ForensicConfig.buildIssueCaptureCommand(context, config.enableRootCapture)
++                .replace(" --bundle-dir <out-dir>", " --bundle-dir <host-out-dir>"));
 +        sb.append('\n');
 +        sb.append(ForensicConfig.buildIssueBrowseCommand(context));
 +        sb.append("\n````\n");
@@ -2747,4 +2747,3 @@ index 0000000..9f9807d
 +}
 -- 
 2.43.0
-

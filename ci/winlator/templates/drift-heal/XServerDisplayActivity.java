@@ -1724,7 +1724,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         DriverProbeResult driverProbe = adrenotoolsManager.probeDriver(adrenoToolsDriverId);
         boolean useSystemVulkan = driverProbe.isUsingSystemVulkan() || !driverProbe.isUsable();
 
-        Log.d("GraphicsDriverExtraction", "Driver probe -> " + driverProbe.summarize());
+        Log.d("GraphicsDriverExtraction", "Driver probe -> " + driverProbe.getSelectedDriverId() + "|" + driverProbe.getRejectReason());
         ForensicLogger.logEvent(this, useSystemVulkan ? "warn" : "info", "RUNTIME_DRIVER_PROBE",
                 forensicTraceId, "graphics_driver",
                 useSystemVulkan ? "driver probe fallback" : "driver probe usable",
@@ -1732,12 +1732,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                         "requested_driver_id", driverProbe.getRequestedDriverId(),
                         "selected_driver_id", driverProbe.getSelectedDriverId(),
                         "driver_probe_status", driverProbe.isUsable() ? "usable" : "fallback",
-                        "driver_probe_summary", driverProbe.summarize()));
+                        "driver_probe_summary", driverProbe.getSelectedDriverId() + "|" + driverProbe.getRejectReason()));
 
         if (driverProbe.isUsable()) {
             adrenotoolsManager.setDriverByProbe(envVars, imageFs, driverProbe);
-        } else if (!driverProbe.getRejectionReasons().isEmpty()) {
-            envVars.put("WINLATOR_DRIVER_FALLBACK_REASON", driverProbe.getRejectionReasons().toString());
+        } else if (!driverProbe.getRejectReason().isEmpty()) {
+            envVars.put("WINLATOR_DRIVER_FALLBACK_REASON", driverProbe.getRejectReason());
         }
 
         envVars.put("WINLATOR_DRIVER_SELECTED", driverProbe.getSelectedDriverId());

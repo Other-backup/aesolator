@@ -6303,7 +6303,7 @@ index 020d9e8..47a5958 100644
 +                show(new AdrenotoolsFragment(), false);
 +                break;
 +            case R.id.main_menu_diagnostics:
-+                show(new DiagnosticsFragment(), false);
++                show(new SettingsFragment(), false);
 +                break;
 +            case R.id.main_menu_settings:
 +                show(new SettingsFragment(), false);  // Forward animation
@@ -8091,7 +8091,7 @@ index a49917b..dab6bba 100644
 +                || driverProbe.isUsingSystemVulkan()
 +                || !driverProbe.isUsable();
 +
-+        Log.d("GraphicsDriverExtraction", "Driver probe -> " + driverProbe.summarize());
++        Log.d("GraphicsDriverExtraction", "Driver probe -> " + driverProbe.getSelectedDriverId() + "|" + driverProbe.getRejectReason());
 +        ForensicLogger.logEvent(this, useSystemVulkan ? "warn" : "info", "RUNTIME_DRIVER_PROBE",
 +                forensicTraceId, "graphics_driver",
 +                useSystemVulkan ? "driver probe fallback" : "driver probe usable",
@@ -8100,12 +8100,12 @@ index a49917b..dab6bba 100644
 +                        "requested_driver_id", driverProbe.getRequestedDriverId(),
 +                        "selected_driver_id", driverProbe.getSelectedDriverId(),
 +                        "driver_probe_status", driverProbe.isUsable() ? "usable" : "fallback",
-+                        "driver_probe_summary", driverProbe.summarize()));
++                        "driver_probe_summary", driverProbe.getSelectedDriverId() + "|" + driverProbe.getRejectReason()));
 +
 +        if (!useSystemVulkan && driverProbe.isUsable()) {
 +            adrenotoolsManager.setDriverByProbe(envVars, imageFs, driverProbe);
-+        } else if (!driverProbe.getRejectionReasons().isEmpty()) {
-+            envVars.put("WINLATOR_DRIVER_FALLBACK_REASON", driverProbe.getRejectionReasons().toString());
++        } else if (!driverProbe.getRejectReason().isEmpty()) {
++            envVars.put("WINLATOR_DRIVER_FALLBACK_REASON", driverProbe.getRejectReason());
 +        } else if (GraphicsDriverConfigDialog.VULKAN_PROVIDER_SYSTEM.equals(requestedVulkanProvider)) {
 +            envVars.put("WINLATOR_DRIVER_FALLBACK_REASON", "system_vulkan_selected");
 +        }
