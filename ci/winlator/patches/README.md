@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently consolidated into a single mainline patch:
+The patch base is currently two-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -18,11 +18,15 @@ The patch base is currently consolidated into a single mainline patch:
   - X11-first launch contracts, upscaler/DX policy matrix, Vulkan diagnostics, and forensic runtime tracing
   - Forensic Center control plane, issue-bundle export, and runtime signal contract helper
   - rebuilt Winlator Task Manager with realtime X11 correlation, Linux `/proc` telemetry, live FPS/GPU/renderer state, rate-based IO/network summaries, process-tree controls, socket filtering, and telemetry JSON/issue-bundle export
+- `0002-mainline-restore-forensic-runtime-core.patch`
+  - restores missing forensic/runtime support classes required by latest upstream
+    (`ForensicConfig`, `ForensicLogger`, `LinuxTelemetrySampler`,
+    `RuntimeProfile*`, `DgVoodooConfigDialog`, `VulkanVersionInfo`, and related helpers)
+  - keeps compile contract stable while `0001` stays unchanged
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
-2026 after apply/build verification. Future `0002+` slices are still allowed
-for bounded review windows, but they should be treated as temporary and folded
-back once stable.
+2026 after apply/build verification. Current `0002` is a bounded restore slice
+for upstream drift and can be folded back into `0001` after the next stable cycle.
 
 ## Patch-base rule
 
