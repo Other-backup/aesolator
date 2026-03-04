@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently three-patch mainline:
+The patch base is currently four-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -28,9 +28,13 @@ The patch base is currently three-patch mainline:
     (`ContainerDiscovery`, `ContainerNormalizer`, `RuntimeSignalContract`,
     `FileDebugLogger`, `DriverProbeResult`, `DgVoodooManager`)
   - closes current upstream drift where `0001` references these classes but upstream does not ship them yet
+- `0004-mainline-dgvoodoo-wcp-dev64-bridge.patch`
+  - extends `DgVoodooManager` import path to accept `ZIP` and `WCP` archives (`.wcp/.wcp.xz/.wcp.zst`)
+  - keeps dgVoodoo Contents lane manageable when artifact source is `dgvoodoo.wcp` from WCP Archive
+  - adds runtime directory probing for `Release/arm64`, `Release/arm64ec`, and `Release/x64` layouts (`dgVoodoo2_*_dev64.zip`)
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
-2026 after apply/build verification. Current `0002` and `0003` are bounded restore
+2026 after apply/build verification. Current `0002`, `0003`, and `0004` are bounded restore
 slices for upstream drift and can be folded back into `0001` after the next stable cycle.
 
 ## Patch-base rule
