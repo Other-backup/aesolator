@@ -1,0 +1,148 @@
+diff --git a/app/src/main/java/com/winlator/cmod/MainActivity.java b/app/src/main/java/com/winlator/cmod/MainActivity.java
+index 0993e20..b3dfdc5 100644
+--- a/app/src/main/java/com/winlator/cmod/MainActivity.java
++++ b/app/src/main/java/com/winlator/cmod/MainActivity.java
+@@ -1,7 +1,9 @@
+ package com.winlator.cmod;
+ 
+ import android.Manifest;
+-import android.app.AlertDialog;
++import android.app.AlertDialog;
++import android.content.ClipData;
++import android.content.ClipboardManager;
+ import android.content.Intent;
+ import android.content.SharedPreferences;
+ import android.content.pm.PackageInfo;
+@@ -37,10 +39,12 @@ import androidx.preference.PreferenceManager;
+ 
+ import com.google.android.material.navigation.NavigationView;
+ import com.winlator.cmod.R;
+-import com.winlator.cmod.contentdialog.ContentDialog;
+-import com.winlator.cmod.core.Callback;
+-import com.winlator.cmod.core.ImageUtils;
+-import com.winlator.cmod.core.PreloaderDialog;
++import com.winlator.cmod.contentdialog.ContentDialog;
++import com.winlator.cmod.core.AppUtils;
++import com.winlator.cmod.core.Callback;
++import com.winlator.cmod.core.ForensicConfig;
++import com.winlator.cmod.core.ImageUtils;
++import com.winlator.cmod.core.PreloaderDialog;
+ import com.winlator.cmod.container.ContainerManager;
+ import com.winlator.cmod.core.WineThemeManager;
+ import com.winlator.cmod.xenvironment.ImageFsInstaller;
+@@ -262,7 +266,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
+             fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+         }
+ 
+-        if (item.getItemId() != R.id.main_menu_about) {
++        if (item.getItemId() != R.id.main_menu_about && item.getItemId() != R.id.main_menu_diagnostics) {
+             currentMenuItemId = item.getItemId();
+         }
+ 
+@@ -283,14 +287,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
+                 show(new AdrenotoolsFragment(), false);
+                 break;
+             case R.id.main_menu_diagnostics:
+-                show(new SettingsFragment(), false);
++                showForensicCenterDialog();
++                drawerLayout.closeDrawer(GravityCompat.START);
+                 break;
+             case R.id.main_menu_settings:
+                 show(new SettingsFragment(), false);  // Forward animation
+                 break;
+-            case R.id.main_menu_about:
+-                showAboutDialog();
+-                break;
++            case R.id.main_menu_about:
++                showAboutDialog();
++                drawerLayout.closeDrawer(GravityCompat.START);
++                break;
+         }
+         return true;
+     }
+@@ -322,9 +328,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
+         drawerLayout.closeDrawer(GravityCompat.START);
+     }
+ 
+-    private void showAboutDialog() {
+-        ContentDialog dialog = new ContentDialog(this, R.layout.about_dialog);
+-        dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
++    private void showAboutDialog() {
++        ContentDialog dialog = new ContentDialog(this, R.layout.about_dialog);
++        dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
+ 
+         if (isDarkMode) {
+             dialog.getWindow().setBackgroundDrawableResource(R.drawable.content_dialog_background_dark);
+@@ -374,8 +380,46 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
+             e.printStackTrace();
+         }
+ 
+-        dialog.show();
+-    }
++        dialog.show();
++    }
++
++    private void showForensicCenterDialog() {
++        ForensicConfig.Snapshot snapshot = ForensicConfig.load(this);
++        String runtimeSummary = ForensicConfig.buildRuntimeSummary(snapshot);
++        String captureSummary = ForensicConfig.buildCaptureSummary(this, snapshot);
++        String captureCmd = ForensicConfig.buildCaptureCommand(this, snapshot);
++        String browseCmd = ForensicConfig.buildIssueBrowseCommand(this);
++
++        String message = getString(R.string.diagnostics_hint)
++                + "\n\n"
++                + getString(R.string.diagnostics_contract_summary, runtimeSummary, snapshot.wineDebugChannels)
++                + "\n\n"
++                + getString(R.string.diagnostics_capture_summary, captureSummary, "run-as")
++                + "\n\n"
++                + getString(R.string.diagnostics_adb_command_prefix) + captureCmd
++                + "\n"
++                + getString(R.string.diagnostics_adb_browse_command_prefix) + browseCmd;
++
++        new AlertDialog.Builder(this)
++                .setTitle(R.string.diagnostics)
++                .setMessage(message)
++                .setPositiveButton("Copy ADB Capture", (dialog, which) ->
++                        copyToClipboard("forensic-adb-capture", captureCmd, R.string.diagnostics_adb_command_copied))
++                .setNegativeButton("Copy ADB Browse", (dialog, which) ->
++                        copyToClipboard("forensic-adb-browse", browseCmd, R.string.diagnostics_adb_browse_command_copied))
++                .setNeutralButton("Open Settings", (dialog, which) -> {
++                    currentMenuItemId = R.id.main_menu_settings;
++                    show(new SettingsFragment(), false);
++                })
++                .show();
++    }
++
++    private void copyToClipboard(String label, String text, int toastResId) {
++        ClipboardManager clipboardManager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
++        if (clipboardManager == null) return;
++        clipboardManager.setPrimaryClip(ClipData.newPlainText(label, text));
++        AppUtils.showToast(this, toastResId);
++    }
+ 
+     private void setNavigationViewItemTextColor(NavigationView navigationView, int color) {
+         for (int i = 0; i < navigationView.getMenu().size(); i++) {
+diff --git a/app/src/main/res/layout/main_menu_header.xml b/app/src/main/res/layout/main_menu_header.xml
+index 2185cdd..5c685c9 100644
+--- a/app/src/main/res/layout/main_menu_header.xml
++++ b/app/src/main/res/layout/main_menu_header.xml
+@@ -2,5 +2,17 @@
+ <FrameLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:layout_width="match_parent"
+-    android:layout_height="8dp"
+-    android:background="@android:color/transparent" />
++    android:layout_height="56dp"
++    android:background="@color/colorPrimaryDark"
++    android:paddingStart="16dp"
++    android:paddingEnd="16dp">
++
++    <TextView
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_gravity="start|center_vertical"
++        android:text="Ae.solator"
++        android:textColor="@android:color/white"
++        android:textSize="18sp"
++        android:textStyle="bold" />
++</FrameLayout>

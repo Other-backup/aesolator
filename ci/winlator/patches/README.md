@@ -32,6 +32,13 @@ The patch base is currently four-patch mainline:
   - extends `DgVoodooManager` import path to accept `ZIP` and `WCP` archives (`.wcp/.wcp.xz/.wcp.zst`)
   - keeps dgVoodoo Contents lane manageable when artifact source is `dgvoodoo.wcp` from WCP Archive
   - adds runtime directory probing for `Release/arm64`, `Release/arm64ec`, and `Release/x64` layouts (`dgVoodoo2_*_dev64.zip`)
+- `0005-mainline-ui-forensic-nav-hotfix.patch`
+  - fixes side navigation regression by restoring deterministic drawer behavior for dialog-only items
+    (`about` and `diagnostics`) and keeping checked state stable
+  - makes `Forensic Center` explicitly clickable via a dedicated in-app forensic dialog with
+    runtime/capture summary and one-tap copy for ADB capture/browse commands
+  - replaces the zero-height transparent drawer header with a compact branded header to prevent
+    sidebar title drift
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
 2026 after apply/build verification. Current `0002`, `0003`, and `0004` are bounded restore
