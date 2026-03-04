@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-APP_REPO="${AEO_APP_RELEASE_REPO:-kosoymiki/aeolator}"
+APP_REPO="${AEO_APP_RELEASE_REPO:-kosoymiki/aesolator}"
 WCP_REPO="${AEO_WCP_RELEASE_REPO:-kosoymiki/wcp-runtime-lanes}"
 APPLY=0
 WINLATOR_TAG="winlator-latest"

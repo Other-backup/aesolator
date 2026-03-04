@@ -10,7 +10,7 @@ This document defines the mandatory split between source/control and release lan
 - `kosoymiki/freewine11`
   - Native FreeWine source tree repository.
   - Primary development branch: `main` (mirrors local `freewine11-main`).
-- `kosoymiki/aeolator`
+- `kosoymiki/aesolator`
   - Ae.solator APK release repository (`winlator-latest` lane).
 - `kosoymiki/wcp-runtime-lanes`
   - Runtime WCP release repository.

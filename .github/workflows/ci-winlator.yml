@@ -35,7 +35,7 @@ env:
   GRAPHICS_RELEASE_REPO: kosoymiki/wcp-graphics-lanes
   RUNTIME_RELEASE_TAG: ${{ github.event.inputs.runtime_release_tag || 'freewine11-arm64ec-latest' }}
   APP_RELEASE_OWNER: kosoymiki
-  APP_RELEASE_REPO: aeolator
+  APP_RELEASE_REPO: aesolator
   PREFIX_PACK_URL: https://raw.githubusercontent.com/GameNative/bionic-prefix-files/main/prefixPack-arm64ec.txz
 
 jobs:

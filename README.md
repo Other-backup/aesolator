@@ -1,4 +1,4 @@
-# Aeolator
+# Aesolator
 
 Application repository for the Ae.solator Winlator fork (`by.aero.so.benchmark`).
 
@@ -6,7 +6,7 @@ Application repository for the Ae.solator Winlator fork (`by.aero.so.benchmark`)
 
 - Winlator app CI and patch stack.
 - Forensic/runtime diagnostics integration for the app layer.
-- Publication of APK lane `winlator-latest` to `kosoymiki/aeolator`.
+- Publication of APK lane `winlator-latest` to `kosoymiki/aesolator`.
 
 ## Upstream Split
 

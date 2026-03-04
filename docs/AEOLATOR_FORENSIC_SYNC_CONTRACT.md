@@ -11,18 +11,18 @@ Unified CI forensic capture for `ci/wine11-arm64ec/run-*.sh` and `ci/proton11-ge
 
 ## Root And Native Sync
 
-- Root path: `AEO_FORENSIC_ROOT` (default: `/tmp/aeolator-forensics`).
-- Native sync target: `AEO_FORENSIC_SYNC_TARGET` (default: `aeolator`).
+- Root path: `AEO_FORENSIC_ROOT` (default: `/tmp/aesolator-forensics`).
+- Native sync target: `AEO_FORENSIC_SYNC_TARGET` (default: `aesolator`).
 - Sync mode: `AEO_FORENSIC_SYNC_MODE` (default: `native`).
-- Aliases: `AEO_FORENSIC_SYNC_ALIASES` (default: `aeolator,aeolater,aesolator`).
+- Aliases: `AEO_FORENSIC_SYNC_ALIASES` (default: `aesolator,aeolator,aeolater`).
 
 At root level each run updates:
 
 - `latest-session` symlink
 - `latest-<pipeline>` symlink
+- `aesolator-sync.json`
 - `aeolator-sync.json`
 - `aeolater-sync.json`
-- `aesolator-sync.json`
 
 ## Session Layout
 
@@ -57,12 +57,12 @@ Every event includes:
 
 ```bash
 AEO_FORENSIC_ENABLE=1 \
-AEO_FORENSIC_ROOT=/tmp/aeolator-forensics-smoke \
+AEO_FORENSIC_ROOT=/tmp/aesolator-forensics-smoke \
 bash ci/wine11-arm64ec/run-core-transfer-gates.sh
 ```
 
 Then inspect:
 
 ```bash
-find /tmp/aeolator-forensics-smoke -maxdepth 7 -type f | sort
+find /tmp/aesolator-forensics-smoke -maxdepth 7 -type f | sort
 ```
