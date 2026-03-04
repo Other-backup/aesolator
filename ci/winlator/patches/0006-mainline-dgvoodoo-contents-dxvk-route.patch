@@ -7,7 +7,7 @@ index b09c1ac..791d07d 100644
          sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
          showBeta = sp.getBoolean("beta_contents_enabled", false);
 -        showArm64ecGraphics = sp.getBoolean("arm64ec_graphics_contents_enabled", true);
-+        showArm64ecGraphics = sp.getBoolean("arm64ec_graphics_contents_enabled", false);
++        showArm64ecGraphics = sp.getBoolean("arm64ec_graphics_contents_enabled", true);
          showArm64VulkanSdk = sp.getBoolean("arm64_vulkan_sdk_contents_enabled", true);
          initAllowedTypes();
          if (!allowedTypes.isEmpty()) {
@@ -174,8 +174,9 @@ index 1a2b056..6e184d5 100644
 --- a/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java
 +++ b/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java
 @@ -66,11 +66,10 @@ public class DXVKConfigDialog extends ContentDialog {
-         setIcon(R.drawable.icon_settings);
-         setTitle("DXVK "+context.getString(R.string.configuration));
+        setIcon(R.drawable.icon_settings);
+-        setTitle("DXVK "+context.getString(R.string.configuration));
++        setTitle(context.getString(R.string.dxvk_vkd3d_configuration));
  
 -        final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
 -        final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);
@@ -341,6 +342,8 @@ index 4477803..f84c1b3 100644
          CONTENT_TYPE_WINE("Wine"),
          CONTENT_TYPE_PROTON("Proton"),
          CONTENT_TYPE_VULKAN_SDK("VulkanSDK"),
++        CONTENT_TYPE_TURNIP_DRIVER("TurnipDriver"),
++        CONTENT_TYPE_OPENGL_DRIVER("OpenGLDriver"),
 +        CONTENT_TYPE_DGVOODOO("DgVoodoo"),
          CONTENT_TYPE_DXVK("DXVK"),
          CONTENT_TYPE_VKD3D("VKD3D"),
@@ -356,9 +359,28 @@ index 4477803..f84c1b3 100644
          if (isProtonLike()) return "Proton";
          if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
          if (type == ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
++        if (type == ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
++        if (type == ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";
 +        if (type == ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
          return type != null ? type.toString() : "";
      }
+ 
+@@ -114,6 +120,18 @@ public class ContentProfile {
+     public boolean isWineLike() {
+         return isWineProtonFamily() && !isProtonLike();
+     }
++
++    public boolean isTurnipDriverType() {
++        return type == ContentType.CONTENT_TYPE_TURNIP_DRIVER;
++    }
++
++    public boolean isOpenGlDriverType() {
++        return type == ContentType.CONTENT_TYPE_OPENGL_DRIVER;
++    }
++
++    public boolean isGraphicsProviderPackage() {
++        return isTurnipDriverType() || isOpenGlDriverType();
++    }
  
 diff --git a/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java b/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java
 index bd4fbac..d6ea1c2 100644
@@ -368,6 +390,8 @@ index bd4fbac..d6ea1c2 100644
      private boolean isRepoManagedOverlayType(ContentProfile.ContentType type) {
          return isWineFamilyType(type)
                  || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
++                || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
++                || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
 +                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
                  || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                  || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
@@ -419,6 +443,7 @@ index d19f650..7edabfc 100644
      <string name="share_android_clipboard">Share Android Clipboard with Wine</string>
      <string name="ddraw_wrapper">DDraw Wrapper</string>
 +    <string name="dxvk_legacy_route_note">Legacy DDraw/D3D1-7 route is handled by dgVoodoo wrapper mode.</string>
++    <string name="dxvk_vkd3d_configuration">DXVK + VKD3D configuration</string>
      <string name="fexcore_version">FEXCore Version</string>
      <string name="graphics_driver_max_device_memory">Max Device Memory</string>
      <string name="graphics_driver_sync_frame">Sync Every Frame</string>

@@ -1,10 +1,10 @@
 # Winlator Patch Stack Runtime Contract Audit
 
-Generated: `2026-03-01T18:17:49Z`
+Generated: `2026-03-04T21:10:02Z`
 
 ## Scope
 
-- Patch files scanned: `1`
+- Patch files scanned: `9`
 - Target groups: `XServerDisplayActivity`, `GuestProgramLauncherComponent`, `RuntimeSignalContract`
 - Contract: forensic telemetry + reason markers + runtime guard markers
 
@@ -14,7 +14,7 @@ Generated: `2026-03-01T18:17:49Z`
 
 - `telemetry_calls`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
 - `reason_markers`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
-- `fallback_guardrails`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
+- `fallback_guardrails`: `ok` (2 patches) -> `0001-mainline-full-stack-consolidated.patch`, `0006-mainline-dgvoodoo-contents-dxvk-route.patch`
 - `external_signal_inputs`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
 - `launch_env_signal_fields`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
 - `contract_helper_usage`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
@@ -29,9 +29,9 @@ Generated: `2026-03-01T18:17:49Z`
 
 ### RuntimeSignalContract
 
-- `policy_markers_constants`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
-- `input_markers_constants`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
-- `policy_hashing`: `ok` (1 patches) -> `0001-mainline-full-stack-consolidated.patch`
+- `policy_markers_constants`: `ok` (1 patches) -> `0003-mainline-add-missing-runtime-bridge-classes.patch`
+- `input_markers_constants`: `ok` (1 patches) -> `0003-mainline-add-missing-runtime-bridge-classes.patch`
+- `policy_hashing`: `ok` (1 patches) -> `0003-mainline-add-missing-runtime-bridge-classes.patch`
 
 ## Contract Summary
 
