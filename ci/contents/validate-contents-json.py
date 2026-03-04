@@ -33,7 +33,7 @@ EXPECTED_DISPLAY_BY_TYPE = {
 WINE_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-[0-9]+(?:\.[0-9]+)*)?-(x86|x86_64|arm64ec)$")
 VULKAN_SDK_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*-(arm64|x86_64)$")
 GRAPHICS_PROVIDER_VERSION_RE = re.compile(r"^(?:rolling|[0-9]+(?:\.[0-9]+)*)-arm64$")
-DGVOODOO_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*$")
+DGVOODOO_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-(x86_64|arm64ec))?$")
 DXVK_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-[0-9]+)?(?:-gplasync)?(?:-arm64ec)?$")
 VKD3D_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:[ab][0-9]*)?(?:-arm64ec)?$")
 RUNTIME_RELEASE_REPO = "kosoymiki/wcp-runtime-lanes"
@@ -73,6 +73,7 @@ def main() -> None:
     turnip_rows = 0
     freedreno_rows = 0
     dgvoodoo_rows = 0
+    dgvoodoo_arches = set()
     dxvk_rows = 0
     vkd3d_rows = 0
     for idx, item in enumerate(data):
@@ -128,6 +129,9 @@ def main() -> None:
             freedreno_rows += 1
         elif type_key == "dgvoodoo":
             dgvoodoo_rows += 1
+            arch_match = re.search(r"-(x86_64|arm64ec)$", ver_name)
+            if arch_match:
+                dgvoodoo_arches.add(arch_match.group(1))
         elif type_key == "dxvk":
             dxvk_rows += 1
         elif type_key == "vkd3d":
@@ -270,8 +274,10 @@ def main() -> None:
         fail(f"turnipdriver entries must appear once at most; got {turnip_rows}")
     if freedreno_rows not in {0, 1}:
         fail(f"opengldriver entries must appear once at most; got {freedreno_rows}")
-    if dgvoodoo_rows not in {0, 1}:
-        fail(f"dgvoodoo entries must appear once at most; got {dgvoodoo_rows}")
+    if dgvoodoo_rows not in {0, 2}:
+        fail(f"dgvoodoo entries must appear exactly as x86_64+arm64ec pair; got {dgvoodoo_rows}")
+    if dgvoodoo_rows == 2 and dgvoodoo_arches != {"x86_64", "arm64ec"}:
+        fail(f"dgvoodoo entries must cover exactly x86_64 and arm64ec; got {sorted(dgvoodoo_arches)}")
     if dxvk_rows not in {0, 2}:
         fail(f"dxvk entries must appear exactly as generic+arm64ec pair; got {dxvk_rows}")
     if vkd3d_rows not in {0, 2}:

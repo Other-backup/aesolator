@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently four-patch mainline:
+The patch base is currently six-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -39,6 +39,11 @@ The patch base is currently four-patch mainline:
     runtime/capture summary and one-tap copy for ADB capture/browse commands
   - replaces the zero-height transparent drawer header with a compact branded header to prevent
     sidebar title drift
+- `0006-mainline-dgvoodoo-contents-dxvk-route.patch`
+  - adds `DgVoodoo` to Contents overlay parser/category routing so remote rows are no longer dropped
+  - restores architecture split visibility (`x86_64`/`arm64ec`) for dgVoodoo in Contents filters
+  - removes legacy DDraw selector from DXVK config and fixes DXVK runtime path to keep DDraw on system/WineD3D
+  - extends dgVoodoo config dialog with arch/route toggles and explicit legacy API routing hints
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
 2026 after apply/build verification. Current `0002`, `0003`, and `0004` are bounded restore

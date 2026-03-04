@@ -284,6 +284,27 @@ def check_contents_schema(
 
         family_entries_by_internal.setdefault(internal_type, []).append(row)
 
+    dgvoodoo_entries = family_entries_by_internal.get("dgvoodoo", [])
+    if dgvoodoo_entries:
+        if len(dgvoodoo_entries) != 2:
+            fail(
+                f"dgvoodoo contents entries must be split into x86_64 + arm64ec lanes; got {len(dgvoodoo_entries)}",
+                failures,
+            )
+        else:
+            dgvoodoo_arches = set()
+            for row in dgvoodoo_entries:
+                ver_name = str(row.get("verName", "")).strip().lower()
+                if ver_name.endswith("-x86_64"):
+                    dgvoodoo_arches.add("x86_64")
+                elif ver_name.endswith("-arm64ec"):
+                    dgvoodoo_arches.add("arm64ec")
+            if dgvoodoo_arches != {"x86_64", "arm64ec"}:
+                fail(
+                    f"dgvoodoo verName lanes must cover exactly x86_64 and arm64ec; got {sorted(dgvoodoo_arches)}",
+                    failures,
+                )
+
     for artifact_key, expected in ARTIFACT_EXPECTED_ENTRIES.items():
         artifact = artifacts.get(artifact_key)
         if not isinstance(artifact, dict):

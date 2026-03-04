@@ -1,0 +1,424 @@
+diff --git a/app/src/main/java/com/winlator/cmod/ContentsFragment.java b/app/src/main/java/com/winlator/cmod/ContentsFragment.java
+index b09c1ac..791d07d 100644
+--- a/app/src/main/java/com/winlator/cmod/ContentsFragment.java
++++ b/app/src/main/java/com/winlator/cmod/ContentsFragment.java
+@@ -79,7 +79,7 @@ public class ContentsFragment extends Fragment {
+         manager.syncContents();
+         sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
+         showBeta = sp.getBoolean("beta_contents_enabled", false);
+-        showArm64ecGraphics = sp.getBoolean("arm64ec_graphics_contents_enabled", true);
++        showArm64ecGraphics = sp.getBoolean("arm64ec_graphics_contents_enabled", false);
+         showArm64VulkanSdk = sp.getBoolean("arm64_vulkan_sdk_contents_enabled", true);
+         initAllowedTypes();
+         if (!allowedTypes.isEmpty()) {
+@@ -222,7 +222,8 @@ public class ContentsFragment extends Fragment {
+ 
+     private boolean isArm64EcSwitchType(ContentProfile.ContentType type) {
+         return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+-                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
++                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
++                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+     }
+ 
+     private boolean isVulkanSdkSwitchType(ContentProfile.ContentType type) {
+@@ -244,6 +245,16 @@ public class ContentsFragment extends Fragment {
+         return combined.contains("arm64ec");
+     }
+ 
++    private boolean isX64Profile(ContentProfile profile) {
++        if (profile == null) return false;
++        String combined = ((profile.verName != null ? profile.verName : "") + " "
++                + (profile.desc != null ? profile.desc : "") + " "
++                + (profile.remoteUrl != null ? profile.remoteUrl : "") + " "
++                + (profile.releaseTag != null ? profile.releaseTag : ""))
++                .toLowerCase(Locale.US);
++        return combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64");
++    }
++
+     private boolean isArm64VulkanSdkProfile(ContentProfile profile) {
+         if (profile == null || profile.type != ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return false;
+         String combined = ((profile.verName != null ? profile.verName : "") + " "
+@@ -283,6 +294,10 @@ public class ContentsFragment extends Fragment {
+ 
+             if (isArm64EcSwitchType(currentContentType)) {
+                 boolean arm64ec = isArm64EcProfile(profile);
++                if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO && !arm64ec && !isX64Profile(profile)) {
++                    filtered.add(profile);
++                    continue;
++                }
+                 if (showArm64ecGraphics && !arm64ec) continue;
+                 if (!showArm64ecGraphics && arm64ec) continue;
+                 filtered.add(profile);
+diff --git a/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java b/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java
+index 294da98..e432ac8 100644
+--- a/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java
+@@ -1241,8 +1241,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             String vkd3dVersionToken = normalizeDxVersionToken(dxwrapperConfig.get("vkd3dVersion"), DefaultVersion.VKD3D);
+             String dxvkWrapper = "dxvk-" + dxvkVersionToken;
+             String vkd3dWrapper = "vkd3d-" + vkd3dVersionToken;
+-            String ddrawrapper = normalizeDdrawWrapper(dxwrapperConfig.get("ddrawrapper"));
+-            dxwrapper = dxvkWrapper + ";" + vkd3dWrapper + ";" + ddrawrapper;
++            dxwrapper = dxvkWrapper + ";" + vkd3dWrapper + ";none";
+         }
+ 
+         if (!dxwrapper.equals(container.getExtra("dxwrapper"))) {
+@@ -3306,10 +3305,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         boolean dgVoodooWrapperSelected = wrapperMode.contains("dgvoodoo");
+         String dxvkVersionRequested = normalizeDxVersionToken(dxwrapperConfig.get("version"), DefaultVersion.DXVK);
+         String vkd3dVersionRequested = normalizeDxVersionToken(dxwrapperConfig.get("vkd3dVersion"), DefaultVersion.VKD3D);
+-        String ddrawWrapperRequested = normalizeDdrawWrapper(dxwrapperConfig.get("ddrawrapper"));
++        String ddrawWrapperRequested = dgVoodooWrapperSelected ? "dgvoodoo" : "none";
+         String dxvkVersion = dxvkWrapperSelected ? dxvkVersionRequested : "none";
+         String vkd3dVersion = dxvkWrapperSelected ? vkd3dVersionRequested : "none";
+-        String ddrawWrapper = dxvkWrapperSelected ? ddrawWrapperRequested : "none";
++        String ddrawWrapper = dgVoodooWrapperSelected ? "dgvoodoo" : "none";
+         boolean dx8AssistRequested = isDx8AssistRequested();
+         boolean dx8AssistEffective = dxvkWrapperSelected && dx8AssistRequested;
+         String policyStack = dxvkWrapperSelected ? "dxvk_stack" : (dgVoodooWrapperSelected ? "dgvoodoo_stack" : "wined3d_stack");
+@@ -3317,8 +3316,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         if (dgVoodooWrapperSelected) {
+             policyReason = "dgvoodoo_wrapper_selected";
+         } else if (!dxvkWrapperSelected && (!"none".equals(dxvkVersionRequested)
+-                || !"none".equals(vkd3dVersionRequested)
+-                || !"none".equals(ddrawWrapperRequested))) {
++                || !"none".equals(vkd3dVersionRequested))) {
+             policyReason = "wrapper_not_dxvk";
+         } else if (dxvkWrapperSelected) {
+             policyReason = "dxvk_wrapper_selected";
+@@ -3327,13 +3325,13 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         }
+         String dxvkArtifactSourcePlan = dxvkWrapperSelected ? "planned" : "system";
+         String vkd3dArtifactSourcePlan = (!dxvkWrapperSelected || "none".equals(vkd3dVersion)) ? "system" : "planned";
+-        String ddrawArtifactSourcePlan = (!dxvkWrapperSelected || "none".equals(ddrawWrapper)) ? "system" : "planned";
++        String ddrawArtifactSourcePlan = dgVoodooWrapperSelected ? "local_import" : "system";
+ 
+         String dx1to7Route = dgVoodooWrapperSelected ? "dgvoodoo" : "wined3d";
+         String dx8Route = dgVoodooWrapperSelected ? "dgvoodoo" : "wined3d";
+         String dx9to11Route = dgVoodooWrapperSelected ? "dgvoodoo" : "wined3d";
+         String dx12Route = "wined3d";
+-        String requestedDx1to7Route = dgVoodooWrapperSelected ? "dgvoodoo" : ("none".equals(ddrawWrapperRequested) ? "wined3d" : ddrawWrapperRequested);
++        String requestedDx1to7Route = dgVoodooWrapperSelected ? "dgvoodoo" : "wined3d";
+         String requestedDx8Route = dgVoodooWrapperSelected ? "dgvoodoo" : (dx8AssistRequested ? "d8vk-requested" : "wined3d");
+         String requestedDx9to11Route = dgVoodooWrapperSelected ? "dgvoodoo" : ("none".equals(dxvkVersionRequested) ? "wined3d" : "dxvk-" + dxvkVersionRequested);
+         String requestedDx12Route = dgVoodooWrapperSelected ? "wined3d" : ("none".equals(vkd3dVersionRequested) ? "wined3d" : "vkd3d-" + vkd3dVersionRequested);
+@@ -3351,9 +3349,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             } else {
+                 dx8Route = "dxvk-native";
+             }
+-            if (!"none".equals(ddrawWrapper)) {
+-                dx1to7Route = ddrawWrapper;
+-            }
+         }
+ 
+         String directMap = "dx1-7=" + dx1to7Route +
+@@ -3384,7 +3379,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+                 ";dx10=" + requestedDx9to11Route +
+                 ";dx11=" + requestedDx9to11Route +
+                 ";dx12=" + requestedDx12Route;
+-        String policyOrder = dgVoodooWrapperSelected ? "dgvoodoo_local->wined3d_fallback" : "ddraw->dx8assist->dxvk->vkd3d";
++        String policyOrder = dgVoodooWrapperSelected ? "dgvoodoo_local->wined3d_fallback" : "dx8assist->dxvk->vkd3d";
+         String d8vkVersionEffective = dx8AssistEffective ? DefaultVersion.D8VK : "none";
+         boolean dxvkCapDx8Native = dxvkWrapperSelected && compareVersion(dxvkVersion, "2.4") >= 0;
+         boolean dxvkCapNvapi = dxvkWrapperSelected && compareVersion(dxvkVersion, "2.1") >= 0;
+@@ -3601,13 +3596,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         return normalized;
+     }
+ 
+-    private String normalizeDdrawWrapper(String value) {
+-        if (value == null || value.trim().isEmpty()) return "none";
+-        String normalized = value.trim().toLowerCase(Locale.ROOT);
+-        if (normalized.contains("none")) return "none";
+-        return normalized;
+-    }
+-
+     private String normalizeUpscalerValue(String value, String fallback, String... allowed) {
+         if (value == null) return fallback;
+         String normalized = value.trim().toLowerCase(Locale.ROOT);
+@@ -3725,7 +3713,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             String vkd3dWrapper = dxwrapper.split(";")[1];
+             String ddrawrapper = dxwrapper.split(";")[2];
+             String vkd3dWrapperNormalized = vkd3dWrapper.trim().toLowerCase(Locale.ROOT);
+-            String ddrawWrapperNormalized = ddrawrapper.trim().toLowerCase(Locale.ROOT);
+             ContentProfile dxvkProfile = contentsManager.getProfileByEntryName(dxvkWrapper);
+             if (dxvkProfile != null) {
+                 Log.d(TAG, "Applying user-defined DXVK content profile: " + dxvkWrapper);
+@@ -3770,22 +3757,9 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+                 }
+             }
+ 
+-            Log.d(TAG, "Extracting nglide wrapper");
+-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir, onExtractFileListener);
+-
+-            if ("none".equals(ddrawWrapperNormalized)) {
+-                Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
+-                restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
+-                envVars.put("AERO_DDRAW_ARTIFACT_SOURCE", "system");
+-            }
+-            else {
+-                if ("cnc-ddraw".equals(ddrawWrapperNormalized))
+-                    envVars.put("CNC_DDRAW_CONFIG_FILE", "C:\\windows\\syswow64\\ddraw.ini");
+-
+-                Log.d(TAG, "Extracting ddrawrapper " + ddrawrapper);
+-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/" + ddrawrapper + ".tzst", windowsDir, onExtractFileListener);
+-                envVars.put("AERO_DDRAW_ARTIFACT_SOURCE", "asset");
+-            }
++            Log.d(TAG, "DXVK mode keeps legacy DDraw route on WineD3D/system");
++            restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
++            envVars.put("AERO_DDRAW_ARTIFACT_SOURCE", "system");
+ 
+             ForensicLogger.logEvent(this, "info", "DX_WRAPPER_ARTIFACTS_APPLIED",
+                     forensicTraceId, "graphics_driver",
+diff --git a/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java b/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java
+index 1a2b056..6e184d5 100644
+--- a/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java
++++ b/app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java
+@@ -66,11 +66,10 @@ public class DXVKConfigDialog extends ContentDialog {
+         setIcon(R.drawable.icon_settings);
+         setTitle("DXVK "+context.getString(R.string.configuration));
+ 
+-        final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
+-        final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);
+-        final Spinner sFramerate = findViewById(R.id.SFramerate);
+-        final Spinner sVKD3DFeatureLevel = findViewById(R.id.SVKD3DFeatureLevel);
+-        final Spinner sDDRAWrapper = findViewById(R.id.SDDRAWrapper);
++        final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
++        final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);
++        final Spinner sFramerate = findViewById(R.id.SFramerate);
++        final Spinner sVKD3DFeatureLevel = findViewById(R.id.SVKD3DFeatureLevel);
+         swAsync = findViewById(R.id.SWAsync);
+         swAsyncCache = findViewById(R.id.SWAsyncCache);
+         swNvapi = findViewById(R.id.SWNVAPI);
+@@ -90,11 +89,10 @@ public class DXVKConfigDialog extends ContentDialog {
+         sVKD3DFeatureLevel.setAdapter(adapter);
+ 
+         setDXVKSpinner(sDXVKVersion, config, contentsManager, isARM64EC);
+-        AppUtils.setSpinnerSelectionFromIdentifier(sFramerate, config.get("framerate"));
+-        AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DVersion, config.get("vkd3dVersion"));
+-        AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DFeatureLevel, config.get("vkd3dLevel"));
+-        AppUtils.setSpinnerSelectionFromIdentifier(sDDRAWrapper, config.get("ddrawrapper"));
+-
++        AppUtils.setSpinnerSelectionFromIdentifier(sFramerate, config.get("framerate"));
++        AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DVersion, config.get("vkd3dVersion"));
++        AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DFeatureLevel, config.get("vkd3dLevel"));
++
+         swAsync.setChecked(config.get("async").equals("1"));
+         swAsyncCache.setChecked(config.get("asyncCache").equals("1"));
+         swNvapi.setChecked(config.get("nvapi").equals("1"));
+@@ -136,11 +134,11 @@ public class DXVKConfigDialog extends ContentDialog {
+             config.put("nvapi", ((swNvapi.isChecked())&&(llNvapi.getVisibility()==View.VISIBLE))?"1":"0");
+             VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
+             config.put("vkd3dVersion", selectedItem.getIdentifier());
+-            config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
+-            config.put("ddrawrapper", StringUtils.parseIdentifier(sDDRAWrapper.getSelectedItem().toString()));
+-            anchor.setTag(config.toString());
+-        });
+-    }
++            config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
++            config.put("ddrawrapper", "none");
++            anchor.setTag(config.toString());
++        });
++    }
+ 
+     private void updateConfigVisibility(int dxvkType) {
+         if (dxvkType == DXVK_TYPE_ASYNC) {
+diff --git a/app/src/main/java/com/winlator/cmod/contentdialog/DgVoodooConfigDialog.java b/app/src/main/java/com/winlator/cmod/contentdialog/DgVoodooConfigDialog.java
+index 791a6e3..705db1d 100644
+--- a/app/src/main/java/com/winlator/cmod/contentdialog/DgVoodooConfigDialog.java
++++ b/app/src/main/java/com/winlator/cmod/contentdialog/DgVoodooConfigDialog.java
+@@ -6,6 +6,7 @@ import android.widget.ArrayAdapter;
+ import android.widget.FrameLayout;
+ import android.widget.LinearLayout;
+ import android.widget.Spinner;
++import android.widget.Switch;
+ import android.widget.TextView;
+ 
+ import com.winlator.cmod.R;
+@@ -14,8 +15,13 @@ import com.winlator.cmod.core.AppUtils;
+ import com.winlator.cmod.core.EnvVars;
+ import com.winlator.cmod.core.KeyValueSet;
+ 
++import java.util.Locale;
++
+ public class DgVoodooConfigDialog extends ContentDialog {
+     private static final String DEFAULT_ARCH = "auto";
++    private static final String DEFAULT_FORCE_D3D11 = "0";
++    private static final String DEFAULT_VSYNC = "0";
++    private static final String DEFAULT_FLIP_MODEL = "1";
+ 
+     public DgVoodooConfigDialog(View anchor) {
+         super(anchor.getContext());
+@@ -43,6 +49,11 @@ public class DgVoodooConfigDialog extends ContentDialog {
+         ));
+         layout.addView(stateView);
+ 
++        TextView noteView = new TextView(context);
++        noteView.setPadding(0, padding / 4, 0, 0);
++        noteView.setText(R.string.dgvoodoo_config_note);
++        layout.addView(noteView);
++
+         TextView labelView = new TextView(context);
+         labelView.setPadding(0, padding / 2, 0, 0);
+         labelView.setText(R.string.dgvoodoo_config_arch);
+@@ -52,18 +63,38 @@ public class DgVoodooConfigDialog extends ContentDialog {
+         String[] labels = {
+                 context.getString(R.string.dgvoodoo_arch_auto),
+                 context.getString(R.string.dgvoodoo_arch_x86),
+-                context.getString(R.string.dgvoodoo_arch_x64)
++                context.getString(R.string.dgvoodoo_arch_x64),
++                context.getString(R.string.dgvoodoo_arch_arm64),
++                context.getString(R.string.dgvoodoo_arch_arm64ec)
+         };
+-        String[] values = {"auto", "x86", "x64"};
++        String[] values = {"auto", "x86", "x64", "arm64", "arm64ec"};
+         archSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, labels));
+         KeyValueSet config = parseConfig(anchor.getTag());
+         AppUtils.setSpinnerSelectionFromValue(archSpinner, labels[indexOf(values, normalizeArch(config.get("dgvoodooArch")))]);
+         layout.addView(archSpinner);
+ 
++        Switch forceD3D11Switch = new Switch(context);
++        forceD3D11Switch.setText(R.string.dgvoodoo_force_d3d11);
++        forceD3D11Switch.setChecked(parseSwitch(config.get("dgvoodooForceD3D11"), false));
++        layout.addView(forceD3D11Switch);
++
++        Switch vsyncSwitch = new Switch(context);
++        vsyncSwitch.setText(R.string.dgvoodoo_vsync);
++        vsyncSwitch.setChecked(parseSwitch(config.get("dgvoodooVSync"), false));
++        layout.addView(vsyncSwitch);
++
++        Switch flipModelSwitch = new Switch(context);
++        flipModelSwitch.setText(R.string.dgvoodoo_flip_model);
++        flipModelSwitch.setChecked(parseSwitch(config.get("dgvoodooFlipModel"), true));
++        layout.addView(flipModelSwitch);
++
+         frameLayout.addView(layout);
+ 
+         setOnConfirmCallback(() -> {
+             config.put("dgvoodooArch", values[archSpinner.getSelectedItemPosition()]);
++            config.put("dgvoodooForceD3D11", forceD3D11Switch.isChecked() ? "1" : "0");
++            config.put("dgvoodooVSync", vsyncSwitch.isChecked() ? "1" : "0");
++            config.put("dgvoodooFlipModel", flipModelSwitch.isChecked() ? "1" : "0");
+             config.put("dgvoodooVersionHint", manager.getVersionHint());
+             anchor.setTag(config.toString());
+         });
+@@ -78,14 +109,31 @@ public class DgVoodooConfigDialog extends ContentDialog {
+         vars.put("AERO_DGVOODOO_MODE", "local_import");
+         vars.put("AERO_DGVOODOO_VERSION_HINT", manager.getVersionHint());
+         vars.put("AERO_DGVOODOO_ARCH_REQUESTED", normalizeArch(config.get("dgvoodooArch")));
++        vars.put("AERO_DGVOODOO_FORCE_D3D11", normalizeToggle(config.get("dgvoodooForceD3D11"), DEFAULT_FORCE_D3D11));
++        vars.put("AERO_DGVOODOO_VSYNC", normalizeToggle(config.get("dgvoodooVSync"), DEFAULT_VSYNC));
++        vars.put("AERO_DGVOODOO_FLIP_MODEL", normalizeToggle(config.get("dgvoodooFlipModel"), DEFAULT_FLIP_MODEL));
+     }
+ 
+     public static String normalizeArch(String value) {
+         if ("x86".equalsIgnoreCase(value)) return "x86";
+         if ("x64".equalsIgnoreCase(value)) return "x64";
++        if ("arm64".equalsIgnoreCase(value) || "aarch64".equalsIgnoreCase(value)) return "arm64";
++        if ("arm64ec".equalsIgnoreCase(value) || "arm64-ec".equalsIgnoreCase(value)) return "arm64ec";
+         return DEFAULT_ARCH;
+     }
+ 
++    private static String normalizeToggle(String value, String fallback) {
++        if (value == null || value.trim().isEmpty()) return fallback;
++        String normalized = value.trim().toLowerCase(Locale.ROOT);
++        if ("1".equals(normalized) || "true".equals(normalized) || "yes".equals(normalized)) return "1";
++        if ("0".equals(normalized) || "false".equals(normalized) || "no".equals(normalized)) return "0";
++        return fallback;
++    }
++
++    private static boolean parseSwitch(String value, boolean fallback) {
++        return "1".equals(normalizeToggle(value, fallback ? "1" : "0"));
++    }
++
+     private static int indexOf(String[] items, String value) {
+         for (int i = 0; i < items.length; i++) {
+             if (items[i].equalsIgnoreCase(value)) return i;
+diff --git a/app/src/main/java/com/winlator/cmod/contents/ContentProfile.java b/app/src/main/java/com/winlator/cmod/contents/ContentProfile.java
+index 4477803..f84c1b3 100644
+--- a/app/src/main/java/com/winlator/cmod/contents/ContentProfile.java
++++ b/app/src/main/java/com/winlator/cmod/contents/ContentProfile.java
+@@ -31,11 +31,12 @@ public class ContentProfile {
+         CONTENT_TYPE_WINE("Wine"),
+         CONTENT_TYPE_PROTON("Proton"),
+         CONTENT_TYPE_VULKAN_SDK("VulkanSDK"),
++        CONTENT_TYPE_DGVOODOO("DgVoodoo"),
+         CONTENT_TYPE_DXVK("DXVK"),
+         CONTENT_TYPE_VKD3D("VKD3D"),
+         CONTENT_TYPE_BOX64("Box64"),
+-        CONTENT_TYPE_WOWBOX64("WOWBox64"),
+-        CONTENT_TYPE_FEXCORE("FEXCore");
++        CONTENT_TYPE_WOWBOX64("WOWBox64"),
++        CONTENT_TYPE_FEXCORE("FEXCore");
+ 
+         final String typeName;
+ 
+@@ -92,6 +93,7 @@ public class ContentProfile {
+         if (isProtonLike()) return "Proton";
+         if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
+         if (type == ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
++        if (type == ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
+         return type != null ? type.toString() : "";
+     }
+ 
+diff --git a/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java b/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java
+index bd4fbac..d6ea1c2 100644
+--- a/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java
++++ b/app/src/main/java/com/winlator/cmod/contents/ContentsManager.java
+@@ -633,6 +633,7 @@ public class ContentsManager {
+     private boolean isRepoManagedOverlayType(ContentProfile.ContentType type) {
+         return isWineFamilyType(type)
+                 || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
++                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
+     }
+diff --git a/app/src/main/res/layout/dxvk_config_dialog.xml b/app/src/main/res/layout/dxvk_config_dialog.xml
+index 2c6eee2..ff6375d 100644
+--- a/app/src/main/res/layout/dxvk_config_dialog.xml
++++ b/app/src/main/res/layout/dxvk_config_dialog.xml
+@@ -119,14 +119,8 @@
+         <TextView
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+-            android:text="@string/ddraw_wrapper" />
+-
+-        <Spinner
+-            style="@style/ComboBox"
+-            android:layout_width="match_parent"
+-            android:id="@+id/SDDRAWrapper"
+-            android:entries="@array/ddrawrapper_entries"
+-            android:spinnerMode="dialog" />
++            android:paddingBottom="4dp"
++            android:text="@string/dxvk_legacy_route_note" />
+ 
+         <TextView
+             android:layout_width="wrap_content"
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index d19f650..7edabfc 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -769,10 +769,16 @@ E.g. <b>META</b> for <i>META key</i>, \n
+     <string name="driver_catalog_aesolator_lanes_desc">Direct release lanes for the runtimes and patch-base we maintain in this fork.</string>
+     <string name="dgvoodoo_configuration">dgVoodoo configuration</string>
+     <string name="dgvoodoo_config_summary">Current package: %1$s</string>
++    <string name="dgvoodoo_config_note">Legacy APIs (DDraw/D3D1-7/Glide) are routed through dgVoodoo when this wrapper mode is selected.</string>
+     <string name="dgvoodoo_config_arch">Preferred local install arch</string>
+     <string name="dgvoodoo_arch_auto">Auto</string>
+     <string name="dgvoodoo_arch_x86">x86</string>
+     <string name="dgvoodoo_arch_x64">x64</string>
++    <string name="dgvoodoo_arch_arm64">arm64</string>
++    <string name="dgvoodoo_arch_arm64ec">arm64ec</string>
++    <string name="dgvoodoo_force_d3d11">Force D3D11 backend</string>
++    <string name="dgvoodoo_vsync">Enable dgVoodoo VSync</string>
++    <string name="dgvoodoo_flip_model">Enable flip model</string>
+     <string name="dgvoodoo_package_state_missing">missing</string>
+     <string name="dgvoodoo_package_state_ready">ready (%1$s)</string>
+     <string name="dgvoodoo_import_message">Select a full dgVoodoo package archive. Ae.solator imports it locally and stages wrapper files next to the target EXE at launch time instead of bundling it globally.</string>
+@@ -818,6 +824,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
+     <string name="open_with_android_browser">Open Android Browser in Wine</string>
+     <string name="share_android_clipboard">Share Android Clipboard with Wine</string>
+     <string name="ddraw_wrapper">DDraw Wrapper</string>
++    <string name="dxvk_legacy_route_note">Legacy DDraw/D3D1-7 route is handled by dgVoodoo wrapper mode.</string>
+     <string name="fexcore_version">FEXCore Version</string>
+     <string name="graphics_driver_max_device_memory">Max Device Memory</string>
+     <string name="graphics_driver_sync_frame">Sync Every Frame</string>
