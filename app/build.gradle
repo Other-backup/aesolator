@@ -67,13 +67,19 @@ tasks.register("downloadImageFS") {
 
 tasks.register("prepareEmbeddedWineAssets") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
+    def enforceEmbeddedRuntimeAssets = (
+            (project.findProperty("ae.enforceEmbeddedRuntimeAssets")?.toString() ?: "") == "true" ||
+                    (System.getenv("AEO_ENFORCE_EMBEDDED_RUNTIME_ASSETS") ?: "") == "1"
+    )
     def requiredRuntimeAssets = [
-            "wine-11.1-arm64ec.txz",
-            "proton-ge10-arm64ec.txz",
-            "protonwine10-gamenative-arm64ec.txz"
+            "freewine11-arm64ec.wcp"
     ]
 
     doLast {
+        if (!enforceEmbeddedRuntimeAssets) {
+            println("Embedded runtime asset check skipped (Contents-first lane active).")
+            return
+        }
         def missing = []
         requiredRuntimeAssets.each { name ->
             File f = new File(assetDir, name)

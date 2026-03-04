@@ -308,9 +308,7 @@
         <item>Box64</item>
     </string-array>
     <string-array name="wine_entries">
-        <item>wine-11.1-arm64ec</item>
-        <item>proton-ge10-arm64ec</item>
-        <item>protonwine10-gamenative-arm64ec</item>
+        <item>freewine11-arm64ec</item>
     </string-array>
     <string-array name="vkbasalt_sharpness_entries">
         <item>None</item>
