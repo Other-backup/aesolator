@@ -84,8 +84,8 @@ index 791d07d..a53478c 100644
 +
 +    private int resolveVulkanFamilyAccentColor(ContentProfile profile) {
 +        String category = profile.getDisplayCategory();
-+        String source = profile.source != null ? profile.source : "";
-+        String version = profile.versionName != null ? profile.versionName : "";
++        String source = profile.sourceRepo != null ? profile.sourceRepo : "";
++        String version = profile.verName != null ? profile.verName : "";
 +        String laneHint = (category + " " + source + " " + version).toLowerCase();
 +        if (laneHint.contains("turnip")) {
 +            return isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
