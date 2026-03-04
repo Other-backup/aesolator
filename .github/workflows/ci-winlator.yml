@@ -26,6 +26,7 @@ permissions:
   contents: write
 
 env:
+  AEO_UPLOAD_ARTIFACTS: "0"
   WINLATOR_OUTPUT_DIR: ${{ github.workspace }}/out/winlator
   WINLATOR_LUDASHI_REPO: https://github.com/StevenMXZ/Winlator-Ludashi.git
   WINLATOR_LUDASHI_REF: ${{ github.event.inputs.winlator_ref || 'latest' }}
@@ -86,6 +87,7 @@ jobs:
           bash ci/winlator/ci-build-winlator-ludashi.sh
 
       - name: Upload Winlator artifact
+        if: env.AEO_UPLOAD_ARTIFACTS == '1'
         uses: actions/upload-artifact@v4
         with:
           name: by.aero.so.benchmark-debug-0.9c+
