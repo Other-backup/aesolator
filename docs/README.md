@@ -12,5 +12,3 @@ This repo stores only application-layer documentation.
 ## Generated In CI
 
 - `docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md`
-- `docs/PATCH_STACK_REFLECTIVE_AUDIT.md`
-- `docs/PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md`

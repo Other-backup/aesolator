@@ -15,13 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-ALLOWED_INTERNAL_TYPES = {"wine", "proton", "protonge", "protonwine", "vulkansdk", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
-ALLOWED_TYPES = {"Wine", "Proton", "VulkanSDK", "TurnipDriver", "OpenGLDriver", "DgVoodoo", "DXVK", "VKD3D"}
+ALLOWED_INTERNAL_TYPES = {"wine", "vulkansdk", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
+ALLOWED_TYPES = {"Wine", "VulkanSDK", "TurnipDriver", "OpenGLDriver", "DgVoodoo", "DXVK", "VKD3D"}
 EXPECTED_TYPE_BY_INTERNAL = {
     "wine": "Wine",
-    "proton": "Proton",
-    "protonge": "Proton",
-    "protonwine": "Proton",
     "vulkansdk": "VulkanSDK",
     "turnip": "TurnipDriver",
     "freedreno": "OpenGLDriver",
@@ -31,7 +28,6 @@ EXPECTED_TYPE_BY_INTERNAL = {
 }
 EXPECTED_DISPLAY_BY_TYPE = {
     "Wine": "Wine",
-    "Proton": "Proton",
     "VulkanSDK": "Vulkan SDK",
     "TurnipDriver": "Turnip",
     "OpenGLDriver": "OpenGL Driver",
@@ -39,14 +35,10 @@ EXPECTED_DISPLAY_BY_TYPE = {
     "DXVK": "DXVK",
     "VKD3D": "VKD3D",
 }
-TARGET_REPO = "kosoymiki/aesolator"
 RUNTIME_RELEASE_REPO = "kosoymiki/wcp-runtime-lanes"
 GRAPHICS_RELEASE_REPO = "kosoymiki/wcp-graphics-lanes"
 TARGET_RELEASE_REPO_BY_INTERNAL = {
     "wine": RUNTIME_RELEASE_REPO,
-    "proton": RUNTIME_RELEASE_REPO,
-    "protonge": RUNTIME_RELEASE_REPO,
-    "protonwine": RUNTIME_RELEASE_REPO,
     "vulkansdk": RUNTIME_RELEASE_REPO,
     "turnip": GRAPHICS_RELEASE_REPO,
     "freedreno": GRAPHICS_RELEASE_REPO,
@@ -54,12 +46,6 @@ TARGET_RELEASE_REPO_BY_INTERNAL = {
     "dxvk": RUNTIME_RELEASE_REPO,
     "vkd3d": RUNTIME_RELEASE_REPO,
 }
-TARGET_OVERLAY_URL = (
-    "https://raw.githubusercontent.com/"
-    f"{TARGET_REPO}/main/contents/contents.json"
-)
-TARGET_HUB_PROFILES_URL = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json"
-
 WORKFLOW_EXPECTATIONS = {
     ".github/workflows/ci-winlator.yml": {
         "RUNTIME_RELEASE_REPO": "kosoymiki/wcp-runtime-lanes",
@@ -70,7 +56,7 @@ WORKFLOW_EXPECTATIONS = {
 
 WORKFLOW_REQUIRED_TOKENS = {
     ".github/workflows/ci-winlator.yml": [
-        "Build Winlator Ludashi fork APK",
+        "Build native Aesolator APK (debug, no embedded runtimes)",
         "Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)",
         "tag: winlator-latest",
     ],
@@ -355,22 +341,21 @@ def check_contents_schema(
             )
 
 
-def check_patch_contract(patch_path: Path, failures: List[str]) -> None:
-    text = patch_path.read_text(encoding="utf-8", errors="ignore")
+def check_native_source_contract(root: Path, failures: List[str]) -> None:
+    build_script = root / "ci/winlator/ci-build-winlator-ludashi.sh"
+    if not build_script.is_file():
+        fail(f"native build script missing: {build_script}", failures)
+        return
 
+    text = build_script.read_text(encoding="utf-8", errors="ignore")
     required_tokens = [
-        'REMOTE_PROFILES = "' + TARGET_HUB_PROFILES_URL + '";',
-        'REMOTE_WINE_PROTON_OVERLAY = "' + TARGET_OVERLAY_URL + '"',
-        'ContentProfile.MARK_DISPLAY_CATEGORY',
-        'ContentProfile.MARK_SOURCE_REPO',
-        'ContentProfile.MARK_RELEASE_TAG',
-        'if (includeBeta && !isBeta) continue;',
-        'if (!includeBeta && isBeta) continue;',
+        "require_native_tree",
+        "Native source tree missing settings.gradle",
+        "Source mode: native tree (no CI patch overlay)",
     ]
-
     for token in required_tokens:
         if token not in text:
-            fail(f"patch contract token missing in 0001: {token}", failures)
+            fail(f"native source contract token missing: {token}", failures)
 
 
 def check_contents_validator_contract(root: Path, failures: List[str]) -> None:
@@ -510,18 +495,16 @@ def main(argv: Sequence[str]) -> int:
 
     contents_path = root / "contents/contents.json"
     artifact_map_path = root / "ci/winlator/artifact-source-map.json"
-    patch_path = root / "ci/winlator/patches/0001-mainline-full-stack-consolidated.patch"
-
     failures: List[str] = []
     warnings: List[str] = []
 
-    for path in (contents_path, artifact_map_path, patch_path):
+    for path in (contents_path, artifact_map_path):
         if not path.is_file():
             fail(f"required file missing: {path}", failures)
 
     if not failures:
         check_contents_schema(contents_path, artifact_map_path, failures, warnings)
-        check_patch_contract(patch_path, failures)
+        check_native_source_contract(root, failures)
         check_contents_validator_contract(root, failures)
         check_release_publish_contract(root, failures)
         check_workflow_contract(root, failures)

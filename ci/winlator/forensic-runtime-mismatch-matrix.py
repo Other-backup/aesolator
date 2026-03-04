@@ -220,7 +220,7 @@ def choose_baseline(rows: list[dict[str, str]], baseline_label: str) -> dict[str
         "gamenative104": "freewine11",
         "wine11": "freewine11",
         "protonwine10": "freewine11",
-        "freewine11": "gamenative104",
+        "freewine11": "freewine11",
     }
     if baseline_label:
         for row in rows:

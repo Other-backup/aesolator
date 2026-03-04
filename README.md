@@ -31,7 +31,7 @@ Legacy donor runtime lanes are not active in Ae.solator.
   - builds APK from native app source stored directly in this repo,
   - publishes APK release lane in this repo.
 
-Patch-stack scripts under `ci/winlator/patches` remain legacy tooling; `check-patch-stack.sh` now validates folded native-source feature parity by default.
+Legacy CI patch-overlay stack has been removed; this repository is the native source of truth for APK builds.
 
 ## Local Build
 

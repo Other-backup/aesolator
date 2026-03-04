@@ -10,16 +10,16 @@ tmp_dir="$(mktemp -d /tmp/runtime_log_assembler_selftest_XXXXXX)"
 cleanup() { rm -rf "${tmp_dir}"; }
 trap cleanup EXIT
 
-scenario_dir="${tmp_dir}/protonwine10"
+scenario_dir="${tmp_dir}/freewine11-runtime"
 mkdir -p "${scenario_dir}/runtime-logs"
 
 cat > "${scenario_dir}/scenario_meta.txt" <<'EOF'
-label=protonwine10
+label=freewine11
 container_id=2
 EOF
 
 cat > "${scenario_dir}/wait-status.txt" <<'EOF'
-trace_id=trace-protonwine10
+trace_id=trace-freewine11
 elapsed_sec=5
 saw_intent=1
 saw_submit=1
@@ -27,12 +27,12 @@ saw_terminal=0
 EOF
 
 cat > "${scenario_dir}/trace_id.txt" <<'EOF'
-trace-protonwine10
+trace-freewine11
 EOF
 
 cat > "${scenario_dir}/logcat-full.txt" <<'EOF'
-03-01 02:00:00.000 1000 1000 I ForensicLogger: {"ts":"2026-03-01T02:00:00.000+0000","event_id":"RUNTIME_LIBRARY_COMPONENT_CONFLICT","severity":"warn","trace_id":"trace-protonwine10","stage":"graphics_driver","message":"runtime library component conflict","component":"translator","state":"fexcore","expected":"libwow64fex.dll"}
-03-01 02:00:00.100 1000 1000 I ForensicLogger: {"ts":"2026-03-01T02:00:00.100+0000","event_id":"LAUNCH_EXEC_EXIT","severity":"info","trace_id":"trace-protonwine10","stage":"launcher","message":"guest program launcher exited","exit_code":1}
+03-01 02:00:00.000 1000 1000 I ForensicLogger: {"ts":"2026-03-01T02:00:00.000+0000","event_id":"RUNTIME_LIBRARY_COMPONENT_CONFLICT","severity":"warn","trace_id":"trace-freewine11","stage":"graphics_driver","message":"runtime library component conflict","component":"translator","state":"fexcore","expected":"libwow64fex.dll"}
+03-01 02:00:00.100 1000 1000 I ForensicLogger: {"ts":"2026-03-01T02:00:00.100+0000","event_id":"LAUNCH_EXEC_EXIT","severity":"info","trace_id":"trace-freewine11","stage":"launcher","message":"guest program launcher exited","exit_code":1}
 03-01 02:00:00.200 1000 1000 E linker64: CANNOT LINK EXECUTABLE "wine": library "libmissing.so" not found
 03-01 02:00:00.300 1000 1000 F vkBasalt: ../src/reshade/effect_preprocessor.cpp:117: bool reshadefx::preprocessor::append_file(const string&): assertion "!path.empty()" failed
 EOF
@@ -42,9 +42,9 @@ AERO_UPSCALE_VKBASALT_REASON=fsr_assert_guard
 EOF
 
 cat > "${scenario_dir}/forensics-jsonl-tail.txt" <<'EOF'
-{"ts":"2026-03-01T02:00:00.400+0000","event_id":"RUNTIME_LIBRARY_CONFLICT_DETECTED","severity":"warn","trace_id":"trace-protonwine10","stage":"graphics_driver","message":"runtime library conflict detected: dxvk_artifact_source_unset","conflict":"dxvk_artifact_source_unset"}
-{"ts":"2026-03-01T02:00:00.500+0000","event_id":"TURNIP_SOURCE_FAILED","severity":"error","trace_id":"trace-protonwine10","stage":"diagnostics_ui","message":"turnip source request failed","error_detail":"curl 404"}
-{"ts":"2026-03-01T02:00:00.600+0000","event_id":"RUNTIME_LOADER_TRACE_CONTRACT_SNAPSHOT","severity":"info","trace_id":"trace-protonwine10","stage":"graphics_driver","message":"runtime loader trace contract snapshot prepared","loader_trace_effective":"1","loader_trace_mode":"wine:loaddll,module"}
+{"ts":"2026-03-01T02:00:00.400+0000","event_id":"RUNTIME_LIBRARY_CONFLICT_DETECTED","severity":"warn","trace_id":"trace-freewine11","stage":"graphics_driver","message":"runtime library conflict detected: dxvk_artifact_source_unset","conflict":"dxvk_artifact_source_unset"}
+{"ts":"2026-03-01T02:00:00.500+0000","event_id":"TURNIP_SOURCE_FAILED","severity":"error","trace_id":"trace-freewine11","stage":"diagnostics_ui","message":"turnip source request failed","error_detail":"curl 404"}
+{"ts":"2026-03-01T02:00:00.600+0000","event_id":"RUNTIME_LOADER_TRACE_CONTRACT_SNAPSHOT","severity":"info","trace_id":"trace-freewine11","stage":"graphics_driver","message":"runtime loader trace contract snapshot prepared","loader_trace_effective":"1","loader_trace_mode":"wine:loaddll,module"}
 EOF
 
 cat > "${scenario_dir}/runtime-logs/wfm_2026-03-01_02-00-00.txt" <<'EOF'
