@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently six-patch mainline:
+The patch base is currently seven-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -44,6 +44,9 @@ The patch base is currently six-patch mainline:
   - restores architecture split visibility (`x86_64`/`arm64ec`) for dgVoodoo in Contents filters
   - removes legacy DDraw selector from DXVK config and fixes DXVK runtime path to keep DDraw on system/WineD3D
   - extends dgVoodoo config dialog with arch/route toggles and explicit legacy API routing hints
+- `0007-graphics-center-color-polish.patch`
+  - improves Graphics Center visual polish by adding per-lane accent colors and a category badge in Contents rows
+  - fixes icon rendering path (`setImageResource` + tint) to avoid inconsistent list item paint in light/dark themes
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
 2026 after apply/build verification. Current `0002`, `0003`, and `0004` are bounded restore
