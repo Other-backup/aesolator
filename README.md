@@ -26,9 +26,10 @@ Android application repository for Ae.solator (`by.aero.so.benchmark`).
 ## Main Workflow
 
 - `.github/workflows/ci-winlator.yml`
-  - pulls current Winlator-Ludashi upstream,
-  - applies app patch-base from `ci/winlator/patches`,
+  - builds APK from native app source stored directly in this repo,
   - publishes APK release lane in this repo.
+
+Patch-stack scripts under `ci/winlator/patches` remain as legacy tooling only; they are no longer the primary CI build path.
 
 ## Local Build
 

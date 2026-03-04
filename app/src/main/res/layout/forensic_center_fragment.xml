@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/TVForensicHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_hint" />
+
+            <View style="@style/HorizontalLine" />
+
+            <CheckBox
+                android:id="@+id/CBForensicWineDebug"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/enable_wine_debug" />
+
+            <CheckBox
+                android:id="@+id/CBForensicBox64Logs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/enable_box64_logs" />
+
+            <CheckBox
+                android:id="@+id/CBForensicDRI3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/use_dri3_extension" />
+
+            <View style="@style/HorizontalLine" />
+
+            <TextView
+                android:id="@+id/TVAdbCommandLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_adb_label" />
+
+            <TextView
+                android:id="@+id/TVAdbCommand"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="6dp"
+                android:paddingBottom="10dp"
+                android:text="@string/diagnostics_adb_command"
+                android:textIsSelectable="true"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/BTCopyAdbCommand"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/copy" />
+
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="0dp" />
+
+                <Button
+                    android:id="@+id/BTSaveForensic"
+                    style="@style/ButtonPositive"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/save" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

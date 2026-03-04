@@ -1,3 +1,17 @@
+# Upstream Android/Gradle noise
+*.iml
+.gradle/
+/local.properties
+/.idea/
+/build
+/captures
+.externalNativeBuild
+.cxx
+app/src/main/assets/imagefs.txz
+app/src/main/assets/imagefs.txz.02
+app/src/main/assets/proton-9.0-arm64ec.txz
+app/src/main/assets/proton-9.0-x86_64.txz
+
 # Local build outputs and working trees
 /out/
 /work/
@@ -19,3 +33,4 @@ ci/wine11-arm64ec/transfer-lanes/tkg-ge-wave6-runtime/patches-pre-stack-rebase/
 
 # OS/editor noise
 .DS_Store
+Thumbs.db

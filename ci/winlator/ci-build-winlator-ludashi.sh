@@ -3,30 +3,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${WINLATOR_OUTPUT_DIR:-${ROOT_DIR}/out/winlator}"
-WORK_DIR="${WORK_DIR:-${ROOT_DIR}/work/winlator-ludashi}"
-SRC_DIR="${WORK_DIR}/src"
+SRC_DIR="${WINLATOR_SRC_DIR:-${ROOT_DIR}}"
 LOG_DIR="${OUT_DIR}/logs"
-INSPECT_DIR="${LOG_DIR}/inspect-upstream"
 DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md}"
-PATCH_AUDIT_REPORT="${WINLATOR_PATCH_AUDIT_REPORT:-${ROOT_DIR}/docs/PATCH_STACK_REFLECTIVE_AUDIT.md}"
-RUNTIME_CONTRACT_AUDIT_REPORT="${WINLATOR_RUNTIME_CONTRACT_AUDIT_REPORT:-${ROOT_DIR}/docs/PATCH_STACK_RUNTIME_CONTRACT_AUDIT.md}"
 
-: "${WINLATOR_LUDASHI_REPO:=https://github.com/StevenMXZ/Winlator-Ludashi.git}"
-: "${WINLATOR_LUDASHI_REF:=latest}"
 : "${WINLATOR_GRADLE_TASK:=assembleDebug}"
 : "${WINLATOR_APK_BASENAME:=by.aero.so.benchmark-debug}"
-: "${WINLATOR_PATCH_PREFLIGHT:=1}"
 
 log() { printf '[winlator-ci] %s\n' "$*"; }
 fail() { printf '[winlator-ci][error] %s\n' "$*" >&2; exit 1; }
 require_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
 
-require_bool() {
-  case "${2:-}" in
-    0|1) ;;
-    *) fail "${1} must be 0 or 1 (got: ${2:-})" ;;
-  esac
-}
+SOURCE_COMMIT="unknown"
+SOURCE_SHORT_SHA="unknown"
+SOURCE_BRANCH="unknown"
 
 configure_app_version_env() {
   local code name
@@ -53,72 +43,43 @@ configure_app_version_env() {
 }
 
 prepare_layout() {
-  rm -rf "${WORK_DIR}"
-  mkdir -p "${OUT_DIR}" "${LOG_DIR}" "${WORK_DIR}"
+  mkdir -p "${OUT_DIR}" "${LOG_DIR}"
 }
 
-clone_upstream() {
-  log "Cloning ${WINLATOR_LUDASHI_REPO} (${WINLATOR_LUDASHI_REF})"
-  git clone --filter=blob:none "${WINLATOR_LUDASHI_REPO}" "${SRC_DIR}"
-  git -C "${SRC_DIR}" fetch --tags --force --prune origin
-  if [[ "${WINLATOR_LUDASHI_REF}" == "latest" || "${WINLATOR_LUDASHI_REF}" == "auto" ]]; then
-    local remote_head
-    remote_head="$(git -C "${SRC_DIR}" symbolic-ref --quiet --short refs/remotes/origin/HEAD || true)"
-    [[ -n "${remote_head}" ]] || remote_head="origin/HEAD"
-    log "Resolved latest upstream ref -> ${remote_head}"
-    git -C "${SRC_DIR}" checkout -q --detach "${remote_head}"
-    printf '%s\n' "${remote_head}" > "${LOG_DIR}/upstream-ref-requested.txt"
-  else
-    git -C "${SRC_DIR}" checkout "${WINLATOR_LUDASHI_REF}"
-    printf '%s\n' "${WINLATOR_LUDASHI_REF}" > "${LOG_DIR}/upstream-ref-requested.txt"
-  fi
-  # Ensure binary assets/submodules (adrenotools, pngs) are present.
-  if command -v git-lfs >/dev/null 2>&1; then
-    git -C "${SRC_DIR}" lfs install --local || true
-    git -C "${SRC_DIR}" lfs pull || true
-  fi
-  git -C "${SRC_DIR}" submodule update --init --recursive || true
-  git -C "${SRC_DIR}" rev-parse HEAD > "${LOG_DIR}/upstream-head.txt"
+require_native_tree() {
+  [[ -f "${SRC_DIR}/settings.gradle" ]] || fail "Native source tree missing settings.gradle in ${SRC_DIR}"
+  [[ -f "${SRC_DIR}/app/build.gradle" ]] || fail "Native source tree missing app/build.gradle in ${SRC_DIR}"
+  [[ -f "${SRC_DIR}/gradlew" ]] || fail "Native source tree missing gradlew in ${SRC_DIR}"
 }
 
-inspect_upstream() {
-  bash "${ROOT_DIR}/ci/winlator/inspect-upstream.sh" "${SRC_DIR}" "${INSPECT_DIR}"
-  bash "${ROOT_DIR}/ci/winlator/generate-reflective-analysis.sh" \
-    "${INSPECT_DIR}/commits.tsv" \
-    "${DOC_REPORT}" \
-    "${WINLATOR_LUDASHI_REPO}"
-}
-
-preflight_patch_stack() {
-  local preflight_log
-  preflight_log="${LOG_DIR}/patch-stack-preflight.log"
-  if [[ "${WINLATOR_PATCH_PREFLIGHT}" != "1" ]]; then
-    log "Skipping patch-stack preflight (WINLATOR_PATCH_PREFLIGHT=0)"
-    return 0
+capture_source_metadata() {
+  if git -C "${SRC_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_COMMIT="$(git -C "${SRC_DIR}" rev-parse HEAD)"
+    SOURCE_SHORT_SHA="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
+    SOURCE_BRANCH="$(git -C "${SRC_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    [[ -n "${SOURCE_BRANCH}" ]] || SOURCE_BRANCH="detached"
   fi
 
-  log "Running patch-stack preflight"
-  if ! bash "${ROOT_DIR}/ci/winlator/check-patch-stack.sh" "${SRC_DIR}" > "${preflight_log}" 2>&1; then
-    tail -n 120 "${preflight_log}" >&2 || true
-    fail "Patch-stack preflight failed (see ${preflight_log})"
-  fi
-}
+  cat > "${LOG_DIR}/native-source-metadata.txt" <<EOF
+source_dir=${SRC_DIR}
+source_branch=${SOURCE_BRANCH}
+source_commit=${SOURCE_COMMIT}
+source_short_sha=${SOURCE_SHORT_SHA}
+EOF
 
-apply_patches() {
-  bash "${ROOT_DIR}/ci/winlator/apply-repo-patches.sh" "${SRC_DIR}" "${ROOT_DIR}/ci/winlator/patches"
-  bash "${ROOT_DIR}/ci/winlator/run-reflective-audits.sh" \
-    "${ROOT_DIR}/ci/winlator/patches" \
-    "${PATCH_AUDIT_REPORT}" \
-    "${RUNTIME_CONTRACT_AUDIT_REPORT}"
-  bash "${ROOT_DIR}/ci/winlator/assets-fixes/remove-broken-anim.sh" "${SRC_DIR}"
-  git -C "${SRC_DIR}" diff --stat > "${LOG_DIR}/patch-diffstat.log"
-  git -C "${SRC_DIR}" diff > "${LOG_DIR}/patch.diff"
-  cp -f "${PATCH_AUDIT_REPORT}" "${LOG_DIR}/patch-stack-reflective-audit.md"
-  cp -f "${RUNTIME_CONTRACT_AUDIT_REPORT}" "${LOG_DIR}/patch-stack-runtime-contract-audit.md"
+  cat > "${DOC_REPORT}" <<EOF
+# Aesolator Native Source Snapshot
+
+- Source mode: native tree (no CI patch overlay)
+- Source directory: \`${SRC_DIR}\`
+- Branch: \`${SOURCE_BRANCH}\`
+- Commit: \`${SOURCE_COMMIT}\`
+- Captured at (UTC): $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
 }
 
 build_apk() {
-  local apk_path upstream_sha out_apk version_name_safe
+  local apk_path out_apk version_name_safe
 
   chmod +x "${SRC_DIR}/gradlew"
   pushd "${SRC_DIR}" >/dev/null
@@ -128,9 +89,8 @@ build_apk() {
   apk_path="$(find "${SRC_DIR}/app/build/outputs/apk" -type f -name '*.apk' | sort | head -n1)"
   [[ -n "${apk_path}" ]] || fail "Unable to locate built APK under app/build/outputs/apk"
 
-  upstream_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
   version_name_safe="$(printf '%s' "${AEROSO_APP_VERSION_NAME}" | tr -cs '[:alnum:]._-' '_')"
-  out_apk="${OUT_DIR}/${WINLATOR_APK_BASENAME}-${version_name_safe}-${upstream_sha}.apk"
+  out_apk="${OUT_DIR}/${WINLATOR_APK_BASENAME}-${version_name_safe}-${SOURCE_SHORT_SHA}.apk"
   cp -f "${apk_path}" "${out_apk}"
 
   (
@@ -144,17 +104,11 @@ build_apk() {
 main() {
   require_cmd bash
   require_cmd git
-  require_cmd curl
-  require_cmd tar
-  require_cmd python3
   require_cmd sha256sum
-  require_bool WINLATOR_PATCH_PREFLIGHT "${WINLATOR_PATCH_PREFLIGHT}"
 
+  require_native_tree
   prepare_layout
-  clone_upstream
-  inspect_upstream
-  preflight_patch_stack
-  apply_patches
+  capture_source_metadata
   configure_app_version_env
   build_apk
 }
