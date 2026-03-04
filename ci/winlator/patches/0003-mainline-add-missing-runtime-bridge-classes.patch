@@ -1,0 +1,808 @@
+diff --git a/app/src/main/java/com/winlator/cmod/container/ContainerDiscovery.java b/app/src/main/java/com/winlator/cmod/container/ContainerDiscovery.java
+new file mode 100644
+index 0000000..7c97a0c
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/container/ContainerDiscovery.java
+@@ -0,0 +1,112 @@
++package com.winlator.cmod.container;
++
++import com.winlator.cmod.xenvironment.ImageFs;
++
++import org.json.JSONArray;
++import org.json.JSONException;
++import org.json.JSONObject;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public final class ContainerDiscovery {
++    private ContainerDiscovery() {}
++
++    public static ParseResult parseContainerDirName(String dirName) {
++        if (dirName == null || dirName.trim().isEmpty()) {
++            return ParseResult.invalid("empty_name");
++        }
++
++        String prefix = ImageFs.USER + "-";
++        if (!dirName.startsWith(prefix)) {
++            return ParseResult.invalid("prefix_mismatch");
++        }
++
++        String suffix = dirName.substring(prefix.length()).trim();
++        if (suffix.isEmpty()) {
++            return ParseResult.invalid("missing_numeric_suffix");
++        }
++
++        try {
++            int id = Integer.parseInt(suffix);
++            if (id <= 0) {
++                return ParseResult.invalid("non_positive_id");
++            }
++            return ParseResult.valid(id);
++        }
++        catch (NumberFormatException e) {
++            return ParseResult.invalid("invalid_numeric_suffix");
++        }
++    }
++
++    public static final class ParseResult {
++        public final boolean valid;
++        public final int id;
++        public final String reason;
++
++        private ParseResult(boolean valid, int id, String reason) {
++            this.valid = valid;
++            this.id = id;
++            this.reason = reason == null ? "" : reason;
++        }
++
++        public static ParseResult valid(int id) {
++            return new ParseResult(true, id, "");
++        }
++
++        public static ParseResult invalid(String reason) {
++            return new ParseResult(false, 0, reason);
++        }
++    }
++
++    public static final class LoadReport {
++        public int scannedDirectories = 0;
++        public int ignoredDirectories = 0;
++        public int duplicateIds = 0;
++        public int missingConfig = 0;
++        public int validContainers = 0;
++        public int invalidConfig = 0;
++        public int parseExceptions = 0;
++
++        private final List<String> warnings = new ArrayList<>();
++
++        public void addWarning(String warning) {
++            if (warning == null || warning.trim().isEmpty()) return;
++            if (warnings.size() < 256) warnings.add(warning.trim());
++        }
++
++        public String toSummaryString() {
++            return "scanned=" + scannedDirectories
++                    + ",valid=" + validContainers
++                    + ",ignored=" + ignoredDirectories
++                    + ",duplicate=" + duplicateIds
++                    + ",missing_config=" + missingConfig
++                    + ",invalid_config=" + invalidConfig
++                    + ",exceptions=" + parseExceptions
++                    + ",warnings=" + warnings.size();
++        }
++
++        public JSONArray warningsJson() {
++            JSONArray array = new JSONArray();
++            for (String warning : warnings) array.put(warning);
++            return array;
++        }
++
++        public JSONObject toJson() {
++            JSONObject obj = new JSONObject();
++            try {
++                obj.put("scanned_directories", scannedDirectories);
++                obj.put("ignored_directories", ignoredDirectories);
++                obj.put("duplicate_ids", duplicateIds);
++                obj.put("missing_config", missingConfig);
++                obj.put("valid_containers", validContainers);
++                obj.put("invalid_config", invalidConfig);
++                obj.put("parse_exceptions", parseExceptions);
++                obj.put("warnings", warningsJson());
++                obj.put("summary", toSummaryString());
++            }
++            catch (JSONException ignored) {}
++            return obj;
++        }
++    }
++}
+diff --git a/app/src/main/java/com/winlator/cmod/container/ContainerNormalizer.java b/app/src/main/java/com/winlator/cmod/container/ContainerNormalizer.java
+new file mode 100644
+index 0000000..b4992b1
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/container/ContainerNormalizer.java
+@@ -0,0 +1,168 @@
++package com.winlator.cmod.container;
++
++import com.winlator.cmod.core.EnvVars;
++
++import org.json.JSONArray;
++import org.json.JSONException;
++import org.json.JSONObject;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public final class ContainerNormalizer {
++    private ContainerNormalizer() {}
++
++    public static NormalizationResult normalizeForLaunch(Container container, Shortcut shortcut) {
++        if (container == null) {
++            return new NormalizationResult(
++                    "", "", "", "", "", "", "",
++                    "", "", "", "", "", "",
++                    new ArrayList<>());
++        }
++
++        List<String> changed = new ArrayList<>();
++
++        String baseWineVersion = safe(container.getWineVersion());
++        String baseEmulator = safe(container.getEmulator());
++        String baseGraphicsDriver = safe(container.getGraphicsDriver());
++        String baseAudioDriver = safe(container.getAudioDriver());
++        String baseDxWrapper = safe(container.getDXWrapper());
++        String baseDxWrapperConfig = safe(container.getDXWrapperConfig());
++        String baseEnvVars = safe(container.getEnvVars());
++        String baseBox64Preset = safe(container.getBox64Preset());
++        String baseFexcorePreset = safe(container.getFEXCorePreset());
++        String baseRuntimeProfile = safe(container.getExtra("runtimeProfile", ""));
++        String baseBox64Version = safe(container.getBox64Version());
++        String baseFexcoreVersion = safe(container.getFEXCoreVersion());
++        String baseLcAll = safe(container.getLC_ALL());
++
++        String wineVersion = override(shortcut, "wineVersion", baseWineVersion, changed, "wineVersion");
++        String emulator = override(shortcut, "emulator", baseEmulator, changed, "emulator");
++        String graphicsDriver = override(shortcut, "graphicsDriver", baseGraphicsDriver, changed, "graphicsDriver");
++        String audioDriver = override(shortcut, "audioDriver", baseAudioDriver, changed, "audioDriver");
++        String dxWrapper = override(shortcut, "dxwrapper", baseDxWrapper, changed, "dxwrapper");
++        String dxWrapperConfig = override(shortcut, "dxwrapperConfig", baseDxWrapperConfig, changed, "dxwrapperConfig");
++        String box64Preset = override(shortcut, "box64Preset", baseBox64Preset, changed, "box64Preset");
++        String fexcorePreset = override(shortcut, "fexcorePreset", baseFexcorePreset, changed, "fexcorePreset");
++        String runtimeProfile = override(shortcut, "runtimeProfile", baseRuntimeProfile, changed, "runtimeProfile");
++        String box64Version = override(shortcut, "box64Version", baseBox64Version, changed, "box64Version");
++        String fexcoreVersion = override(shortcut, "fexcoreVersion", baseFexcoreVersion, changed, "fexcoreVersion");
++        String lcAll = override(shortcut, "lc_all", baseLcAll, changed, "lc_all");
++
++        String envVars = mergeEnvVars(baseEnvVars, shortcut != null ? shortcut.getExtra("envVars", "") : "", changed);
++
++        return new NormalizationResult(
++                wineVersion, emulator, graphicsDriver, audioDriver, dxWrapper, dxWrapperConfig, envVars,
++                box64Preset, fexcorePreset, runtimeProfile, box64Version, fexcoreVersion, lcAll,
++                changed);
++    }
++
++    private static String mergeEnvVars(String baseEnvVars, String shortcutEnvVars, List<String> changed) {
++        EnvVars merged = new EnvVars();
++        if (!safe(baseEnvVars).isEmpty()) merged.putAll(baseEnvVars);
++        String normalizedShortcut = safe(shortcutEnvVars);
++        if (!normalizedShortcut.isEmpty()) {
++            merged.putAll(normalizedShortcut);
++            if (!normalizedShortcut.equals(safe(baseEnvVars))) changed.add("envVars");
++        }
++        return merged.toString();
++    }
++
++    private static String override(
++            Shortcut shortcut,
++            String key,
++            String fallback,
++            List<String> changed,
++            String changedName) {
++        if (shortcut == null) return safe(fallback);
++        String value = safe(shortcut.getExtra(key, fallback));
++        String baseline = safe(fallback);
++        if (!value.equals(baseline)) changed.add(changedName);
++        return value;
++    }
++
++    private static String safe(String value) {
++        return value == null ? "" : value;
++    }
++
++    public static final class NormalizationResult {
++        public final String wineVersion;
++        public final String emulator;
++        public final String graphicsDriver;
++        public final String audioDriver;
++        public final String dxwrapper;
++        public final String dxwrapperConfig;
++        public final String envVars;
++        public final String box64Preset;
++        public final String fexcorePreset;
++        public final String runtimeProfile;
++        public final String box64Version;
++        public final String fexcoreVersion;
++        public final String lcAll;
++
++        private final List<String> changedFields;
++
++        private NormalizationResult(
++                String wineVersion,
++                String emulator,
++                String graphicsDriver,
++                String audioDriver,
++                String dxwrapper,
++                String dxwrapperConfig,
++                String envVars,
++                String box64Preset,
++                String fexcorePreset,
++                String runtimeProfile,
++                String box64Version,
++                String fexcoreVersion,
++                String lcAll,
++                List<String> changedFields) {
++            this.wineVersion = safe(wineVersion);
++            this.emulator = safe(emulator);
++            this.graphicsDriver = safe(graphicsDriver);
++            this.audioDriver = safe(audioDriver);
++            this.dxwrapper = safe(dxwrapper);
++            this.dxwrapperConfig = safe(dxwrapperConfig);
++            this.envVars = safe(envVars);
++            this.box64Preset = safe(box64Preset);
++            this.fexcorePreset = safe(fexcorePreset);
++            this.runtimeProfile = safe(runtimeProfile);
++            this.box64Version = safe(box64Version);
++            this.fexcoreVersion = safe(fexcoreVersion);
++            this.lcAll = safe(lcAll);
++            this.changedFields = changedFields == null ? new ArrayList<>() : changedFields;
++        }
++
++        public boolean hasDrift() {
++            return !changedFields.isEmpty();
++        }
++
++        public JSONArray changedFieldsJson() {
++            JSONArray array = new JSONArray();
++            for (String field : changedFields) array.put(field);
++            return array;
++        }
++
++        public JSONObject toJson() {
++            JSONObject obj = new JSONObject();
++            try {
++                obj.put("wine_version", wineVersion);
++                obj.put("emulator", emulator);
++                obj.put("graphics_driver", graphicsDriver);
++                obj.put("audio_driver", audioDriver);
++                obj.put("dxwrapper", dxwrapper);
++                obj.put("dxwrapper_config", dxwrapperConfig);
++                obj.put("env_vars", envVars);
++                obj.put("box64_preset", box64Preset);
++                obj.put("fexcore_preset", fexcorePreset);
++                obj.put("runtime_profile", runtimeProfile);
++                obj.put("box64_version", box64Version);
++                obj.put("fexcore_version", fexcoreVersion);
++                obj.put("lc_all", lcAll);
++                obj.put("changed_fields", changedFieldsJson());
++            }
++            catch (JSONException ignored) {}
++            return obj;
++        }
++    }
++}
+diff --git a/app/src/main/java/com/winlator/cmod/contents/DgVoodooManager.java b/app/src/main/java/com/winlator/cmod/contents/DgVoodooManager.java
+new file mode 100644
+index 0000000..c490337
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/contents/DgVoodooManager.java
+@@ -0,0 +1,271 @@
++package com.winlator.cmod.contents;
++
++import android.content.Context;
++import android.net.Uri;
++import android.util.Log;
++
++import com.winlator.cmod.core.FileUtils;
++
++import java.io.BufferedInputStream;
++import java.io.BufferedOutputStream;
++import java.io.File;
++import java.io.FileInputStream;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.zip.ZipEntry;
++import java.util.zip.ZipInputStream;
++
++public class DgVoodooManager {
++    private static final String TAG = "DgVoodooManager";
++    private static final String META_FILE = "package.meta";
++    private static final String STAGE_LIST = ".aesolator-dgvoodoo-stage.list";
++    private static final String[] KNOWN_DLLS = {
++            "ddraw.dll", "d3d8.dll", "d3d9.dll", "d3dim.dll",
++            "d3dimm.dll", "glide.dll", "d3drm.dll", "dinput.dll"
++    };
++
++    private final Context context;
++    private final File packageRootDir;
++    private final File runtimeRootDir;
++    private final File metaFile;
++
++    public DgVoodooManager(Context context) {
++        this.context = context.getApplicationContext();
++        this.packageRootDir = new File(this.context.getFilesDir(), "dgvoodoo");
++        this.runtimeRootDir = new File(packageRootDir, "runtime");
++        this.metaFile = new File(packageRootDir, META_FILE);
++    }
++
++    public boolean isInstalled() {
++        if (!runtimeRootDir.isDirectory()) return false;
++        File[] files = runtimeRootDir.listFiles();
++        return files != null && files.length > 0;
++    }
++
++    public String getVersionHint() {
++        if (metaFile.isFile()) {
++            String text = FileUtils.readString(metaFile);
++            if (text != null) {
++                for (String line : text.split("\n")) {
++                    line = line.trim();
++                    if (line.startsWith("version=")) {
++                        String value = line.substring("version=".length()).trim();
++                        if (!value.isEmpty()) return value;
++                    }
++                }
++            }
++        }
++        return isInstalled() ? "local-import" : "not-installed";
++    }
++
++    public String installPackage(Uri packageUri) {
++        if (packageUri == null) return "";
++        File tmpDir = new File(packageRootDir, "tmp_install");
++        File zipFile = new File(packageRootDir, "package.zip");
++
++        try {
++            if (tmpDir.exists()) FileUtils.delete(tmpDir);
++            if (!tmpDir.mkdirs()) return "";
++            if (zipFile.exists()) FileUtils.delete(zipFile);
++
++            try (InputStream in = context.getContentResolver().openInputStream(packageUri)) {
++                if (in == null) return "";
++                copyStream(in, new FileOutputStream(zipFile));
++            }
++
++            unzipInto(zipFile, tmpDir);
++
++            if (runtimeRootDir.exists()) FileUtils.delete(runtimeRootDir);
++            if (!tmpDir.renameTo(runtimeRootDir)) {
++                if (!FileUtils.copy(tmpDir, runtimeRootDir)) return "";
++                FileUtils.delete(tmpDir);
++            }
++
++            String version = guessVersionHint(packageUri);
++            writeMeta(version);
++            return version;
++        }
++        catch (Exception e) {
++            Log.e(TAG, "installPackage failed", e);
++            return "";
++        }
++        finally {
++            if (tmpDir.exists()) FileUtils.delete(tmpDir);
++            if (zipFile.exists()) FileUtils.delete(zipFile);
++        }
++    }
++
++    public File resolveShortcutTargetDir(File imageRootDir, String shortcutPath) {
++        if (shortcutPath != null && !shortcutPath.trim().isEmpty()) {
++            File shortcutFile = new File(shortcutPath.trim());
++            File parent = shortcutFile.getParentFile();
++            if (parent != null && parent.isDirectory()) return parent;
++        }
++
++        if (imageRootDir != null) {
++            File fallback = new File(imageRootDir, ".wine/drive_c/windows/system32");
++            if (!fallback.exists()) fallback.mkdirs();
++            if (fallback.isDirectory()) return fallback;
++        }
++        return null;
++    }
++
++    public String resolvePreferredArch(String shortcutPath, String requestedArch) {
++        String arch = normalizeArch(requestedArch);
++        if (!"auto".equals(arch)) return arch;
++
++        String lower = shortcutPath == null ? "" : shortcutPath.toLowerCase(Locale.ROOT);
++        if (lower.contains("program files (x86)") || lower.contains("syswow64") || lower.endsWith("32.exe")) {
++            return "x86";
++        }
++        return "x64";
++    }
++
++    public boolean stageRuntime(File targetDir, String arch) {
++        if (targetDir == null || !targetDir.isDirectory()) return false;
++        if (!isInstalled()) return false;
++
++        File source = resolveArchSourceDir(normalizeArch(arch));
++        if (source == null || !source.isDirectory()) return false;
++
++        List<String> staged = new ArrayList<>();
++        File[] files = source.listFiles();
++        if (files == null) return false;
++
++        for (File file : files) {
++            if (!file.isFile()) continue;
++            String name = file.getName().toLowerCase(Locale.ROOT);
++            if (!name.endsWith(".dll") && !name.endsWith(".conf")) continue;
++
++            File dest = new File(targetDir, file.getName());
++            if (FileUtils.copy(file, dest)) staged.add(dest.getName());
++        }
++
++        if (staged.isEmpty()) return false;
++        writeStageList(targetDir, staged);
++        return true;
++    }
++
++    public void cleanupStagedRuntime(File targetDir) {
++        if (targetDir == null || !targetDir.isDirectory()) return;
++
++        File listFile = new File(targetDir, STAGE_LIST);
++        if (listFile.isFile()) {
++            String content = FileUtils.readString(listFile);
++            if (content != null) {
++                for (String line : content.split("\n")) {
++                    String name = line.trim();
++                    if (name.isEmpty()) continue;
++                    FileUtils.delete(new File(targetDir, name));
++                }
++            }
++            FileUtils.delete(listFile);
++            return;
++        }
++
++        for (String dll : KNOWN_DLLS) {
++            FileUtils.delete(new File(targetDir, dll));
++            FileUtils.delete(new File(targetDir, dll.toUpperCase(Locale.ROOT)));
++        }
++        FileUtils.delete(new File(targetDir, "dgVoodoo.conf"));
++    }
++
++    private File resolveArchSourceDir(String arch) {
++        String[] candidates;
++        if ("x86".equals(arch)) {
++            candidates = new String[] {"MS/x86", "x86", "bin/x86", ""};
++        }
++        else {
++            candidates = new String[] {"MS/x64", "x64", "bin/x64", ""};
++        }
++
++        for (String candidate : candidates) {
++            File dir = candidate.isEmpty() ? runtimeRootDir : new File(runtimeRootDir, candidate);
++            if (dir.isDirectory()) return dir;
++        }
++        return null;
++    }
++
++    private String normalizeArch(String value) {
++        if ("x86".equalsIgnoreCase(value)) return "x86";
++        if ("x64".equalsIgnoreCase(value) || "amd64".equalsIgnoreCase(value)) return "x64";
++        return "auto";
++    }
++
++    private String guessVersionHint(Uri uri) {
++        String tail = uri == null ? "" : String.valueOf(uri.getLastPathSegment());
++        if (tail == null) tail = "";
++        tail = tail.replace('\\', '/');
++        int slash = tail.lastIndexOf('/');
++        if (slash >= 0 && slash + 1 < tail.length()) tail = tail.substring(slash + 1);
++        tail = tail.replaceAll("(?i)\\.zip$", "");
++        tail = tail.replaceAll("[^a-zA-Z0-9._-]", "_");
++        if (tail.isEmpty()) tail = "local-import";
++        return tail;
++    }
++
++    private void writeMeta(String versionHint) {
++        if (!packageRootDir.exists()) packageRootDir.mkdirs();
++        StringBuilder sb = new StringBuilder();
++        sb.append("version=").append(versionHint == null ? "local-import" : versionHint).append('\n');
++        sb.append("updated_at_ms=").append(System.currentTimeMillis()).append('\n');
++        FileUtils.writeString(metaFile, sb.toString());
++    }
++
++    private void writeStageList(File targetDir, List<String> stagedNames) {
++        File listFile = new File(targetDir, STAGE_LIST);
++        StringBuilder sb = new StringBuilder();
++        for (String name : stagedNames) sb.append(name).append('\n');
++        FileUtils.writeString(listFile, sb.toString());
++    }
++
++    private void unzipInto(File zipFile, File destDir) throws IOException {
++        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile)))) {
++            ZipEntry entry;
++            while ((entry = zis.getNextEntry()) != null) {
++                File outFile = safeZipEntry(destDir, entry);
++                if (outFile == null) continue;
++
++                if (entry.isDirectory()) {
++                    if (!outFile.exists() && !outFile.mkdirs()) {
++                        throw new IOException("Failed to create dir: " + outFile.getAbsolutePath());
++                    }
++                    continue;
++                }
++
++                File parent = outFile.getParentFile();
++                if (parent != null && !parent.exists() && !parent.mkdirs()) {
++                    throw new IOException("Failed to create parent dir: " + parent.getAbsolutePath());
++                }
++
++                try (OutputStream out = new BufferedOutputStream(new FileOutputStream(outFile))) {
++                    copyStream(zis, out);
++                }
++            }
++        }
++    }
++
++    private File safeZipEntry(File rootDir, ZipEntry entry) throws IOException {
++        File out = new File(rootDir, entry.getName());
++        String rootPath = rootDir.getCanonicalPath() + File.separator;
++        String outPath = out.getCanonicalPath();
++        if (!outPath.startsWith(rootPath)) {
++            Log.w(TAG, "Skipping suspicious zip entry: " + entry.getName());
++            return null;
++        }
++        return out;
++    }
++
++    private static void copyStream(InputStream in, OutputStream out) throws IOException {
++        byte[] buffer = new byte[16 * 1024];
++        int read;
++        while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
++        out.flush();
++    }
++}
+diff --git a/app/src/main/java/com/winlator/cmod/contract/RuntimeSignalContract.java b/app/src/main/java/com/winlator/cmod/contract/RuntimeSignalContract.java
+new file mode 100644
+index 0000000..a49e238
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/contract/RuntimeSignalContract.java
+@@ -0,0 +1,87 @@
++package com.winlator.cmod.contract;
++
++import com.winlator.cmod.core.EnvVars;
++
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.Locale;
++
++public final class RuntimeSignalContract {
++    public static final String WINLATOR_SIGNAL_POLICY = "WINLATOR_SIGNAL_POLICY";
++    public static final String WINLATOR_SIGNAL_SOURCES = "WINLATOR_SIGNAL_SOURCES";
++    public static final String WINLATOR_SIGNAL_DECISION_HASH = "WINLATOR_SIGNAL_DECISION_HASH";
++    public static final String WINLATOR_RUNTIME_PRESET_GUARD_REASON = "WINLATOR_RUNTIME_PRESET_GUARD_REASON";
++    public static final String WINLATOR_UPSCALER_BINDING_GUARD_REASON = "WINLATOR_UPSCALER_BINDING_GUARD_REASON";
++    public static final String WINLATOR_SIGNAL_INPUT_ROUTE = "WINLATOR_SIGNAL_INPUT_ROUTE";
++    public static final String WINLATOR_SIGNAL_INPUT_LAUNCH_KIND = "WINLATOR_SIGNAL_INPUT_LAUNCH_KIND";
++    public static final String WINLATOR_SIGNAL_INPUT_PRECHECK_REASON = "WINLATOR_SIGNAL_INPUT_PRECHECK_REASON";
++    public static final String WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK = "WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK";
++
++    private RuntimeSignalContract() {}
++
++    public static void putSignalInputMarkers(
++            EnvVars envVars,
++            String route,
++            String launchKind,
++            String precheckReason,
++            String precheckFallback) {
++        if (envVars == null) return;
++        envVars.put(WINLATOR_SIGNAL_INPUT_ROUTE, normalize(route, "unknown"));
++        envVars.put(WINLATOR_SIGNAL_INPUT_LAUNCH_KIND, normalize(launchKind, "unknown"));
++        envVars.put(WINLATOR_SIGNAL_INPUT_PRECHECK_REASON, normalize(precheckReason, "none"));
++        envVars.put(WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK, normalize(precheckFallback, "none"));
++        refreshDecisionHash(envVars);
++    }
++
++    public static void putSignalPolicyMarkers(
++            EnvVars envVars,
++            String signalPolicy,
++            String signalSources,
++            String runtimePresetGuardReason,
++            String upscalerBindingGuardReason) {
++        if (envVars == null) return;
++        envVars.put(WINLATOR_SIGNAL_POLICY, normalize(signalPolicy, "unset"));
++        envVars.put(WINLATOR_SIGNAL_SOURCES, normalize(signalSources, "unset"));
++        envVars.put(WINLATOR_RUNTIME_PRESET_GUARD_REASON, normalize(runtimePresetGuardReason, "none"));
++        envVars.put(WINLATOR_UPSCALER_BINDING_GUARD_REASON, normalize(upscalerBindingGuardReason, "none"));
++        refreshDecisionHash(envVars);
++    }
++
++    public static String get(EnvVars envVars, String key) {
++        if (envVars == null || key == null || key.isEmpty()) return "";
++        return envVars.get(key);
++    }
++
++    private static void refreshDecisionHash(EnvVars envVars) {
++        String data = String.join("|",
++                get(envVars, WINLATOR_SIGNAL_POLICY),
++                get(envVars, WINLATOR_SIGNAL_SOURCES),
++                get(envVars, WINLATOR_RUNTIME_PRESET_GUARD_REASON),
++                get(envVars, WINLATOR_UPSCALER_BINDING_GUARD_REASON),
++                get(envVars, WINLATOR_SIGNAL_INPUT_ROUTE),
++                get(envVars, WINLATOR_SIGNAL_INPUT_LAUNCH_KIND),
++                get(envVars, WINLATOR_SIGNAL_INPUT_PRECHECK_REASON),
++                get(envVars, WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK));
++        envVars.put(WINLATOR_SIGNAL_DECISION_HASH, sha256Short(data));
++    }
++
++    private static String normalize(String value, String fallback) {
++        String normalized = value == null ? "" : value.trim();
++        return normalized.isEmpty() ? fallback : normalized;
++    }
++
++    private static String sha256Short(String value) {
++        try {
++            MessageDigest digest = MessageDigest.getInstance("SHA-256");
++            byte[] hash = digest.digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
++            StringBuilder sb = new StringBuilder(hash.length * 2);
++            for (byte b : hash) sb.append(String.format(Locale.US, "%02x", b));
++            String full = sb.toString();
++            return full.length() > 16 ? full.substring(0, 16) : full;
++        }
++        catch (NoSuchAlgorithmException e) {
++            return Integer.toHexString((value == null ? "" : value).hashCode());
++        }
++    }
++}
+diff --git a/app/src/main/java/com/winlator/cmod/core/FileDebugLogger.java b/app/src/main/java/com/winlator/cmod/core/FileDebugLogger.java
+new file mode 100644
+index 0000000..9cdd28b
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/core/FileDebugLogger.java
+@@ -0,0 +1,58 @@
++package com.winlator.cmod.core;
++
++import android.content.Context;
++import android.util.Log;
++
++import java.io.File;
++import java.io.FileWriter;
++import java.io.IOException;
++import java.util.Locale;
++
++public final class FileDebugLogger implements Callback<String> {
++    private static final String TAG = "FileDebugLogger";
++
++    private final File logFile;
++    private final String[] filters;
++
++    public FileDebugLogger(Context context, String prefix, String... filters) {
++        Context appContext = context != null ? context.getApplicationContext() : null;
++        this.logFile = WinlatorLogUtils.createTimestampedLogFile(appContext, safePrefix(prefix));
++        this.filters = filters != null ? filters : new String[0];
++        appendHeader(prefix);
++    }
++
++    @Override
++    public void call(String line) {
++        if (!matches(line)) return;
++        appendLine(line);
++    }
++
++    private void appendHeader(String prefix) {
++        appendLine("# debug stream: " + safePrefix(prefix));
++    }
++
++    private boolean matches(String line) {
++        if (filters.length == 0) return true;
++        String text = line == null ? "" : line.toLowerCase(Locale.ROOT);
++        for (String filter : filters) {
++            if (filter == null || filter.trim().isEmpty()) continue;
++            if (text.contains(filter.toLowerCase(Locale.ROOT))) return true;
++        }
++        return false;
++    }
++
++    private void appendLine(String line) {
++        try (FileWriter writer = new FileWriter(logFile, true)) {
++            writer.write((line == null ? "" : line));
++            writer.write('\n');
++        }
++        catch (IOException e) {
++            Log.e(TAG, "Failed to write debug log line", e);
++        }
++    }
++
++    private static String safePrefix(String value) {
++        if (value == null || value.trim().isEmpty()) return "runtime";
++        return value.trim();
++    }
++}
+diff --git a/app/src/main/java/com/winlator/cmod/graphics/DriverProbeResult.java b/app/src/main/java/com/winlator/cmod/graphics/DriverProbeResult.java
+new file mode 100644
+index 0000000..0ae2327
+--- /dev/null
++++ b/app/src/main/java/com/winlator/cmod/graphics/DriverProbeResult.java
+@@ -0,0 +1,76 @@
++package com.winlator.cmod.graphics;
++
++public class DriverProbeResult {
++    private final String requestedDriverId;
++    private String selectedDriverId;
++    private boolean found;
++    private boolean usingSystemVulkan;
++    private String driverPath = "";
++    private String libraryName = "";
++    private String rejectReason = "";
++
++    public DriverProbeResult(String requestedDriverId) {
++        this.requestedDriverId = requestedDriverId == null ? "" : requestedDriverId;
++        this.selectedDriverId = this.requestedDriverId;
++    }
++
++    public String getRequestedDriverId() {
++        return requestedDriverId;
++    }
++
++    public String getSelectedDriverId() {
++        return selectedDriverId;
++    }
++
++    public void setSelectedDriverId(String selectedDriverId) {
++        this.selectedDriverId = selectedDriverId == null ? "" : selectedDriverId;
++    }
++
++    public boolean isFound() {
++        return found;
++    }
++
++    public void setFound(boolean found) {
++        this.found = found;
++    }
++
++    public boolean isUsingSystemVulkan() {
++        return usingSystemVulkan;
++    }
++
++    public void setUsingSystemVulkan(boolean usingSystemVulkan) {
++        this.usingSystemVulkan = usingSystemVulkan;
++    }
++
++    public String getDriverPath() {
++        return driverPath;
++    }
++
++    public void setDriverPath(String driverPath) {
++        this.driverPath = driverPath == null ? "" : driverPath;
++    }
++
++    public String getLibraryName() {
++        return libraryName;
++    }
++
++    public void setLibraryName(String libraryName) {
++        this.libraryName = libraryName == null ? "" : libraryName;
++    }
++
++    public String getRejectReason() {
++        return rejectReason;
++    }
++
++    public void reject(String reason) {
++        this.rejectReason = reason == null ? "" : reason;
++        this.found = false;
++        this.usingSystemVulkan = false;
++    }
++
++    public boolean isUsable() {
++        if (!found) return false;
++        if (usingSystemVulkan) return true;
++        return !driverPath.isEmpty() && !libraryName.isEmpty();
++    }
++}

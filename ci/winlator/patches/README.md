@@ -10,7 +10,7 @@ middle of the stack.
 
 ## Current baseline
 
-The patch base is currently two-patch mainline:
+The patch base is currently three-patch mainline:
 
 - `0001-mainline-full-stack-consolidated.patch`
   - base fork/runtime/FEX contract and Ae.solator branding
@@ -23,10 +23,15 @@ The patch base is currently two-patch mainline:
     (`ForensicConfig`, `ForensicLogger`, `LinuxTelemetrySampler`,
     `RuntimeProfile*`, `DgVoodooConfigDialog`, `VulkanVersionInfo`, and related helpers)
   - keeps compile contract stable while `0001` stays unchanged
+- `0003-mainline-add-missing-runtime-bridge-classes.patch`
+  - adds compile-safe bridge classes referenced by `0001` runtime/graphics integrations
+    (`ContainerDiscovery`, `ContainerNormalizer`, `RuntimeSignalContract`,
+    `FileDebugLogger`, `DriverProbeResult`, `DgVoodooManager`)
+  - closes current upstream drift where `0001` references these classes but upstream does not ship them yet
 
 Historical review slices `0002..0029` were folded back into `0001` on March 1,
-2026 after apply/build verification. Current `0002` is a bounded restore slice
-for upstream drift and can be folded back into `0001` after the next stable cycle.
+2026 after apply/build verification. Current `0002` and `0003` are bounded restore
+slices for upstream drift and can be folded back into `0001` after the next stable cycle.
 
 ## Patch-base rule
 
