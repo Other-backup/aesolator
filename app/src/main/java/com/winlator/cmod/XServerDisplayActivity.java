@@ -351,6 +351,22 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         }
 
         Intent launchIntent = getIntent();
+        String launchTrustState = LaunchSecurity.getXServerLaunchTrustState(this, launchIntent);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_LAUNCH_TRUST_EVAL",
+                null,
+                "xserver",
+                "launch_trust_evaluated",
+                ForensicLogger.fields(
+                        "container_id", launchIntent != null ? launchIntent.getIntExtra("container_id", 0) : 0,
+                        "shortcut_path", launchIntent != null ? launchIntent.getStringExtra("shortcut_path") : "",
+                        "requires_signature", requiresSignedLaunchIntent(launchIntent),
+                        "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent),
+                        "trust_state", launchTrustState
+                )
+        );
         if (requiresSignedLaunchIntent(launchIntent)
                 && !LaunchSecurity.isTrustedXServerLaunchIntent(this, launchIntent)) {
             ForensicLogger.logEvent(
@@ -363,13 +379,28 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                     ForensicLogger.fields(
                             "container_id", launchIntent.getIntExtra("container_id", 0),
                             "shortcut_path", launchIntent.getStringExtra("shortcut_path"),
-                            "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent)
+                            "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent),
+                            "trust_state", launchTrustState,
+                            "adb_diagnostics_cmd", "adb logcat -d | grep XSERVER_LAUNCH_"
                     )
             );
             showToast(this, "Blocked untrusted launch request");
             finish();
             return;
         }
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_CLIPBOARD_POLICY_APPLIED",
+                null,
+                "xserver",
+                "clipboard_policy_applied",
+                ForensicLogger.fields(
+                        "share_android_clipboard", isShareAndroidClipboard,
+                        "open_with_android_browser", isOpenWithAndroidBrowser
+                )
+        );
 
 
 

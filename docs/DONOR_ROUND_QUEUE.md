@@ -39,18 +39,18 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 6 | `ewt45/termux-x11-fork` | `active` | opened after Round 5 closure |
+| 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
-## Round 6 (termux-x11-fork) Immediate Workset
+## Round 6 (termux-x11-fork) Historical Workset (Completed)
 
-1. Rebuild strict file inventory for `termux-x11-fork` and lock module buckets (`app/java`, `app/cpp`, `shell-loader`, `res`).
-2. Re-open transfer matrix by lanes (`loader_trust`, `touch_input_strategy`, `clipboard_sync`, `key_interceptor`, `native_xtrans`).
-3. Mark every signal `integrate` or `reject_with_rationale`.
-4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
-5. Prepare `active -> gate` checklist with X11 launch/input/clipboard smoke anchors.
+1. Rebuilt strict file inventory for `termux-x11-fork` and locked module buckets (`app/java`, `app/cpp`, `shell-loader`, `res`).
+2. Re-opened transfer matrix by lanes (`loader_trust`, `touch_input_strategy`, `clipboard_sync`, `key_interceptor`, `native_xtrans`).
+3. Marked each signal `integrate` or `reject_with_rationale`.
+4. Landed no-regression app-tree deltas as contracts (no blind donor copy).
+5. Completed round closure (`active -> closed`) with X11 launch/input/clipboard forensic anchors.
 
 Round 6 control artifacts:
 - `docs/rounds/R6_TERMUXX11_MATRIX.md`
@@ -132,3 +132,8 @@ What was added to smooth the transition:
 - `2026-03-05` pass 1:
   - Round 6 opened as `active`.
   - `R6_TERMUXX11_MATRIX` and `R6_TERMUXX11_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - launch trust-state forensic markers landed in `XServerDisplayActivity`.
+  - clipboard policy forensic marker lane landed.
+- `2026-03-05` closure:
+  - Round 6 moved to `closed`.

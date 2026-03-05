@@ -45,6 +45,13 @@ public final class LaunchSecurity {
         );
     }
 
+    public static String getXServerLaunchTrustState(Context context, Intent intent) {
+        if (intent == null) return "no_intent";
+        if (!hasXServerLaunchSignature(intent)) return "unsigned_legacy";
+        if (context == null) return "signed_unverified";
+        return isTrustedXServerLaunchIntent(context, intent) ? "signed_trusted" : "signed_untrusted";
+    }
+
     private static String computeSignature(Context context, Intent intent) {
         try {
             byte[] key = resolveOrCreateSecret(context.getApplicationContext());

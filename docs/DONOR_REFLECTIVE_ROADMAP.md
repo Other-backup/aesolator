@@ -31,7 +31,7 @@ Rules:
 
 Round queue and per-round acceptance criteria are tracked in:
 - `docs/DONOR_ROUND_QUEUE.md`
-- Active round transfer matrix:
+- Latest closed transfer matrix:
   - `docs/rounds/R6_TERMUXX11_MATRIX.md`
 
 All donors were mirrored to local analysis workspace:
@@ -223,7 +223,7 @@ Previous mixed-source task ledger is archived as baseline only; execution now fo
 | 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed |
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed |
-| 6 | `ewt45/termux-x11-fork` | `active` | current donor round |
+| 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed |
 | 7 | `ewt45/winlator-fork` | `pending` | starts after Round 6 = `closed` |
 | 8 | `coffincolors/winlator` | `pending` | starts after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | starts after Round 8 = `closed` |

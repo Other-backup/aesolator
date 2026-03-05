@@ -21,8 +21,8 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md` - file-level coverage control for Round 4 donor sweep, closed.
 - `docs/rounds/R5_MOBOX_MATRIX.md` - Round 5 donor transfer matrix (`mobox`), closed.
 - `docs/rounds/R5_MOBOX_FILE_COVERAGE.md` - file-level coverage control for Round 5 donor sweep, closed.
-- `docs/rounds/R6_TERMUXX11_MATRIX.md` - active Round 6 donor transfer matrix (`termux-x11-fork`).
-- `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md` - file-level coverage control for Round 6 donor sweep.
+- `docs/rounds/R6_TERMUXX11_MATRIX.md` - Round 6 donor transfer matrix (`termux-x11-fork`), closed.
+- `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md` - file-level coverage control for Round 6 donor sweep, closed.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 
