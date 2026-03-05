@@ -374,11 +374,18 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         if (openWithAndroidBrowser) {
             launchEnv.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
+        } else {
+            launchEnv.remove("WINE_OPEN_WITH_ANDROID_BROWSER");
         }
         if (shareAndroidClipboard) {
             launchEnv.put("WINE_FROM_ANDROID_CLIPBOARD", "1");
             launchEnv.put("WINE_TO_ANDROID_CLIPBOARD", "1");
+        } else {
+            launchEnv.remove("WINE_FROM_ANDROID_CLIPBOARD");
+            launchEnv.remove("WINE_TO_ANDROID_CLIPBOARD");
         }
+        launchEnv.put("AERO_RUNTIME_BROWSER_BRIDGE", openWithAndroidBrowser ? "1" : "0");
+        launchEnv.put("AERO_RUNTIME_CLIPBOARD_SYNC", shareAndroidClipboard ? "1" : "0");
 
         if (launchEnv.has("MANGOHUD")) {
             launchEnv.remove("MANGOHUD");

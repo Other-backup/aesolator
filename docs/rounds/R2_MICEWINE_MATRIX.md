@@ -1,7 +1,7 @@
 # Round 2 Matrix: `KreitinnSoftware/MiceWine-Application`
 
 Date: `2026-03-05`  
-Round state: `active`
+Round state: `closed`
 
 ## Round Scope
 
@@ -19,13 +19,13 @@ Primary code surfaces:
 
 | Signal Cluster | Donor Anchors | Aeolator Targets | Status | Decision |
 |---|---|---|---|---|
-| Process row operability and inline actions | `AdapterProcess.java`, `TaskManagerFragment.java` | `TaskManagerDialog`, process row layouts, telemetry actions | `in_progress` | `integrate` |
-| Touch stale-pointer release discipline | `input/InputEventSender.java` | `InputControlsView`, `ControlElement`, `TouchpadView` | `in_progress` | `integrate` |
-| Surface lifecycle and display ratio handling | `LorieView.java` | `XServerView`, `XServerDisplayActivity`, screen resize path | `pending` | `integrate` |
-| Clipboard/IME runtime bridge guards | `LorieView.java` | `XServerDisplayActivity`, input/clipboard bridge lane | `pending` | `integrate` |
-| Runtime env variable policy semantics | `core/EnvVars.java`, `fragments/Box64SettingsFragment.java` | `RuntimeProfileManager`, settings/runtime env merge | `pending` | `integrate` |
-| RAT/rootfs package manager semantics | `core/RatPackageManager.java`, `fragments/Rat*` | `ContentsManager`, package workflows | `pending` | `reject_with_rationale` |
-| Overlay/controller mapper behavior | `activities/VirtualControllerOverlayMapper.java`, `views/VirtualController*` | `InputControlsView`, shortcut/controller config lane | `pending` | `integrate` |
+| Process row operability and inline actions | `AdapterProcess.java`, `TaskManagerFragment.java` | `TaskManagerDialog`, process row layouts, telemetry actions | `integrated` | `integrate` |
+| Touch stale-pointer release discipline | `input/InputEventSender.java` | `InputControlsView`, `ControlElement`, `TouchpadView` | `integrated` | `integrate` |
+| Surface lifecycle and display ratio handling | `LorieView.java` | `XServerView`, `XServerDisplayActivity`, screen resize path | `integrated` | `integrate` |
+| Clipboard/IME runtime bridge guards | `LorieView.java` | `XServerDisplayActivity`, input/clipboard bridge lane | `integrated` | `integrate` |
+| Runtime env variable policy semantics | `core/EnvVars.java`, `fragments/Box64SettingsFragment.java` | `RuntimeProfileManager`, settings/runtime env merge | `integrated` | `integrate` |
+| RAT/rootfs package manager semantics | `core/RatPackageManager.java`, `fragments/Rat*` | `ContentsManager`, package workflows | `rejected` | `reject_with_rationale` |
+| Overlay/controller mapper behavior | `activities/VirtualControllerOverlayMapper.java`, `views/VirtualController*` | `InputControlsView`, shortcut/controller config lane | `integrated` | `integrate` |
 
 ## Closure Criteria For Round 2
 
@@ -51,3 +51,21 @@ Round 2 can be marked `closed` only when:
 
 - Task-manager refresh cadence aligned to donor baseline:
   - update timer interval switched from `1000ms` to `750ms` for tighter real-time responsiveness.
+
+### 2026-03-05 / Pass 4
+
+- Lorie-like surface lifecycle hardening integrated:
+  - on orientation/config change, `XServerView` now performs explicit layout refresh (`requestLayout + setSizeFromLayout`).
+  - input overlay lane requests relayout before redraw to keep mapping stable after rotate.
+
+### 2026-03-05 / Pass 5
+
+- Clipboard/runtime guard semantics integrated:
+  - launch env now removes inherited clipboard/browser bridge vars when corresponding switches are off;
+  - explicit forensic/runtime markers added: `AERO_RUNTIME_BROWSER_BRIDGE`, `AERO_RUNTIME_CLIPBOARD_SYNC`.
+
+### 2026-03-05 / Closure
+
+- Round 2 closed.
+- Rejected signal rationale:
+  - `RAT/rootfs package manager semantics` is donor-specific (`Rat*` workflow) and conflicts with Aeolator WCP Contents contract; port was intentionally rejected.

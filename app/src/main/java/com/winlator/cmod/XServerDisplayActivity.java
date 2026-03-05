@@ -251,6 +251,18 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        if (xServerView != null) {
+            xServerView.requestLayout();
+            xServerView.post(() -> {
+                try {
+                    xServerView.getHolder().setSizeFromLayout();
+                } catch (Throwable ignored) {
+                }
+            });
+        }
+        if (inputControlsView != null) {
+            inputControlsView.requestLayout();
+        }
         if (touchpadView != null) touchpadView.toggleFullscreen();
         if (inputControlsView != null) inputControlsView.post(inputControlsView::invalidate);
         if (configChangedCallback != null) {

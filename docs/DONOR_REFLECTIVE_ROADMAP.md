@@ -32,7 +32,7 @@ Rules:
 Round queue and per-round acceptance criteria are tracked in:
 - `docs/DONOR_ROUND_QUEUE.md`
 - Active round transfer matrix:
-  - `docs/rounds/R2_MICEWINE_MATRIX.md`
+  - `docs/rounds/R3_UMU_MATRIX.md`
 
 All donors were mirrored to local analysis workspace:
 - `/home/mikhail/work/donor-analysis/src`
@@ -218,9 +218,9 @@ Previous mixed-source task ledger is archived as baseline only; execution now fo
 
 | Round | Donor | Current State | Closure Rule |
 |---:|---|---|---|
-| 1 | `utkarshdalal/GameNative` | `gate_hold` | owner override; closure deferred after Round 2 workset |
-| 2 | `KreitinnSoftware/MiceWine-Application` | `active` | current donor round |
-| 3 | `Open-Wine-Components/umu-launcher` | `pending` | starts after Round 2 = `closed` |
+| 1 | `utkarshdalal/GameNative` | `gate_hold` | owner override; closure deferred |
+| 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed |
+| 3 | `Open-Wine-Components/umu-launcher` | `active` | current donor round |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `pending` | starts after Round 3 = `closed` |
 | 5 | `olegos2/mobox` | `pending` | starts after Round 4 = `closed` |
 | 6 | `ewt45/termux-x11-fork` | `pending` | starts after Round 5 = `closed` |

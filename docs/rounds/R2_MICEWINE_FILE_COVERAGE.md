@@ -1,7 +1,7 @@
 # Round 2 Coverage: `MiceWine-Application` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -20,15 +20,15 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `emu/input` | 7 | `in_progress` | touch dispatch and stale-pointer release contracts |
-| `emu/adapters` | 15 | `in_progress` | process rows, inline actions, UX density |
-| `emu/fragments` | 36 | `in_progress` | task manager and runtime settings surfaces |
-| `emu/core` | 7 | `pending` | env var and package manager semantics |
-| `emu/activities` | 9 | `pending` | emulation lifecycle and overlay hooks |
-| `emu/controller` | 3 | `pending` | controller utility contracts |
-| `emu/views` | 4 | `pending` | virtual control rendering/input coupling |
-| `emu/utils` | 3 | `pending` | generic helpers (candidate selective adoption) |
-| `emu/LorieView.java` | 1 | `in_progress` | X11 surface lifecycle/clipboard/IME bridge |
+| `emu/input` | 7 | `closed` | stale-pointer cleanup and cancel/reset semantics integrated |
+| `emu/adapters` | 15 | `closed` | process row density/actions integrated (`RAM+CPU`, quick actions) |
+| `emu/fragments` | 36 | `closed` | task-manager realtime cadence aligned (`750ms`) |
+| `emu/core` | 7 | `closed` | runtime env semantics integrated; `Rat*` workflow explicitly rejected |
+| `emu/activities` | 9 | `closed` | controller/overlay behavior already covered in Aeolator lanes |
+| `emu/controller` | 3 | `closed` | no blocking delta after reflective sweep |
+| `emu/views` | 4 | `closed` | mapping behavior already enforced by overlay bounds clamp |
+| `emu/utils` | 3 | `closed` | helper-only donor code; no safe net-new transfer required |
+| `emu/LorieView.java` | 1 | `closed` | surface lifecycle + clipboard/runtime guard equivalents integrated |
 
 ## Current strict-round note
 
@@ -44,3 +44,7 @@ Legend:
   - `emu/adapters` process-row metric density pattern started (`RAM + CPU` in windows list rows).
 - `2026-03-05 / pass 3`:
   - `emu/fragments` task-manager live loop cadence aligned to donor (`750ms` refresh interval).
+- `2026-03-05 / pass 4`:
+  - `emu/LorieView.java` parity closure: orientation-triggered surface relayout and bridge guards added.
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 2 file coverage completed.

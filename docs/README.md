@@ -15,6 +15,8 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R1_GAMENATIVE_GATE.md` - Round 1 gate checklist (`gate -> closed`) and mandatory CI/runtime checks.
 - `docs/rounds/R2_MICEWINE_MATRIX.md` - active Round 2 donor transfer matrix (`MiceWine-Application`).
 - `docs/rounds/R2_MICEWINE_FILE_COVERAGE.md` - file-level coverage control for Round 2 donor sweep.
+- `docs/rounds/R3_UMU_MATRIX.md` - active Round 3 donor transfer matrix (`umu-launcher`).
+- `docs/rounds/R3_UMU_FILE_COVERAGE.md` - file-level coverage control for Round 3 donor sweep.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 

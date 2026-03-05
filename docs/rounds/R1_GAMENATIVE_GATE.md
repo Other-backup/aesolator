@@ -35,3 +35,10 @@ Round 1 can move `gate -> closed` only after these checks are green on CI/runtim
 - Local build execution intentionally skipped in this pass (CI-only build policy).
 - Code and docs moved to `gate`; closure awaits CI + runtime smoke confirmation.
 - Owner override switched execution to Round 2; this round is frozen as `gate_hold` until closure pass resumes.
+
+## Soft Handoff To Round 2
+
+To avoid hard stop between rounds, the following continuity contract is fixed:
+1. Launch dependency framework from Round 1 remains active as baseline for Round 2+.
+2. Runtime selector and version normalization from Round 1 are not reverted during Round 2 work.
+3. Round 1 CI closure is deferred, not discarded; `gate_hold` preserves completion context.

@@ -34,9 +34,9 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 
 | Round | Donor | State | Notes |
 |---:|---|---|---|
-| 1 | `utkarshdalal/GameNative` | `gate_hold` | owner override: moved to Round 2 without additional rerun; returns to `closed` later |
-| 2 | `KreitinnSoftware/MiceWine-Application` | `active` | active round opened by owner override on `2026-03-05` |
-| 3 | `Open-Wine-Components/umu-launcher` | `pending` | unlocks after Round 2 = `closed` |
+| 1 | `utkarshdalal/GameNative` | `gate_hold` | soft-handoff completed; closure deferred by owner decision |
+| 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
+| 3 | `Open-Wine-Components/umu-launcher` | `active` | opened after Round 2 closure |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `pending` | unlocks after Round 3 = `closed` |
 | 5 | `olegos2/mobox` | `pending` | unlocks after Round 4 = `closed` |
 | 6 | `ewt45/termux-x11-fork` | `pending` | unlocks after Round 5 = `closed` |
@@ -44,17 +44,28 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
-## Active Round 2 (MiceWine) Immediate Workset
+## Round 3 (umu-launcher) Immediate Workset
 
-1. Rebuild strict file inventory for `MiceWine-Application` and lock module buckets.
-2. Re-open transfer matrix by lanes (`task_manager`, `input`, `x11_surface`, `runtime_env`, `controller`).
+1. Rebuild strict file inventory for `umu-launcher` and lock module buckets.
+2. Re-open transfer matrix by lanes (`runtime_fetch`, `runtime_route`, `provenance`, `delta_update`, `plugins`).
 3. Mark every signal `integrate` or `reject_with_rationale`.
 4. Land only no-regression deltas in Aeolator tree with forensic visibility.
-5. Prepare `active -> gate` checklist with runtime-smoke anchors for task manager + input lanes.
+5. Prepare `active -> gate` checklist with runtime update + provenance anchors.
 
-Round 2 control artifacts:
-- `docs/rounds/R2_MICEWINE_MATRIX.md`
-- `docs/rounds/R2_MICEWINE_FILE_COVERAGE.md`
+Round 3 control artifacts:
+- `docs/rounds/R3_UMU_MATRIX.md`
+- `docs/rounds/R3_UMU_FILE_COVERAGE.md`
+
+## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
+
+What was added to smooth the transition:
+1. Round 1 kept as `gate_hold` instead of forcing artificial `closed`.
+2. Round 2 opened with explicit owner-override record and no hidden state jumps.
+3. Carry-over technical prerequisites from Round 1 were preserved:
+   - launch dependency contracts remained active;
+   - runtime/version selector normalization remained in place;
+   - no rollback of gate-level fixes before Round 2 start.
+4. Round 2 scope explicitly excluded Round 1 CI rerun dependency to avoid blocking momentum.
 
 ## Round 1 Hold Snapshot
 
@@ -72,3 +83,15 @@ Round 2 control artifacts:
   - first donor transfer landed in task manager lane: windows rows now expose `RAM + CPU` live metrics.
 - `2026-03-05` pass 3:
   - task manager refresh cadence aligned with donor baseline (`750ms`) for tighter realtime updates.
+- `2026-03-05` pass 4:
+  - orientation/config change path hardened (`XServerView` relayout + overlay relayout request).
+- `2026-03-05` pass 5:
+  - clipboard/browser bridge env guards hardened and explicit runtime markers added.
+- `2026-03-05` closure:
+  - Round 2 moved to `closed`.
+
+## Round 3 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 3 opened as `active`.
+  - `R3_UMU_MATRIX` and `R3_UMU_FILE_COVERAGE` initialized.
