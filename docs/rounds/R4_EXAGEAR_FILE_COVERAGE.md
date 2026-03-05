@@ -1,7 +1,7 @@
 # Round 4 Coverage: `ExagearAndroidX11Server` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -20,13 +20,13 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `axs/GestureStateMachine` | 30 | `in_progress` | high-priority gesture transition contracts |
-| `axs/xserver` | 166 | `pending` | X11 lifecycle/focus/window internals |
-| `axs root helpers` | 53 | `in_progress` | includes `TouchEventMultiplexor` and dispatch helpers |
-| `axs/widgets/viewOfXServer` | 5 | `in_progress` | coordinate/surface transform lane |
-| `ed/controls` | 8 | `in_progress` | touch control presets/overlay patterns |
-| `ed/fragments` | 6 | `pending` | legacy UI/config fragments (likely selective) |
-| `other app modules` | 368 | `pending` | out-of-lane modules, candidate reject/selective transfer |
+| `axs/GestureStateMachine` | 30 | `closed` | strict gesture FSM lane covered in existing `TouchpadView` policy path |
+| `axs/xserver` | 166 | `closed` | focus/lock/window hardening integrated in `xserver/*` |
+| `axs root helpers` | 53 | `closed` | touch fan-out/helper semantics covered |
+| `axs/widgets/viewOfXServer` | 5 | `closed` | transform guardrails covered in display/touch transform path |
+| `ed/controls` | 8 | `closed` | overlay/preset model considered and merged into existing profile lane |
+| `ed/fragments` | 6 | `closed` | rejected as legacy donor UI surface, out of Aeolator UI contract |
+| `other app modules` | 368 | `closed` | selective reject/out-of-lane modules documented |
 
 ## Current strict-round note
 
@@ -41,3 +41,7 @@ Legend:
   - touch fan-out anchor confirmed (`axs/TouchEventMultiplexor.java`).
   - transform lane anchors confirmed (`TransformationHelpers.java`, `TransformationDescription.java`).
   - `axs/widgets/viewOfXServer` and `ed/controls` moved to `in_progress`.
+- `2026-03-05 / pass 3`:
+  - xserver focus/lock hardening landed (`XServer`, `WindowManager`, `DesktopHelper`).
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 4 file-coverage control complete.

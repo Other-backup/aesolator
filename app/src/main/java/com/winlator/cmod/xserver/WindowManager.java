@@ -125,14 +125,19 @@ public class WindowManager extends XResourceManager {
                 focusedWindow = rootWindow;
                 break;
             case PARENT:
-                if (focusedWindow.getParent() != null) focusedWindow = focusedWindow.getParent();
+                if (focusedWindow != null && focusedWindow.getParent() != null) {
+                    focusedWindow = focusedWindow.getParent();
+                }
+                else {
+                    focusedWindow = rootWindow;
+                }
                 break;
         }
     }
 
     public void setFocus(Window focusedWindow, FocusRevertTo focusRevertTo) {
-        this.focusedWindow = focusedWindow;
-        this.focusRevertTo = focusRevertTo;
+        this.focusedWindow = focusedWindow != null && focusedWindow.attributes.isMapped() ? focusedWindow : null;
+        this.focusRevertTo = focusRevertTo != null ? focusRevertTo : FocusRevertTo.NONE;
     }
 
     public FocusRevertTo getFocusRevertTo() {

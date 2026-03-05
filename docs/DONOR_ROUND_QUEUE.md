@@ -37,7 +37,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 1 | `utkarshdalal/GameNative` | `gate_hold` | soft-handoff completed; closure deferred by owner decision |
 | 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 4 | `khanhduytran0/ExagearAndroidX11Server` | `active` | opened after Round 3 closure |
+| 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 5 | `olegos2/mobox` | `pending` | unlocks after Round 4 = `closed` |
 | 6 | `ewt45/termux-x11-fork` | `pending` | unlocks after Round 5 = `closed` |
 | 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
@@ -109,3 +109,7 @@ What was added to smooth the transition:
   - `R4_EXAGEAR_MATRIX` and `R4_EXAGEAR_FILE_COVERAGE` initialized.
 - `2026-03-05` pass 2:
   - concrete donor anchors fixed for touch fan-out, gesture FSM, transform lane, X11 lifecycle lane.
+- `2026-03-05` pass 3:
+  - xserver lock/focus hardening landed (`XServer`, `WindowManager`, `DesktopHelper`).
+- `2026-03-05` closure:
+  - Round 4 moved to `closed`.

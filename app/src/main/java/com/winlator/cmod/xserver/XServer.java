@@ -12,6 +12,9 @@ import com.winlator.cmod.xserver.extensions.MITSHMExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
 
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.nio.charset.Charset;
 import java.util.EnumMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -118,8 +121,10 @@ public class XServer {
         private final Lockable[] lockables;
 
         private MultiXLock(Lockable[] lockables) {
-            this.lockables = lockables;
-            for (Lockable lockable : lockables) locks.get(lockable).lock();
+            this.lockables = normalizeLockables(lockables);
+            for (Lockable lockable : this.lockables) {
+                locks.get(lockable).lock();
+            }
         }
 
         @Override
@@ -128,6 +133,19 @@ public class XServer {
                 locks.get(lockables[i]).unlock();
             }
         }
+    }
+
+    private Lockable[] normalizeLockables(Lockable[] input) {
+        if (input == null || input.length == 0) return new Lockable[0];
+
+        EnumSet<Lockable> unique = EnumSet.noneOf(Lockable.class);
+        for (Lockable lockable : input) {
+            if (lockable != null) unique.add(lockable);
+        }
+
+        Lockable[] normalized = unique.toArray(new Lockable[0]);
+        Arrays.sort(normalized, Comparator.comparingInt(Enum::ordinal));
+        return normalized;
     }
 
     public XLock lock(Lockable lockable) {

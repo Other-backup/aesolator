@@ -17,8 +17,8 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R2_MICEWINE_FILE_COVERAGE.md` - file-level coverage control for Round 2 donor sweep.
 - `docs/rounds/R3_UMU_MATRIX.md` - Round 3 donor transfer matrix (`umu-launcher`), closed.
 - `docs/rounds/R3_UMU_FILE_COVERAGE.md` - file-level coverage control for Round 3 donor sweep, closed.
-- `docs/rounds/R4_EXAGEAR_MATRIX.md` - active Round 4 donor transfer matrix (`ExagearAndroidX11Server`).
-- `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md` - file-level coverage control for Round 4 donor sweep.
+- `docs/rounds/R4_EXAGEAR_MATRIX.md` - Round 4 donor transfer matrix (`ExagearAndroidX11Server`), closed.
+- `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md` - file-level coverage control for Round 4 donor sweep, closed.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 
