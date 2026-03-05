@@ -2035,6 +2035,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
     private void applyRuntimeWrapperEnvFromProfile(@Nullable ContentProfile profile) {
         if (profile == null) return;
+        envVars.put("AERO_RUNTIME_WRAPPER_ENV_SOURCE", ContentsManager.getEntryName(profile));
         File envFile = new File(ContentsManager.getInstallDir(this, profile), "ae-runtime-wrapper.env");
         if (!envFile.isFile()) return;
 
@@ -2055,6 +2056,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
     private void applyRuntimeContractFromProfile(@Nullable ContentProfile profile, String socClass) {
         if (profile == null) return;
+        envVars.put("AERO_RUNTIME_WRAPPER_PACKAGE", ContentsManager.getEntryName(profile));
+        envVars.put("AERO_RUNTIME_WRAPPER_VERSION", profile.verName == null ? "" : profile.verName);
         File contractFile = new File(ContentsManager.getInstallDir(this, profile), "ae-runtime-contract.json");
         if (!contractFile.isFile()) return;
 

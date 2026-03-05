@@ -37,3 +37,5 @@ Legend:
 
 - `2026-03-05 / pass 1`:
   - bucket map initialized and linked to active matrix.
+- `2026-03-05 / pass 2`:
+  - `runtime_orchestration` bucket started with runtime provenance source markers in wrapper contract lane.

@@ -40,3 +40,11 @@ Round 3 can be marked `closed` only when:
 
 - Round 3 opened after Round 2 closure.
 - Matrix initialized from local donor mirror with strict lane mapping.
+
+### 2026-03-05 / Pass 2
+
+- Runtime provenance lane started:
+  - wrapper env/contract ingestion now stamps explicit source markers:
+    - `AERO_RUNTIME_WRAPPER_ENV_SOURCE`
+    - `AERO_RUNTIME_WRAPPER_PACKAGE`
+    - `AERO_RUNTIME_WRAPPER_VERSION`

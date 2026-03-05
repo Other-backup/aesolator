@@ -95,3 +95,5 @@ What was added to smooth the transition:
 - `2026-03-05` pass 1:
   - Round 3 opened as `active`.
   - `R3_UMU_MATRIX` and `R3_UMU_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - runtime provenance markers added for wrapper contract/env source tracking.
