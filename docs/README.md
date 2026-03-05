@@ -25,6 +25,8 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md` - file-level coverage control for Round 6 donor sweep, closed.
 - `docs/rounds/R7_WINLATORFORK_MATRIX.md` - Round 7 donor transfer matrix (`winlator-fork`), closed.
 - `docs/rounds/R7_WINLATORFORK_FILE_COVERAGE.md` - file-level coverage control for Round 7 donor sweep, closed.
+- `docs/rounds/R8_COFFINCOLORS_MATRIX.md` - active Round 8 donor transfer matrix (`coffincolors/winlator`).
+- `docs/rounds/R8_COFFINCOLORS_FILE_COVERAGE.md` - file-level coverage control for Round 8 donor sweep.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 

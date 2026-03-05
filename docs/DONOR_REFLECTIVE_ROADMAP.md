@@ -31,8 +31,8 @@ Rules:
 
 Round queue and per-round acceptance criteria are tracked in:
 - `docs/DONOR_ROUND_QUEUE.md`
-- Latest closed transfer matrix:
-  - `docs/rounds/R7_WINLATORFORK_MATRIX.md`
+- Active round transfer matrix:
+  - `docs/rounds/R8_COFFINCOLORS_MATRIX.md`
 
 All donors were mirrored to local analysis workspace:
 - `/home/mikhail/work/donor-analysis/src`
@@ -225,7 +225,7 @@ Previous mixed-source task ledger is archived as baseline only; execution now fo
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed |
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed |
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed |
-| 8 | `coffincolors/winlator` | `pending` | starts after Round 7 = `closed` |
+| 8 | `coffincolors/winlator` | `active` | current donor round |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | starts after Round 8 = `closed` |
 
 ## Reflective Re-Run (Round 2 Gap Matrix, Historical Baseline)

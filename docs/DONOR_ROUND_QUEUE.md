@@ -41,7 +41,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
+| 8 | `coffincolors/winlator` | `active` | opened after Round 7 closure |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
 ## Round 6 (termux-x11-fork) Historical Workset (Completed)
@@ -67,6 +67,18 @@ Round 6 control artifacts:
 Round 7 control artifacts:
 - `docs/rounds/R7_WINLATORFORK_MATRIX.md`
 - `docs/rounds/R7_WINLATORFORK_FILE_COVERAGE.md`
+
+## Round 8 (coffincolors/winlator) Immediate Workset
+
+1. Rebuild strict file inventory for `coffincolors/winlator` and lock module buckets (`java`, `native cpp`, `res`, plugins, root metadata).
+2. Open transfer matrix by lanes (`bionic_runtime`, `launcher_discipline`, `graphics_dialogs`, `task_manager`, `xserver_java`, `native_boundary`).
+3. Mark each signal `integrate` or `reject_with_rationale`.
+4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
+5. Prepare `active -> gate` checklist with launch/graphics/task-manager/forensic anchors.
+
+Round 8 control artifacts:
+- `docs/rounds/R8_COFFINCOLORS_MATRIX.md`
+- `docs/rounds/R8_COFFINCOLORS_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -172,3 +184,9 @@ What was added to smooth the transition:
   - key-input lane finalized (stable fanout + consumption semantics; donor unicode remap hack rejected).
 - `2026-03-05` closure:
   - Round 7 moved to `closed`.
+
+## Round 8 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 8 opened as `active`.
+  - `R8_COFFINCOLORS_MATRIX` and `R8_COFFINCOLORS_FILE_COVERAGE` initialized.
