@@ -23,8 +23,8 @@ Legend:
 | `axs/GestureStateMachine` | 30 | `in_progress` | high-priority gesture transition contracts |
 | `axs/xserver` | 166 | `pending` | X11 lifecycle/focus/window internals |
 | `axs root helpers` | 53 | `in_progress` | includes `TouchEventMultiplexor` and dispatch helpers |
-| `axs/widgets/viewOfXServer` | 5 | `pending` | coordinate/surface transform lane |
-| `ed/controls` | 8 | `pending` | touch control presets/overlay patterns |
+| `axs/widgets/viewOfXServer` | 5 | `in_progress` | coordinate/surface transform lane |
+| `ed/controls` | 8 | `in_progress` | touch control presets/overlay patterns |
 | `ed/fragments` | 6 | `pending` | legacy UI/config fragments (likely selective) |
 | `other app modules` | 368 | `pending` | out-of-lane modules, candidate reject/selective transfer |
 
@@ -37,3 +37,7 @@ Legend:
 
 - `2026-03-05 / pass 1`:
   - bucket map initialized and linked to active matrix.
+- `2026-03-05 / pass 2`:
+  - touch fan-out anchor confirmed (`axs/TouchEventMultiplexor.java`).
+  - transform lane anchors confirmed (`TransformationHelpers.java`, `TransformationDescription.java`).
+  - `axs/widgets/viewOfXServer` and `ed/controls` moved to `in_progress`.

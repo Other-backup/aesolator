@@ -107,3 +107,5 @@ What was added to smooth the transition:
 - `2026-03-05` pass 1:
   - Round 4 opened as `active`.
   - `R4_EXAGEAR_MATRIX` and `R4_EXAGEAR_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - concrete donor anchors fixed for touch fan-out, gesture FSM, transform lane, X11 lifecycle lane.
