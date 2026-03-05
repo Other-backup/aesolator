@@ -303,9 +303,25 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             TextView tvName = itemView.findViewById(R.id.TVName);
             tvName.setText(processInfo.name + " [" + entry.archLane + "]");
             ((TextView) itemView.findViewById(R.id.TVPID)).setText(String.valueOf(processInfo.pid));
-            ((TextView) itemView.findViewById(R.id.TVMemoryUsage)).setText(processInfo.getFormattedMemoryUsage());
+            LinuxTelemetrySampler.ProcessSample runtimeSample = linuxTelemetrySampler.sampleProcess(processInfo.pid);
+            String cpuPercent = runtimeSample != null ? formatPercent(runtimeSample.cpuPercent) : "--";
+            ((TextView) itemView.findViewById(R.id.TVMemoryUsage)).setText(
+                    String.format(Locale.ENGLISH, "%s | CPU %s", processInfo.getFormattedMemoryUsage(), cpuPercent)
+            );
             itemView.findViewById(R.id.BTMenu).setOnClickListener((v) -> showListItemMenu(v, processInfo));
+            itemView.findViewById(R.id.BTQuickEnd).setOnClickListener(v -> ContentDialog.confirm(
+                    activity,
+                    R.string.do_you_want_to_end_this_process,
+                    () -> {
+                        logProcessAction("kill_process_quick", processInfo);
+                        activity.getWinHandler().killProcess(processInfo.name);
+                    }
+            ));
             itemView.setOnClickListener(v -> showWindowsProcessDetails(entry));
+            itemView.setOnLongClickListener(v -> {
+                showListItemMenu(v, processInfo);
+                return true;
+            });
 
             ImageView ivIcon = itemView.findViewById(R.id.IVIcon);
             ivIcon.setImageResource(R.drawable.taskmgr_process);

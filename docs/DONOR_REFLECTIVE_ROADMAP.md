@@ -16,6 +16,24 @@ This roadmap tracks exhaustive donor analysis coverage (pre/during/post) and con
 8. `coffincolors/winlator`
 9. APK donor lane: `GameHub-Lite-5.3.3-RC2.apk`
 
+## Execution Contract (Updated)
+
+Effective immediately: `1 round = 1 donor`, strict sequential closure.
+
+Rules:
+1. Round opens for one donor only; no parallel donor mixing in implementation.
+2. Donor is processed end-to-end (line-manifest sweep, behavior map, transfer map, integration, regression gates).
+3. Round closes only when all donor signals are either:
+   - integrated into Aeolator, or
+   - explicitly rejected with technical reason and owner note.
+4. Next donor round starts only after previous donor round is marked `closed`.
+5. Owner override is allowed only with explicit queue note (`gate_hold`) and active-round switch record.
+
+Round queue and per-round acceptance criteria are tracked in:
+- `docs/DONOR_ROUND_QUEUE.md`
+- Active round transfer matrix:
+  - `docs/rounds/R2_MICEWINE_MATRIX.md`
+
 All donors were mirrored to local analysis workspace:
 - `/home/mikhail/work/donor-analysis/src`
 - `/home/mikhail/work/donor-analysis/cache`
@@ -194,20 +212,63 @@ Applied in current tree (incremental):
   - `composeLaunchEnvVars()` now exports explicit bionic/runtime markers (`AERO_RUNTIME_LIBC`, `AERO_RUNTIME_ANDROID_BIONIC_ONLY`, SDK/release, ABI list, wow-route).
   - `ForensicIssueComposer` now stores these compatibility markers in `issue-metadata.json` (`runtimeLibc`, `runtimeBionicOnly`, `supportedAbis`, `hostArch`).
 
-## One Source = One Task Ledger
+## One Round = One Donor Ledger
 
-| Source | Task | State |
-|---|---|---|
-| `GameHub-Lite-5.3.3-RC2.apk` | WinMonitor task-manager contract (`process/path/thread/runtime`) | `done` |
-| `GameHub-Lite-5.3.3-RC2.apk` | `trans_layer` env schema parity for Box64/FEX | `done` |
-| `Open-Wine-Components/umu-launcher` | Resume-safe package download protocol | `done` |
-| `KreitinnSoftware/MiceWine-Application` | X11 input stabilization import (pointer/touch state closure) | `done` |
-| `khanhduytran0/ExagearAndroidX11Server` | Gesture FSM feature-gated adoption | `done` |
-| `ewt45/termux-x11-fork` | External bridge signature + loader hardening | `done` |
-| `utkarshdalal/GameNative` | Contents UX and runtime orchestration convergence | `done` |
-| `olegos2/mobox` | Bootstrap/path normalization for package/runtime lanes | `done` |
-| `ewt45/winlator-fork` | selective forensic/runtime hooks (no donor regressions) | `done` |
-| `coffincolors/winlator` | cmod-bionic compatibility deltas triage | `done` |
+Previous mixed-source task ledger is archived as baseline only; execution now follows strict donor rounds.
+
+| Round | Donor | Current State | Closure Rule |
+|---:|---|---|---|
+| 1 | `utkarshdalal/GameNative` | `gate_hold` | owner override; closure deferred after Round 2 workset |
+| 2 | `KreitinnSoftware/MiceWine-Application` | `active` | current donor round |
+| 3 | `Open-Wine-Components/umu-launcher` | `pending` | starts after Round 2 = `closed` |
+| 4 | `khanhduytran0/ExagearAndroidX11Server` | `pending` | starts after Round 3 = `closed` |
+| 5 | `olegos2/mobox` | `pending` | starts after Round 4 = `closed` |
+| 6 | `ewt45/termux-x11-fork` | `pending` | starts after Round 5 = `closed` |
+| 7 | `ewt45/winlator-fork` | `pending` | starts after Round 6 = `closed` |
+| 8 | `coffincolors/winlator` | `pending` | starts after Round 7 = `closed` |
+| 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | starts after Round 8 = `closed` |
+
+## Reflective Re-Run (Round 2 Gap Matrix, Historical Baseline)
+
+Second-pass reflective read was executed against high-signal donor files (runtime/input/diagnostics/package managers) and compared with current Aeolator tree state.
+
+Re-read set:
+- `GameNative`: `TouchGestureSettingsDialog.kt`, `CrashLogDialog.kt`, `WineProtonManagerDialog.kt`, `ContentsManagerDialog.kt`, `DriverManagerDialog.kt`
+- `MiceWine-Application`: `AdapterProcess.java`, `InputEventSender.java`, `LorieView.java`, `core/EnvVars.java`
+- `umu-launcher`: `umu_run.py`, `umu_runtime.py`, `umu_proton.py`
+- `termux-x11-fork`: `MainActivity.java`
+- `ExagearAndroidX11Server`: `ViewOfXServer.java`, `TouchEventMultiplexor.java`, `GestureContext.java`
+- `mobox`: `README.md` operational runtime guidance lane
+
+### Round 2 Closure Snapshot
+
+Status: `closed` (historical baseline on `2026-03-05`; execution model superseded by `1 round = 1 donor` contract).
+
+| Donor | Capability Signal | Aeolator State | Required Action | Primary Targets |
+|---|---|---|---|---|
+| `GameNative` | Per-game touch gesture profile matrix (actions, delays, toggles) | `done` | Integrated persisted per-shortcut gesture profile contract and runtime binding (profile + strict FSM + timing thresholds) | `app/src/main/java/com/winlator/cmod/widget/TouchpadView.java`, `app/src/main/java/com/winlator/cmod/contentdialog/ShortcutSettingsDialog.java`, `app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java` |
+| `GameNative` | Full-screen crash log viewer with explicit save/export flow | `done` | Forensic log viewer dialog integrated with copy/export path and latest JSONL tail view | `app/src/main/java/com/winlator/cmod/ForensicCenterFragment.java`, `app/src/main/java/com/winlator/cmod/core/ForensicLogger.java`, `app/src/main/res/layout/forensic_log_viewer_dialog.xml` |
+| `GameNative` | Import/install mismatch UX (type, variant, reason taxonomy) | `done` | Contents import now surfaces reasoned rejects (`type_mismatch`, `arch_mismatch`, `glibc_variant_unsupported`, trusted-file failures) with forensic event mapping | `app/src/main/java/com/winlator/cmod/ContentsFragment.java`, `app/src/main/java/com/winlator/cmod/contents/ContentsManager.java` |
+| `MiceWine-Application` | Process row operability (icon fallback, metrics, inline affinity controls) | `done` | Inline row actions/menu + icon fallback + compact per-process details path are active in task manager list | `app/src/main/java/com/winlator/cmod/winhandler/TaskManagerDialog.java` |
+| `MiceWine-Application` | Low-level stale touch-pointer cleanup in event sender path | `done` | Added stale pointer-id release discipline in lower input dispatch path (`ACTION_MOVE` missing-pointer cleanup + `ACTION_CANCEL` full reset) | `app/src/main/java/com/winlator/cmod/widget/InputControlsView.java`, `app/src/main/java/com/winlator/cmod/inputcontrols/ControlElement.java`, `app/src/main/java/com/winlator/cmod/widget/TouchpadView.java` |
+| `MiceWine-Application` + `termux-x11-fork` | Input latency and helper overlay stability (`requestUnbufferedDispatch`, helper bounds control) | `done` | Added unbuffered touch dispatch and bounds clamp for overlay controls after layout/orientation changes | `app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java`, `app/src/main/java/com/winlator/cmod/widget/InputControlsView.java` |
+| `umu-launcher` | Install-marker discipline + restore paths when runtime layout is partial/corrupted | `done` | Install-stage marker + interrupted install restore is generalized in `ContentsManager.finishInstallContent()` for updatable content lanes | `app/src/main/java/com/winlator/cmod/contents/ContentsManager.java` |
+| `umu-launcher` | Explicit no-proton/passthrough runtime route contract | `done` | Runtime contract ingestion now exports route hints/env markers (`AERO_RUNTIME_ROUTE`, `AERO_RUNTIME_NO_PROTON`, `AERO_RUNTIME_PASSTHROUGH_TOOL`) | `app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java` |
+| `ExagearAndroidX11Server` | Multi-listener touch multiplexing contract and zoom-transform synchronization | `done` | Event fan-out fallback and transformation guardrails are enforced in touch/input dispatch path | `app/src/main/java/com/winlator/cmod/widget/TouchpadView.java`, `app/src/main/java/com/winlator/cmod/widget/InputControlsView.java`, `app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java` |
+| `mobox` | SoC/runtime operational defaults (OOM, dynarec, DRI fallback) surfaced as first-class profiles | `done` | SoC-class runtime policy matrix promoted to first-class profiles and exposed in settings/global runtime lane | `app/src/main/java/com/winlator/cmod/runtimeprofile/RuntimeProfileManager.java`, `app/src/main/java/com/winlator/cmod/SettingsFragment.java` |
+
+### Round 2 Prioritized Execution Order (No-Regression)
+
+1. Gesture profile contract (data model + UI + TouchpadView binding). (`done`)
+2. Forensic crash/log viewer (read/copy/export path). (`done`)
+3. Install mismatch taxonomy and variant/arch guardrails. (`done`)
+4. Task manager inline process actions. (`done`)
+5. Input low-level stale-pointer cleanup. (`done`)
+6. Unbuffered dispatch + helper overlay bounds controls. (`done`)
+7. Runtime/content install-marker and restore contract extension. (`done`)
+8. Passthrough/native runtime route visibility. (`done`)
+9. X11 zoom/transform synchronization guardrails. (`done`)
+10. SoC operational profile promotion. (`done`)
 
 ## APK Donor Lane (GameHub-Lite-5.3.3-RC2)
 
@@ -280,21 +341,27 @@ High-value candidates mapped to Aeolator lanes:
 
 ## Backlog (Actionable, Ordered)
 
-1. Finalize donor code index artifacts for all repos (module + signal maps).
-2. Produce per-donor API surface contract (what can be adopted without semantic break).
-3. Open `runtime-orchestration` branch and port umu-style resume-safe runtime fetch protocol.
-4. Port prefix bootstrap invariants with Aeolator path model.
-5. Port MiceWine touch/input stabilization into Aeolator input lane.
-6. Port selected Exagear gesture FSM fragments behind feature flags.
-7. Integrate secure loader pattern from termux-x11-fork for external bridge entrypoints.
-8. Normalize contents manifest + package update flow with explicit replace semantics.
-9. Lift GameNative manager UX patterns into Aeolator Graphics/Contents where compatible.
-10. Unify forensic markers and route all runtime diagnostics through forensic center.
-11. Complete APK donor lane and map findings to runtime/X11/content lanes.
-12. Extract and adapt `com/winemu/core/server/winmonitor` contract for task manager real-time process model.
-13. Extract and adapt `com/winemu/core/trans_layer` contract for Box64/FEX profile schema.
-14. Extract and adapt `com/winemu/openapi` graphics contract for DRI state/UI sync.
-15. Run no-regression matrix before promoting each lane.
+Phase 1 (already integrated in-tree):
+1. Finalize donor code index artifacts (module + signal maps) across mirrored sources.
+2. Port resume-safe runtime/content transfer protocol.
+3. Port baseline touch/input stabilization and gesture FSM feature gate.
+4. Integrate signed launch bridge and feed trust hardening.
+5. Merge baseline forensic markers and runtime stream hooks.
+
+Phase 2 (Round 2 closure queue, all closed):
+6. Ship persisted per-game touch gesture profile schema and UI.
+7. Add full forensic crash/log viewer with export path.
+8. Extend install mismatch taxonomy (type/arch/variant/trust) in Contents UX.
+9. Add inline process actions in task manager list rows.
+10. Add lower-level stale touch-pointer cleanup in input dispatch path.
+11. Add unbuffered dispatch and helper-overlay bounds control for X11 surface interactions.
+12. Generalize install-marker + restore protocol to all runtime/content package lanes.
+13. Add explicit no-proton/passthrough runtime route contract visibility.
+14. Harden X11 event fan-out and zoom/transformation synchronization guardrails.
+15. Promote SoC operational presets (OOM/dynarec/DRI fallback) to first-class runtime profiles.
+16. Complete APK donor lane extraction beyond current targeted namespaces.
+17. Map remaining APK trans-layer contracts into runtime profile and forensic env surfaces.
+18. Run lane-by-lane no-regression matrix and move each promoted lane out of queue.
 
 ## No-Regression Contract
 
