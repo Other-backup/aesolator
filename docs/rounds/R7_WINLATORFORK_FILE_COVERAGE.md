@@ -45,3 +45,5 @@ Legend:
 - `2026-03-05 / pass 4`:
   - `native_cpp_lane` closed with explicit boundary decision (`reject_with_rationale` for app-tree).
   - `ewt45_overlay_lane` sweep continued: diagnostics row integrated, extra-nav row rejected.
+- `2026-03-05 / pass 5`:
+  - `java_mainline_lane` extended with storage-permission forensic hooks in `MainActivity`.

@@ -26,7 +26,7 @@ Primary code surfaces:
 | XServer lifecycle + PiP continuity semantics | `XServerDisplayActivity` (`onStart/onStop`, PiP flow) | `cmod/XServerDisplayActivity` | `integrated` | `integrate` |
 | Selective runtime diagnostics/log surface | `E03_Logcat`, `ExtraFeatures`, `ForeGroundService` | forensic center + runtime diagnostics contracts | `integrated` | `integrate` |
 | Extra navigation/menu injection model | `XserverNavMenuControl`, `ExtraFeatures` | existing Aeolator nav contracts | `rejected` | `reject_with_rationale` |
-| Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `pending` | `integrate` |
+| Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `in_progress` | `integrate` |
 | Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `in_progress` | `integrate` |
 | XServer extension deltas (DRI3/Present/Sync) | `xserver/extensions/*`, request handlers | `cmod/xserver/*` | `integrated` | `integrate` |
 | Native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `rejected` | `reject_with_rationale` |
@@ -81,3 +81,12 @@ Round 7 can be marked `closed` only when:
   - donor `DRI3/Present/Sync` baseline is already covered/superseded in current `cmod/xserver/extensions` lane.
 - Native cpp row rejected for app-tree:
   - low-level cpp glue is explicitly bounded to native/runtime owner repos, not Java app layer.
+
+### 2026-03-05 / Pass 5
+
+- Storage helper lane moved to in-progress integration:
+  - `MainActivity` all-files-access prompt now emits forensic markers:
+    - `STORAGE_ALL_FILES_ACCESS_PROMPT`
+    - `STORAGE_ALL_FILES_ACCESS_OPEN_SETTINGS`
+    - `STORAGE_ALL_FILES_ACCESS_DECLINED`
+- This ports donor `E11_ManageStorage` intent (permission orchestration visibility) into Aeolator forensic-first contract without cloning donor UI fragments.

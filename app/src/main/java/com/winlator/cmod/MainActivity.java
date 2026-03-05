@@ -39,6 +39,7 @@ import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.R;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
@@ -148,15 +149,45 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void showAllFilesAccessDialog() {
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "STORAGE_ALL_FILES_ACCESS_PROMPT",
+                null,
+                "main",
+                "all_files_access_prompt_shown",
+                ForensicLogger.fields(
+                        "sdk_int", Build.VERSION.SDK_INT,
+                        "is_external_storage_manager", Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+                )
+        );
+
         new AlertDialog.Builder(this)
                 .setTitle("All Files Access Required")
                 .setMessage("In order to grant access to additional storage devices such as USB storage device, the All Files Access permission must be granted. Press Okay to grant All Files Access in your Android Settings.")
                 .setPositiveButton("Okay", (dialog, which) -> {
+                    ForensicLogger.logEvent(
+                            this,
+                            "info",
+                            "STORAGE_ALL_FILES_ACCESS_OPEN_SETTINGS",
+                            null,
+                            "main",
+                            "all_files_access_open_settings",
+                            ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
+                    );
                     Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton("Cancel", (dialog, which) -> ForensicLogger.logEvent(
+                        this,
+                        "warn",
+                        "STORAGE_ALL_FILES_ACCESS_DECLINED",
+                        null,
+                        "main",
+                        "all_files_access_prompt_declined",
+                        ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
+                ))
                 .show();
     }
 

@@ -163,3 +163,5 @@ What was added to smooth the transition:
 - `2026-03-05` pass 4:
   - diagnostics/runtime stream row finalized as integrated (existing forensic stream hook contract reused).
   - native cpp donor lane bounded out of app-tree (explicit reject-with-rationale boundary).
+- `2026-03-05` pass 5:
+  - storage permission lane moved to forensic-visible contract in `MainActivity` (`all-files-access` prompt/actions logged).
