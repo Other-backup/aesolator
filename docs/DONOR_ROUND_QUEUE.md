@@ -38,23 +38,23 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 5 | `olegos2/mobox` | `pending` | unlocks after Round 4 = `closed` |
+| 5 | `olegos2/mobox` | `active` | opened after Round 4 closure |
 | 6 | `ewt45/termux-x11-fork` | `pending` | unlocks after Round 5 = `closed` |
 | 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
-## Round 4 (ExagearAndroidX11Server) Immediate Workset
+## Round 5 (mobox) Immediate Workset
 
-1. Rebuild strict file inventory for `ExagearAndroidX11Server` and lock module buckets.
-2. Re-open transfer matrix by lanes (`gesture_fsm`, `touch_fanout`, `surface_transform`, `x11_focus_window`, `overlays`).
+1. Rebuild strict file inventory for `mobox` and lock module buckets (`install`, `patches`, `components`, `docs`).
+2. Re-open transfer matrix by lanes (`bootstrap_shell`, `path_normalization`, `artifact_policy`, `runtime_patch_boundary`).
 3. Mark every signal `integrate` or `reject_with_rationale`.
-4. Land only no-regression deltas in Aeolator tree with forensic visibility.
-5. Prepare `active -> gate` checklist with gesture/X11 runtime-smoke anchors.
+4. Land only no-regression deltas in Aeolator app-tree as contracts (no raw donor script/patch copy).
+5. Prepare `active -> gate` checklist with contents/runtime bootstrap smoke anchors.
 
-Round 4 control artifacts:
-- `docs/rounds/R4_EXAGEAR_MATRIX.md`
-- `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md`
+Round 5 control artifacts:
+- `docs/rounds/R5_MOBOX_MATRIX.md`
+- `docs/rounds/R5_MOBOX_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -113,3 +113,12 @@ What was added to smooth the transition:
   - xserver lock/focus hardening landed (`XServer`, `WindowManager`, `DesktopHelper`).
 - `2026-03-05` closure:
   - Round 4 moved to `closed`.
+
+## Round 5 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 5 opened as `active`.
+  - `R5_MOBOX_MATRIX` and `R5_MOBOX_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - donor anchors fixed for `install`, `patches/*`, `components/*`.
+  - boundary rule recorded: runtime patch rows routed to runtime/build repos, not app-tree.

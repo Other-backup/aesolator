@@ -13,12 +13,14 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R1_GAMENATIVE_MATRIX.md` - Round 1 donor transfer matrix (`GameNative`) currently in `gate_hold`.
 - `docs/rounds/R1_GAMENATIVE_FILE_COVERAGE.md` - file-level coverage control for full donor exhaustion in Round 1.
 - `docs/rounds/R1_GAMENATIVE_GATE.md` - Round 1 gate checklist (`gate -> closed`) and mandatory CI/runtime checks.
-- `docs/rounds/R2_MICEWINE_MATRIX.md` - active Round 2 donor transfer matrix (`MiceWine-Application`).
-- `docs/rounds/R2_MICEWINE_FILE_COVERAGE.md` - file-level coverage control for Round 2 donor sweep.
+- `docs/rounds/R2_MICEWINE_MATRIX.md` - Round 2 donor transfer matrix (`MiceWine-Application`), closed.
+- `docs/rounds/R2_MICEWINE_FILE_COVERAGE.md` - file-level coverage control for Round 2 donor sweep, closed.
 - `docs/rounds/R3_UMU_MATRIX.md` - Round 3 donor transfer matrix (`umu-launcher`), closed.
 - `docs/rounds/R3_UMU_FILE_COVERAGE.md` - file-level coverage control for Round 3 donor sweep, closed.
 - `docs/rounds/R4_EXAGEAR_MATRIX.md` - Round 4 donor transfer matrix (`ExagearAndroidX11Server`), closed.
 - `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md` - file-level coverage control for Round 4 donor sweep, closed.
+- `docs/rounds/R5_MOBOX_MATRIX.md` - active Round 5 donor transfer matrix (`mobox`).
+- `docs/rounds/R5_MOBOX_FILE_COVERAGE.md` - file-level coverage control for Round 5 donor sweep.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 
