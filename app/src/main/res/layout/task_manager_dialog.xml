@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
@@ -9,68 +10,205 @@
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="430dp"
+            android:layout_width="520dp"
             android:layout_height="match_parent"
             android:background="@drawable/bordered_panel"
             android:orientation="vertical"
             android:padding="8dp">
 
-            <LinearLayout
-                android:id="@+id/LLTableHead"
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/TabLayoutProcessScope"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:orientation="horizontal">
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/tab_layout_background"
+                app:tabGravity="fill"
+                app:tabMode="fixed">
 
-                <TextView
-                    style="@style/TableHeadBackground"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:text="@string/process_name" />
+                <com.google.android.material.tabs.TabItem
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/task_manager_tab_windows" />
 
-                <TextView
-                    style="@style/TableHeadBackground"
-                    android:layout_width="60dp"
-                    android:text="@string/pid" />
+                <com.google.android.material.tabs.TabItem
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/task_manager_tab_linux" />
+            </com.google.android.material.tabs.TabLayout>
 
-                <TextView
-                    style="@style/TableHeadBackground"
-                    android:layout_width="110dp"
-                    android:text="@string/memory" />
-
-                <View
-                    style="@style/TableHeadBackground"
-                    android:layout_width="40dp" />
-            </LinearLayout>
-
-            <FrameLayout
+            <LinearLayout
+                android:id="@+id/LLTabWindowsProcesses"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:minHeight="140dp">
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-                <ScrollView
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                    <LinearLayout
-                        android:id="@+id/LLProcessList"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-                </ScrollView>
+                    <EditText
+                        android:id="@+id/ETWindowsSearch"
+                        style="@style/EditText"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:hint="@string/task_manager_windows_search_hint"
+                        android:inputType="text"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/TVEmptyText"
+                    <Spinner
+                        android:id="@+id/SWindowsSort"
+                        style="@style/ComboBox"
+                        android:layout_width="160dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:entries="@array/task_manager_windows_sort_entries" />
+                </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/CBWindowsWindowedOnly"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/task_manager_windows_only_windowed" />
+
+                <LinearLayout
+                    android:id="@+id/LLTableHead"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="@string/process_name" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="60dp"
+                        android:text="@string/pid" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="110dp"
+                        android:text="@string/memory" />
+
+                    <View
+                        style="@style/TableHeadBackground"
+                        android:layout_width="40dp" />
+                </LinearLayout>
+
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:text="@string/no_items_to_display"
-                    android:visibility="gone" />
-            </FrameLayout>
+                    android:minHeight="160dp">
+
+                    <ScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent">
+
+                        <LinearLayout
+                            android:id="@+id/LLProcessList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </ScrollView>
+
+                    <TextView
+                        android:id="@+id/TVEmptyWindowsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="@string/no_items_to_display"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/LLTabLinuxProcesses"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <CheckBox
+                    android:id="@+id/CBLinuxRuntimeOnly"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:checked="true"
+                    android:text="@string/task_manager_linux_runtime_only" />
+
+                <LinearLayout
+                    android:id="@+id/LLLinuxTableHead"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="@string/process_name" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="56dp"
+                        android:text="@string/pid" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="64dp"
+                        android:text="@string/cpu_short" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="90dp"
+                        android:text="@string/memory" />
+
+                    <TextView
+                        style="@style/TableHeadBackground"
+                        android:layout_width="110dp"
+                        android:text="@string/task_manager_io" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:minHeight="160dp">
+
+                    <ScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent">
+
+                        <LinearLayout
+                            android:id="@+id/LLLinuxProcessList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </ScrollView>
+
+                    <TextView
+                        android:id="@+id/TVEmptyLinuxText"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="@string/task_manager_linux_no_items"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
         </LinearLayout>
 
         <ScrollView
-            android:layout_width="140dp"
+            android:layout_width="190dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp">
 
@@ -119,6 +257,51 @@
                         android:id="@+id/TVMemoryInfo"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bordered_panel"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:id="@+id/TVHostTelemetryTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/task_manager_runtime_telemetry"
+                        android:textColor="@color/colorPrimary"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/TVHostLoadInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/TVHostNetInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/TVHostPressureInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/TVProcessCountersInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>

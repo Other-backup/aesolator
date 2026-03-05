@@ -163,6 +163,18 @@
         <item>on</item>
         <item>off</item>
     </string-array>
+    <string-array name="task_manager_windows_sort_entries">
+        <item>@string/task_manager_sort_memory</item>
+        <item>@string/task_manager_sort_name</item>
+        <item>@string/task_manager_sort_pid</item>
+        <item>@string/task_manager_sort_arch</item>
+    </string-array>
+    <string-array name="task_manager_windows_sort_values">
+        <item>memory_desc</item>
+        <item>name_asc</item>
+        <item>pid_asc</item>
+        <item>arch_lane</item>
+    </string-array>
     <string-array name="some_lc_all">
         <item>ar_EG</item>
         <item>ar_SA</item>

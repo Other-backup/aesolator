@@ -4,18 +4,30 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Build;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
+import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.preference.PreferenceManager;
+
+import com.google.android.material.tabs.TabLayout;
 import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.CPUStatus;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ProcessHelper;
@@ -27,18 +39,53 @@ import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfoListener {
+    private static final int TAB_WINDOWS = 0;
+    private static final int TAB_LINUX = 1;
+    private static final int MAX_LINUX_ROWS = 80;
+    private static final String WINDOWS_SORT_MEMORY_DESC = "memory_desc";
+    private static final String WINDOWS_SORT_NAME_ASC = "name_asc";
+    private static final String WINDOWS_SORT_PID_ASC = "pid_asc";
+    private static final String WINDOWS_SORT_ARCH_LANE = "arch_lane";
+
+    private static final String[] RUNTIME_HINT_TOKENS = new String[] {
+            "wine", "wineserver", "freewine", "box64", "box86", "proton",
+            "winhandler", "explorer.exe", "services.exe", ".exe", "aeolator", "aesolator"
+    };
+
     private final XServerDisplayActivity activity;
     private final LayoutInflater inflater;
+    private final LinuxTelemetrySampler linuxTelemetrySampler = new LinuxTelemetrySampler();
+    private final ExecutorService telemetryExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean telemetryInFlight = new AtomicBoolean(false);
+    private final ArrayList<WindowsProcessEntry> windowsPending = new ArrayList<>();
+    private final boolean arm64ecRuntime;
     private Timer timer;
     private final Object lock = new Object();
+    private int selectedTab = TAB_WINDOWS;
+    private int lastWindowsTotal = 0;
+    private int lastWindowsVisible = 0;
+    private int lastLinuxTotal = 0;
+    private int lastLinuxVisible = 0;
+    private String windowsSearchQuery = "";
+    private String windowsSortMode = WINDOWS_SORT_MEMORY_DESC;
+    private LinuxTelemetrySampler.HostSample lastHostSample;
 
     public TaskManagerDialog(XServerDisplayActivity activity) {
         super(activity, R.layout.task_manager_dialog);
         this.activity = activity;
+        this.arm64ecRuntime = detectArm64ecRuntime(activity);
         setCancelable(false);
         setTitle(R.string.task_manager);
         setIcon(R.drawable.icon_task_manager);
@@ -50,12 +97,17 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             ContentDialog.prompt(activity, R.string.new_task, "taskmgr.exe", (command) -> activity.getWinHandler().exec(command));
         });
 
+        setupProcessTabs();
+        setupFilters();
+        applyThemeState();
+        applyHostTelemetryViews(null);
+
         setOnDismissListener((dialog) -> {
             if (timer != null) {
                 timer.cancel();
                 timer = null;
             }
-
+            telemetryExecutor.shutdownNow();
             activity.getWinHandler().setOnGetProcessInfoListener(null);
         });
 
@@ -65,12 +117,16 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
     private void update() {
         synchronized (lock) {
-            activity.getWinHandler().listProcesses();
-
-            final LinearLayout container = findViewById(R.id.LLProcessList);
-            if (container.getChildCount() == 0) findViewById(R.id.TVEmptyText).setVisibility(View.VISIBLE);
+            if (selectedTab == TAB_WINDOWS) {
+                activity.getWinHandler().listProcesses();
+                final LinearLayout container = findViewById(R.id.LLProcessList);
+                if (container.getChildCount() == 0) findViewById(R.id.TVEmptyWindowsText).setVisibility(View.VISIBLE);
+            } else {
+                refreshLinuxProcessPanelAsync();
+            }
         }
 
+        refreshHostTelemetryAsync();
         updateCPUInfoView();
         updateMemoryInfoView();
     }
@@ -122,8 +178,8 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
     @Override
     public void show() {
-        update();
         activity.getWinHandler().setOnGetProcessInfoListener(this);
+        update();
 
         timer = new Timer();
         timer.schedule(new TimerTask() {
@@ -139,23 +195,19 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     public void onGetProcessInfo(int index, int numProcesses, ProcessInfo processInfo) {
         activity.runOnUiThread(() -> {
             synchronized (lock) {
-                final LinearLayout container = findViewById(R.id.LLProcessList);
-                setBottomBarText(activity.getString(R.string.processes)+": " + numProcesses);
-
-                if (numProcesses == 0) {
-                    container.removeAllViews();
-                    findViewById(R.id.TVEmptyText).setVisibility(View.VISIBLE);
-                    return;
+                if (!isShowing() || selectedTab != TAB_WINDOWS) return;
+                if (index == 0) {
+                    windowsPending.clear();
+                    lastWindowsTotal = numProcesses;
                 }
 
-                findViewById(R.id.TVEmptyText).setVisibility(View.GONE);
-
-                int childCount = container.getChildCount();
-                View itemView = index < childCount ? container.getChildAt(index) : inflater.inflate(R.layout.process_info_list_item, container, false);
-                ((TextView)itemView.findViewById(R.id.TVName)).setText(processInfo.name+(processInfo.wow64Process ? " *32" : ""));
-                ((TextView)itemView.findViewById(R.id.TVPID)).setText(String.valueOf(processInfo.pid));
-                ((TextView)itemView.findViewById(R.id.TVMemoryUsage)).setText(processInfo.getFormattedMemoryUsage());
-                itemView.findViewById(R.id.BTMenu).setOnClickListener((v) -> showListItemMenu(v, processInfo));
+                if (numProcesses == 0 || processInfo == null) {
+                    lastWindowsVisible = 0;
+                    windowsPending.clear();
+                    renderWindowsProcessRows();
+                    updateBottomBarSummary();
+                    return;
+                }
 
                 XServer xServer = activity.getXServer();
                 Window window;
@@ -164,26 +216,97 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                     window = xServer.windowManager.findWindowWithProcessId(processInfo.pid);
                 }
 
-                ImageView ivIcon = itemView.findViewById(R.id.IVIcon);
-                ivIcon.setImageResource(R.drawable.taskmgr_process);
-                if (window != null) {
-                    Bitmap icon = xServer.pixmapManager.getWindowIcon(window);
-                    if (icon != null) ivIcon.setImageBitmap(icon);
-                }
-
-                if (index >= childCount) container.addView(itemView);
-
-                if (index == numProcesses-1 && childCount > numProcesses) {
-                    for (int i = childCount-1; i >= numProcesses; i--) container.removeViewAt(i);
-                }
+                windowsPending.add(new WindowsProcessEntry(processInfo, window, resolveArchLane(processInfo)));
+                finalizeWindowsList(index, numProcesses);
             }
         });
+    }
+
+    private void finalizeWindowsList(int index, int numProcesses) {
+        if (index != numProcesses - 1) return;
+        renderWindowsProcessRows();
+        updateBottomBarSummary();
+    }
+
+    private void renderWindowsProcessRows() {
+        final LinearLayout container = findViewById(R.id.LLProcessList);
+        container.removeAllViews();
+
+        ArrayList<WindowsProcessEntry> rows = new ArrayList<>();
+        for (WindowsProcessEntry entry : windowsPending) {
+            if (isWindowsOnlyWindowedEnabled() && !entry.windowed) continue;
+            if (!matchesWindowsQuery(entry)) continue;
+            rows.add(entry);
+        }
+        sortWindowsRows(rows);
+
+        for (WindowsProcessEntry entry : rows) {
+            ProcessInfo processInfo = entry.processInfo;
+            View itemView = inflater.inflate(R.layout.process_info_list_item, container, false);
+            TextView tvName = itemView.findViewById(R.id.TVName);
+            tvName.setText(processInfo.name + " [" + entry.archLane + "]");
+            ((TextView) itemView.findViewById(R.id.TVPID)).setText(String.valueOf(processInfo.pid));
+            ((TextView) itemView.findViewById(R.id.TVMemoryUsage)).setText(processInfo.getFormattedMemoryUsage());
+            itemView.findViewById(R.id.BTMenu).setOnClickListener((v) -> showListItemMenu(v, processInfo));
+
+            ImageView ivIcon = itemView.findViewById(R.id.IVIcon);
+            ivIcon.setImageResource(R.drawable.taskmgr_process);
+            if (entry.window != null) {
+                Bitmap icon = activity.getXServer().pixmapManager.getWindowIcon(entry.window);
+                if (icon != null) ivIcon.setImageBitmap(icon);
+            }
+            container.addView(itemView);
+        }
+
+        lastWindowsVisible = rows.size();
+        int childCount = container.getChildCount();
+        findViewById(R.id.TVEmptyWindowsText).setVisibility(childCount == 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void sortWindowsRows(ArrayList<WindowsProcessEntry> rows) {
+        switch (windowsSortMode) {
+            case WINDOWS_SORT_NAME_ASC:
+                rows.sort((left, right) -> left.processInfo.name.compareToIgnoreCase(right.processInfo.name));
+                break;
+            case WINDOWS_SORT_PID_ASC:
+                rows.sort(Comparator.comparingInt(left -> left.processInfo.pid));
+                break;
+            case WINDOWS_SORT_ARCH_LANE:
+                rows.sort((left, right) -> {
+                    int laneCompare = archLaneRank(left.archLane) - archLaneRank(right.archLane);
+                    if (laneCompare != 0) return laneCompare;
+                    return left.processInfo.name.compareToIgnoreCase(right.processInfo.name);
+                });
+                break;
+            case WINDOWS_SORT_MEMORY_DESC:
+            default:
+                rows.sort((left, right) -> Long.compare(right.processInfo.memoryUsage, left.processInfo.memoryUsage));
+                break;
+        }
+    }
+
+    private int archLaneRank(String archLane) {
+        if (activity.getString(R.string.task_manager_arch_wow64).equals(archLane)) return 0;
+        if (activity.getString(R.string.task_manager_arch_arm64ec).equals(archLane)) return 1;
+        return 2;
+    }
+
+    private boolean matchesWindowsQuery(WindowsProcessEntry entry) {
+        String query = windowsSearchQuery;
+        if (query == null || query.isEmpty()) return true;
+        String haystack = (entry.processInfo.name + " " + entry.processInfo.pid + " " + entry.archLane).toLowerCase(Locale.ENGLISH);
+        return haystack.contains(query);
     }
 
     private void updateCPUInfoView() {
         LinearLayout llCPUInfo = findViewById(R.id.LLCPUInfo);
         llCPUInfo.removeAllViews();
         short[] clockSpeeds = CPUStatus.getCurrentClockSpeeds();
+        TextView tvCPUTitle = findViewById(R.id.TVCPUTitle);
+        if (clockSpeeds.length == 0) {
+            tvCPUTitle.setText("CPU (--%)");
+            return;
+        }
         int totalClockSpeed = 0;
         short maxClockSpeed = 0;
 
@@ -198,8 +321,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         }
 
         int avgClockSpeed = totalClockSpeed / clockSpeeds.length;
-        TextView tvCPUTitle = findViewById(R.id.TVCPUTitle);
-        byte cpuUsagePercent = (byte)(((float)avgClockSpeed / maxClockSpeed) * 100.0f);
+        byte cpuUsagePercent = (byte)(((float)avgClockSpeed / Math.max(1, maxClockSpeed)) * 100.0f);
         tvCPUTitle.setText("CPU ("+cpuUsagePercent+"%)");
     }
 
@@ -207,13 +329,380 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         ActivityManager activityManager = (ActivityManager)activity.getSystemService(Context.ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
         activityManager.getMemoryInfo(memoryInfo);
-        long usedMem = memoryInfo.totalMem - memoryInfo.availMem;
-        byte memUsagePercent = (byte)(((double)usedMem / memoryInfo.totalMem) * 100.0f);
+        long totalMem = Math.max(0L, memoryInfo.totalMem);
+        long usedMem = Math.max(0L, totalMem - memoryInfo.availMem);
+        byte memUsagePercent = totalMem > 0L ? (byte)(((double)usedMem / totalMem) * 100.0f) : 0;
 
         TextView tvMemoryTitle = findViewById(R.id.TVMemoryTitle);
         tvMemoryTitle.setText(activity.getString(R.string.memory)+" ("+memUsagePercent+"%)");
 
         TextView tvMemoryInfo = findViewById(R.id.TVMemoryInfo);
-        tvMemoryInfo.setText(StringUtils.formatBytes(usedMem, false)+"/"+StringUtils.formatBytes(memoryInfo.totalMem));
+        tvMemoryInfo.setText(StringUtils.formatBytes(usedMem, false)+"/"+StringUtils.formatBytes(totalMem));
+    }
+
+    private void setupProcessTabs() {
+        AppUtils.setupTabLayout(getContentView(), R.id.TabLayoutProcessScope, R.id.LLTabWindowsProcesses, R.id.LLTabLinuxProcesses);
+        TabLayout tabLayout = findViewById(R.id.TabLayoutProcessScope);
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                selectedTab = tab.getPosition();
+                update();
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {}
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {
+                selectedTab = tab.getPosition();
+                update();
+            }
+        });
+    }
+
+    private void setupFilters() {
+        CheckBox windowsOnlyWindowed = findViewById(R.id.CBWindowsWindowedOnly);
+        windowsOnlyWindowed.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            renderWindowsProcessRows();
+            updateBottomBarSummary();
+        });
+
+        final EditText etWindowsSearch = findViewById(R.id.ETWindowsSearch);
+        etWindowsSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                windowsSearchQuery = s == null ? "" : s.toString().trim().toLowerCase(Locale.ENGLISH);
+                renderWindowsProcessRows();
+                updateBottomBarSummary();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        final Spinner sWindowsSort = findViewById(R.id.SWindowsSort);
+        ArrayAdapter<CharSequence> sortAdapter = ArrayAdapter.createFromResource(
+                activity,
+                R.array.task_manager_windows_sort_entries,
+                android.R.layout.simple_spinner_dropdown_item);
+        sWindowsSort.setAdapter(sortAdapter);
+        boolean darkMode = PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false);
+        sWindowsSort.setPopupBackgroundResource(darkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        String[] sortValues = activity.getResources().getStringArray(R.array.task_manager_windows_sort_values);
+        int selectedSort = 0;
+        for (int i = 0; i < sortValues.length; i++) {
+            if (sortValues[i].equals(windowsSortMode)) {
+                selectedSort = i;
+                break;
+            }
+        }
+        sWindowsSort.setSelection(selectedSort, false);
+        sWindowsSort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String[] values = activity.getResources().getStringArray(R.array.task_manager_windows_sort_values);
+                if (position >= 0 && position < values.length) {
+                    windowsSortMode = values[position];
+                    renderWindowsProcessRows();
+                    updateBottomBarSummary();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        CheckBox linuxRuntimeOnly = findViewById(R.id.CBLinuxRuntimeOnly);
+        linuxRuntimeOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (selectedTab == TAB_LINUX) update();
+        });
+    }
+
+    private void applyThemeState() {
+        boolean darkMode = PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false);
+        TabLayout tabLayout = findViewById(R.id.TabLayoutProcessScope);
+        tabLayout.setBackgroundResource(darkMode ? R.drawable.tab_layout_background_dark : R.drawable.tab_layout_background);
+        EditText etWindowsSearch = findViewById(R.id.ETWindowsSearch);
+        if (darkMode) {
+            etWindowsSearch.setTextColor(0xFFFFFFFF);
+            etWindowsSearch.setHintTextColor(0xFF9E9E9E);
+            etWindowsSearch.setBackgroundResource(R.drawable.edit_text_dark);
+        } else {
+            etWindowsSearch.setTextColor(0xFF000000);
+            etWindowsSearch.setHintTextColor(0xFF6E6E6E);
+            etWindowsSearch.setBackgroundResource(R.drawable.edit_text);
+        }
+    }
+
+    private void refreshHostTelemetryAsync() {
+        if (!telemetryInFlight.compareAndSet(false, true)) return;
+        telemetryExecutor.execute(() -> {
+            LinuxTelemetrySampler.HostSample hostSample = linuxTelemetrySampler.sampleHost(activity);
+            activity.runOnUiThread(() -> {
+                telemetryInFlight.set(false);
+                if (!isShowing()) return;
+                lastHostSample = hostSample;
+                applyHostTelemetryViews(hostSample);
+                updateBottomBarSummary();
+            });
+        });
+    }
+
+    private void refreshLinuxProcessPanelAsync() {
+        if (!telemetryInFlight.compareAndSet(false, true)) return;
+        final boolean runtimeOnly = isLinuxRuntimeOnlyEnabled();
+        telemetryExecutor.execute(() -> {
+            LinuxTelemetrySampler.HostSample hostSample = linuxTelemetrySampler.sampleHost(activity);
+            LinuxBatch batch = collectLinuxBatch(runtimeOnly);
+            activity.runOnUiThread(() -> {
+                telemetryInFlight.set(false);
+                if (!isShowing() || selectedTab != TAB_LINUX) return;
+                lastHostSample = hostSample;
+                lastLinuxTotal = batch.total;
+                lastLinuxVisible = batch.visible;
+                bindLinuxProcessRows(batch.samples);
+                applyHostTelemetryViews(hostSample);
+                updateBottomBarSummary();
+            });
+        });
+    }
+
+    private LinuxBatch collectLinuxBatch(boolean runtimeOnly) {
+        File procDir = new File("/proc");
+        String[] entries = procDir.list();
+        ArrayList<LinuxTelemetrySampler.ProcessSample> samples = new ArrayList<>();
+        Set<Integer> livePids = new HashSet<>();
+        int total = 0;
+        int visible = 0;
+
+        if (entries != null) {
+            for (String entry : entries) {
+                if (!isNumericPid(entry)) continue;
+                int pid;
+                try {
+                    pid = Integer.parseInt(entry);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                livePids.add(pid);
+                LinuxTelemetrySampler.ProcessSample sample = linuxTelemetrySampler.sampleProcess(pid);
+                if (sample == null) continue;
+                total++;
+                if (runtimeOnly && !isRuntimeProcess(sample)) continue;
+                visible++;
+                samples.add(sample);
+            }
+        }
+
+        linuxTelemetrySampler.retainOnly(livePids);
+        samples.sort(new Comparator<LinuxTelemetrySampler.ProcessSample>() {
+            @Override
+            public int compare(LinuxTelemetrySampler.ProcessSample left, LinuxTelemetrySampler.ProcessSample right) {
+                int cpuCompare = Float.compare(right.cpuPercent, left.cpuPercent);
+                if (cpuCompare != 0) return cpuCompare;
+                int memCompare = Long.compare(right.residentBytes, left.residentBytes);
+                if (memCompare != 0) return memCompare;
+                return Integer.compare(left.pid, right.pid);
+            }
+        });
+
+        if (samples.size() > MAX_LINUX_ROWS) {
+            samples.subList(MAX_LINUX_ROWS, samples.size()).clear();
+        }
+        return new LinuxBatch(samples, total, visible);
+    }
+
+    private void bindLinuxProcessRows(ArrayList<LinuxTelemetrySampler.ProcessSample> samples) {
+        final LinearLayout container = findViewById(R.id.LLLinuxProcessList);
+        container.removeAllViews();
+        for (LinuxTelemetrySampler.ProcessSample sample : samples) {
+            View itemView = inflater.inflate(R.layout.linux_process_info_list_item, container, false);
+            ((TextView)itemView.findViewById(R.id.TVLinuxName)).setText(sample.commandName + " [" + sample.state + "]");
+            ((TextView)itemView.findViewById(R.id.TVLinuxPid)).setText(String.valueOf(sample.pid));
+            ((TextView)itemView.findViewById(R.id.TVLinuxCpu)).setText(formatPercent(sample.cpuPercent));
+            ((TextView)itemView.findViewById(R.id.TVLinuxMemory)).setText(StringUtils.formatBytes(sample.residentBytes));
+            ((TextView)itemView.findViewById(R.id.TVLinuxIo)).setText(formatIoRate(sample));
+            itemView.setOnClickListener((v) -> showLinuxProcessDetails(sample));
+            container.addView(itemView);
+        }
+
+        findViewById(R.id.TVEmptyLinuxText).setVisibility(samples.isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    private void showLinuxProcessDetails(LinuxTelemetrySampler.ProcessSample sample) {
+        ContentDialog dialog = new ContentDialog(activity);
+        dialog.setTitle(activity.getString(R.string.task_manager_linux_details_title, sample.pid));
+
+        String notAvailable = activity.getString(R.string.task_manager_linux_details_not_available);
+        String cpuset = sample.cpuSetList == null || sample.cpuSetList.isEmpty() ? notAvailable : sample.cpuSetList;
+        String waitChannel = sample.waitChannel == null || sample.waitChannel.isEmpty() ? notAvailable : sample.waitChannel;
+        String ioRate = formatIoRate(sample);
+        String contextSwitchRate = sample.hasContextSwitchRate() ? formatFloat(sample.contextSwitchesPerSecond) + "/s" : notAvailable;
+        String sockets = String.format(Locale.ENGLISH, "inet=%d (tcp=%d udp=%d), unix=%d",
+                sample.inetSocketCount, sample.tcpSocketCount, sample.udpSocketCount, sample.unixSocketCount);
+
+        StringBuilder details = new StringBuilder();
+        details.append(activity.getString(R.string.task_manager_linux_details_name)).append(": ").append(sample.commandName).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_cmd)).append(": ").append(sample.commandLine).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_state)).append(": ").append(sample.state).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_threads)).append(": ").append(sample.threadCount).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_cpuset)).append(": ").append(cpuset).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_fd)).append(": ").append(sample.fileDescriptorCount).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_io_rate)).append(": ").append(ioRate).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_ctx_switch)).append(": ").append(contextSwitchRate).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_sockets)).append(": ").append(sockets).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_wait_channel)).append(": ").append(waitChannel).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_oom)).append(": ").append(sample.oomScore).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_age)).append(": ").append(formatDuration(sample.ageMs));
+
+        dialog.setMessage(details.toString());
+        dialog.findViewById(R.id.BTCancel).setVisibility(View.GONE);
+        dialog.show();
+    }
+
+    private void applyHostTelemetryViews(LinuxTelemetrySampler.HostSample sample) {
+        TextView tvLoadInfo = findViewById(R.id.TVHostLoadInfo);
+        TextView tvNetInfo = findViewById(R.id.TVHostNetInfo);
+        TextView tvPressureInfo = findViewById(R.id.TVHostPressureInfo);
+        TextView tvCountersInfo = findViewById(R.id.TVProcessCountersInfo);
+
+        if (sample == null) {
+            tvLoadInfo.setText("CPU -- | Load -- -- --");
+            tvNetInfo.setText("Net RX -- | TX --");
+            tvPressureInfo.setText("PSI cpu --/-- io --/-- mem --/--");
+            tvCountersInfo.setText("Windows 0/0 | Linux 0/0");
+            return;
+        }
+
+        tvLoadInfo.setText(String.format(Locale.ENGLISH, "CPU %.1f%% | Load %.2f %.2f %.2f",
+                sample.cpuPercent, sample.loadAverage1m, sample.loadAverage5m, sample.loadAverage15m));
+        tvNetInfo.setText(String.format(Locale.ENGLISH, "Net RX %s/s | TX %s/s",
+                formatRate(sample.rxBytesPerSecond), formatRate(sample.txBytesPerSecond)));
+        tvPressureInfo.setText(String.format(Locale.ENGLISH, "PSI cpu %s/%s io %s/%s mem %s/%s",
+                formatPsi(sample.cpuPressureSome10), formatPsi(sample.cpuPressureFull10),
+                formatPsi(sample.ioPressureSome10), formatPsi(sample.ioPressureFull10),
+                formatPsi(sample.memoryPressureSome10), formatPsi(sample.memoryPressureFull10)));
+        tvCountersInfo.setText(String.format(Locale.ENGLISH, "Windows %d/%d | Linux %d/%d",
+                lastWindowsVisible, lastWindowsTotal, lastLinuxVisible, lastLinuxTotal));
+    }
+
+    private void updateBottomBarSummary() {
+        String summary = String.format(Locale.ENGLISH, "Windows %d/%d | Linux %d/%d",
+                lastWindowsVisible, lastWindowsTotal, lastLinuxVisible, lastLinuxTotal);
+        setBottomBarText(summary);
+
+        if (lastHostSample != null) {
+            applyHostTelemetryViews(lastHostSample);
+        }
+    }
+
+    private boolean isWindowsOnlyWindowedEnabled() {
+        CheckBox checkBox = findViewById(R.id.CBWindowsWindowedOnly);
+        return checkBox != null && checkBox.isChecked();
+    }
+
+    private boolean isLinuxRuntimeOnlyEnabled() {
+        CheckBox checkBox = findViewById(R.id.CBLinuxRuntimeOnly);
+        return checkBox != null && checkBox.isChecked();
+    }
+
+    private static boolean isNumericPid(String value) {
+        if (value == null || value.isEmpty()) return false;
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) return false;
+        }
+        return true;
+    }
+
+    private static boolean isRuntimeProcess(LinuxTelemetrySampler.ProcessSample sample) {
+        String haystack = (sample.commandName + " " + sample.commandLine).toLowerCase(Locale.ENGLISH);
+        for (String token : RUNTIME_HINT_TOKENS) {
+            if (haystack.contains(token)) return true;
+        }
+        return false;
+    }
+
+    private static String formatPercent(float value) {
+        if (value < 0f) return "--";
+        return String.format(Locale.ENGLISH, "%.1f%%", value);
+    }
+
+    private static String formatPsi(float value) {
+        if (value < 0f) return "--";
+        return String.format(Locale.ENGLISH, "%.1f", value);
+    }
+
+    private static String formatFloat(float value) {
+        if (value < 0f) return "--";
+        return String.format(Locale.ENGLISH, "%.1f", value);
+    }
+
+    private static String formatRate(long bytesPerSecond) {
+        if (bytesPerSecond < 0L) return "--";
+        return StringUtils.formatBytes(bytesPerSecond);
+    }
+
+    private static String formatIoRate(LinuxTelemetrySampler.ProcessSample sample) {
+        if (!sample.hasIoRate()) return "R -- W --";
+        String readRate = sample.readRateBytes >= 0L ? StringUtils.formatBytes(sample.readRateBytes) + "/s" : "--";
+        String writeRate = sample.writeRateBytes >= 0L ? StringUtils.formatBytes(sample.writeRateBytes) + "/s" : "--";
+        return "R " + readRate + " W " + writeRate;
+    }
+
+    private static String formatDuration(long milliseconds) {
+        long totalSeconds = Math.max(0L, milliseconds / 1000L);
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0L) return String.format(Locale.ENGLISH, "%dh %dm %ds", hours, minutes, seconds);
+        if (minutes > 0L) return String.format(Locale.ENGLISH, "%dm %ds", minutes, seconds);
+        return String.format(Locale.ENGLISH, "%ds", seconds);
+    }
+
+    private static boolean detectArm64ecRuntime(XServerDisplayActivity activity) {
+        try {
+            Container container = activity.getContainer();
+            if (container == null) return false;
+            String wineVersion = container.getWineVersion();
+            return wineVersion != null && wineVersion.toLowerCase(Locale.ENGLISH).contains("arm64ec");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private String resolveArchLane(ProcessInfo processInfo) {
+        if (processInfo.wow64Process) return activity.getString(R.string.task_manager_arch_wow64);
+        if (arm64ecRuntime) return activity.getString(R.string.task_manager_arch_arm64ec);
+        return activity.getString(R.string.task_manager_arch_native);
+    }
+
+    private static final class WindowsProcessEntry {
+        final ProcessInfo processInfo;
+        final Window window;
+        final boolean windowed;
+        final String archLane;
+
+        WindowsProcessEntry(ProcessInfo processInfo, Window window, String archLane) {
+            this.processInfo = processInfo;
+            this.window = window;
+            this.windowed = window != null;
+            this.archLane = archLane;
+        }
+    }
+
+    private static final class LinuxBatch {
+        final ArrayList<LinuxTelemetrySampler.ProcessSample> samples;
+        final int total;
+        final int visible;
+
+        LinuxBatch(ArrayList<LinuxTelemetrySampler.ProcessSample> samples, int total, int visible) {
+            this.samples = samples;
+            this.total = total;
+            this.visible = visible;
+        }
     }
 }

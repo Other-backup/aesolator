@@ -22,7 +22,7 @@ public abstract class WinlatorLogUtils {
             Uri winlatorUri = Uri.parse(winlatorPath);
             logsDir = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "logs");
         } else {
-            logsDir = new File(SettingsFragment.getResolvedDefaultStoragePath(), "logs");
+            logsDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "logs");
         }
 
         if (!logsDir.exists()) {

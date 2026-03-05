@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="38dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
+
+    <TextView
+        android:id="@+id/TVLinuxName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/TVLinuxPid"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp" />
+
+    <TextView
+        android:id="@+id/TVLinuxCpu"
+        android:layout_width="64dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp" />
+
+    <TextView
+        android:id="@+id/TVLinuxMemory"
+        android:layout_width="90dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp" />
+
+    <TextView
+        android:id="@+id/TVLinuxIo"
+        android:layout_width="110dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:paddingStart="4dp"
+        android:textSize="12sp" />
+</LinearLayout>
