@@ -1,0 +1,8 @@
+# phase	first	last	note
+foundation	1	4	consolidated mainline + runtime restore slices (0002/0003/0004)
+turnip_adrenotools	1	4	four-patch baseline; review slices beyond 0004 remain folded
+contents_ui	1	4	four-patch baseline; review slices beyond 0004 remain folded
+upscale_profiles	1	4	four-patch baseline; review slices beyond 0004 remain folded
+runtime_policy	1	4	four-patch baseline; review slices beyond 0004 remain folded
+contracts_finish	1	4	four-patch baseline; review slices beyond 0004 remain folded
+harvard_followup	1	4	four-patch baseline; review slices beyond 0004 remain folded

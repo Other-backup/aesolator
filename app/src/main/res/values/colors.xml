@@ -6,6 +6,14 @@
     <color name="colorPrimaryDark">#143A2B</color>
     <color name="colorAccent">#2CCB7F</color>
     <color name="black">#000000</color>
+    <color name="contents_lane_wine">#0D7F67</color>
+    <color name="contents_lane_proton">#2E7D32</color>
+    <color name="contents_lane_vulkansdk">#1565C0</color>
+    <color name="contents_lane_turnip">#00897B</color>
+    <color name="contents_lane_opengl">#EF6C00</color>
+    <color name="contents_lane_dgvoodoo">#C62828</color>
+    <color name="contents_lane_dxvk">#00695C</color>
+    <color name="contents_lane_vkd3d">#455A64</color>
 
     <!-- Dark Theme Colors -->
     <color name="window_background_color_dark">#121212</color>
@@ -13,10 +21,18 @@
     <color name="colorPrimaryDarkModeDark">#10241C</color>
     <color name="colorAccentDark">#39D98A</color>
     <color name="white">#ffffff</color>
+    <color name="contents_lane_wine_dark">#6FF0BF</color>
+    <color name="contents_lane_proton_dark">#81C784</color>
+    <color name="contents_lane_vulkansdk_dark">#90CAF9</color>
+    <color name="contents_lane_turnip_dark">#80CBC4</color>
+    <color name="contents_lane_opengl_dark">#FFB74D</color>
+    <color name="contents_lane_dgvoodoo_dark">#EF9A9A</color>
+    <color name="contents_lane_dxvk_dark">#80CBC4</color>
+    <color name="contents_lane_vkd3d_dark">#B0BEC5</color>
 
     <!-- Additional Colors for Dark Mode -->
-    <color name="combo_box_dark">#303030</color>
-    <color name="content_dialog_background_dark">#424242</color>
+    <color name="combo_box_dark">#1F4A40</color>
+    <color name="content_dialog_background_dark">#15362F</color>
     <color name="button_neutral_dark">#1F5A43</color>
     <color name="button_positive_dark">#2CCB7F</color>
 

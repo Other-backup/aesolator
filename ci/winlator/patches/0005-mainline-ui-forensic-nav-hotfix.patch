@@ -1,0 +1,12 @@
+diff --git a/app/src/main/java/com/winlator/cmod/MainActivity.java b/app/src/main/java/com/winlator/cmod/MainActivity.java
+index 0993e20..3cd4ac3 100644
+--- a/app/src/main/java/com/winlator/cmod/MainActivity.java
++++ b/app/src/main/java/com/winlator/cmod/MainActivity.java
+@@ -286,6 +286,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
+                 break;
+             case R.id.main_menu_about:
+                 showAboutDialog();
++                drawerLayout.closeDrawer(GravityCompat.START);
+                 break;
+         }
+         return true;

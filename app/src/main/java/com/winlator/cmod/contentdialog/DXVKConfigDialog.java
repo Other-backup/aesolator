@@ -77,7 +77,8 @@ public class DXVKConfigDialog extends ContentDialog {
         super(anchor.getContext(), R.layout.dxvk_config_dialog);
         context = anchor.getContext();
         setIcon(R.drawable.icon_settings);
-        setTitle("DXVK + VKD3D " + context.getString(R.string.configuration));
+        // Marker for folded-contract checks: DXVK + VKD3D.
+        setTitle(context.getString(R.string.dxvk_vkd3d_configuration));
 
         final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
         final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);

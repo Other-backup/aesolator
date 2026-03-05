@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,6 +23,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
@@ -58,6 +60,9 @@ public class ContentsFragment extends Fragment {
             ContentProfile.ContentType.CONTENT_TYPE_DXVK,
             ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
             ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK,
+            ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER,
+            ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER,
+            ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO,
             ContentProfile.ContentType.CONTENT_TYPE_BOX64,
             ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
             ContentProfile.ContentType.CONTENT_TYPE_FEXCORE
@@ -154,6 +159,9 @@ public class ContentsFragment extends Fragment {
     private String getTypeLabel(ContentProfile.ContentType type) {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) return "Proton";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
         return type.toString();
     }
 
@@ -333,12 +341,88 @@ public class ContentsFragment extends Fragment {
         return "Remote package";
     }
 
+    private String buildProfileTitleLine(ContentProfile profile) {
+        String versionName = profile.verName != null ? profile.verName.trim() : "";
+        if (!versionName.isEmpty()) return versionName;
+        return getDisplayTypeLabel(profile.type);
+    }
+
+    private String buildProfileMetaLine(ContentProfile profile) {
+        StringBuilder meta = new StringBuilder(getString(R.string.version_code) + ": " + profile.verCode);
+        if (profile.isBetaLike()) meta.append(" • beta");
+        if (profile.isInstalledLocally()) meta.append(" • installed");
+        return meta.toString();
+    }
+
+    private String buildProfileSourceLine(ContentProfile profile) {
+        String sourceLabel = getSourceLabel(profile);
+        String repo = profile.sourceRepo != null ? profile.sourceRepo.trim() : "";
+        String tag = profile.releaseTag != null ? profile.releaseTag.trim() : "";
+        if (!repo.isEmpty() && !tag.isEmpty()) return sourceLabel + " • " + repo + "@" + tag;
+        if (!repo.isEmpty()) return sourceLabel + " • " + repo;
+        if (!tag.isEmpty()) return sourceLabel + " • " + tag;
+        return sourceLabel;
+    }
+
+    private String getDisplayTypeLabel(ContentProfile.ContentType type) {
+        return getTypeLabel(type);
+    }
+
+    private int resolveProfileAccentColor(ContentProfile profile) {
+        int fallbackRes = isDarkMode ? R.color.colorAccentDark : R.color.colorAccent;
+        int colorRes = switch (profile.type) {
+            case CONTENT_TYPE_WINE -> isDarkMode ? R.color.contents_lane_wine_dark : R.color.contents_lane_wine;
+            case CONTENT_TYPE_PROTON -> isDarkMode ? R.color.contents_lane_proton_dark : R.color.contents_lane_proton;
+            case CONTENT_TYPE_VULKAN_SDK -> resolveVulkanFamilyAccentColor(profile);
+            case CONTENT_TYPE_TURNIP_DRIVER -> isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
+            case CONTENT_TYPE_OPENGL_DRIVER -> isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
+            case CONTENT_TYPE_DGVOODOO -> isDarkMode ? R.color.contents_lane_dgvoodoo_dark : R.color.contents_lane_dgvoodoo;
+            case CONTENT_TYPE_DXVK -> isDarkMode ? R.color.contents_lane_dxvk_dark : R.color.contents_lane_dxvk;
+            case CONTENT_TYPE_VKD3D -> isDarkMode ? R.color.contents_lane_vkd3d_dark : R.color.contents_lane_vkd3d;
+            default -> fallbackRes;
+        };
+        return ContextCompat.getColor(requireContext(), colorRes);
+    }
+
+    private int resolveVulkanFamilyAccentColor(ContentProfile profile) {
+        String category = profile.getDisplayCategory();
+        String source = profile.sourceRepo != null ? profile.sourceRepo : "";
+        String version = profile.verName != null ? profile.verName : "";
+        String laneHint = (category + " " + source + " " + version).toLowerCase(Locale.US);
+        if (laneHint.contains("turnip")) {
+            return isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
+        }
+        if (laneHint.contains("opengl") || laneHint.contains("zink")) {
+            return isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
+        }
+        return isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
+    }
+
+    private GradientDrawable buildCategoryBadgeBackground(int accentColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setCornerRadius(dpToPx(10f));
+        drawable.setColor(withAlpha(accentColor, isDarkMode ? 74 : 36));
+        drawable.setStroke(dpToPx(1f), withAlpha(accentColor, isDarkMode ? 220 : 132));
+        return drawable;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        int clampedAlpha = Math.max(0, Math.min(255, alpha));
+        return (color & 0x00ffffff) | (clampedAlpha << 24);
+    }
+
+    private int dpToPx(float dp) {
+        return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
+    }
+
     private class ContentItemAdapter extends RecyclerView.Adapter<ContentItemAdapter.ViewHolder> {
         private final List<ContentProfile> data;
 
         private class ViewHolder extends RecyclerView.ViewHolder {
             private final ImageView ivIcon;
             private final TextView tvVersionName;
+            private final TextView tvCategoryBadge;
             private final TextView tvVersionCode;
             private final TextView tvDescription;
             private final TextView tvSource;
@@ -350,6 +434,7 @@ public class ContentsFragment extends Fragment {
                 super(view);
                 ivIcon = view.findViewById(R.id.IVIcon);
                 tvVersionName = view.findViewById(R.id.TVVersionName);
+                tvCategoryBadge = view.findViewById(R.id.TVCategoryBadge);
                 tvVersionCode = view.findViewById(R.id.TVVersionCode);
                 tvDescription = view.findViewById(R.id.TVDescription);
                 tvSource = view.findViewById(R.id.TVSource);
@@ -382,20 +467,37 @@ public class ContentsFragment extends Fragment {
             final ContentProfile profile = data.get(position);
             int iconId = switch (profile.type) {
                 case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> R.drawable.icon_wine;
-                case CONTENT_TYPE_DXVK, CONTENT_TYPE_VKD3D, CONTENT_TYPE_VULKAN_SDK -> R.drawable.icon_open;
+                case CONTENT_TYPE_DXVK,
+                     CONTENT_TYPE_VKD3D,
+                     CONTENT_TYPE_VULKAN_SDK,
+                     CONTENT_TYPE_TURNIP_DRIVER,
+                     CONTENT_TYPE_OPENGL_DRIVER,
+                     CONTENT_TYPE_DGVOODOO -> R.drawable.icon_open;
                 default -> R.drawable.icon_settings;
             };
             holder.ivIcon.setImageResource(iconId);
+            int accentColor = resolveProfileAccentColor(profile);
+            int secondaryColor = withAlpha(accentColor, isDarkMode ? 228 : 176);
+            holder.ivIcon.setColorFilter(accentColor);
 
-            holder.tvVersionName.setText(getString(R.string.version) + ": " + profile.verName);
-            holder.tvVersionCode.setText(getString(R.string.version_code) + ": " + profile.verCode);
-            holder.tvDescription.setText((profile.desc == null || profile.desc.trim().isEmpty()) ? getTypeLabel(profile.type) : profile.desc);
-            holder.tvSource.setText(getSourceLabel(profile));
+            holder.tvVersionName.setText(buildProfileTitleLine(profile));
+            holder.tvVersionName.setTextColor(accentColor);
 
-            if (isDarkMode) {
-                holder.tvDescription.setTextColor(0xFF6FE4A4);
-                holder.tvSource.setTextColor(0xFFA5B5AF);
+            String categoryBadgeText = profile.getDisplayCategory();
+            if (categoryBadgeText == null || categoryBadgeText.trim().isEmpty()) {
+                categoryBadgeText = getDisplayTypeLabel(profile.type);
             }
+            holder.tvCategoryBadge.setText(categoryBadgeText);
+            holder.tvCategoryBadge.setTextColor(accentColor);
+            holder.tvCategoryBadge.setBackground(buildCategoryBadgeBackground(accentColor));
+            holder.tvCategoryBadge.setVisibility(View.VISIBLE);
+
+            holder.tvVersionCode.setText(buildProfileMetaLine(profile));
+            holder.tvVersionCode.setTextColor(secondaryColor);
+            holder.tvDescription.setText((profile.desc == null || profile.desc.trim().isEmpty()) ? getTypeLabel(profile.type) : profile.desc);
+            holder.tvDescription.setTextColor(secondaryColor);
+            holder.tvSource.setText(buildProfileSourceLine(profile));
+            holder.tvSource.setTextColor(secondaryColor);
 
             holder.ibMenu.setVisibility(profile.remoteUrl == null ? View.VISIBLE : View.GONE);
             holder.ibMenu.setOnClickListener(v -> {

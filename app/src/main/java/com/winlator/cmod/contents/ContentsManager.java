@@ -27,6 +27,7 @@ public class ContentsManager {
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
     public static final String REMOTE_PROFILES_FALLBACK = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
     public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/aesolator/main/contents/contents.json";
+    public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -35,6 +36,7 @@ public class ContentsManager {
     public static final String[] BOX64_TRUST_FILES = {"${bindir}/box64"};
     public static final String[] WOWBOX64_TRUST_FILES = {"${system32}/wowbox64.dll"};
     public static final String[] FEXCORE_TRUST_FILES = {"${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll"};
+    public static final String[] VULKAN_SDK_TRUST_PREFIXES = {"${sharedir}/vulkan", "${sharedir}/vulkan-sdk"};
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -94,45 +96,97 @@ public class ContentsManager {
     }
 
     public void setRemoteProfiles(String json) {
+        setRemoteProfiles(json, false, false);
+    }
+
+    public void setRemoteProfiles(String json, boolean includeBeta, boolean ignoreRepoManaged) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, includeBeta, ignoreRepoManaged, false, false);
+        syncContents();
+    }
+
+    public void setCompositeRemoteProfiles(String hubJson, String repoOverlayJson, boolean showNightlyOnly) {
+        remoteProfiles = new ArrayList<>();
+        // Hub feed: keep all channels available in-memory, UI can filter by toggles.
+        appendRemoteProfiles(hubJson, showNightlyOnly, true, false, true);
+        // Overlay feed: repo-managed lanes only.
+        appendRemoteProfiles(repoOverlayJson, false, false, true, false);
+        syncContents();
+    }
+
+    private void appendRemoteProfiles(String json, boolean includeBeta, boolean ignoreRepoManaged, boolean onlyRepoManaged, boolean keepAllChannels) {
+        if (json == null || json.trim().isEmpty()) return;
         try {
-            remoteProfiles = new ArrayList<>();
             JSONArray content = new JSONArray(json);
             for (int i = 0; i < content.length(); i++) {
                 try {
                     JSONObject object = content.getJSONObject(i);
                     ContentProfile remoteProfile = new ContentProfile();
-                    remoteProfile.remoteUrl = object.getString("remoteUrl");
-                    remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.getString("type"));
-                    if (remoteProfile.type == null) {
-                        Log.w("ContentsManager", "Skipping remote profile with unsupported type: " + object.optString("type"));
-                        continue;
+                    remoteProfile.remoteUrl = readRemoteUrl(object);
+                    if (remoteProfile.remoteUrl == null || remoteProfile.remoteUrl.isEmpty()) continue;
+
+                    remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.optString("type"));
+                    if (remoteProfile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE) {
+                        String internalType = object.optString("internalType", "").trim().toLowerCase(Locale.US);
+                        if (internalType.contains("proton")) {
+                            remoteProfile.type = ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+                        }
                     }
-                    remoteProfile.verName = object.getString("verName");
-                    remoteProfile.verCode = object.getInt("verCode");
+                    if (remoteProfile.type == null) continue;
+
+                    if (onlyRepoManaged && !isRepoManagedOverlayType(remoteProfile.type)) continue;
+                    if (ignoreRepoManaged && isRepoManagedOverlayType(remoteProfile.type)) continue;
+
+                    remoteProfile.verName = object.optString("verName", "").trim();
+                    remoteProfile.verCode = parseVerCode(object);
+                    remoteProfile.desc = object.optString("description", "").trim();
+                    remoteProfile.displayCategory = object.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "").trim();
+                    remoteProfile.sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim();
+                    remoteProfile.releaseTag = object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim();
+                    remoteProfile.delivery = object.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE).trim();
+                    remoteProfile.channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
+                    remoteProfile.locallyInstalled = false;
+
+                    if (remoteProfile.verName.isEmpty()) {
+                        remoteProfile.verName = deriveVersionNameFromUrl(remoteProfile.remoteUrl);
+                    }
+                    if (remoteProfile.desc.isEmpty()) {
+                        remoteProfile.desc = object.optString("name", "").trim();
+                    }
+                    if (remoteProfile.desc.isEmpty()) {
+                        remoteProfile.desc = remoteProfile.verName != null ? remoteProfile.verName : "";
+                    }
+                    if (remoteProfile.channel.isEmpty()) {
+                        remoteProfile.channel = deriveLegacyChannel(object, remoteProfile.verName, remoteProfile.remoteUrl);
+                    }
+
+                    boolean isBeta = ContentProfile.CHANNEL_BETA.equals(remoteProfile.channel)
+                            || ContentProfile.CHANNEL_NIGHTLY.equals(remoteProfile.channel);
+                    if (!keepAllChannels) {
+                        if (includeBeta && !isBeta) continue;
+                        if (!includeBeta && isBeta) continue;
+                    }
+
                     remoteProfiles.add(remoteProfile);
-                } catch (JSONException e) {
-                    e.printStackTrace();
+                } catch (Exception e) {
+                    Log.w("ContentsManager", "Failed to parse remote profile row", e);
                 }
             }
         } catch (JSONException e) {
-            e.printStackTrace();
+            Log.w("ContentsManager", "Failed to parse remote profile feed", e);
         }
-        syncContents();
     }
 
     public void syncContents() {
         profilesMap = new HashMap<>();
-
-        // Ensure all content types are initialized in the profilesMap
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             profilesMap.put(type, new LinkedList<>());
         }
 
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             List<ContentProfile> profiles = profilesMap.get(type);
+            HashMap<String, ContentProfile> profileByEntry = new HashMap<>();
 
-
-            // Load local profiles
             File typeFile = getContentTypeDir(context, type);
             File[] fileList = typeFile.listFiles();
             if (fileList != null) {
@@ -141,30 +195,26 @@ public class ContentsManager {
                     if (proFile.exists() && proFile.isFile()) {
                         ContentProfile profile = readProfile(proFile);
                         if (profile != null) {
+                            profile.locallyInstalled = true;
                             profiles.add(profile);
-                            Log.d("ContentsManager", "Local profile loaded: " + profile.verName);
-                        } else {
-                            Log.w("ContentsManager", "Invalid local profile at: " + proFile.getAbsolutePath());
+                            profileByEntry.put(getEntryName(profile), profile);
                         }
                     }
                 }
             }
 
-            // Add remote profiles for this type
             if (remoteProfiles != null) {
                 for (ContentProfile remote : remoteProfiles) {
-                    if (remote.type == type) {
-                        boolean exists = false;
-                        for (ContentProfile profile : profiles) {
-                            if (profile.verName.equals(remote.verName) && profile.verCode == remote.verCode) {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (!exists) {
-                            profiles.add(remote);
-                            Log.d("ContentsManager", "Remote profile added: " + remote.verName);
-                        }
+                    if (remote.type != type) continue;
+                    ContentProfile existing = profileByEntry.get(getEntryName(remote));
+                    if (existing == null) {
+                        existing = findEquivalentProfile(profiles, remote);
+                    }
+                    if (existing != null) {
+                        existing.mergeRemoteMetadata(remote);
+                    } else {
+                        profiles.add(remote);
+                        profileByEntry.put(getEntryName(remote), remote);
                     }
                 }
             }
@@ -252,9 +302,17 @@ public class ContentsManager {
             String typeName = profileJSONObject.getString(ContentProfile.MARK_TYPE);
             ContentProfile.ContentType resolvedType = ContentProfile.ContentType.getTypeByName(typeName);
             if (resolvedType == null) return null;
-            String verName = profileJSONObject.getString(ContentProfile.MARK_VERSION_NAME);
-            int verCode = profileJSONObject.getInt(ContentProfile.MARK_VERSION_CODE);
-            String desc = profileJSONObject.getString(ContentProfile.MARK_DESC);
+
+            profile.type = resolvedType;
+            profile.verName = profileJSONObject.optString(ContentProfile.MARK_VERSION_NAME, "");
+            profile.verCode = profileJSONObject.optInt(ContentProfile.MARK_VERSION_CODE, 0);
+            profile.desc = profileJSONObject.optString(ContentProfile.MARK_DESC, "");
+            profile.channel = profileJSONObject.optString(ContentProfile.MARK_CHANNEL, ContentProfile.CHANNEL_STABLE);
+            profile.delivery = profileJSONObject.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_EMBEDDED);
+            profile.displayCategory = profileJSONObject.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "");
+            profile.sourceRepo = profileJSONObject.optString(ContentProfile.MARK_SOURCE_REPO, "");
+            profile.releaseTag = profileJSONObject.optString(ContentProfile.MARK_RELEASE_TAG, "");
+            profile.locallyInstalled = true;
 
             JSONArray fileJSONArray = profileJSONObject.getJSONArray(ContentProfile.MARK_FILE_LIST);
             List<ContentProfile.ContentFile> fileList = new ArrayList<>();
@@ -265,18 +323,17 @@ public class ContentsManager {
                 contentFile.target = contentFileJSONObject.getString(ContentProfile.MARK_FILE_TARGET);
                 fileList.add(contentFile);
             }
-            if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE) {
-                JSONObject wineJSONObject = profileJSONObject.getJSONObject(ContentProfile.MARK_WINE);
-                profile.wineLibPath = wineJSONObject.getString(ContentProfile.MARK_WINE_LIBPATH);
-                profile.wineBinPath = wineJSONObject.getString(ContentProfile.MARK_WINE_BINPATH);
-                profile.winePrefixPack = wineJSONObject.getString(ContentProfile.MARK_WINE_PREFIX_PACK);
-            }
-
-            profile.type = resolvedType;
-            profile.verName = verName;
-            profile.verCode = verCode;
-            profile.desc = desc;
             profile.fileList = fileList;
+
+            if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                    || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                JSONObject wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
+                if (wineJSONObject != null) {
+                    profile.wineLibPath = wineJSONObject.optString(ContentProfile.MARK_WINE_LIBPATH, "");
+                    profile.wineBinPath = wineJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, "");
+                    profile.winePrefixPack = wineJSONObject.optString(ContentProfile.MARK_WINE_PREFIX_PACK, "");
+                }
+            }
             return profile;
         } catch (Exception e) {
             return null;
@@ -319,9 +376,11 @@ public class ContentsManager {
         createTrustedFilesMap();
         List<ContentProfile.ContentFile> files = new ArrayList<>();
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
-            if (!trustedFilesMap.get(profile.type).contains(
-                    Paths.get(getPathFromTemplate(contentFile.target)).toAbsolutePath().normalize().toString()))
+            String normalizedTarget = Paths.get(getPathFromTemplate(contentFile.target)).toAbsolutePath().normalize().toString();
+            if (!trustedFilesMap.get(profile.type).contains(normalizedTarget)
+                    && !isTrustedByPrefix(profile.type, normalizedTarget)) {
                 files.add(contentFile);
+            }
         }
         return files;
     }
@@ -424,6 +483,81 @@ public class ContentsManager {
             // TODO: do nothing?
         }
         return true;
+    }
+
+    private String readRemoteUrl(JSONObject object) {
+        if (object == null) return "";
+        String[] keys = {"remoteUrl", "url", "browser_download_url", "downloadUrl", "assetUrl"};
+        for (String key : keys) {
+            String value = object.optString(key, "").trim();
+            if (!value.isEmpty()) return value;
+        }
+        return "";
+    }
+
+    private int parseVerCode(JSONObject object) {
+        if (object == null) return 0;
+        Object raw = object.opt("verCode");
+        if (raw instanceof Number) return ((Number) raw).intValue();
+        if (raw != null) {
+            try {
+                return Integer.parseInt(String.valueOf(raw).replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private String deriveVersionNameFromUrl(String remoteUrl) {
+        if (remoteUrl == null || remoteUrl.trim().isEmpty()) return "";
+        String path = remoteUrl.trim();
+        int slash = path.lastIndexOf('/');
+        String fileName = slash >= 0 ? path.substring(slash + 1) : path;
+        return fileName.replaceAll("\\.(wcp|zip|tar|txz|tzst)$", "");
+    }
+
+    private String deriveLegacyChannel(JSONObject object, String verName, String remoteUrl) {
+        String combined = (
+                object.optString("name", "") + " "
+                        + object.optString("description", "") + " "
+                        + (verName == null ? "" : verName) + " "
+                        + (remoteUrl == null ? "" : remoteUrl)
+        ).toLowerCase(Locale.US);
+        if (combined.contains("nightly")) return ContentProfile.CHANNEL_NIGHTLY;
+        if (combined.contains("beta") || combined.contains("rc")) return ContentProfile.CHANNEL_BETA;
+        return ContentProfile.CHANNEL_STABLE;
+    }
+
+    private boolean isWineFamilyType(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+    }
+
+    private boolean isRepoManagedOverlayType(ContentProfile.ContentType type) {
+        return isWineFamilyType(type)
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
+                || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
+    }
+
+    private boolean isTrustedByPrefix(ContentProfile.ContentType type, String normalizedTarget) {
+        if (type != ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return false;
+        for (String prefix : VULKAN_SDK_TRUST_PREFIXES) {
+            String resolvedPrefix = Paths.get(getPathFromTemplate(prefix)).toAbsolutePath().normalize().toString();
+            if (normalizedTarget.startsWith(resolvedPrefix)) return true;
+        }
+        return false;
+    }
+
+    private ContentProfile findEquivalentProfile(List<ContentProfile> profiles, ContentProfile remote) {
+        if (profiles == null || remote == null) return null;
+        for (ContentProfile profile : profiles) {
+            if (profile != null && profile.sameEntry(remote)) return profile;
+        }
+        return null;
     }
 }
 

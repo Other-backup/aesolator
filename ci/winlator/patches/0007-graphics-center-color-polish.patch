@@ -1,0 +1,209 @@
+diff --git a/app/src/main/java/com/winlator/cmod/ContentsFragment.java b/app/src/main/java/com/winlator/cmod/ContentsFragment.java
+index 791d07d..a53478c 100644
+--- a/app/src/main/java/com/winlator/cmod/ContentsFragment.java
++++ b/app/src/main/java/com/winlator/cmod/ContentsFragment.java
+@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
+ import android.app.Activity;
+ import android.content.Intent;
+ import android.content.SharedPreferences;
++import android.graphics.drawable.GradientDrawable;
+ import android.net.Uri;
+ import android.os.Build;
+ import android.os.Bundle;
+@@ -24,6 +25,7 @@ import android.widget.TextView;
+ import androidx.annotation.NonNull;
+ import androidx.annotation.Nullable;
+ import androidx.appcompat.app.AppCompatActivity;
++import androidx.core.content.ContextCompat;
+ import androidx.fragment.app.Fragment;
+ import androidx.preference.PreferenceManager;
+ import androidx.recyclerview.widget.DividerItemDecoration;
+@@ -544,6 +546,7 @@ public class ContentsFragment extends Fragment {
+         private static class ViewHolder extends RecyclerView.ViewHolder {
+             private final ImageView ivIcon;
+             private final TextView tvVersionName;
++            private final TextView tvCategoryBadge;
+             private final TextView tvVersionCode;
+             private final TextView tvSource;
+             private final ImageButton ibMenu;
+@@ -555,6 +558,7 @@ public class ContentsFragment extends Fragment {
+ 
+                 ivIcon = view.findViewById(R.id.IVIcon);
+                 tvVersionName = view.findViewById(R.id.TVVersionName);
++                tvCategoryBadge = view.findViewById(R.id.TVCategoryBadge);
+                 tvVersionCode = view.findViewById(R.id.TVVersionCode);
+                 tvSource = view.findViewById(R.id.TVSource);
+                 ibMenu = view.findViewById(R.id.BTMenu);
+@@ -590,12 +594,26 @@ public class ContentsFragment extends Fragment {
+                 case CONTENT_TYPE_PROTON -> R.drawable.icon_wine;
+                 default -> R.drawable.icon_settings;
+             };
+-            holder.ivIcon.setBackground(getContext().getDrawable(iconId));
++            int accentColor = resolveProfileAccentColor(profile);
++            int secondaryColor = withAlpha(accentColor, isDarkMode ? 228 : 176);
++            holder.ivIcon.setImageResource(iconId);
++            holder.ivIcon.setColorFilter(accentColor);
+ 
+             holder.tvVersionName.setText(buildProfileTitleLine(profile));
++            holder.tvVersionName.setTextColor(accentColor);
++            String categoryBadgeText = profile.getDisplayCategory();
++            if (categoryBadgeText == null || categoryBadgeText.trim().isEmpty()) {
++                categoryBadgeText = getDisplayTypeLabel(profile.type);
++            }
++            holder.tvCategoryBadge.setText(categoryBadgeText);
++            holder.tvCategoryBadge.setTextColor(accentColor);
++            holder.tvCategoryBadge.setBackground(buildCategoryBadgeBackground(accentColor));
++            holder.tvCategoryBadge.setVisibility(View.VISIBLE);
+             holder.tvVersionCode.setText(buildProfileMetaLine(profile));
++            holder.tvVersionCode.setTextColor(secondaryColor);
+             String sourceLine = buildProfileSourceLine(profile);
+             holder.tvSource.setText(sourceLine);
++            holder.tvSource.setTextColor(secondaryColor);
+             holder.tvSource.setVisibility(View.VISIBLE);
+             boolean remoteDownloadable = profile.isRemoteDownloadable();
+             boolean locallyInstalled = profile.isInstalledLocally();
+@@ -668,4 +686,42 @@ public class ContentsFragment extends Fragment {
+             return data.size();
+         }
+     }
++
++    private int resolveProfileAccentColor(ContentProfile profile) {
++        int fallbackRes = isDarkMode ? R.color.colorAccentDark : R.color.colorAccent;
++        int colorRes = switch (profile.type) {
++            case CONTENT_TYPE_WINE -> isDarkMode ? R.color.contents_lane_wine_dark : R.color.contents_lane_wine;
++            case CONTENT_TYPE_PROTON -> isDarkMode ? R.color.contents_lane_proton_dark : R.color.contents_lane_proton;
++            case CONTENT_TYPE_VULKAN_SDK -> resolveVulkanFamilyAccentColor(profile);
++            case CONTENT_TYPE_DGVOODOO ->
++                    isDarkMode ? R.color.contents_lane_dgvoodoo_dark : R.color.contents_lane_dgvoodoo;
++            case CONTENT_TYPE_DXVK -> isDarkMode ? R.color.contents_lane_dxvk_dark : R.color.contents_lane_dxvk;
++            case CONTENT_TYPE_VKD3D -> isDarkMode ? R.color.contents_lane_vkd3d_dark : R.color.contents_lane_vkd3d;
++            default -> fallbackRes;
++        };
++        return ContextCompat.getColor(requireContext(), colorRes);
++    }
++
++    private int resolveVulkanFamilyAccentColor(ContentProfile profile) {
++        String category = profile.getDisplayCategory();
++        String source = profile.sourceRepo != null ? profile.sourceRepo : "";
++        String version = profile.verName != null ? profile.verName : "";
++        String laneHint = (category + " " + source + " " + version).toLowerCase();
++        if (laneHint.contains("turnip")) {
++            return isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
++        }
++        if (laneHint.contains("opengl") || laneHint.contains("zink")) {
++            return isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
++        }
++        return isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
++    }
++
++    private GradientDrawable buildCategoryBadgeBackground(int accentColor) {
++        GradientDrawable drawable = new GradientDrawable();
++        drawable.setShape(GradientDrawable.RECTANGLE);
++        drawable.setCornerRadius(dpToPx(10f));
++        drawable.setColor(withAlpha(accentColor, isDarkMode ? 74 : 36));
++        drawable.setStroke(dpToPx(1f), withAlpha(accentColor, isDarkMode ? 220 : 132));
++        return drawable;
++    }
++
++    private int withAlpha(int color, int alpha) {
++        int clampedAlpha = Math.max(0, Math.min(255, alpha));
++        return (color & 0x00ffffff) | (clampedAlpha << 24);
++    }
++
++    private int dpToPx(float dp) {
++        return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
++    }
+ }
+diff --git a/app/src/main/res/layout/content_list_item.xml b/app/src/main/res/layout/content_list_item.xml
+index 42aff37..c73396b 100644
+--- a/app/src/main/res/layout/content_list_item.xml
++++ b/app/src/main/res/layout/content_list_item.xml
+@@ -1,6 +1,5 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+-    xmlns:app="http://schemas.android.com/apk/res-auto"
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+     android:gravity="center_vertical"
+@@ -8,14 +7,13 @@
+     android:paddingLeft="16dp"
+     android:paddingRight="16dp">
+ 
+-    <ImageView
+-        android:id="@+id/IVIcon"
+-        android:layout_width="36dp"
+-        android:layout_height="36dp"
+-        android:layout_marginTop="8dp"
+-        android:layout_marginEnd="16dp"
+-        android:layout_marginBottom="8dp"
+-        app:tint="@color/colorPrimaryDark" />
++    <ImageView
++        android:id="@+id/IVIcon"
++        android:layout_width="36dp"
++        android:layout_height="36dp"
++        android:layout_marginTop="8dp"
++        android:layout_marginEnd="16dp"
++        android:layout_marginBottom="8dp" />
+ 
+     <LinearLayout
+         android:layout_width="0dp"
+@@ -34,6 +32,20 @@
+             android:maxLines="2"
+             android:textStyle="bold" />
+ 
++        <TextView
++            android:id="@+id/TVCategoryBadge"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="2dp"
++            android:layout_marginBottom="2dp"
++            android:paddingStart="8dp"
++            android:paddingTop="2dp"
++            android:paddingEnd="8dp"
++            android:paddingBottom="2dp"
++            android:textStyle="bold"
++            android:textSize="11sp"
++            android:visibility="gone" />
++
+         <TextView
+             android:id="@+id/TVVersionCode"
+             android:layout_width="match_parent"
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 88b2752..7980de6 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -5,14 +5,30 @@
+     <color name="colorPrimary">#0d7f67</color>
+     <color name="colorPrimaryDark">#085b4b</color>
+     <color name="colorAccent">#12b886</color>
+-    <color name="black">#000000</color>
++    <color name="black">#000000</color>
++    <color name="contents_lane_wine">#0d7f67</color>
++    <color name="contents_lane_proton">#2e7d32</color>
++    <color name="contents_lane_vulkansdk">#1565c0</color>
++    <color name="contents_lane_turnip">#00897b</color>
++    <color name="contents_lane_opengl">#ef6c00</color>
++    <color name="contents_lane_dgvoodoo">#c62828</color>
++    <color name="contents_lane_dxvk">#00695c</color>
++    <color name="contents_lane_vkd3d">#455a64</color>
+ 
+     <!-- Dark Theme Colors -->
+     <color name="window_background_color_dark">#101615</color>
+     <color name="colorPrimaryDarkMode">#17332d</color>
+     <color name="colorPrimaryDarkModeDark">#0c211d</color>
+     <color name="colorAccentDark">#6ff0bf</color>
+-    <color name="white">#ffffff</color>
++    <color name="white">#ffffff</color>
++    <color name="contents_lane_wine_dark">#6ff0bf</color>
++    <color name="contents_lane_proton_dark">#81c784</color>
++    <color name="contents_lane_vulkansdk_dark">#90caf9</color>
++    <color name="contents_lane_turnip_dark">#80cbc4</color>
++    <color name="contents_lane_opengl_dark">#ffb74d</color>
++    <color name="contents_lane_dgvoodoo_dark">#ef9a9a</color>
++    <color name="contents_lane_dxvk_dark">#80cbc4</color>
++    <color name="contents_lane_vkd3d_dark">#b0bec5</color>
+ 
+     <!-- Additional Colors for Dark Mode -->
+     <color name="combo_box_dark">#1a2925</color>

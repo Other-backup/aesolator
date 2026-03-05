@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE resources [
     <!ENTITY TERMUX_PACKAGE_NAME "com.winlator">
-    <!ENTITY TERMUX_X11_APP_NAME "Winlator:X11">
+    <!ENTITY TERMUX_X11_APP_NAME "Aesolator:X11">
     ]>
 <resources>
-    <string name="app_name">Winlator</string>
+    <string name="app_name">Aesolator</string>
     <string name="run">Run</string>
     <string name="edit">Edit</string>
     <string name="remove">Remove</string>
@@ -343,7 +343,7 @@
     <string name="reinstall_imagefs">Reinstall Imagefs</string>
     <string name="do_you_want_to_reinstall_imagefs">Do you want to reinstall imagefs? This operation will restore system files, your containers won\'t be changed.</string>
     <string name="unable_to_remove_content_since_container_using">Unable to remove this content, because a container is currently using this Wine.</string>
-    <string name="get_more_contents_form_github">You can access https://github.com/longjunyu2/winlator/releases to get more contents.</string>
+    <string name="get_more_contents_form_github">You can access https://github.com/kosoymiki/wcp-runtime-lanes/releases to get more contents.</string>
     <string name="setup_failed">Setup failed</string>
     <string name="graphics_driver_configuration">Graphics Driver Configuration</string>
     <string name="select_graphics_driver_version">Select Graphics Driver Version:</string>
@@ -427,7 +427,7 @@
     ]]></string>
     <string name="toggle_orientation">Toggle Orientation</string>
     <string name="help_file_provider"><![CDATA[
-        <i><b>File Provider</b></i> allows access to Winlator\'s internal data through android file manager.<br/><br/>
+        <i><b>File Provider</b></i> allows access to Aesolator\'s internal data through android file manager.<br/><br/>
     ]]></string>
     <string name="reconfigure">Reconfigure</string>
     <string name="do_you_want_to_reconfigure_wine">Do you want to reconfigure this container on the next startup? This will remove the timestamp to trigger Wine Configuration.</string>
@@ -629,6 +629,22 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="install_drivers_local">Install Local Driver</string>
     <string name="open_contents_packages">Open Contents Packages</string>
     <string name="graphics_center_hint">Graphics Center controls local GPU driver zips and routes you to Contents for WCP packages (DXVK/VKD3D/Vulkan SDK).</string>
+    <string name="dxvk_vkd3d_configuration">DXVK + VKD3D configuration</string>
+    <string name="dxvk_legacy_route_note">Legacy DDraw/D3D1-7 route is handled by dgVoodoo wrapper mode.</string>
+    <string name="dgvoodoo_configuration">dgVoodoo configuration</string>
+    <string name="dgvoodoo_config_summary">Current package: %1$s</string>
+    <string name="dgvoodoo_config_note">Legacy APIs (DDraw/D3D1-7/Glide) are routed through dgVoodoo when this wrapper mode is selected.</string>
+    <string name="dgvoodoo_config_arch">Preferred local install arch</string>
+    <string name="dgvoodoo_arch_auto">Auto</string>
+    <string name="dgvoodoo_arch_x86">x86</string>
+    <string name="dgvoodoo_arch_x64">x64</string>
+    <string name="dgvoodoo_arch_arm64">arm64</string>
+    <string name="dgvoodoo_arch_arm64ec">arm64ec</string>
+    <string name="dgvoodoo_force_d3d11">Force D3D11 backend</string>
+    <string name="dgvoodoo_vsync">Enable dgVoodoo VSync</string>
+    <string name="dgvoodoo_flip_model">Enable flip model</string>
+    <string name="dgvoodoo_package_state_missing">missing</string>
+    <string name="dgvoodoo_package_state_ready">ready (%1$s)</string>
     <string name="install_drivers_message">You will now be prompted to pick a driver. These must be the same ones used in other emulators like Yuzu, Dolphin, Citra, etc.</string>
     <string name="install_drivers_warning">Be warned that because of limitations of current PC emulators, Qualcomm Drivers may not work on chipsets below 8 Gen2 without getting patched.</string>
     <string name="enable_vulkan_api_dump">Enable dumping of Vulkan api calls to file.</string>

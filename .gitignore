@@ -7,9 +7,6 @@
 /captures
 .externalNativeBuild
 .cxx
-app/src/main/assets/imagefs.txz
-app/src/main/assets/imagefs.txz.02
-
 # Local build outputs and working trees
 /out/
 /work/

@@ -127,6 +127,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1484,14 +1486,154 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         inputControlsView.invalidate();
     }
 
+    private static final Pattern SOC_ADRENO_PATTERN =
+            Pattern.compile("adreno\\s*(\\d{3,4})", Pattern.CASE_INSENSITIVE);
+
+    private String detectSoCClass() {
+        String renderer = GPUInformation.getRenderer(null, this);
+        if (renderer == null) return "unknown";
+        String normalized = renderer.toLowerCase(Locale.US);
+
+        if (normalized.contains("adreno")) {
+            Matcher matcher = SOC_ADRENO_PATTERN.matcher(normalized);
+            if (matcher.find()) {
+                int generation = safeParseInt(matcher.group(1));
+                if (generation >= 700) return "adreno-7xx";
+            }
+            return "adreno-6xx-and-older";
+        }
+        if (normalized.contains("xclipse")) return "xclipse-rdna-mobile";
+        if (normalized.contains("mali")) {
+            if (normalized.contains("g7") || normalized.contains("g8") || normalized.contains("g9")) {
+                return "mali-g7xx-or-newer";
+            }
+        }
+        return "unknown";
+    }
+
+    private void applyGraphicsRouteDefaults(boolean dxvkRoute, String socClass) {
+        envVars.put("AERO_GRAPHICS_STACK_PROFILE", "vulkan-first-with-gl-fallback");
+        envVars.put("AERO_GRAPHICS_SOC_CLASS", socClass);
+        envVars.put("AERO_GRAPHICS_VULKAN_PROVIDER", "turnip-vulkan");
+        envVars.put("AERO_GRAPHICS_OPENGL_PROVIDER", "freedreno-opengl");
+        envVars.put("AERO_GL_FALLBACK_ENGINE", "wined3d");
+        envVars.put("AERO_DXVK_LEGACY_DX89_PATH", "wined3d");
+        envVars.put("AERO_DXVK_GL_FALLBACK", "1");
+        envVars.put("AERO_VKD3D_GL_FALLBACK", "1");
+
+        if (dxvkRoute) {
+            envVars.put("AERO_GRAPHICS_ACTIVE_ROUTE", "turnip-primary");
+            envVars.put("AERO_DXVK_ROUTE_MODE", "turnip-first");
+            envVars.put("AERO_VKD3D_ROUTE_MODE", "turnip-first");
+            envVars.put("GALLIUM_DRIVER", "zink");
+        } else {
+            envVars.put("AERO_GRAPHICS_ACTIVE_ROUTE", "freedreno-primary");
+            envVars.put("AERO_DXVK_ROUTE_MODE", "freedreno-first");
+            envVars.put("AERO_VKD3D_ROUTE_MODE", "freedreno-first");
+            envVars.put("GALLIUM_DRIVER", "freedreno");
+        }
+    }
+
+    private void applyRuntimeWrapperEnvFromProfile(@Nullable ContentProfile profile) {
+        if (profile == null) return;
+        File envFile = new File(ContentsManager.getInstallDir(this, profile), "ae-runtime-wrapper.env");
+        if (!envFile.isFile()) return;
+
+        String content = FileUtils.readString(envFile);
+        if (content == null || content.isEmpty()) return;
+
+        String[] lines = content.split("\\r?\\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            int idx = trimmed.indexOf('=');
+            if (idx <= 0 || idx >= trimmed.length() - 1) continue;
+            String key = trimmed.substring(0, idx).trim();
+            String value = trimmed.substring(idx + 1).trim();
+            if (!key.isEmpty() && !value.isEmpty()) envVars.put(key, value);
+        }
+    }
+
+    private void applyRuntimeContractFromProfile(@Nullable ContentProfile profile, String socClass) {
+        if (profile == null) return;
+        File contractFile = new File(ContentsManager.getInstallDir(this, profile), "ae-runtime-contract.json");
+        if (!contractFile.isFile()) return;
+
+        try {
+            JSONObject runtimeContract = new JSONObject(FileUtils.readString(contractFile));
+            String lane = runtimeContract.optString("lane", "").trim();
+            if (!lane.isEmpty()) envVars.put("AERO_GRAPHICS_WRAPPER_LANE", lane);
+
+            JSONObject wrapperContract = runtimeContract.optJSONObject("wrapperContract");
+            if (wrapperContract == null) return;
+
+            String selectedProfile = wrapperContract.optString("defaultProfile", "balanced").trim();
+            JSONObject socClassProfiles = wrapperContract.optJSONObject("socClassProfiles");
+            if (socClassProfiles != null) {
+                String socMappedProfile = socClassProfiles.optString(socClass, "").trim();
+                if (!socMappedProfile.isEmpty()) selectedProfile = socMappedProfile;
+            }
+
+            JSONObject profileEnv = wrapperContract.optJSONObject("profileEnv");
+            if (profileEnv != null) {
+                JSONObject selectedProfileEnv = profileEnv.optJSONObject(selectedProfile);
+                if (selectedProfileEnv != null) {
+                    Iterator<String> keys = selectedProfileEnv.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        String value = selectedProfileEnv.optString(key, "");
+                        if (!value.isEmpty()) envVars.put(key, value);
+                    }
+                }
+            }
+
+            JSONObject routeHints = wrapperContract.optJSONObject("routeHints");
+            if (routeHints != null) {
+                String primaryProvider = routeHints.optString("primaryProvider", "").trim();
+                String fallbackProvider = routeHints.optString("fallbackProvider", "").trim();
+                String legacyEngine = routeHints.optString("legacyFallbackEngine", "").trim();
+                if (!primaryProvider.isEmpty()) envVars.put("AERO_GRAPHICS_PRIMARY_PROVIDER", primaryProvider);
+                if (!fallbackProvider.isEmpty()) envVars.put("AERO_GRAPHICS_FALLBACK_PROVIDER", fallbackProvider);
+                if (!legacyEngine.isEmpty()) envVars.put("AERO_GL_FALLBACK_ENGINE", legacyEngine);
+            }
+
+            envVars.put("AERO_GRAPHICS_WRAPPER_PROFILE", selectedProfile);
+            envVars.put("AERO_GRAPHICS_WRAPPER_SOC_CLASS", socClass);
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to parse runtime contract for profile " + profile.verName, e);
+        }
+    }
+
+    private void applyWrapperContractsForCurrentRoute(boolean dxvkRoute, String socClass) {
+        if (!dxvkRoute) return;
+
+        String dxvkVersion = dxwrapperConfig.get("version");
+        if (!dxvkVersion.isEmpty()) {
+            String dxvkEntry = "dxvk-" + dxvkVersion;
+            ContentProfile dxvkProfile = contentsManager.getProfileByEntryName(dxvkEntry);
+            applyRuntimeWrapperEnvFromProfile(dxvkProfile);
+            applyRuntimeContractFromProfile(dxvkProfile, socClass);
+        }
+
+        String vkd3dVersion = dxwrapperConfig.get("vkd3dVersion");
+        if (!vkd3dVersion.isEmpty() && !"None".equalsIgnoreCase(vkd3dVersion)) {
+            String vkd3dEntry = "vkd3d-" + vkd3dVersion;
+            ContentProfile vkd3dProfile = contentsManager.getProfileByEntryName(vkd3dEntry);
+            applyRuntimeWrapperEnvFromProfile(vkd3dProfile);
+            applyRuntimeContractFromProfile(vkd3dProfile, socClass);
+        }
+    }
+
     private void extractGraphicsDriverFiles() {
         String adrenoToolsDriverId = graphicsDriverConfig.get("version");
 
         Log.d("GraphicsDriverExtraction", "Adrenotools DriverID: " + adrenoToolsDriverId);
 
         File rootDir = imageFs.getRootDir();
+        boolean dxvkRoute = dxwrapper.contains("dxvk");
+        String socClass = detectSoCClass();
 
-        if (dxwrapper.contains("dxvk")) {
+        if (dxvkRoute) {
             DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
             String version = dxwrapperConfig.get("version");
             if (version.equals("1.11.1-sarek")) {
@@ -1509,7 +1651,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         }
 
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
-        envVars.put("GALLIUM_DRIVER", "zink");
+        applyGraphicsRouteDefaults(dxvkRoute, socClass);
+        applyWrapperContractsForCurrentRoute(dxvkRoute, socClass);
 
         if (firstTimeBoot) {
             Log.d("XServerDisplayActivity", "First time container boot, re-extracting libs");
@@ -1520,7 +1663,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/zink_dlls" + ".tzst", new File(rootDir, imageFs.WINEPREFIX + "/drive_c/windows"));
         }
 
-        if (adrenoToolsDriverId != "System") {
+        if (!"System".equals(adrenoToolsDriverId)) {
             AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
             adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
         }
