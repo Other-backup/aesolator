@@ -42,6 +42,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private String guestExecutable;
@@ -216,7 +218,23 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     }
 
     public void setBindingPaths(String[] bindingPaths) {
-        this.bindingPaths = bindingPaths;
+        if (bindingPaths == null || bindingPaths.length == 0) {
+            this.bindingPaths = null;
+            return;
+        }
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String path : bindingPaths) {
+            if (path == null || path.trim().isEmpty()) continue;
+            try {
+                String normalizedPath = Paths.get(path.trim()).toAbsolutePath().normalize().toString();
+                File candidate = new File(normalizedPath);
+                if (candidate.exists() && candidate.isDirectory()) {
+                    normalized.add(normalizedPath);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        this.bindingPaths = normalized.isEmpty() ? null : normalized.toArray(new String[0]);
     }
 
     public EnvVars getEnvVars() {
@@ -348,6 +366,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (this.envVars != null) {
             envVars.putAll(this.envVars);
         }
+        if (bindingPaths != null && bindingPaths.length > 0) {
+            envVars.put("AESO_BIND_PATHS", String.join(":", bindingPaths));
+            envVars.put("AESO_BIND_PATH_COUNT", String.valueOf(bindingPaths.length));
+        }
 
         String emulator = container.getEmulator();
         if (shortcut != null)
@@ -391,17 +413,18 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     }
 
     private void addBox64EnvVars(EnvVars envVars, boolean enableLogs) {
-        envVars.put("BOX64_NOBANNER", ProcessHelper.PRINT_DEBUG && enableLogs ? "0" : "1");
         envVars.put("BOX64_DYNAREC", "1");
+        envVars.putAll(Box64PresetManager.getEnvVars("box64", environment.getContext(), box64Preset));
+        if (!envVars.has("BOX64_NOBANNER")) {
+            envVars.put("BOX64_NOBANNER", ProcessHelper.PRINT_DEBUG && enableLogs ? "0" : "1");
+        }
+        if (!envVars.has("BOX64_X11GLX")) envVars.put("BOX64_X11GLX", "1");
+        if (!envVars.has("BOX64_NORCFILES")) envVars.put("BOX64_NORCFILES", "1");
 
         if (enableLogs) {
             envVars.put("BOX64_LOG", "1");
             envVars.put("BOX64_DYNAREC_MISSING", "1");
         }
-
-        envVars.putAll(Box64PresetManager.getEnvVars("box64", environment.getContext(), box64Preset));
-        envVars.put("BOX64_X11GLX", "1");
-        envVars.put("BOX64_NORCFILES", "1");
     }
 
     public void suspendProcess() {

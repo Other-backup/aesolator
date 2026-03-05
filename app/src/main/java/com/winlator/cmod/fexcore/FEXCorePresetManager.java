@@ -30,6 +30,27 @@ public class FEXCorePresetManager {
     public static EnvVars getEnvVars(Context context, String id) {
         EnvVars envVars = new EnvVars();
 
+        if (id.startsWith(FEXCorePreset.CUSTOM)) {
+            for (String[] preset : customPresetsIterator(context)) {
+                if (preset[0].equals(id)) {
+                    envVars.putAll(preset[2]);
+                    break;
+                }
+            }
+            return envVars;
+        }
+
+        if (!id.equals(FEXCorePreset.STABILITY)
+                && !id.equals(FEXCorePreset.COMPATIBILITY)
+                && !id.equals(FEXCorePreset.INTERMEDIATE)
+                && !id.equals(FEXCorePreset.PERFORMANCE)
+                && !id.equals(FEXCorePreset.S8G1_BALANCED)
+                && !id.equals(FEXCorePreset.S8G1_SUPER)) {
+            return envVars;
+        }
+
+        applyBasePresetDefaults(envVars);
+
         if (id.equals(FEXCorePreset.STABILITY)) {
             envVars.put("FEX_TSOENABLED", "1");
             envVars.put("FEX_VECTORTSOENABLED", "1");
@@ -37,41 +58,92 @@ public class FEXCorePresetManager {
             envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
             envVars.put("FEX_X87REDUCEDPRECISION", "0");
             envVars.put("FEX_MULTIBLOCK", "0");
-        }
-        else if (id.equals(FEXCorePreset.COMPATIBILITY)) {
+            envVars.put("FEX_SMC_CHECKS", "full");
+            envVars.put("FEX_SMCCHECKS", "full");
+            envVars.put("FEX_DYNAMICL1CACHE", "0");
+            envVars.put("FEX_LOG_LEVEL", "off");
+        } else if (id.equals(FEXCorePreset.COMPATIBILITY)) {
             envVars.put("FEX_TSOENABLED", "1");
             envVars.put("FEX_VECTORTSOENABLED", "1");
             envVars.put("FEX_MEMCPYSETTSOENABLED", "1");
             envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
             envVars.put("FEX_X87REDUCEDPRECISION", "0");
             envVars.put("FEX_MULTIBLOCK", "1");
-        }
-        else if (id.equals(FEXCorePreset.INTERMEDIATE)) {
+            envVars.put("FEX_SMC_CHECKS", "mtrack");
+            envVars.put("FEX_SMCCHECKS", "mtrack");
+            envVars.put("FEX_DYNAMICL1CACHE", "0");
+            envVars.put("FEX_LOG_LEVEL", "off");
+        } else if (id.equals(FEXCorePreset.INTERMEDIATE)) {
             envVars.put("FEX_TSOENABLED", "1");
             envVars.put("FEX_VECTORTSOENABLED", "0");
             envVars.put("FEX_MEMCPYSETTSOENABLED", "0");
             envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
             envVars.put("FEX_X87REDUCEDPRECISION", "1");
             envVars.put("FEX_MULTIBLOCK", "1");
-        }
-        else if (id.equals(FEXCorePreset.PERFORMANCE)) {
+            envVars.put("FEX_SMC_CHECKS", "mtrack");
+            envVars.put("FEX_SMCCHECKS", "mtrack");
+            envVars.put("FEX_DYNAMICL1CACHE", "0");
+            envVars.put("FEX_LOG_LEVEL", "off");
+        } else if (id.equals(FEXCorePreset.PERFORMANCE)) {
             envVars.put("FEX_TSOENABLED", "0");
             envVars.put("FEX_VECTORTSOENABLED", "0");
             envVars.put("FEX_MEMCPYSETTSOENABLED", "0");
             envVars.put("FEX_HALFBARRIERTSOENABLED", "0");
             envVars.put("FEX_X87REDUCEDPRECISION", "1");
             envVars.put("FEX_MULTIBLOCK", "1");
-        }
-        else if (id.startsWith(FEXCorePreset.CUSTOM)) {
-            for (String[] preset : customPresetsIterator(context)) {
-                if (preset[0].equals(id)) {
-                    envVars.putAll(preset[2]);
-                    break;
-                }
-            }
+            envVars.put("FEX_SMC_CHECKS", "none");
+            envVars.put("FEX_SMCCHECKS", "none");
+            envVars.put("FEX_DYNAMICL1CACHE", "1");
+            envVars.put("FEX_LOG_LEVEL", "off");
+        } else if (id.equals(FEXCorePreset.S8G1_BALANCED)) {
+            envVars.put("FEX_TSOENABLED", "1");
+            envVars.put("FEX_VECTORTSOENABLED", "1");
+            envVars.put("FEX_MEMCPYSETTSOENABLED", "1");
+            envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
+            envVars.put("FEX_X87REDUCEDPRECISION", "0");
+            envVars.put("FEX_MULTIBLOCK", "1");
+            envVars.put("FEX_SMC_CHECKS", "mtrack");
+            envVars.put("FEX_SMCCHECKS", "mtrack");
+            envVars.put("FEX_DYNAMICL1CACHE", "1");
+            envVars.put("FEX_MAXINST", "7000");
+            envVars.put("FEX_LOG_LEVEL", "off");
+        } else if (id.equals(FEXCorePreset.S8G1_SUPER)) {
+            envVars.put("FEX_TSOENABLED", "1");
+            envVars.put("FEX_VECTORTSOENABLED", "0");
+            envVars.put("FEX_MEMCPYSETTSOENABLED", "0");
+            envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
+            envVars.put("FEX_X87REDUCEDPRECISION", "1");
+            envVars.put("FEX_MULTIBLOCK", "1");
+            envVars.put("FEX_SMC_CHECKS", "none");
+            envVars.put("FEX_SMCCHECKS", "none");
+            envVars.put("FEX_DYNAMICL1CACHE", "1");
+            envVars.put("FEX_MAXINST", "9000");
+            envVars.put("FEX_SMALLTSCSCALE", "1");
+            envVars.put("FEX_LOG_LEVEL", "off");
         }
 
         return envVars;
+    }
+
+    private static void applyBasePresetDefaults(EnvVars envVars) {
+        envVars.put("FEX_TSOENABLED", "1");
+        envVars.put("FEX_VECTORTSOENABLED", "1");
+        envVars.put("FEX_MEMCPYSETTSOENABLED", "1");
+        envVars.put("FEX_HALFBARRIERTSOENABLED", "1");
+        envVars.put("FEX_X87REDUCEDPRECISION", "0");
+        envVars.put("FEX_MULTIBLOCK", "1");
+        envVars.put("FEX_MAXINST", "5000");
+        envVars.put("FEX_HOSTFEATURES", "off");
+        envVars.put("FEX_SMALLTSCSCALE", "1");
+        envVars.put("FEX_SMC_CHECKS", "mtrack");
+        envVars.put("FEX_SMCCHECKS", "mtrack");
+        envVars.put("FEX_VOLATILEMETADATA", "1");
+        envVars.put("FEX_MONOHACKS", "1");
+        envVars.put("FEX_HIDEHYPERVISORBIT", "0");
+        envVars.put("FEX_DISABLEL2CACHE", "0");
+        envVars.put("FEX_DYNAMICL1CACHE", "0");
+        envVars.put("FEX_LOG_LEVEL", "off");
+        envVars.put("FEX_DEBUG", "0");
     }
 
     public static ArrayList<FEXCorePreset> getPresets(Context context) {
@@ -80,6 +152,8 @@ public class FEXCorePresetManager {
         presets.add(new FEXCorePreset(FEXCorePreset.COMPATIBILITY, context.getString(R.string.compatibility)));
         presets.add(new FEXCorePreset(FEXCorePreset.INTERMEDIATE, context.getString(R.string.intermediate)));
         presets.add(new FEXCorePreset(FEXCorePreset.PERFORMANCE, context.getString(R.string.performance)));
+        presets.add(new FEXCorePreset(FEXCorePreset.S8G1_BALANCED, context.getString(R.string.fexcore_profile_s8g1_balanced)));
+        presets.add(new FEXCorePreset(FEXCorePreset.S8G1_SUPER, context.getString(R.string.fexcore_profile_s8g1_super)));
         for (String[] preset : customPresetsIterator(context)) presets.add(new FEXCorePreset(preset[0], preset[1]));
         return presets;
     }

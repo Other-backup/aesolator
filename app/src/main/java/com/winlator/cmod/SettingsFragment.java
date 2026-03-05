@@ -58,6 +58,8 @@ import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.PreferenceKeys;
 import com.winlator.cmod.midi.MidiManager;
+import com.winlator.cmod.runtimeprofile.RuntimeProfile;
+import com.winlator.cmod.runtimeprofile.RuntimeProfileManager;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
@@ -77,7 +79,7 @@ import java.util.concurrent.Executors;
 
 public class SettingsFragment extends Fragment {
     public static final String DEFAULT_WINE_DEBUG_CHANNELS = "warn,err,fixme";
-    public static final String DEFAULT_WINLATOR_PATH = Environment.getExternalStorageDirectory().getPath() + "/Winlator";
+    public static final String DEFAULT_WINLATOR_PATH = Environment.getExternalStorageDirectory().getPath() + "/Ae.solator";
     public static final String DEFAULT_SHORTCUT_EXPORT_PATH = DEFAULT_WINLATOR_PATH + "/Shortcuts";
     private Callback<Uri> installSoundFontCallback;
     private PreloaderDialog preloaderDialog;
@@ -202,6 +204,25 @@ public class SettingsFragment extends Fragment {
         final Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         loadFEXCorePresetSpinners(view, sFEXCorePreset);
 
+        final Spinner sRuntimeProfileGlobal = view.findViewById(R.id.SRuntimeProfileGlobal);
+        RuntimeProfileManager.loadSpinner(
+                sRuntimeProfileGlobal,
+                preferences.getString("runtime_profile_global", RuntimeProfile.AUTO)
+        );
+        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+
+        view.findViewById(R.id.BTOpenForensicCenter).setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
+                if (navigationView != null) {
+                    navigationView.setCheckedItem(R.id.main_menu_diagnostics);
+                    ((MainActivity) getActivity()).onNavigationItemSelected(
+                            navigationView.getMenu().findItem(R.id.main_menu_diagnostics)
+                    );
+                }
+            }
+        });
+
         final Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
 
         sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
@@ -295,6 +316,12 @@ public class SettingsFragment extends Fragment {
             public void onNothingSelected(android.widget.AdapterView<?> parent) {
             }
         });
+        cbUseDRI3.setVisibility(View.GONE);
+        view.findViewById(R.id.TVDri3ModeLabel).setVisibility(View.GONE);
+        sDri3Mode.setVisibility(View.GONE);
+        view.findViewById(R.id.TVDri3ModeHint).setVisibility(View.GONE);
+        cbDri3PresentWait.setVisibility(View.GONE);
+        cbDri3ForceSwWsi.setVisibility(View.GONE);
 
         final CheckBox cbUseXR = view.findViewById(R.id.CBUseXR);
         cbUseXR.setChecked(preferences.getBoolean("use_xr", true));
@@ -310,6 +337,10 @@ public class SettingsFragment extends Fragment {
 
         final CheckBox cbEnableBox64Logs = view.findViewById(R.id.CBEnableBox64Logs);
         cbEnableBox64Logs.setChecked(preferences.getBoolean("enable_box64_logs", false));
+        cbEnableWineDebug.setVisibility(View.GONE);
+        view.findViewById(R.id.LLWineDebugChannels).setVisibility(View.GONE);
+        cbEnableBox64Logs.setVisibility(View.GONE);
+        view.findViewById(R.id.TVLogs).setVisibility(View.GONE);
 
         final TextView tvCursorSpeed = view.findViewById(R.id.TVCursorSpeed);
         final SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);
@@ -354,6 +385,7 @@ public class SettingsFragment extends Fragment {
             editor.putBoolean("dark_mode", cbDarkMode.isChecked());
             editor.putString("box64_preset", Box64PresetManager.getSpinnerSelectedId(sBox64Preset));
             editor.putString("fexcore_preset", FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset));
+            editor.putString("runtime_profile_global", RuntimeProfileManager.getSpinnerSelectedId(sRuntimeProfileGlobal));
             editor.putBoolean("use_dri3", cbUseDRI3.isChecked());
             editor.putString("dri3_mode", dri3Modes[sDri3Mode.getSelectedItemPosition()]);
             editor.putBoolean("dri3_present_wait", cbDri3PresentWait.isChecked());
@@ -415,6 +447,8 @@ public class SettingsFragment extends Fragment {
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        Spinner sRuntimeProfileGlobal = view.findViewById(R.id.SRuntimeProfileGlobal);
+        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         Spinner sDri3Mode = view.findViewById(R.id.SDri3Mode);
         sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
     }

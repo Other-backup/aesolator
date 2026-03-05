@@ -34,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 public class WinHandler {
     private static final short SERVER_PORT = 7947;
     private static final short CLIENT_PORT = 7946;
+    private static final int SEND_PACKET_SIZE = 64;
+    private static final int RECEIVE_PACKET_SIZE = 2048;
     public static final byte FLAG_DINPUT_MAPPER_STANDARD = 0x01;
     public static final byte FLAG_DINPUT_MAPPER_XINPUT = 0x02;
     public static final byte FLAG_INPUT_TYPE_XINPUT = 0x04;
@@ -41,10 +43,10 @@ public class WinHandler {
     public static final byte DEFAULT_INPUT_TYPE = FLAG_INPUT_TYPE_XINPUT;
     public static final byte INPUT_TYPE_MIXED = 2;
     private DatagramSocket socket;
-    private final ByteBuffer sendData = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    private final ByteBuffer receiveData = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    private final DatagramPacket sendPacket = new DatagramPacket(sendData.array(), 64);
-    private final DatagramPacket receivePacket = new DatagramPacket(receiveData.array(), 64);
+    private final ByteBuffer sendData = ByteBuffer.allocate(SEND_PACKET_SIZE).order(ByteOrder.LITTLE_ENDIAN);
+    private final ByteBuffer receiveData = ByteBuffer.allocate(RECEIVE_PACKET_SIZE).order(ByteOrder.LITTLE_ENDIAN);
+    private final DatagramPacket sendPacket = new DatagramPacket(sendData.array(), SEND_PACKET_SIZE);
+    private final DatagramPacket receivePacket = new DatagramPacket(receiveData.array(), RECEIVE_PACKET_SIZE);
     private final ArrayDeque<Runnable> actions = new ArrayDeque<>();
     private boolean initReceived = false;
     private boolean running = false;
@@ -420,6 +422,7 @@ public class WinHandler {
 
             case RequestCodes.GET_PROCESS: {
                 if (onGetProcessInfoListener == null) return;
+                if (receiveData.remaining() < 57) return;
                 receiveData.position(receiveData.position() + 4);
                 int numProcesses = receiveData.getShort();
                 int index = receiveData.getShort();
@@ -431,8 +434,14 @@ public class WinHandler {
                 byte[] bytes = new byte[32];
                 receiveData.get(bytes);
                 String name = StringUtils.fromANSIString(bytes);
+                String path = "";
+                if (receiveData.hasRemaining()) {
+                    byte[] pathBytes = new byte[receiveData.remaining()];
+                    receiveData.get(pathBytes);
+                    path = StringUtils.fromANSIString(pathBytes);
+                }
 
-                onGetProcessInfoListener.onGetProcessInfo(index, numProcesses, new ProcessInfo(pid, name, memoryUsage, affinityMask, wow64Process));
+                onGetProcessInfoListener.onGetProcessInfo(index, numProcesses, new ProcessInfo(pid, name, path, memoryUsage, affinityMask, wow64Process));
                 break;
             }
             case RequestCodes.GET_GAMEPAD: {
@@ -553,10 +562,12 @@ public class WinHandler {
                 socket.bind(new InetSocketAddress((InetAddress)null, SERVER_PORT));
 
                 while (running) {
+                    receivePacket.setLength(receiveData.capacity());
                     socket.receive(receivePacket);
 
                     synchronized (actions) {
-                        receiveData.rewind();
+                        receiveData.clear();
+                        receiveData.limit(receivePacket.getLength());
                         byte requestCode = receiveData.get();
                         handleRequest(requestCode, receivePacket.getPort());
                     }

@@ -44,24 +44,15 @@ public class AdrenotoolsFragment extends Fragment {
         recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
         recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
         View btInstallDriver = layout.findViewById(R.id.BTInstallDriver);
-        btInstallDriver.setOnClickListener((v) -> {
-            ContentDialog.confirm(getContext(), getString(R.string.install_drivers_message) + " " + getString(R.string.install_drivers_warning), () -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("*/*");
-                getActivity().startActivityFromFragment(this, intent, MainActivity.OPEN_FILE_REQUEST_CODE);               
-            });
-        });
+        btInstallDriver.setOnClickListener((v) -> openZipInstaller());
 
         View btOpenContentsGraphics = layout.findViewById(R.id.BTOpenContentsGraphics);
         btOpenContentsGraphics.setOnClickListener(v -> {
             openContents();
         });
 
-        layout.findViewById(R.id.BTLaneTurnip).setOnClickListener(v ->
-                openContentsForType("TurnipDriver"));
-        layout.findViewById(R.id.BTLaneOpenGL).setOnClickListener(v ->
-                openContentsForType("OpenGLDriver"));
+        layout.findViewById(R.id.BTLaneTurnip).setOnClickListener(v -> openZipInstaller());
+        layout.findViewById(R.id.BTLaneOpenGL).setOnClickListener(v -> openZipInstaller());
         layout.findViewById(R.id.BTLaneDgVoodoo).setOnClickListener(v ->
                 openContentsForType("DgVoodoo"));
         layout.findViewById(R.id.BTLaneDxvkVkd3d).setOnClickListener(v ->
@@ -181,6 +172,15 @@ public class AdrenotoolsFragment extends Fragment {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(requireContext());
         preferences.edit().putString("contents_preselected_type", typeName).apply();
         openContents();
+    }
+
+    private void openZipInstaller() {
+        ContentDialog.confirm(getContext(), getString(R.string.install_drivers_message) + " " + getString(R.string.install_drivers_warning), () -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            getActivity().startActivityFromFragment(this, intent, MainActivity.OPEN_FILE_REQUEST_CODE);
+        });
     }
 
     private void openContents() {

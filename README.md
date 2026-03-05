@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/winlator-cmod-aesolator-logo.png" alt="Aesolator" width="920">
+  <img src="docs/assets/winlator-cmod-aesolator-logo.png" alt="Ae.solator" width="920">
 </p>
 <p align="center">
-  <img src="docs/assets/aesolator-accent-bar.svg" alt="Aesolator accent bar" width="920">
+  <img src="docs/assets/aesolator-accent-bar.svg" alt="Ae.solator accent bar" width="920">
 </p>
 
-# Aesolator
+# Ae.solator
 
 Android application repository for Ae.solator (`by.aero.so.benchmark`).
 

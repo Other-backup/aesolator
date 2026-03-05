@@ -40,6 +40,7 @@ import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.contentdialog.AddEnvVarDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
+import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.ShortcutSettingsDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
@@ -774,6 +775,8 @@ public class ContainerDetailFragment extends Fragment {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
                 if (dxwrapper.contains("dxvk")) {
                     vDXWrapperConfig.setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
+                } else if (dxwrapper.contains("dgvoodoo")) {
+                    vDXWrapperConfig.setOnClickListener((v) -> (new DgVoodooConfigDialog(vDXWrapperConfig)).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }

@@ -55,6 +55,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.LaunchSecurity;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -1018,6 +1019,7 @@ public class BigPictureActivity extends AppCompatActivity {
         // Check if the shortcut has the disableXinput value; if not, default to false.
         String disableXinputValue = shortcut.getExtra("disableXinput", "0"); // Get value from shortcut or use "0" (false) by default
         intent.putExtra("disableXinput", disableXinputValue); // Use the actual value from the shortcut
+        LaunchSecurity.signXServerLaunchIntent(this, intent);
         startActivity(intent);
     }
 

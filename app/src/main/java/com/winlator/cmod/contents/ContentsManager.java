@@ -15,6 +15,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
@@ -38,6 +40,9 @@ public class ContentsManager {
     public static final String[] WOWBOX64_TRUST_FILES = {"${system32}/wowbox64.dll"};
     public static final String[] FEXCORE_TRUST_FILES = {"${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll"};
     public static final String[] VULKAN_SDK_TRUST_PREFIXES = {"${sharedir}/vulkan", "${sharedir}/vulkan-sdk"};
+    private static final String[] CONTENT_ARCHIVE_SUFFIXES = {
+            ".wcp", ".zip", ".tar", ".txz", ".tzst", ".tar.xz", ".tar.zst"
+    };
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -125,6 +130,7 @@ public class ContentsManager {
                     ContentProfile remoteProfile = new ContentProfile();
                     remoteProfile.remoteUrl = readRemoteUrl(object);
                     if (remoteProfile.remoteUrl == null || remoteProfile.remoteUrl.isEmpty()) continue;
+                    remoteProfile.remoteSha256 = readRemoteSha256(object);
 
                     remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.optString("type"));
                     if (remoteProfile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE) {
@@ -144,6 +150,9 @@ public class ContentsManager {
                     remoteProfile.displayCategory = object.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "").trim();
                     remoteProfile.sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim();
                     remoteProfile.releaseTag = object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim();
+                    remoteProfile.vulkanApiMin = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MIN), 0);
+                    remoteProfile.vulkanApiMax = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MAX), 0);
+                    remoteProfile.vulkanSdkVersion = object.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "").trim();
                     remoteProfile.delivery = object.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE).trim();
                     remoteProfile.channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
                     remoteProfile.locallyInstalled = false;
@@ -279,18 +288,50 @@ public class ContentsManager {
 
     public void finishInstallContent(ContentProfile profile, OnInstallFinishedCallback callback) {
         File installPath = getInstallDir(context, profile);
+        File tmpPath = getTmpDir(context);
+        if (!tmpPath.exists() || !tmpPath.isDirectory()) {
+            callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+            return;
+        }
+
+        File typeDir = installPath.getParentFile();
+        if (typeDir == null || (!typeDir.exists() && !typeDir.mkdirs())) {
+            callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+            return;
+        }
+
+        File backupPath = null;
         if (installPath.exists()) {
-            callback.onFailed(InstallFailedReason.ERROR_EXIST, null);
-            return;
+            if (!isUpdatableLane(profile.type)) {
+                callback.onFailed(InstallFailedReason.ERROR_EXIST, null);
+                return;
+            }
+            backupPath = new File(typeDir, installPath.getName() + ".bak-" + UUID.randomUUID().toString().replace("-", ""));
+            if (!installPath.renameTo(backupPath)) {
+                callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+                return;
+            }
         }
 
-        if (!installPath.mkdirs()) {
+        boolean moved = tmpPath.renameTo(installPath);
+        if (!moved) {
+            // Fallback to recursive copy for filesystems where renameTo can fail.
+            moved = FileUtils.copy(tmpPath, installPath);
+            if (moved) {
+                FileUtils.delete(tmpPath);
+            }
+        }
+
+        if (!moved) {
+            if (backupPath != null && backupPath.exists() && !installPath.exists()) {
+                backupPath.renameTo(installPath);
+            }
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
 
-        if (!getTmpDir(context).renameTo(installPath)) {
-            callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+        if (backupPath != null && backupPath.exists()) {
+            FileUtils.delete(backupPath);
         }
 
         callback.onSucceed(profile);
@@ -313,6 +354,10 @@ public class ContentsManager {
             profile.displayCategory = profileJSONObject.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "");
             profile.sourceRepo = profileJSONObject.optString(ContentProfile.MARK_SOURCE_REPO, "");
             profile.releaseTag = profileJSONObject.optString(ContentProfile.MARK_RELEASE_TAG, "");
+            profile.vulkanApiMin = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0);
+            profile.vulkanApiMax = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0);
+            profile.vulkanSdkVersion = profileJSONObject.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "");
+            profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
             profile.locallyInstalled = true;
 
             JSONArray fileJSONArray = profileJSONObject.getJSONArray(ContentProfile.MARK_FILE_LIST);
@@ -491,9 +536,65 @@ public class ContentsManager {
         String[] keys = {"remoteUrl", "url", "browser_download_url", "downloadUrl", "assetUrl"};
         for (String key : keys) {
             String value = object.optString(key, "").trim();
+            if (!value.isEmpty() && isAllowedRemoteUrl(value)) return value;
+        }
+        return "";
+    }
+
+    private String readRemoteSha256(JSONObject object) {
+        if (object == null) return "";
+        String[] keys = {
+                ContentProfile.MARK_SHA256,
+                "sha256sum",
+                "checksum",
+                "checksumSha256",
+                "assetSha256",
+                "digest"
+        };
+        for (String key : keys) {
+            String value = normalizeSha256(object.optString(key, ""));
             if (!value.isEmpty()) return value;
         }
         return "";
+    }
+
+    private boolean isAllowedRemoteUrl(String value) {
+        try {
+            URI uri = new URI(value.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null) return false;
+            String normalizedScheme = scheme.trim().toLowerCase(Locale.US);
+            if (!"https".equals(normalizedScheme) && !"http".equals(normalizedScheme)) return false;
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) return false;
+            String normalizedHost = host.trim().toLowerCase(Locale.US);
+            if ("http".equals(normalizedScheme) && !isLocalhostHost(normalizedHost)) return false;
+            // Reject credential-in-URL patterns.
+            if (uri.getUserInfo() != null && !uri.getUserInfo().trim().isEmpty()) return false;
+            String path = uri.getPath();
+            return hasAllowedArchiveSuffix(path);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isLocalhostHost(String host) {
+        return "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
+    }
+
+    private boolean hasAllowedArchiveSuffix(String path) {
+        if (path == null || path.trim().isEmpty()) return false;
+        String normalizedPath = path.trim().toLowerCase(Locale.US);
+        for (String suffix : CONTENT_ARCHIVE_SUFFIXES) {
+            if (normalizedPath.endsWith(suffix)) return true;
+        }
+        return false;
+    }
+
+    private String normalizeSha256(String value) {
+        if (value == null) return "";
+        String normalized = value.trim().toLowerCase(Locale.US).replaceAll("[^0-9a-f]", "");
+        return normalized.length() == 64 ? normalized : "";
     }
 
     private int parseVerCode(JSONObject object) {
@@ -507,6 +608,18 @@ public class ContentsManager {
             }
         }
         return 0;
+    }
+
+    private int parseOptionalInt(Object raw, int fallback) {
+        if (raw == null) return fallback;
+        if (raw instanceof Number) return ((Number) raw).intValue();
+        try {
+            String normalized = String.valueOf(raw).trim();
+            if (normalized.isEmpty()) return fallback;
+            return Integer.parseInt(normalized.replaceAll("[^0-9-]", ""));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private String deriveVersionNameFromUrl(String remoteUrl) {
@@ -542,6 +655,15 @@ public class ContentsManager {
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
+    }
+
+    private boolean isUpdatableLane(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
+                || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER;
     }
 
     private boolean isTrustedByPrefix(ContentProfile.ContentType type, String normalizedTarget) {

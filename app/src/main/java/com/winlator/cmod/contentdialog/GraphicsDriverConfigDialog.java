@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
+import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
@@ -31,10 +32,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Locale;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class GraphicsDriverConfigDialog extends ContentDialog {
 
     private static final String TAG = "GraphicsDriverConfigDialog"; // Tag for logging
+    private static final Pattern VULKAN_API_PATTERN = Pattern.compile("1\\.(\\d+)");
     private Spinner sVersion;
     private Spinner sVulkanVersion;
     private MultiSelectionComboBox mscAvailableExtensions;
@@ -208,7 +214,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sVulkanVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedVulkanVersion = sVulkanVersion.getSelectedItem().toString();
+                if (sVulkanVersion.isEnabled()) {
+                    selectedVulkanVersion = sVulkanVersion.getSelectedItem().toString();
+                }
             }
 
             @Override
@@ -353,10 +361,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         Log.d(TAG, "Initial version: " + initialVersion);
 
         loadGPUNameSpinner(context, sGPUName);
+        populateVulkanVersionSpinner(context, contentsManager, vulkanVersion);
 
         // Use the custom selection logic
         setSpinnerSelectionWithFallback(sVersion, initialVersion, graphicsDriver);
-        AppUtils.setSpinnerSelectionFromValue(sVulkanVersion, vulkanVersion);
         AppUtils.setSpinnerSelectionFromValue(sGPUName, gpuName);
         AppUtils.setSpinnerSelectionFromNumber(sMaxDeviceMemory, maxDeviceMemory);
         AppUtils.setSpinnerSelectionFromValue(sPresentMode, presentMode);
@@ -368,6 +376,87 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         // We can log the spinner values now
         Log.d(TAG, "Spinner selected position: " + sVersion.getSelectedItemPosition());
         Log.d(TAG, "Spinner selected value: " + sVersion.getSelectedItem());
+    }
+
+    private void populateVulkanVersionSpinner(Context context, ContentsManager contentsManager, String selectedValue) {
+        ArrayList<String> sdkApiVersions = collectInstalledVulkanSdkApiVersions(contentsManager);
+        if (sdkApiVersions.isEmpty()) {
+            // No installed Vulkan SDK lane: keep previous config value and disable selector.
+            sdkApiVersions.add("—");
+            sVulkanVersion.setEnabled(false);
+            selectedVulkanVersion = selectedValue != null && !selectedValue.trim().isEmpty() ? selectedValue : "1.3";
+            sVulkanVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sdkApiVersions));
+            sVulkanVersion.setSelection(0);
+            return;
+        }
+
+        sVulkanVersion.setEnabled(true);
+        sVulkanVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sdkApiVersions));
+        if (!AppUtils.setSpinnerSelectionFromValue(sVulkanVersion, selectedValue)) {
+            // Default to highest API exposed by installed SDK lanes.
+            sVulkanVersion.setSelection(sdkApiVersions.size() - 1);
+        }
+        selectedVulkanVersion = sVulkanVersion.getSelectedItem().toString();
+    }
+
+    private ArrayList<String> collectInstalledVulkanSdkApiVersions(ContentsManager contentsManager) {
+        TreeSet<Integer> apiMinors = new TreeSet<>();
+        List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
+        if (profiles == null) return new ArrayList<>();
+
+        for (ContentProfile profile : profiles) {
+            if (profile == null || !profile.locallyInstalled) continue;
+            int[] range = resolveVulkanApiRangeFromProfile(profile);
+            int minMinor = range[0];
+            int maxMinor = range[1];
+            if (maxMinor < 1) continue;
+            for (int minor = minMinor; minor <= maxMinor; minor++) {
+                apiMinors.add(minor);
+            }
+        }
+
+        ArrayList<String> versions = new ArrayList<>();
+        for (Integer minor : apiMinors) {
+            versions.add(String.format(Locale.US, "1.%d", minor));
+        }
+        return versions;
+    }
+
+    private int parseMaxVulkanMinorFromProfile(ContentProfile profile) {
+        return resolveVulkanApiRangeFromProfile(profile)[1];
+    }
+
+    private int[] resolveVulkanApiRangeFromProfile(ContentProfile profile) {
+        int min = profile != null ? profile.vulkanApiMin : 0;
+        int max = profile != null ? profile.vulkanApiMax : 0;
+        if (min > 0 && max > 0) {
+            if (min > max) {
+                int tmp = min;
+                min = max;
+                max = tmp;
+            }
+            return new int[]{min, max};
+        }
+
+        int inferredMax = 0;
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.verName : null));
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.desc : null));
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.releaseTag : null));
+        if (inferredMax > 0) return new int[]{1, inferredMax};
+        return new int[]{0, 0};
+    }
+
+    private int parseMaxVulkanMinorFromString(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return 0;
+        int maxMinor = 0;
+        Matcher matcher = VULKAN_API_PATTERN.matcher(raw);
+        while (matcher.find()) {
+            try {
+                maxMinor = Math.max(maxMinor, Integer.parseInt(matcher.group(1)));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return maxMinor;
     }
 
     private void setSpinnerSelectionWithFallback(Spinner spinner, String version, String graphicsDriver) {

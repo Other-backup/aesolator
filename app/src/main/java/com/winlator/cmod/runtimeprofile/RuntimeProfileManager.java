@@ -1,15 +1,22 @@
 package com.winlator.cmod.runtimeprofile;
 
 import android.content.Context;
+import android.os.Build;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 
+import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.EnvVars;
 
 import java.util.ArrayList;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class RuntimeProfileManager {
+    private static final Pattern ADRENO_PATTERN = Pattern.compile("adreno\\s*(\\d{3,4})", Pattern.CASE_INSENSITIVE);
+
     private RuntimeProfileManager() {}
 
     public static ArrayList<RuntimeProfile> getProfiles(Context context) {
@@ -25,8 +32,12 @@ public final class RuntimeProfileManager {
     }
 
     public static EnvVars getEnvVars(Context context, String profileId) {
-        String id = profileId != null && !profileId.trim().isEmpty() ? profileId.trim() : RuntimeProfile.AUTO;
+        String requestedId = profileId != null && !profileId.trim().isEmpty() ? profileId.trim() : RuntimeProfile.AUTO;
+        String id = resolveEffectiveProfileId(context, requestedId);
         EnvVars envVars = new EnvVars();
+        envVars.put("AERO_RUNTIME_PROFILE_REQUESTED", requestedId);
+        envVars.put("AERO_RUNTIME_PROFILE_EFFECTIVE", id);
+        envVars.put("AERO_RUNTIME_SOC_CLASS", detectSoCClass(context));
 
         // Baseline shared knobs (independent from FEX/Box profile overlays).
         envVars.put("WINEESYNC", "1");
@@ -91,6 +102,47 @@ public final class RuntimeProfileManager {
         return envVars;
     }
 
+    public static String resolveEffectiveProfileId(Context context, String profileId) {
+        String requested = profileId != null && !profileId.trim().isEmpty() ? profileId.trim() : RuntimeProfile.AUTO;
+        if (!RuntimeProfile.AUTO.equals(requested)) return requested;
+
+        String socClass = detectSoCClass(context);
+        String socModel = readBuildField("SOC_MODEL").toLowerCase(Locale.ENGLISH);
+        String hardware = readBuildField("HARDWARE").toLowerCase(Locale.ENGLISH);
+        String chipset = socModel + " " + hardware;
+
+        if (chipset.contains("8 elite")
+                || chipset.contains("8 gen 4")
+                || chipset.contains("8 gen 3")
+                || chipset.contains("dimensity 9300")
+                || chipset.contains("dimensity 9400")) {
+            return RuntimeProfile.FLAGSHIP_2026;
+        }
+        if (chipset.contains("8+ gen 1")) {
+            return RuntimeProfile.S8G1_BALANCED;
+        }
+        if (chipset.contains("8 gen 2")
+                || chipset.contains("xclipse 920")
+                || chipset.contains("xclipse 940")
+                || chipset.contains("xclipse 950")) {
+            return RuntimeProfile.UPPER_MID_2026;
+        }
+
+        switch (socClass) {
+            case "adreno-7xx":
+            case "xclipse":
+                return RuntimeProfile.UPPER_MID_2026;
+            case "adreno-6xx":
+            case "mali-g7xx-or-newer":
+                return RuntimeProfile.MID_2026;
+            case "adreno-legacy":
+            case "mali-legacy":
+                return RuntimeProfile.LEGACY_LOW_2026;
+            default:
+                return RuntimeProfile.MID_2026;
+        }
+    }
+
     public static void loadSpinner(Spinner spinner, String selectedId) {
         Context context = spinner.getContext();
         ArrayList<RuntimeProfile> profiles = getProfiles(context);
@@ -112,5 +164,49 @@ public final class RuntimeProfileManager {
             return ((RuntimeProfile) adapter.getItem(selectedPosition)).id;
         }
         return RuntimeProfile.AUTO;
+    }
+
+    private static String detectSoCClass(Context context) {
+        String renderer = "";
+        try {
+            renderer = GPUInformation.getRenderer(null, context);
+        } catch (Throwable ignored) {
+            renderer = "";
+        }
+        String normalized = renderer == null ? "" : renderer.toLowerCase(Locale.ENGLISH);
+        if (normalized.contains("adreno")) {
+            Matcher matcher = ADRENO_PATTERN.matcher(normalized);
+            if (matcher.find()) {
+                int generation = parseIntSafe(matcher.group(1));
+                if (generation >= 700) return "adreno-7xx";
+                if (generation >= 600) return "adreno-6xx";
+            }
+            return "adreno-legacy";
+        }
+        if (normalized.contains("xclipse")) return "xclipse";
+        if (normalized.contains("mali")) {
+            if (normalized.contains("g7") || normalized.contains("g8") || normalized.contains("g9")) {
+                return "mali-g7xx-or-newer";
+            }
+            return "mali-legacy";
+        }
+        return "unknown";
+    }
+
+    private static String readBuildField(String fieldName) {
+        try {
+            Object value = Build.class.getField(fieldName).get(null);
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static int parseIntSafe(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception ignored) {
+            return -1;
+        }
     }
 }

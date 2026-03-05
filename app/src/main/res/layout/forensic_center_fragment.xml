@@ -136,6 +136,93 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/dri3_force_sw_wsi" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicLoaderTrace"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/enable_loader_trace" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicFexLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_fex_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicTurnipLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_turnip_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicDxvkLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_dxvk_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicVkd3dLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_vkd3d_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicVulkanApiDump"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_vulkan_api_dump" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicVulkanLoaderDebug"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_vulkan_loader_debug" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicVulkanValidation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_vulkan_validation" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicPulseLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_pulse_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicAlsaLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_alsa_logs" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicDeviceSnapshot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_device_snapshot" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicNonRootCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_nonroot_capture" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicRootCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_root_capture" />
+
+                <Button
+                    android:id="@+id/BTForensicOpenX11"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/open_dri3_settings" />
             </LinearLayout>
 
             <LinearLayout

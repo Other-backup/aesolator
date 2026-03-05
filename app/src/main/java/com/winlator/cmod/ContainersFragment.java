@@ -43,6 +43,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.StorageInfoDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.xenvironment.ImageFs;
 
@@ -190,6 +191,7 @@ public class ContainersFragment extends Fragment {
             if (!XrActivity.isEnabled(getContext())) {
                 Intent intent = new Intent(context, XServerDisplayActivity.class);
                 intent.putExtra("container_id", container.id);
+                LaunchSecurity.signXServerLaunchIntent(context, intent);
                 requireActivity().startActivity(intent);
             } else {
                 XrActivity.openIntent(getActivity(), container.id, null);

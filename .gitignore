@@ -16,6 +16,8 @@
 *.log.*
 *.log.zip
 prefixPack.txz
+app/src/main/assets/imagefs.txz
+app/src/main/assets/imagefs.txz.*
 
 # Patch rejection files from manual patch/debug work
 *.rej

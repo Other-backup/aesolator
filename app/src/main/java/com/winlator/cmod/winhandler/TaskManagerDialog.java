@@ -31,6 +31,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.CPUStatus;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.widget.CPUListView;
@@ -39,8 +40,13 @@ import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Locale;
@@ -55,6 +61,8 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private static final int TAB_WINDOWS = 0;
     private static final int TAB_LINUX = 1;
     private static final int MAX_LINUX_ROWS = 80;
+    private static final int MAX_WINDOWS_THREAD_PREVIEW = 12;
+    private static final long TASKMGR_REFRESH_LOG_INTERVAL_MS = 10000L;
     private static final String WINDOWS_SORT_MEMORY_DESC = "memory_desc";
     private static final String WINDOWS_SORT_NAME_ASC = "name_asc";
     private static final String WINDOWS_SORT_PID_ASC = "pid_asc";
@@ -90,6 +98,12 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private String windowsSortMode = WINDOWS_SORT_MEMORY_DESC;
     private int windowsArchFilterMode = ARCH_FILTER_ALL;
     private LinuxTelemetrySampler.HostSample lastHostSample;
+    private long lastRefreshLogAtMs = 0L;
+    private int lastLoggedWindowsVisible = -1;
+    private int lastLoggedWindowsTotal = -1;
+    private int lastLoggedLinuxVisible = -1;
+    private int lastLoggedLinuxTotal = -1;
+    private boolean lastWindowsPathSupport = false;
 
     public TaskManagerDialog(XServerDisplayActivity activity) {
         super(activity, R.layout.task_manager_dialog);
@@ -118,6 +132,21 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             }
             telemetryExecutor.shutdownNow();
             activity.getWinHandler().setOnGetProcessInfoListener(null);
+            ForensicLogger.logEvent(
+                    activity,
+                    "info",
+                    "TASKMGR_CLOSE",
+                    null,
+                    "task_manager",
+                    "Task Manager closed",
+                    ForensicLogger.fields(
+                            "selected_tab", selectedTab == TAB_WINDOWS ? "windows" : "linux",
+                            "windows_visible", lastWindowsVisible,
+                            "windows_total", lastWindowsTotal,
+                            "linux_visible", lastLinuxVisible,
+                            "linux_total", lastLinuxTotal
+                    )
+            );
         });
 
         FileUtils.clear(getIconDir(activity));
@@ -149,14 +178,17 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             int itemId = menuItem.getItemId();
             final WinHandler winHandler = activity.getWinHandler();
             if (itemId == R.id.process_affinity) {
+                logProcessAction("set_affinity_open", processInfo);
                 showProcessorAffinityDialog(processInfo);
             }
             else if (itemId == R.id.bring_to_front) {
+                logProcessAction("bring_to_front", processInfo);
                 winHandler.bringToFront(processInfo.name);
                 dismiss();
             }
             else if (itemId == R.id.process_end) {
                 ContentDialog.confirm(activity, R.string.do_you_want_to_end_this_process, () -> {
+                    logProcessAction("kill_process", processInfo);
                     winHandler.killProcess(processInfo.name);
                 });
             }
@@ -173,6 +205,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         cpuListView.setCheckedCPUList(processInfo.getCPUList());
         dialog.setOnConfirmCallback(() -> {
             WinHandler winHandler = activity.getWinHandler();
+            logProcessAction("set_affinity_apply", processInfo);
             winHandler.setProcessAffinity(processInfo.pid, ProcessHelper.getAffinityMask(cpuListView.getCheckedCPUList()));
             update();
         });
@@ -187,6 +220,15 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
     @Override
     public void show() {
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "TASKMGR_OPEN",
+                null,
+                "task_manager",
+                "Task Manager opened",
+                ForensicLogger.fields("arm64ec_runtime", arm64ecRuntime)
+        );
         activity.getWinHandler().setOnGetProcessInfoListener(this);
         update();
 
@@ -208,6 +250,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                 if (index == 0) {
                     windowsPending.clear();
                     lastWindowsTotal = numProcesses;
+                    lastWindowsPathSupport = false;
                 }
 
                 if (numProcesses == 0 || processInfo == null) {
@@ -220,6 +263,9 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
                 XServer xServer = activity.getXServer();
                 Window window;
+                if (processInfo.path != null && !processInfo.path.trim().isEmpty()) {
+                    lastWindowsPathSupport = true;
+                }
 
                 try (XLock xlock = xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
                     window = xServer.windowManager.findWindowWithProcessId(processInfo.pid);
@@ -235,6 +281,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         if (index != numProcesses - 1) return;
         renderWindowsProcessRows();
         updateBottomBarSummary();
+        maybeLogRefreshCycle("windows");
     }
 
     private void renderWindowsProcessRows() {
@@ -305,7 +352,16 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private boolean matchesWindowsQuery(WindowsProcessEntry entry) {
         String query = windowsSearchQuery;
         if (query == null || query.isEmpty()) return true;
-        String haystack = (entry.processInfo.name + " " + entry.processInfo.pid + " " + entry.archLane).toLowerCase(Locale.ENGLISH);
+        String windowTitle = entry.window != null ? safeValue(entry.window.getName()) : "";
+        String windowClass = entry.window != null ? safeValue(entry.window.getClassName()) : "";
+        String haystack = (
+                entry.processInfo.name + " "
+                + entry.processInfo.path + " "
+                + entry.processInfo.pid + " "
+                + entry.archLane + " "
+                + windowTitle + " "
+                + windowClass
+        ).toLowerCase(Locale.ENGLISH);
         return haystack.contains(query);
     }
 
@@ -325,6 +381,8 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
     private void showWindowsProcessDetails(WindowsProcessEntry entry) {
         ProcessInfo processInfo = entry.processInfo;
+        LinuxTelemetrySampler.ProcessSample runtimeSample = linuxTelemetrySampler.sampleProcess(processInfo.pid);
+        String threadPreview = buildWindowsThreadPreview(processInfo.pid, MAX_WINDOWS_THREAD_PREVIEW);
         ContentDialog dialog = new ContentDialog(activity);
         dialog.setTitle(activity.getString(R.string.task_manager_windows_details_title, processInfo.pid));
 
@@ -347,12 +405,26 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         StringBuilder details = new StringBuilder();
         details.append(activity.getString(R.string.task_manager_windows_details_process)).append(": ")
                 .append(processInfo.name).append('\n');
+        details.append(activity.getString(R.string.task_manager_windows_details_path)).append(": ")
+                .append(safeValue(processInfo.path)).append('\n');
         details.append(activity.getString(R.string.task_manager_windows_details_arch)).append(": ")
                 .append(entry.archLane).append('\n');
         details.append(activity.getString(R.string.task_manager_windows_details_memory)).append(": ")
                 .append(processInfo.getFormattedMemoryUsage()).append('\n');
         details.append(activity.getString(R.string.task_manager_windows_details_foreground)).append(": ")
                 .append(yesNo).append('\n');
+        details.append(activity.getString(R.string.cpu_short)).append(": ")
+                .append(runtimeSample != null ? formatPercent(runtimeSample.cpuPercent) : activity.getString(R.string.task_manager_linux_details_not_available)).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_threads)).append(": ")
+                .append(runtimeSample != null ? String.valueOf(runtimeSample.threadCount) : activity.getString(R.string.task_manager_linux_details_not_available)).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_io_rate)).append(": ")
+                .append(runtimeSample != null ? formatIoRate(runtimeSample) : activity.getString(R.string.task_manager_linux_details_not_available)).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_state)).append(": ")
+                .append(runtimeSample != null ? runtimeSample.state : activity.getString(R.string.task_manager_linux_details_not_available)).append('\n');
+        details.append(activity.getString(R.string.task_manager_linux_details_cmd)).append(": ")
+                .append(runtimeSample != null ? safeValue(runtimeSample.commandLine) : activity.getString(R.string.task_manager_linux_details_not_available)).append('\n');
+        details.append(activity.getString(R.string.task_manager_windows_details_threads_preview)).append(":\n")
+                .append(threadPreview).append('\n');
 
         if (entry.window != null) {
             details.append(activity.getString(R.string.task_manager_windows_details_window_status)).append(": ")
@@ -377,6 +449,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
         dialog.setMessage(details.toString());
         dialog.findViewById(R.id.BTCancel).setVisibility(View.GONE);
+        logProcessDetailsOpen(entry, runtimeSample);
         dialog.show();
     }
 
@@ -385,6 +458,87 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             return activity.getString(R.string.task_manager_linux_details_not_available);
         }
         return value.trim();
+    }
+
+    private String buildWindowsThreadPreview(int pid, int maxThreads) {
+        File taskDir = new File(String.format(Locale.US, "/proc/%d/task", pid));
+        String[] entries = taskDir.list();
+        if (entries == null || entries.length == 0) {
+            return activity.getString(R.string.task_manager_windows_details_threads_preview_none);
+        }
+
+        ArrayList<Integer> tids = new ArrayList<>();
+        for (String entry : entries) {
+            if (!isNumericPid(entry)) continue;
+            try {
+                tids.add(Integer.parseInt(entry));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (tids.isEmpty()) {
+            return activity.getString(R.string.task_manager_windows_details_threads_preview_none);
+        }
+        Collections.sort(tids);
+
+        StringBuilder builder = new StringBuilder();
+        int shown = 0;
+        for (Integer tid : tids) {
+            if (shown >= maxThreads) break;
+            String name = safeValue(readFirstLine(new File(String.format(Locale.US, "/proc/%d/task/%d/comm", pid, tid))));
+            String state = safeValue(readThreadState(pid, tid));
+            String scheduling = safeValue(readThreadScheduling(pid, tid));
+            if (shown > 0) builder.append('\n');
+            builder.append("TID ").append(tid)
+                    .append(" | ").append(name)
+                    .append(" | ").append(state)
+                    .append(" | ").append(scheduling);
+            shown++;
+        }
+        int hidden = tids.size() - shown;
+        if (hidden > 0) {
+            builder.append('\n').append(activity.getString(R.string.task_manager_windows_details_threads_preview_more, hidden));
+        }
+        return builder.length() == 0
+                ? activity.getString(R.string.task_manager_windows_details_threads_preview_none)
+                : builder.toString();
+    }
+
+    private String readThreadState(int pid, int tid) {
+        File statusFile = new File(String.format(Locale.US, "/proc/%d/task/%d/status", pid, tid));
+        if (!statusFile.isFile()) return "";
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(statusFile)))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("State:")) {
+                    return line.substring("State:".length()).trim();
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return "";
+    }
+
+    private String readThreadScheduling(int pid, int tid) {
+        String statLine = readFirstLine(new File(String.format(Locale.US, "/proc/%d/task/%d/stat", pid, tid)));
+        if (statLine.isEmpty()) return "";
+        int marker = statLine.lastIndexOf(") ");
+        if (marker <= 0 || marker + 2 >= statLine.length()) return "";
+        String tail = statLine.substring(marker + 2).trim();
+        String[] fields = tail.split("\\s+");
+        if (fields.length <= 16) return "";
+        String priority = fields[15];
+        String nice = fields[16];
+        return "prio " + priority + " nice " + nice;
+    }
+
+    private String readFirstLine(File file) {
+        if (file == null || !file.isFile()) return "";
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+            String line = reader.readLine();
+            return line == null ? "" : line.trim();
+        } catch (IOException ignored) {
+            return "";
+        }
     }
 
     private void updateCPUInfoView() {
@@ -633,6 +787,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                 bindLinuxProcessRows(batch.samples);
                 applyHostTelemetryViews(hostSample);
                 updateBottomBarSummary();
+                maybeLogRefreshCycle("linux");
             });
         });
     }
@@ -844,6 +999,83 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         if (processInfo.wow64Process) return activity.getString(R.string.task_manager_arch_wow64);
         if (arm64ecRuntime) return activity.getString(R.string.task_manager_arch_arm64ec);
         return activity.getString(R.string.task_manager_arch_native);
+    }
+
+    private void logProcessAction(String action, ProcessInfo processInfo) {
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "TASKMGR_ACTION",
+                null,
+                "task_manager",
+                action,
+                ForensicLogger.fields(
+                        "pid", processInfo.pid,
+                        "name", processInfo.name,
+                        "path", processInfo.path,
+                        "wow64", processInfo.wow64Process,
+                        "arch_lane", resolveArchLane(processInfo),
+                        "selected_tab", selectedTab == TAB_WINDOWS ? "windows" : "linux"
+                )
+        );
+    }
+
+    private void logProcessDetailsOpen(WindowsProcessEntry entry, LinuxTelemetrySampler.ProcessSample sample) {
+        ProcessInfo processInfo = entry.processInfo;
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "TASKMGR_DETAILS_OPEN",
+                null,
+                "task_manager",
+                "open_process_details",
+                ForensicLogger.fields(
+                        "pid", processInfo.pid,
+                        "name", processInfo.name,
+                        "path", processInfo.path,
+                        "wow64", processInfo.wow64Process,
+                        "arch_lane", resolveArchLane(processInfo),
+                        "windowed", entry.windowed,
+                        "cpu_percent", sample != null ? sample.cpuPercent : -1f,
+                        "threads", sample != null ? sample.threadCount : -1,
+                        "state", sample != null ? sample.state : "",
+                        "selected_tab", selectedTab == TAB_WINDOWS ? "windows" : "linux"
+                )
+        );
+    }
+
+    private void maybeLogRefreshCycle(String lane) {
+        long now = System.currentTimeMillis();
+        boolean countersChanged =
+                lastLoggedWindowsVisible != lastWindowsVisible
+                || lastLoggedWindowsTotal != lastWindowsTotal
+                || lastLoggedLinuxVisible != lastLinuxVisible
+                || lastLoggedLinuxTotal != lastLinuxTotal;
+        if (!countersChanged && now - lastRefreshLogAtMs < TASKMGR_REFRESH_LOG_INTERVAL_MS) return;
+
+        lastRefreshLogAtMs = now;
+        lastLoggedWindowsVisible = lastWindowsVisible;
+        lastLoggedWindowsTotal = lastWindowsTotal;
+        lastLoggedLinuxVisible = lastLinuxVisible;
+        lastLoggedLinuxTotal = lastLinuxTotal;
+
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "TASKMGR_REFRESH",
+                null,
+                "task_manager",
+                "refresh_cycle",
+                ForensicLogger.fields(
+                        "lane", lane,
+                        "selected_tab", selectedTab == TAB_WINDOWS ? "windows" : "linux",
+                        "windows_visible", lastWindowsVisible,
+                        "windows_total", lastWindowsTotal,
+                        "linux_visible", lastLinuxVisible,
+                        "linux_total", lastLinuxTotal,
+                        "path_support", lastWindowsPathSupport ? "present" : "legacy"
+                )
+        );
     }
 
     private static final class WindowsProcessEntry {

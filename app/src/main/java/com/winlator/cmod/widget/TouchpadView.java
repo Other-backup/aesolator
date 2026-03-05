@@ -28,6 +28,7 @@ import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
 public class TouchpadView extends View {
+    private static final String PREF_STRICT_GESTURE_FSM = "touchpad_strict_gesture_fsm";
     private static final byte MAX_FINGERS = 4;
     private static final short MAX_TWO_FINGERS_SCROLL_DISTANCE = 350;
     public static final byte MAX_TAP_TRAVEL_DISTANCE = 10;
@@ -59,6 +60,14 @@ public class TouchpadView extends View {
     private Runnable hideControlsRunnable; // Runnable to hide the controls
 
     private SharedPreferences preferences;
+    private GestureMode gestureMode = GestureMode.NONE;
+
+    private enum GestureMode {
+        NONE,
+        POINTER,
+        TWO_FINGER_SCROLL,
+        TWO_FINGER_DRAG
+    }
 
 
     // Flag to control touchpad vs touchscreen mode
@@ -272,6 +281,7 @@ public class TouchpadView extends View {
                 if (event.isFromSource(InputDevice.SOURCE_MOUSE)) return true;
                 scrollAccumY = 0;
                 scrolling = false;
+                gestureMode = GestureMode.NONE;
                 fingers[pointerId] = new Finger(event.getX(actionIndex), event.getY(actionIndex));
                 numFingers++;
                 if (simTouchScreen) {
@@ -333,15 +343,49 @@ public class TouchpadView extends View {
                     handleFingerUp(fingers[pointerId]);
                     fingers[pointerId] = null;
                     numFingers--;
+                    if (numFingers <= 0) {
+                        numFingers = 0;
+                        scrolling = false;
+                        scrollAccumY = 0;
+                        gestureMode = GestureMode.NONE;
+                    } else if (numFingers == 1) {
+                        gestureMode = GestureMode.NONE;
+                    }
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
-                for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
-                numFingers = 0;
+                resetTouchpadGestureState(true);
                 break;
         }
 
         return true;
+    }
+
+    private void resetTouchpadGestureState(boolean releaseButtons) {
+        for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
+        numFingers = 0;
+        scrolling = false;
+        scrollAccumY = 0;
+        continueClick = false;
+        gestureMode = GestureMode.NONE;
+
+        Finger leftOwner = fingerPointerButtonLeft;
+        Finger rightOwner = fingerPointerButtonRight;
+        fingerPointerButtonLeft = null;
+        fingerPointerButtonRight = null;
+
+        if (!releaseButtons) return;
+        if (xServer.isRelativeMouseMovement()) {
+            xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
+            xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
+            return;
+        }
+        if (leftOwner != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+        }
+        if (rightOwner != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+        }
     }
 
     private boolean handleTouchscreenEvent(MotionEvent event) {
@@ -472,31 +516,71 @@ public class TouchpadView extends View {
 
     private void handleFingerMove(Finger finger1) {
         boolean skipPointerMove = false;
+        boolean strictFsmEnabled = isStrictGestureFsmEnabled();
+
+        if (strictFsmEnabled && numFingers == 2) {
+            Finger primary = getPrimaryFinger();
+            if (primary != null && finger1 != primary) {
+                return;
+            }
+        }
 
         Finger finger2 = numFingers == 2 ? findSecondFinger(finger1) : null;
         if (finger2 != null) {
             final float resolutionScale = 1000.0f / Math.min(xServer.screenInfo.width, xServer.screenInfo.height);
             float currDistance = (float)Math.hypot(finger1.x - finger2.x, finger1.y - finger2.y) * resolutionScale;
 
-            if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
-                scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
+            if (strictFsmEnabled) {
+                if (gestureMode == GestureMode.NONE) {
+                    if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
+                        gestureMode = GestureMode.TWO_FINGER_SCROLL;
+                    } else if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)
+                            && finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
+                        pressPointerButtonLeft(finger1);
+                        gestureMode = GestureMode.TWO_FINGER_DRAG;
+                        skipPointerMove = true;
+                    } else {
+                        gestureMode = GestureMode.POINTER;
+                    }
+                }
 
-                if (scrollAccumY < -100) {
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    scrollAccumY = 0;
+                if (gestureMode == GestureMode.TWO_FINGER_SCROLL) {
+                    scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
+                    if (scrollAccumY < -100) {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        scrollAccumY = 0;
+                    } else if (scrollAccumY > 100) {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                        scrollAccumY = 0;
+                    }
+                    scrolling = true;
+                    skipPointerMove = true;
+                } else {
+                    scrolling = false;
                 }
-                else if (scrollAccumY > 100) {
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-                    scrollAccumY = 0;
+            } else {
+                if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
+                    scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
+
+                    if (scrollAccumY < -100) {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        scrollAccumY = 0;
+                    }
+                    else if (scrollAccumY > 100) {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                        scrollAccumY = 0;
+                    }
+                    scrolling = true;
                 }
-                scrolling = true;
-            }
-            else if (currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
-                     finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
-                pressPointerButtonLeft(finger1);
-                skipPointerMove = true;
+                else if (currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
+                         finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
+                    pressPointerButtonLeft(finger1);
+                    skipPointerMove = true;
+                }
             }
         }
 
@@ -521,6 +605,17 @@ public class TouchpadView extends View {
             if (fingers[i] != null && fingers[i] != finger) return fingers[i];
         }
         return null;
+    }
+
+    private Finger getPrimaryFinger() {
+        for (byte i = 0; i < MAX_FINGERS; i++) {
+            if (fingers[i] != null) return fingers[i];
+        }
+        return null;
+    }
+
+    private boolean isStrictGestureFsmEnabled() {
+        return preferences != null && preferences.getBoolean(PREF_STRICT_GESTURE_FSM, false);
     }
 
     private void pressPointerButtonLeft(Finger finger) {

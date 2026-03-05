@@ -22,6 +22,10 @@ public class ContentProfile {
     public static final String MARK_DISPLAY_CATEGORY = "displayCategory";
     public static final String MARK_SOURCE_REPO = "sourceRepo";
     public static final String MARK_RELEASE_TAG = "releaseTag";
+    public static final String MARK_SHA256 = "sha256";
+    public static final String MARK_VULKAN_API_MIN = "vulkanApiMin";
+    public static final String MARK_VULKAN_API_MAX = "vulkanApiMax";
+    public static final String MARK_VULKAN_SDK_VERSION = "vulkanSdkVersion";
     public static final String CHANNEL_STABLE = "stable";
     public static final String CHANNEL_BETA = "beta";
     public static final String CHANNEL_NIGHTLY = "nightly";
@@ -96,11 +100,15 @@ public class ContentProfile {
     public String wineBinPath;
     public String winePrefixPack;
     public String remoteUrl;
+    public String remoteSha256 = "";
     public String channel = CHANNEL_STABLE;
     public String delivery = "";
     public String displayCategory = "";
     public String sourceRepo = "";
     public String releaseTag = "";
+    public int vulkanApiMin = 0;
+    public int vulkanApiMax = 0;
+    public String vulkanSdkVersion = "";
     public boolean locallyInstalled = false;
 
     public String getChannel() {
@@ -181,6 +189,9 @@ public class ContentProfile {
         if (remoteProfile == null) return;
         boolean crossFamilyRepair = isWineProtonFamily() && remoteProfile.isWineProtonFamily() && type != remoteProfile.type;
         if (!isRemoteDownloadable() && remoteProfile.isRemoteDownloadable()) remoteUrl = remoteProfile.remoteUrl;
+        if ((remoteSha256 == null || remoteSha256.trim().isEmpty()) && remoteProfile.remoteSha256 != null) {
+            remoteSha256 = remoteProfile.remoteSha256;
+        }
         if ((channel == null || channel.trim().isEmpty()) && remoteProfile.channel != null) channel = remoteProfile.channel;
         if ((crossFamilyRepair || displayCategory == null || displayCategory.trim().isEmpty()) && remoteProfile.displayCategory != null) {
             displayCategory = remoteProfile.displayCategory;
@@ -190,6 +201,15 @@ public class ContentProfile {
         }
         if ((releaseTag == null || releaseTag.trim().isEmpty()) && remoteProfile.releaseTag != null) {
             releaseTag = remoteProfile.releaseTag;
+        }
+        if (vulkanApiMin <= 0 && remoteProfile.vulkanApiMin > 0) {
+            vulkanApiMin = remoteProfile.vulkanApiMin;
+        }
+        if (vulkanApiMax <= 0 && remoteProfile.vulkanApiMax > 0) {
+            vulkanApiMax = remoteProfile.vulkanApiMax;
+        }
+        if ((vulkanSdkVersion == null || vulkanSdkVersion.trim().isEmpty()) && remoteProfile.vulkanSdkVersion != null) {
+            vulkanSdkVersion = remoteProfile.vulkanSdkVersion;
         }
         if ((crossFamilyRepair || desc == null || desc.trim().isEmpty() || desc.trim().equalsIgnoreCase(verName))
                 && remoteProfile.desc != null && !remoteProfile.desc.trim().isEmpty()) {

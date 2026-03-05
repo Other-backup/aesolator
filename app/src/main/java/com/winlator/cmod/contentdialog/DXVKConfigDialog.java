@@ -168,8 +168,8 @@ public class DXVKConfigDialog extends ContentDialog {
             VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
             config.put("vkd3dVersion", selectedItem.getIdentifier());
             config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
-            // Legacy DDraw wrapper selection is deprecated; legacy APIs are routed by dgVoodoo lane.
-            config.put("ddrawrapper", "none");
+            // Legacy DDraw wrapper key is removed from DXVK config; dgVoodoo has its own wrapper mode.
+            config.remove("ddrawrapper");
             anchor.setTag(config.toString());
         });
     }

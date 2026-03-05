@@ -44,6 +44,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.ShortcutSettingsDialog;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.LaunchSecurity;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -258,6 +259,7 @@ public class ShortcutsFragment extends Fragment {
                 // Check if the shortcut has the disableXinput value; if not, default to false.
                 String disableXinputValue = shortcut.getExtra("disableXinput", "0"); // Get value from shortcut or use "0" (false) by default
                 intent.putExtra("disableXinput", disableXinputValue); // Use the actual value from the shortcut
+                LaunchSecurity.signXServerLaunchIntent(activity, intent);
                 activity.startActivity(intent);
             }
             else XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());
@@ -388,6 +390,8 @@ public class ShortcutsFragment extends Fragment {
         intent.setAction(Intent.ACTION_VIEW);
         intent.putExtra("container_id", containerId);
         intent.putExtra("shortcut_path", shortcutPath);
+        intent.putExtra("shortcut_name", shortLabel);
+        LaunchSecurity.signXServerLaunchIntent(requireContext(), intent);
 
         return new ShortcutInfo.Builder(getActivity(), uuid)
                 .setShortLabel(shortLabel)

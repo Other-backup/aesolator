@@ -34,81 +34,166 @@ public abstract class Box64PresetManager {
         String ucPrefix = prefix.toUpperCase(Locale.ENGLISH);
         EnvVars envVars = new EnvVars();
 
-        if (id.equals(Box64Preset.STABILITY)) {
-            envVars.put(ucPrefix+"_DYNAREC_SAFEFLAGS", "2");
-            envVars.put(ucPrefix+"_DYNAREC_FASTNAN", "0");
-            envVars.put(ucPrefix+"_DYNAREC_FASTROUND", "0");
-            envVars.put(ucPrefix+"_DYNAREC_X87DOUBLE", "1");
-            envVars.put(ucPrefix+"_DYNAREC_BIGBLOCK", "0");
-            envVars.put(ucPrefix+"_DYNAREC_STRONGMEM", "2");
-            envVars.put(ucPrefix+"_DYNAREC_FORWARD", "128");
-            envVars.put(ucPrefix+"_DYNAREC_CALLRET", "0");
-            envVars.put(ucPrefix+"_DYNAREC_WAIT", "0");
-            if (ucPrefix.equals("BOX64")) {
-                envVars.put("BOX64_AVX", "0");
-                envVars.put("BOX64_UNITYPLAYER", "1");
-                envVars.put("BOX64_MMAP32", "0");
-            }
-        }
-        else if (id.equals(Box64Preset.COMPATIBILITY)) {
-            envVars.put(ucPrefix+"_DYNAREC_SAFEFLAGS", "2");
-            envVars.put(ucPrefix+"_DYNAREC_FASTNAN", "0");
-            envVars.put(ucPrefix+"_DYNAREC_FASTROUND", "0");
-            envVars.put(ucPrefix+"_DYNAREC_X87DOUBLE", "1");
-            envVars.put(ucPrefix+"_DYNAREC_BIGBLOCK", "0");
-            envVars.put(ucPrefix+"_DYNAREC_STRONGMEM", "1");
-            envVars.put(ucPrefix+"_DYNAREC_FORWARD", "128");
-            envVars.put(ucPrefix+"_DYNAREC_CALLRET", "0");
-            envVars.put(ucPrefix+"_DYNAREC_WAIT", "1");
-            if (ucPrefix.equals("BOX64")) {
-                envVars.put("BOX64_AVX", "0");
-                envVars.put("BOX64_UNITYPLAYER", "1");
-                envVars.put("BOX64_MMAP32", "0");
-            }
-        }
-        else if (id.equals(Box64Preset.INTERMEDIATE)) {
-            envVars.put(ucPrefix+"_DYNAREC_SAFEFLAGS", "2");
-            envVars.put(ucPrefix+"_DYNAREC_FASTNAN", "1");
-            envVars.put(ucPrefix+"_DYNAREC_FASTROUND", "0");
-            envVars.put(ucPrefix+"_DYNAREC_X87DOUBLE", "1");
-            envVars.put(ucPrefix+"_DYNAREC_BIGBLOCK", "1");
-            envVars.put(ucPrefix+"_DYNAREC_STRONGMEM", "0");
-            envVars.put(ucPrefix+"_DYNAREC_FORWARD", "128");
-            envVars.put(ucPrefix+"_DYNAREC_CALLRET", "1");
-            envVars.put(ucPrefix+"_DYNAREC_WAIT", "1");
-            if (ucPrefix.equals("BOX64")) {
-                envVars.put("BOX64_AVX", "0");
-                envVars.put("BOX64_UNITYPLAYER", "0");
-                envVars.put("BOX64_MMAP32", "1");
-            }
-        }
-        else if (id.equals(Box64Preset.PERFORMANCE)) {
-            envVars.put(ucPrefix+"_DYNAREC_SAFEFLAGS", "1");
-            envVars.put(ucPrefix+"_DYNAREC_FASTNAN", "1");
-            envVars.put(ucPrefix+"_DYNAREC_FASTROUND", "1");
-            envVars.put(ucPrefix+"_DYNAREC_X87DOUBLE", "0");
-            envVars.put(ucPrefix+"_DYNAREC_BIGBLOCK", "3");
-            envVars.put(ucPrefix+"_DYNAREC_STRONGMEM", "0");
-            envVars.put(ucPrefix+"_DYNAREC_FORWARD", "512");
-            envVars.put(ucPrefix+"_DYNAREC_CALLRET", "1");
-            envVars.put(ucPrefix+"_DYNAREC_WAIT", "1");
-            if (ucPrefix.equals("BOX64")) {
-                envVars.put("BOX64_AVX", "0");
-                envVars.put("BOX64_UNITYPLAYER", "0");
-                envVars.put("BOX64_MMAP32", "1");
-
-            }
-        }
-        else if (id.startsWith(Box64Preset.CUSTOM)) {
+        if (id.startsWith(Box64Preset.CUSTOM)) {
             for (String[] preset : customPresetsIterator(prefix, context)) {
                 if (preset[0].equals(id)) {
                     envVars.putAll(preset[2]);
                     break;
                 }
             }
+            return envVars;
+        }
+
+        if (!id.equals(Box64Preset.STABILITY)
+                && !id.equals(Box64Preset.COMPATIBILITY)
+                && !id.equals(Box64Preset.INTERMEDIATE)
+                && !id.equals(Box64Preset.PERFORMANCE)
+                && !id.equals(Box64Preset.S8G1_BALANCED)
+                && !id.equals(Box64Preset.S8G1_SUPER)) {
+            return envVars;
+        }
+
+        applyBasePresetDefaults(envVars, ucPrefix);
+
+        if (id.equals(Box64Preset.STABILITY)) {
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "0");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "2");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "128");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "0");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "0");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "1");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "0");
+                envVars.put("BOX64_UNITYPLAYER", "1");
+                envVars.put("BOX64_UNITY", "1");
+                envVars.put("BOX64_MMAP32", "0");
+            }
+        } else if (id.equals(Box64Preset.COMPATIBILITY)) {
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "0");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "128");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "0");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "0");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "1");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "0");
+                envVars.put("BOX64_UNITYPLAYER", "1");
+                envVars.put("BOX64_UNITY", "1");
+                envVars.put("BOX64_MMAP32", "0");
+            }
+        } else if (id.equals(Box64Preset.INTERMEDIATE)) {
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "1");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "256");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "1");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "0");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "1");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "0");
+                envVars.put("BOX64_UNITYPLAYER", "0");
+                envVars.put("BOX64_UNITY", "0");
+                envVars.put("BOX64_MMAP32", "1");
+            }
+        } else if (id.equals(Box64Preset.PERFORMANCE)) {
+            envVars.put(ucPrefix + "_DYNAREC_SAFEFLAGS", "1");
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "3");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "512");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "1");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "1");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "0");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "1");
+                envVars.put("BOX64_UNITYPLAYER", "0");
+                envVars.put("BOX64_UNITY", "0");
+                envVars.put("BOX64_MMAP32", "1");
+            }
+        } else if (id.equals(Box64Preset.S8G1_BALANCED)) {
+            envVars.put(ucPrefix + "_DYNAREC_SAFEFLAGS", "2");
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "2");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "256");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "1");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "0");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "1");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "0");
+                envVars.put("BOX64_UNITYPLAYER", "0");
+                envVars.put("BOX64_UNITY", "0");
+                envVars.put("BOX64_MMAP32", "1");
+                envVars.put("BOX64_MAXCPU", "8");
+            }
+        } else if (id.equals(Box64Preset.S8G1_SUPER)) {
+            envVars.put(ucPrefix + "_DYNAREC_SAFEFLAGS", "1");
+            envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "3");
+            envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "0");
+            envVars.put(ucPrefix + "_DYNAREC_FORWARD", "512");
+            envVars.put(ucPrefix + "_DYNAREC_CALLRET", "1");
+            envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "1");
+            envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "1");
+            envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "0");
+            if (ucPrefix.equals("BOX64")) {
+                envVars.put("BOX64_AVX", "1");
+                envVars.put("BOX64_UNITYPLAYER", "0");
+                envVars.put("BOX64_UNITY", "0");
+                envVars.put("BOX64_MMAP32", "1");
+                envVars.put("BOX64_MAXCPU", "8");
+            }
         }
 
         return envVars;
+    }
+
+    private static void applyBasePresetDefaults(EnvVars envVars, String ucPrefix) {
+        envVars.put(ucPrefix + "_DYNAREC_SAFEFLAGS", "2");
+        envVars.put(ucPrefix + "_DYNAREC", "1");
+        envVars.put(ucPrefix + "_DYNAREC_FASTNAN", "0");
+        envVars.put(ucPrefix + "_DYNAREC_FASTROUND", "0");
+        envVars.put(ucPrefix + "_DYNAREC_X87DOUBLE", "1");
+        envVars.put(ucPrefix + "_DYNAREC_BIGBLOCK", "1");
+        envVars.put(ucPrefix + "_DYNAREC_STRONGMEM", "1");
+        envVars.put(ucPrefix + "_DYNAREC_FORWARD", "256");
+        envVars.put(ucPrefix + "_DYNAREC_CALLRET", "0");
+        envVars.put(ucPrefix + "_DYNAREC_WAIT", "1");
+        envVars.put(ucPrefix + "_DYNAREC_WEAKBARRIER", "0");
+        envVars.put(ucPrefix + "_DYNAREC_ALIGNED_ATOMICS", "0");
+        envVars.put(ucPrefix + "_DYNAREC_DF", "1");
+        envVars.put(ucPrefix + "_DYNAREC_DIRTY", "0");
+        envVars.put(ucPrefix + "_DYNAREC_NATIVEFLAGS", "1");
+        envVars.put(ucPrefix + "_DYNAREC_PAUSE", "0");
+        envVars.put(ucPrefix + "_DYNAREC_DIV0", "0");
+        envVars.put(ucPrefix + "_DYNAREC_VOLATILE_METADATA", "0");
+        envVars.put(ucPrefix + "_DYNAREC_MISSING", "0");
+        envVars.put(ucPrefix + "_MAXCPU", "0");
+        envVars.put(ucPrefix + "_DYNACACHE", "0");
+        envVars.put(ucPrefix + "_DYNACACHE_MIN", "0");
+        envVars.put(ucPrefix + "_NOBANNER", "1");
+        envVars.put(ucPrefix + "_IGNOREINT3", "0");
+        envVars.put(ucPrefix + "_RDTSC_1GHZ", "0");
+        envVars.put(ucPrefix + "_DLSYM_ERROR", "0");
+        envVars.put(ucPrefix + "_SHOWSEGV", "0");
+        envVars.put(ucPrefix + "_JITGDB", "0");
+        envVars.put(ucPrefix + "_PREFER_WRAPPED", "0");
+        envVars.put(ucPrefix + "_X11GLX", "1");
+        envVars.put(ucPrefix + "_NORCFILES", "1");
+
+        if (ucPrefix.equals("BOX64")) {
+            envVars.put("BOX64_AVX", "0");
+            envVars.put("BOX64_UNITYPLAYER", "1");
+            envVars.put("BOX64_UNITY", "1");
+            envVars.put("BOX64_MMAP32", "0");
+        }
     }
 
     public static ArrayList<Box64Preset> getPresets(String prefix, Context context) {
@@ -117,6 +202,8 @@ public abstract class Box64PresetManager {
         presets.add(new Box64Preset(Box64Preset.COMPATIBILITY, context.getString(R.string.compatibility)));
         presets.add(new Box64Preset(Box64Preset.INTERMEDIATE, context.getString(R.string.intermediate)));
         presets.add(new Box64Preset(Box64Preset.PERFORMANCE, context.getString(R.string.performance)));
+        presets.add(new Box64Preset(Box64Preset.S8G1_BALANCED, context.getString(R.string.box64_profile_s8g1_balanced)));
+        presets.add(new Box64Preset(Box64Preset.S8G1_SUPER, context.getString(R.string.box64_profile_s8g1_super)));
         for (String[] preset : customPresetsIterator(prefix, context)) presets.add(new Box64Preset(preset[0], preset[1]));
         return presets;
     }

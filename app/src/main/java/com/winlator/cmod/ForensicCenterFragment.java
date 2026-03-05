@@ -21,6 +21,8 @@ import androidx.fragment.app.Fragment;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
+import com.google.android.material.navigation.NavigationView;
+import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.AppUtils;
 
 public class ForensicCenterFragment extends Fragment {
@@ -39,6 +41,19 @@ public class ForensicCenterFragment extends Fragment {
         Spinner sDri3Mode = view.findViewById(R.id.SForensicDri3Mode);
         CheckBox cbDri3PresentWait = view.findViewById(R.id.CBForensicDri3PresentWait);
         CheckBox cbDri3ForceSwWsi = view.findViewById(R.id.CBForensicDri3ForceSwWsi);
+        CheckBox cbLoaderTrace = view.findViewById(R.id.CBForensicLoaderTrace);
+        CheckBox cbFexLogs = view.findViewById(R.id.CBForensicFexLogs);
+        CheckBox cbTurnipLogs = view.findViewById(R.id.CBForensicTurnipLogs);
+        CheckBox cbDxvkLogs = view.findViewById(R.id.CBForensicDxvkLogs);
+        CheckBox cbVkd3dLogs = view.findViewById(R.id.CBForensicVkd3dLogs);
+        CheckBox cbVulkanApiDump = view.findViewById(R.id.CBForensicVulkanApiDump);
+        CheckBox cbVulkanLoaderDebug = view.findViewById(R.id.CBForensicVulkanLoaderDebug);
+        CheckBox cbVulkanValidation = view.findViewById(R.id.CBForensicVulkanValidation);
+        CheckBox cbPulseLogs = view.findViewById(R.id.CBForensicPulseLogs);
+        CheckBox cbAlsaLogs = view.findViewById(R.id.CBForensicAlsaLogs);
+        CheckBox cbDeviceSnapshot = view.findViewById(R.id.CBForensicDeviceSnapshot);
+        CheckBox cbNonRootCapture = view.findViewById(R.id.CBForensicNonRootCapture);
+        CheckBox cbRootCapture = view.findViewById(R.id.CBForensicRootCapture);
         TextView badgeFreeWine = view.findViewById(R.id.TVPolicyBadgeFreeWine);
         TextView badgeDxvk = view.findViewById(R.id.TVPolicyBadgeDxvk);
         TextView badgeDgVoodoo = view.findViewById(R.id.TVPolicyBadgeDgVoodoo);
@@ -74,6 +89,19 @@ public class ForensicCenterFragment extends Fragment {
         cbUseDri3.setChecked(preferences.getBoolean("use_dri3", true));
         cbDri3PresentWait.setChecked(preferences.getBoolean("dri3_present_wait", true));
         cbDri3ForceSwWsi.setChecked(preferences.getBoolean("dri3_force_sw_wsi", false));
+        cbLoaderTrace.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_LOADER_TRACE, false));
+        cbFexLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_FEX_LOGS, false));
+        cbTurnipLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_TURNIP_LOGS, false));
+        cbDxvkLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DXVK_LOGS, false));
+        cbVkd3dLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VKD3D_LOGS, false));
+        cbVulkanApiDump.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_API_DUMP, false));
+        cbVulkanLoaderDebug.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_LOADER_DEBUG, false));
+        cbVulkanValidation.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_VALIDATION, false));
+        cbPulseLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_PULSE_LOGS, false));
+        cbAlsaLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_ALSA_LOGS, false));
+        cbDeviceSnapshot.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DEVICE_SNAPSHOT, true));
+        cbNonRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, true));
+        cbRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, true));
         String[] dri3Labels = getResources().getStringArray(R.array.dri3_mode_entries);
         String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
         String selectedDri3Mode = preferences.getString("dri3_mode", cbUseDri3.isChecked() ? "auto" : "off");
@@ -124,8 +152,33 @@ public class ForensicCenterFragment extends Fragment {
                     .putString("dri3_mode", dri3Values[sDri3Mode.getSelectedItemPosition()])
                     .putBoolean("dri3_present_wait", cbDri3PresentWait.isChecked())
                     .putBoolean("dri3_force_sw_wsi", cbDri3ForceSwWsi.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_LOADER_TRACE, cbLoaderTrace.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_FEX_LOGS, cbFexLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_TURNIP_LOGS, cbTurnipLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_DXVK_LOGS, cbDxvkLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_VKD3D_LOGS, cbVkd3dLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_API_DUMP, cbVulkanApiDump.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_LOADER_DEBUG, cbVulkanLoaderDebug.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_VALIDATION, cbVulkanValidation.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_PULSE_LOGS, cbPulseLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_ALSA_LOGS, cbAlsaLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_DEVICE_SNAPSHOT, cbDeviceSnapshot.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, cbNonRootCapture.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, cbRootCapture.isChecked())
                     .apply();
             AppUtils.showToast(getContext(), R.string.diagnostics_saved);
+        });
+
+        view.findViewById(R.id.BTForensicOpenX11).setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
+                if (navigationView != null) {
+                    navigationView.setCheckedItem(R.id.main_menu_settings);
+                    ((MainActivity) getActivity()).onNavigationItemSelected(
+                            navigationView.getMenu().findItem(R.id.main_menu_settings)
+                    );
+                }
+            }
         });
 
         return view;

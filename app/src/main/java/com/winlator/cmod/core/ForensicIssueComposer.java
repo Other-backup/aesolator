@@ -121,6 +121,14 @@ public final class ForensicIssueComposer {
             obj.put("androidRelease", Build.VERSION.RELEASE);
             obj.put("sdkInt", Build.VERSION.SDK_INT);
             obj.put("abi", Build.SUPPORTED_ABIS != null && Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "");
+            obj.put("runtimeLibc", "bionic");
+            obj.put("runtimeBionicOnly", true);
+            obj.put("hostArch", System.getProperty("os.arch", ""));
+            JSONArray abiList = new JSONArray();
+            if (Build.SUPPORTED_ABIS != null) {
+                for (String abi : Build.SUPPORTED_ABIS) abiList.put(abi);
+            }
+            obj.put("supportedAbis", abiList);
             obj.put("forensicConfig", ForensicConfig.toJson(context, config));
             obj.put("latestTraceSummary", ForensicLogger.describeLatestTrace(context));
 

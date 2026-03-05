@@ -42,28 +42,31 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ContentsFragment extends Fragment {
+    private static final String PREF_REMOTE_CACHE_JSON = "contents_remote_cache_json";
     private static final List<ContentProfile.ContentType> SUPPORTED_CONTENT_TYPES = Arrays.asList(
             ContentProfile.ContentType.CONTENT_TYPE_WINE,
             ContentProfile.ContentType.CONTENT_TYPE_PROTON,
             ContentProfile.ContentType.CONTENT_TYPE_DXVK,
             ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
             ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK,
-            ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER,
-            ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER,
             ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO,
             ContentProfile.ContentType.CONTENT_TYPE_BOX64,
             ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
@@ -77,6 +80,8 @@ public class ContentsFragment extends Fragment {
     private ContentProfile.ContentType currentContentType = ContentProfile.ContentType.CONTENT_TYPE_WINE;
     private Spinner sContentType;
     private boolean isDarkMode;
+    private TextView tvContentsFiltersLabel;
+    private ViewGroup llContentsFilters;
     private CheckBox cbSourceWcpHub;
     private CheckBox cbSourceFallback;
     private CheckBox cbSourceAesolator;
@@ -135,6 +140,7 @@ public class ContentsFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 currentContentType = SUPPORTED_CONTENT_TYPES.get(position);
+                updateFilterControlsVisibility();
                 if (emptyText != null && recyclerView != null) {
                     loadContentList();
                 }
@@ -149,6 +155,8 @@ public class ContentsFragment extends Fragment {
         cbSourceWcpHub = layout.findViewById(R.id.CBSourceWcpHub);
         cbSourceFallback = layout.findViewById(R.id.CBSourceFallback);
         cbSourceAesolator = layout.findViewById(R.id.CBSourceAesolator);
+        tvContentsFiltersLabel = layout.findViewById(R.id.TVContentsFiltersLabel);
+        llContentsFilters = layout.findViewById(R.id.LLContentsFilters);
         cbFilterArm64ec = layout.findViewById(R.id.CBFilterArm64ec);
         cbFilterX64 = layout.findViewById(R.id.CBFilterX64);
         cbFilterBeta = layout.findViewById(R.id.CBFilterBeta);
@@ -175,6 +183,7 @@ public class ContentsFragment extends Fragment {
         cbFilterArm64ec.setOnCheckedChangeListener(refreshListListener);
         cbFilterX64.setOnCheckedChangeListener(refreshListListener);
         cbFilterBeta.setOnCheckedChangeListener(refreshListListener);
+        updateFilterControlsVisibility();
 
         emptyText = layout.findViewById(R.id.TVEmptyText);
 
@@ -212,8 +221,6 @@ public class ContentsFragment extends Fragment {
     private String getTypeLabel(ContentProfile.ContentType type) {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) return "Proton";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
         return type.toString();
     }
@@ -286,9 +293,37 @@ public class ContentsFragment extends Fragment {
         return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
-                || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+    }
+
+    private boolean supportsArchitectureFilters(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+    }
+
+    private boolean supportsChannelFilter(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+    }
+
+    private void updateFilterControlsVisibility() {
+        if (!isAdded()) return;
+        boolean showArchFilters = supportsArchitectureFilters(currentContentType);
+        boolean showChannelFilter = supportsChannelFilter(currentContentType);
+
+        cbFilterArm64ec.setVisibility(showArchFilters ? View.VISIBLE : View.GONE);
+        cbFilterX64.setVisibility(showArchFilters ? View.VISIBLE : View.GONE);
+        cbFilterBeta.setVisibility(showChannelFilter ? View.VISIBLE : View.GONE);
+
+        boolean showFiltersCard = showArchFilters || showChannelFilter;
+        if (tvContentsFiltersLabel != null) tvContentsFiltersLabel.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
+        if (llContentsFilters != null) llContentsFilters.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
     }
 
     private boolean isArm64EcProfile(ContentProfile profile) {
@@ -314,6 +349,19 @@ public class ContentsFragment extends Fragment {
     }
 
     private void reloadRemoteContents() {
+        ForensicLogger.logEvent(
+                getContext(),
+                "info",
+                "CONTENTS_FEED_REFRESH_START",
+                null,
+                "contents",
+                "refresh_remote_feeds",
+                ForensicLogger.fields(
+                        "source_wcphub", sourceWcpHubEnabled,
+                        "source_fallback", sourceFallbackEnabled,
+                        "source_aesolator", sourceAesolatorEnabled
+                )
+        );
         new Thread(() -> {
             try {
                 ArrayList<String> payloads = new ArrayList<>();
@@ -336,7 +384,18 @@ public class ContentsFragment extends Fragment {
                 if (!isAdded() || getActivity() == null) return;
                 if (payloads.isEmpty()) {
                     getActivity().runOnUiThread(() -> {
-                        manager.setRemoteProfiles("[]");
+                        String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
+                        boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                        manager.setRemoteProfiles(cached != null && !cached.trim().isEmpty() ? cached : "[]");
+                        ForensicLogger.logEvent(
+                                getContext(),
+                                useCached ? "warn" : "warn",
+                                "CONTENTS_FEED_REFRESH_FALLBACK",
+                                null,
+                                "contents",
+                                useCached ? "all_sources_failed_use_cached" : "all_sources_failed_empty",
+                                ForensicLogger.fields("sources_enabled", sources.size(), "cached_used", useCached)
+                        );
                         loadContentList();
                     });
                     return;
@@ -344,10 +403,40 @@ public class ContentsFragment extends Fragment {
 
                 String merged = mergeJsonArrays(payloads);
                 getActivity().runOnUiThread(() -> {
+                    sharedPreferences.edit().putString(PREF_REMOTE_CACHE_JSON, merged).apply();
                     manager.setRemoteProfiles(merged);
+                    ForensicLogger.logEvent(
+                            getContext(),
+                            "info",
+                            "CONTENTS_FEED_REFRESH_DONE",
+                            null,
+                            "contents",
+                            "refresh_complete",
+                            ForensicLogger.fields(
+                                    "sources_polled", sources.size(),
+                                    "payloads_received", payloads.size(),
+                                    "merged_size", merged.length()
+                            )
+                    );
                     loadContentList();
                 });
             } catch (Exception ignored) {
+                if (!isAdded() || getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
+                    boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                    manager.setRemoteProfiles(cached != null && !cached.trim().isEmpty() ? cached : "[]");
+                    ForensicLogger.logEvent(
+                            getContext(),
+                            "warn",
+                            "CONTENTS_FEED_REFRESH_EXCEPTION",
+                            null,
+                            "contents",
+                            useCached ? "refresh_exception_use_cached" : "refresh_exception_empty",
+                            ForensicLogger.fields("cached_used", useCached)
+                    );
+                    loadContentList();
+                });
             }
         }).start();
     }
@@ -355,33 +444,133 @@ public class ContentsFragment extends Fragment {
     private void addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
         if (url == null) return;
         String normalized = url.trim();
-        if (normalized.isEmpty() || seenSources.contains(normalized)) return;
+        if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return;
         seenSources.add(normalized);
         String json = Downloader.downloadString(normalized);
         if (json != null && !json.trim().isEmpty()) payloads.add(json);
     }
 
+    private boolean isAllowedFeedUrl(String url) {
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            if (scheme == null) return false;
+            String normalizedScheme = scheme.trim().toLowerCase(Locale.US);
+            if (!"https".equals(normalizedScheme) && !"http".equals(normalizedScheme)) return false;
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) return false;
+            String normalizedHost = host.trim().toLowerCase(Locale.US);
+            if ("http".equals(normalizedScheme) && !isLocalhostHost(normalizedHost)) return false;
+            // Reject user:pass@host patterns in feed sources.
+            return uri.getUserInfo() == null || uri.getUserInfo().trim().isEmpty();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isLocalhostHost(String host) {
+        return "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
+    }
+
     private String mergeJsonArrays(List<String> payloads) {
-        JSONArray merged = new JSONArray();
-        HashSet<String> seenEntries = new HashSet<>();
+        Map<String, JSONObject> bestByEntry = new LinkedHashMap<>();
         for (String payload : payloads) {
             try {
                 JSONArray array = new JSONArray(payload);
                 for (int i = 0; i < array.length(); i++) {
-                    JSONObject object = array.getJSONObject(i);
-                    String type = object.optString("type", "");
-                    String verName = object.optString("verName", "");
-                    String verCode = String.valueOf(object.opt("verCode"));
-                    String remoteUrl = object.optString("remoteUrl", "");
-                    String key = (type + "|" + verName + "|" + verCode + "|" + remoteUrl).toLowerCase(Locale.US);
-                    if (seenEntries.add(key)) {
-                        merged.put(object);
+                    JSONObject candidate = array.getJSONObject(i);
+                    String key = buildMergeEntryKey(candidate);
+                    JSONObject currentBest = bestByEntry.get(key);
+                    if (currentBest == null || isBetterRemoteCandidate(candidate, currentBest)) {
+                        bestByEntry.put(key, candidate);
                     }
                 }
             } catch (Exception ignored) {
             }
         }
+
+        JSONArray merged = new JSONArray();
+        for (JSONObject selected : bestByEntry.values()) {
+            merged.put(selected);
+        }
         return merged.toString();
+    }
+
+    private String buildMergeEntryKey(JSONObject object) {
+        String type = object.optString("type", "").trim().toLowerCase(Locale.US);
+        String verName = object.optString("verName", "").trim().toLowerCase(Locale.US);
+        String channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
+        String displayCategory = object.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "").trim().toLowerCase(Locale.US);
+        String archHint = resolveRemoteArchHint(object);
+        return type + "|" + verName + "|" + channel + "|" + displayCategory + "|" + archHint;
+    }
+
+    private boolean isBetterRemoteCandidate(JSONObject candidate, JSONObject currentBest) {
+        int candidateVerCode = parseRemoteVerCode(candidate);
+        int currentVerCode = parseRemoteVerCode(currentBest);
+        if (candidateVerCode != currentVerCode) return candidateVerCode > currentVerCode;
+
+        int candidateSourcePriority = resolveRemoteSourcePriority(candidate);
+        int currentSourcePriority = resolveRemoteSourcePriority(currentBest);
+        if (candidateSourcePriority != currentSourcePriority) return candidateSourcePriority > currentSourcePriority;
+
+        int candidateChannelPriority = resolveChannelPriority(candidate.optString(ContentProfile.MARK_CHANNEL, ""));
+        int currentChannelPriority = resolveChannelPriority(currentBest.optString(ContentProfile.MARK_CHANNEL, ""));
+        if (candidateChannelPriority != currentChannelPriority) return candidateChannelPriority > currentChannelPriority;
+
+        // Stable tie-breaker to avoid flicker.
+        String candidateUrl = candidate.optString("remoteUrl", "");
+        String currentUrl = currentBest.optString("remoteUrl", "");
+        return candidateUrl.compareToIgnoreCase(currentUrl) < 0;
+    }
+
+    private int parseRemoteVerCode(JSONObject object) {
+        Object raw = object.opt("verCode");
+        if (raw instanceof Number) return ((Number) raw).intValue();
+        if (raw instanceof String) {
+            try {
+                return Integer.parseInt(((String) raw).trim());
+            } catch (Exception ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private int resolveRemoteSourcePriority(JSONObject object) {
+        String sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").toLowerCase(Locale.US);
+        String remoteUrl = object.optString("remoteUrl", "").toLowerCase(Locale.US);
+        String joined = sourceRepo + " " + remoteUrl;
+        if (joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator")) return 300;
+        if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany")) return 200;
+        if (joined.contains("stevenmxz") || joined.contains("winlator-contents")) return 100;
+        return 50;
+    }
+
+    private int resolveChannelPriority(String channel) {
+        String normalized = channel == null ? "" : channel.trim().toLowerCase(Locale.US);
+        if (ContentProfile.CHANNEL_STABLE.equals(normalized)) return 30;
+        if (ContentProfile.CHANNEL_BETA.equals(normalized)) return 20;
+        if (ContentProfile.CHANNEL_NIGHTLY.equals(normalized)) return 10;
+        return 0;
+    }
+
+    private String resolveRemoteArchHint(JSONObject object) {
+        String combined = (
+                object.optString("verName", "") + " "
+                        + object.optString("description", "") + " "
+                        + object.optString("remoteUrl", "") + " "
+                        + object.optString(ContentProfile.MARK_RELEASE_TAG, "")
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
+        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
+        if (combined.contains("arm64")) return "arm64";
+        return "generic";
+    }
+
+    private String normalizeSha256(String value) {
+        if (value == null) return "";
+        String normalized = value.trim().toLowerCase(Locale.US).replaceAll("[^0-9a-f]", "");
+        return normalized.length() == 64 ? normalized : "";
     }
 
     @Override
@@ -673,18 +862,99 @@ public class ContentsFragment extends Fragment {
             holder.ibDownload.setOnClickListener(v -> {
                 holder.ibDownload.setVisibility(View.GONE);
                 holder.progressBar.setVisibility(View.VISIBLE);
+                ForensicLogger.logEvent(
+                        getContext(),
+                        "info",
+                        "CONTENTS_PACKAGE_DOWNLOAD_START",
+                        null,
+                        "contents",
+                        "download_start",
+                        ForensicLogger.fields(
+                                "type", profile.type.toString(),
+                                "ver_name", profile.verName,
+                                "ver_code", profile.verCode,
+                                "url", profile.remoteUrl
+                        )
+                );
 
-                Intent intent = new Intent();
-                intent.setData(Uri.parse(profile.remoteUrl));
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
                     File output = new File(requireContext().getCacheDir(), "temp_" + timestamp);
-                    if (Downloader.downloadFile(profile.remoteUrl, output)) {
-                        intent.setData(Uri.parse(output.getAbsolutePath()));
+                    boolean downloaded = Downloader.downloadFile(profile.remoteUrl, output);
+                    String expectedSha256 = normalizeSha256(profile.remoteSha256);
+                    String actualSha256 = "";
+                    boolean checksumVerified = false;
+                    if (downloaded && !expectedSha256.isEmpty()) {
+                        actualSha256 = normalizeSha256(Downloader.sha256Hex(output));
+                        checksumVerified = expectedSha256.equals(actualSha256);
+                        if (!checksumVerified) {
+                            downloaded = false;
+                            if (output.exists()) output.delete();
+                        }
                     }
+                    boolean checksumRequired = !expectedSha256.isEmpty();
+                    boolean finalChecksumVerified = checksumVerified;
+                    String finalActualSha256 = actualSha256;
+                    String finalExpectedSha256 = expectedSha256;
+                    boolean finalDownloaded = downloaded;
                     requireActivity().runOnUiThread(() -> {
                         holder.progressBar.setVisibility(View.GONE);
                         holder.ibDownload.setVisibility(View.VISIBLE);
+                        if (!finalDownloaded) {
+                            if (checksumRequired && !finalChecksumVerified) {
+                                ForensicLogger.logEvent(
+                                        getContext(),
+                                        "warn",
+                                        "CONTENTS_PACKAGE_DOWNLOAD_HASH_FAIL",
+                                        null,
+                                        "contents",
+                                        "sha256_mismatch",
+                                        ForensicLogger.fields(
+                                                "type", profile.type.toString(),
+                                                "ver_name", profile.verName,
+                                                "url", profile.remoteUrl,
+                                                "expected_sha256", finalExpectedSha256,
+                                                "actual_sha256", finalActualSha256
+                                        )
+                                );
+                                ContentDialog.alert(getContext(), R.string.content_cannot_be_trusted, null);
+                                return;
+                            }
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "warn",
+                                    "CONTENTS_PACKAGE_DOWNLOAD_FAIL",
+                                    null,
+                                    "contents",
+                                    "download_failed",
+                                    ForensicLogger.fields(
+                                            "type", profile.type.toString(),
+                                            "ver_name", profile.verName,
+                                            "url", profile.remoteUrl
+                                    )
+                            );
+                            ContentDialog.alert(getContext(), R.string.unable_to_install_content, null);
+                            return;
+                        }
+                        ForensicLogger.logEvent(
+                                getContext(),
+                                "info",
+                                "CONTENTS_PACKAGE_DOWNLOAD_DONE",
+                                null,
+                                "contents",
+                                "download_complete",
+                                ForensicLogger.fields(
+                                        "type", profile.type.toString(),
+                                        "ver_name", profile.verName,
+                                        "file", output.getAbsolutePath(),
+                                        "size_bytes", output.length(),
+                                        "sha256", finalActualSha256,
+                                        "sha256_expected", finalExpectedSha256,
+                                        "sha256_verified", !checksumRequired || finalChecksumVerified
+                                )
+                        );
+                        Intent intent = new Intent();
+                        intent.setData(Uri.parse(output.getAbsolutePath()));
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);
                     });
                 }).start();

@@ -80,6 +80,26 @@ public class KeyValueSet implements Iterable<String[]> {
         put(key, String.valueOf(value));
     }
 
+    // Removes a key from the packed key-value data.
+    public void remove(String key) {
+        int[] range = indexOfKey(key);
+        if (range == null) return;
+
+        int start = range[0];
+        int end = range[1];
+        int dataLength = data.length();
+
+        if (start == 0) {
+            // Remove the first pair, including trailing comma if present.
+            int removeUntil = end < dataLength ? end + 1 : end;
+            data = StringUtils.replace(data, 0, removeUntil, "");
+        }
+        else {
+            // Remove comma before this pair.
+            data = StringUtils.replace(data, start - 1, end, "");
+        }
+    }
+
     // Iterator implementation for key-value pairs in the format [key, value]
     @NonNull
     @Override

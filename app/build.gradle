@@ -97,6 +97,15 @@ tasks.register("prepareKotlinBuildScriptModel"){}
 prepareEmbeddedWineAssets.dependsOn(downloadImageFS)
 preBuild.dependsOn(prepareEmbeddedWineAssets)
 
+def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "20"
+int aeroVersionCode
+try {
+    aeroVersionCode = Integer.parseInt(aeroVersionCodeRaw.toString())
+} catch (Exception ignored) {
+    aeroVersionCode = 20
+}
+def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9c+").toString()
+
 android {
     namespace 'com.winlator.cmod'
     // Keep compileSdk from your current config. If you want to match Termux-X11, you could set to 34.
@@ -109,8 +118,8 @@ android {
         // We’re preserving Winlator’s request to keep targetSdkVersion at 28
         targetSdkVersion 28
 
-        versionCode 20
-        versionName "7.1.4x-cmod"
+        versionCode aeroVersionCode
+        versionName aeroVersionName
 
         // External native build from Winlator
         externalNativeBuild {

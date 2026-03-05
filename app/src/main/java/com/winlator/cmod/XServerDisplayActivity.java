@@ -55,18 +55,24 @@ import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.DebugDialog;
+import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.ScreenEffectDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
+import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.FileDebugLogger;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicConfig;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
@@ -91,6 +97,8 @@ import com.winlator.cmod.renderer.effects.ColorEffect;
 import com.winlator.cmod.renderer.effects.FXAAEffect;
 import com.winlator.cmod.renderer.effects.NTSCCombinedEffect;
 import com.winlator.cmod.renderer.effects.ToonEffect;
+import com.winlator.cmod.runtimeprofile.RuntimeProfile;
+import com.winlator.cmod.runtimeprofile.RuntimeProfileManager;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.LogView;
@@ -127,6 +135,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -136,7 +145,7 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
-    public static String NOTIFICATION_CHANNEL_ID = "Winlator";
+    public static String NOTIFICATION_CHANNEL_ID = "Aesolator";
     public static int NOTIFICATION_ID = -1;
     private XServerView xServerView;
     private InputControlsView inputControlsView;
@@ -168,6 +177,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private float globalCursorSpeed = 1.0f;
     private MagnifierView magnifierView;
     private DebugDialog debugDialog;
+    private final ArrayList<Callback<String>> forensicRuntimeCallbacks = new ArrayList<>();
     private short taskAffinityMask = 0;
     private short taskAffinityMaskWoW64 = 0;
     private int frameRatingWindowId = -1;
@@ -208,8 +218,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private EnvVars overrideEnvVars;
 
     private void createNotifcationChannel() {
-        String name = "Winlator";
-        String description = "Winlator XServer Messages";
+        String name = "Aesolator";
+        String description = "Aesolator XServer Messages";
         int importance = NotificationManager.IMPORTANCE_HIGH;
         NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance);
         channel.setDescription(description);
@@ -260,6 +270,14 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     	return maxRefresh;
     }
 
+    private boolean requiresSignedLaunchIntent(Intent intent) {
+        if (intent == null) return false;
+        if (!getClass().equals(XServerDisplayActivity.class)) return false;
+        if (LaunchSecurity.hasXServerLaunchSignature(intent)) return true;
+        return intent.hasExtra("shortcut_name")
+                || intent.hasExtra("disableXinput");
+    }
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -295,6 +313,27 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         if (controller != null) {
             int triggerType = preferences.getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS); // Default to TRIGGER_IS_AXIS
             controller.setTriggerType((byte) triggerType); // Cast to byte if needed
+        }
+
+        Intent launchIntent = getIntent();
+        if (requiresSignedLaunchIntent(launchIntent)
+                && !LaunchSecurity.isTrustedXServerLaunchIntent(this, launchIntent)) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_LAUNCH_REJECTED",
+                    null,
+                    "xserver",
+                    "launch_signature_invalid",
+                    ForensicLogger.fields(
+                            "container_id", launchIntent.getIntExtra("container_id", 0),
+                            "shortcut_path", launchIntent.getStringExtra("shortcut_path"),
+                            "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent)
+                    )
+            );
+            showToast(this, "Blocked untrusted launch request");
+            finish();
+            return;
         }
 
 
@@ -460,6 +499,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             LogView.setFilename(getExecutable());
             ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
         }
+        installForensicRuntimeLogCallbacks(ForensicConfig.load(this));
 
         graphicsDriver = container.getGraphicsDriver();
         String graphicsDriverConfig = container.getGraphicsDriverConfig();
@@ -473,8 +513,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         lc_all = container.getLC_ALL();
 
         // Log the entire intent to verify the extras
-        Intent intent = getIntent();
-        Log.d("XServerDisplayActivity", "Intent Extras: " + intent.getExtras());
+        Log.d("XServerDisplayActivity", "Intent Extras: " + launchIntent.getExtras());
 
         if (shortcut != null) {
             graphicsDriver = shortcut.getExtra("graphicsDriver", container.getGraphicsDriver());
@@ -583,11 +622,18 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         createNotifcationChannel();
 
         Intent notificationIntent = new Intent(this, XServerDisplayActivity.class);
+        notificationIntent.putExtra("container_id", container.id);
+        if (shortcut != null) {
+            notificationIntent.putExtra("shortcut_path", shortcut.file.getPath());
+            notificationIntent.putExtra("shortcut_name", shortcut.name);
+        }
+        notificationIntent.putExtra("disableXinput", xinputDisabledFromShortcut ? "1" : "0");
+        LaunchSecurity.signXServerLaunchIntent(this, notificationIntent);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_ab_gear_0011)
-                .setContentTitle("Winlator")
-                .setContentText("Winlator is running, do not kill or swipe this notification")
+                .setContentTitle("Aesolator")
+                .setContentText("Aesolator is running, do not kill or swipe this notification")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false);
@@ -1000,17 +1046,23 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             containerDataChanged = true;
         }
 
-        String dxwrapper = this.dxwrapper;
+        String dxwrapperMode = this.dxwrapper;
+        String dxwrapperSignature = dxwrapperMode;
 
-        if (dxwrapper.contains("dxvk")) {
+        if (dxwrapperMode.contains("dxvk")) {
             String dxvkWrapper = "dxvk-" + dxwrapperConfig.get("version");
             String vkd3dWrapper = "vkd3d-" + dxwrapperConfig.get("vkd3dVersion");
-            dxwrapper = dxvkWrapper + ";" + vkd3dWrapper;
+            dxwrapperSignature = dxvkWrapper + ";" + vkd3dWrapper;
+        } else if (dxwrapperMode.contains("dgvoodoo")) {
+            KeyValueSet dgConfig = DgVoodooConfigDialog.parseConfig(dxwrapperConfig);
+            String archRequested = DgVoodooConfigDialog.normalizeArch(dgConfig.get("dgvoodooArch"));
+            String versionHint = dgConfig.get("dgvoodooVersionHint");
+            dxwrapperSignature = "dgvoodoo:" + archRequested + ":" + versionHint;
         }
 
-        if (!dxwrapper.equals(container.getExtra("dxwrapper"))) {
-            extractDXWrapperFiles(dxwrapper);
-            container.putExtra("dxwrapper", dxwrapper);
+        if (!dxwrapperSignature.equals(container.getExtra("dxwrapper"))) {
+            extractDXWrapperFiles(dxwrapperMode);
+            container.putExtra("dxwrapper", dxwrapperSignature);
             containerDataChanged = true;
         }
 
@@ -1048,17 +1100,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     }
 
     private void setupXEnvironment() throws PackageManager.NameNotFoundException {
-
-        // Set environment variables
-        envVars.put("LC_ALL", lc_all);
-        envVars.put("WINEPREFIX", imageFs.wineprefix);
-
-        boolean enableWineDebug = preferences.getBoolean("enable_wine_debug", false);
-        String wineDebugChannels = preferences.getString("wine_debug_channels", SettingsFragment.DEFAULT_WINE_DEBUG_CHANNELS);
-        envVars.put("WINEDEBUG", enableWineDebug && !wineDebugChannels.isEmpty()
-                ? "+" + wineDebugChannels.replace(",", ",+")
-                : "-all"
-        );
+        ForensicConfig.Snapshot forensicSnapshot = ForensicConfig.load(this);
+        composeLaunchEnvVars(forensicSnapshot);
 
         // Clear any temporary directory
         String rootPath = imageFs.getRootDir().getPath();
@@ -1083,14 +1126,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
             guestProgramLauncherComponent.setGuestExecutable(guestExecutable);
 
-            envVars.putAll(container.getEnvVars());
-
-            if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));
-
-            if (!envVars.has("WINEESYNC")) {
-                envVars.put("WINEESYNC", "1");
-            }
-
             ArrayList<String> bindingPaths = new ArrayList<>();
             for (String[] drive : container.drivesIterator()) {
                 bindingPaths.add(drive[1]);
@@ -1109,12 +1144,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                             ? shortcut.getExtra("fexcorePreset", container.getFEXCorePreset())
                             : container.getFEXCorePreset()
             );
-        }
-
-        // Merge overrideEnvVars if present
-        if (overrideEnvVars != null) {
-            envVars.putAll(overrideEnvVars);
-            overrideEnvVars.clear(); // Clear overrideEnvVars as per smali logic
         }
 
         // Create our overall XEnvironment with various components
@@ -1488,6 +1517,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
     private static final Pattern SOC_ADRENO_PATTERN =
             Pattern.compile("adreno\\s*(\\d{3,4})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern VULKAN_API_MINOR_PATTERN = Pattern.compile("1\\.(\\d+)");
 
     private String detectSoCClass() {
         String renderer = GPUInformation.getRenderer(null, this);
@@ -1509,6 +1539,362 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             }
         }
         return "unknown";
+    }
+
+    private String resolveRuntimeProfileId() {
+        return resolveRuntimeProfileId(envVars);
+    }
+
+    private String resolveRuntimeProfileId(EnvVars mergedEnv) {
+        String globalProfile = preferences.getString("runtime_profile_global", RuntimeProfile.AUTO);
+        if (globalProfile == null || globalProfile.trim().isEmpty()) {
+            globalProfile = RuntimeProfile.AUTO;
+        }
+
+        String containerProfile = container != null ? container.getExtra("runtimeProfile", globalProfile) : globalProfile;
+        if (shortcut != null) {
+            containerProfile = shortcut.getExtra("runtimeProfile", containerProfile);
+        }
+
+        String envOverride = mergedEnv != null ? mergedEnv.get("AERO_RUNTIME_PROFILE") : "";
+        if (envOverride != null && !envOverride.trim().isEmpty()) {
+            return envOverride.trim();
+        }
+        return containerProfile;
+    }
+
+    private void composeLaunchEnvVars(ForensicConfig.Snapshot forensicSnapshot) {
+        EnvVars mergedEnv = new EnvVars();
+        // Preserve graphics/runtime route env prepared before setupXEnvironment().
+        mergedEnv.putAll(envVars);
+
+        mergedEnv.put("LC_ALL", lc_all);
+        mergedEnv.put("WINEPREFIX", imageFs.wineprefix);
+
+        if (container != null) {
+            mergedEnv.putAll(container.getEnvVars());
+        }
+        if (shortcut != null) {
+            String shortcutEnv = shortcut.getExtra("envVars");
+            if (shortcutEnv != null && !shortcutEnv.trim().isEmpty()) {
+                mergedEnv.putAll(shortcutEnv);
+            }
+        }
+
+        applyForensicEnvVars(mergedEnv, forensicSnapshot);
+
+        String requestedRuntimeProfile = resolveRuntimeProfileId(mergedEnv);
+        mergedEnv.putAll(RuntimeProfileManager.getEnvVars(this, requestedRuntimeProfile));
+        applyBionicRuntimeMarkers(mergedEnv);
+        String effectiveRuntimeProfile = mergedEnv.get("AERO_RUNTIME_PROFILE_EFFECTIVE");
+        if (effectiveRuntimeProfile == null || effectiveRuntimeProfile.trim().isEmpty()) {
+            effectiveRuntimeProfile = RuntimeProfileManager.resolveEffectiveProfileId(this, requestedRuntimeProfile);
+        }
+        mergedEnv.put("AERO_RUNTIME_PROFILE", effectiveRuntimeProfile);
+
+        if (!mergedEnv.has("WINEESYNC")) {
+            mergedEnv.put("WINEESYNC", "1");
+        }
+
+        if (overrideEnvVars != null) {
+            mergedEnv.putAll(overrideEnvVars);
+            overrideEnvVars.clear();
+        }
+        mergedEnv.put("AERO_ENV_LAYER_ORDER", "graphics->container->shortcut->forensic->runtime->override");
+
+        envVars.clear();
+        envVars.putAll(mergedEnv);
+    }
+
+    private void applyForensicEnvVars(ForensicConfig.Snapshot snapshot) {
+        applyForensicEnvVars(envVars, snapshot);
+    }
+
+    private void applyForensicEnvVars(EnvVars targetEnv, ForensicConfig.Snapshot snapshot) {
+        boolean loaderTraceEnabled = ForensicConfig.shouldEnableLoaderTrace(snapshot, false);
+        String effectiveWineDebug = ForensicConfig.buildEffectiveWineDebug(
+                snapshot.enableWineDebug,
+                snapshot.wineDebugChannels,
+                loaderTraceEnabled
+        );
+        targetEnv.put("WINEDEBUG", effectiveWineDebug);
+        targetEnv.put("AERO_FORENSIC_LOADER_TRACE", loaderTraceEnabled ? "1" : "0");
+        targetEnv.put("AERO_FORENSIC_TRACE_MODE", ForensicConfig.buildLoaderTraceMode(snapshot));
+
+        setOrClearEnv(targetEnv, "BOX64_LOG", snapshot.enableBox64Logs ? "1" : "");
+        setOrClearEnv(targetEnv, "BOX64_DYNAREC_MISSING", snapshot.enableBox64Logs ? "1" : "");
+        setOrClearEnv(targetEnv, "FEX_LOG_LEVEL", snapshot.enableFexLogs ? "debug" : "");
+        setOrClearEnv(targetEnv, "FEX_DEBUG", snapshot.enableFexLogs ? "1" : "");
+        setOrClearEnv(targetEnv, "MESA_LOG_LEVEL", snapshot.enableTurnipLogs ? "debug" : "");
+        setOrClearEnv(targetEnv, "MESA_DEBUG", snapshot.enableTurnipLogs ? "context" : "");
+        setOrClearEnv(targetEnv, "DXVK_LOG_LEVEL", snapshot.enableDxvkLogs ? "info" : "none");
+        setOrClearEnv(targetEnv, "VKD3D_DEBUG", snapshot.enableVkd3dLogs ? "warn" : "");
+        setOrClearEnv(targetEnv, "PULSE_LOG", snapshot.enablePulseLogs ? "4" : "");
+        setOrClearEnv(targetEnv, "ALSA_DEBUG", snapshot.enableAlsaLogs ? "1" : "");
+        setOrClearEnv(targetEnv, "VK_LOADER_DEBUG", snapshot.enableVulkanLoaderDebug ? "all" : "");
+
+        String vkLayers = "";
+        if (snapshot.enableVulkanApiDump) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_LUNARG_api_dump");
+        if (snapshot.enableVulkanValidation) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
+        setOrClearEnv(targetEnv, "VK_INSTANCE_LAYERS", vkLayers);
+    }
+
+    private void installForensicRuntimeLogCallbacks(ForensicConfig.Snapshot snapshot) {
+        forensicRuntimeCallbacks.clear();
+        if (snapshot == null) return;
+
+        addForensicRuntimeFileCallback(snapshot.enableWineDebug || snapshot.enableLoaderTrace,
+                "wine_loader", "wine", "loaddll", "module", "ntdll", "kernel32");
+        addForensicRuntimeFileCallback(snapshot.enableBox64Logs,
+                "box64", "box64", "dynarec");
+        addForensicRuntimeFileCallback(snapshot.enableFexLogs,
+                "fex_runtime", "fex", "thunk");
+        addForensicRuntimeFileCallback(snapshot.enableTurnipLogs,
+                "turnip_mesa", "turnip", "mesa", "freedreno", "gallium", "zink");
+        addForensicRuntimeFileCallback(snapshot.enableVulkanApiDump,
+                "vulkan_api_dump", "api_dump", "vkcreate", "vkqueue", "vkcmd");
+        addForensicRuntimeFileCallback(snapshot.enableVulkanLoaderDebug,
+                "vulkan_loader", "vk_loader", "vulkan loader", "icd", "layer");
+        addForensicRuntimeFileCallback(snapshot.enableDxvkLogs,
+                "dxvk", "dxvk", "d3d9", "d3d11", "d3d12");
+        addForensicRuntimeFileCallback(snapshot.enableVkd3dLogs,
+                "vkd3d", "vkd3d", "d3d12");
+        addForensicRuntimeFileCallback(snapshot.enablePulseLogs,
+                "pulse", "pulse", "pulseaudio");
+        addForensicRuntimeFileCallback(snapshot.enableAlsaLogs,
+                "alsa", "alsa");
+
+        if (!forensicRuntimeCallbacks.isEmpty()) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "FORENSIC_STREAM_HOOKS_READY",
+                    null,
+                    "xserver",
+                    "Attached runtime forensic stream hooks",
+                    ForensicLogger.fields(
+                            "callbacks", forensicRuntimeCallbacks.size(),
+                            "trace_mode", ForensicConfig.buildLoaderTraceMode(snapshot)
+                    )
+            );
+        }
+    }
+
+    private void addForensicRuntimeFileCallback(boolean enabled, String prefix, String... filters) {
+        if (!enabled) return;
+        FileDebugLogger callback = new FileDebugLogger(this, prefix, filters);
+        forensicRuntimeCallbacks.add(callback);
+        ProcessHelper.addDebugCallback(callback);
+    }
+
+    private void applyBionicRuntimeMarkers(EnvVars targetEnv) {
+        if (targetEnv == null) return;
+        targetEnv.put("AERO_RUNTIME_LIBC", "bionic");
+        targetEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
+        targetEnv.put("AERO_RUNTIME_ANDROID_SDK", String.valueOf(Build.VERSION.SDK_INT));
+        targetEnv.put("AERO_RUNTIME_ANDROID_RELEASE", Build.VERSION.RELEASE == null ? "" : Build.VERSION.RELEASE);
+        targetEnv.put("AERO_RUNTIME_HOST_ARCH", System.getProperty("os.arch", ""));
+        if (Build.SUPPORTED_ABIS != null && Build.SUPPORTED_ABIS.length > 0) {
+            targetEnv.put("AERO_RUNTIME_DEVICE_ABI", Build.SUPPORTED_ABIS[0]);
+            targetEnv.put("AERO_RUNTIME_DEVICE_ABIS", joinAbiList(Build.SUPPORTED_ABIS));
+        } else {
+            targetEnv.put("AERO_RUNTIME_DEVICE_ABI", "unknown");
+            targetEnv.put("AERO_RUNTIME_DEVICE_ABIS", "unknown");
+        }
+        targetEnv.put("AERO_RUNTIME_WOW_ROUTE", wineInfo != null && wineInfo.isArm64EC() ? "arm64ec" : "box64");
+    }
+
+    private String joinAbiList(String[] values) {
+        if (values == null || values.length == 0) return "unknown";
+        StringBuilder joined = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.trim().isEmpty()) continue;
+            if (joined.length() > 0) joined.append(',');
+            joined.append(value.trim());
+        }
+        return joined.length() == 0 ? "unknown" : joined.toString();
+    }
+
+    private void setOrClearEnv(String key, String value) {
+        setOrClearEnv(envVars, key, value);
+    }
+
+    private void setOrClearEnv(EnvVars targetEnv, String key, String value) {
+        if (value == null || value.trim().isEmpty()) {
+            targetEnv.remove(key);
+        } else {
+            targetEnv.put(key, value);
+        }
+    }
+
+    private String appendVkInstanceLayers(String baseLayers, String layer) {
+        if (layer == null || layer.trim().isEmpty()) return baseLayers;
+        String normalizedLayer = layer.trim();
+        if (baseLayers == null || baseLayers.trim().isEmpty()) return normalizedLayer;
+        String[] parts = baseLayers.split(":");
+        for (String part : parts) {
+            if (normalizedLayer.equals(part.trim())) return baseLayers;
+        }
+        return baseLayers + ":" + normalizedLayer;
+    }
+
+    private String normalizeRequestedVulkanApi(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return "1.3";
+        Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(raw);
+        if (!matcher.find()) return "1.3";
+        try {
+            int minor = Integer.parseInt(matcher.group(1));
+            if (minor < 1) minor = 1;
+            return "1." + minor;
+        } catch (NumberFormatException ignored) {
+            return "1.3";
+        }
+    }
+
+    private int getVulkanApiMinor(String apiVersion) {
+        if (apiVersion == null || apiVersion.trim().isEmpty()) return 3;
+        Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(apiVersion);
+        if (!matcher.find()) return 3;
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return 3;
+        }
+    }
+
+    private int parseMaxVulkanMinor(ContentProfile profile) {
+        return resolveVulkanApiRange(profile)[1];
+    }
+
+    private int parseMinVulkanMinor(ContentProfile profile) {
+        return resolveVulkanApiRange(profile)[0];
+    }
+
+    private int[] resolveVulkanApiRange(ContentProfile profile) {
+        if (profile == null) return new int[]{0, 0};
+        int min = profile.vulkanApiMin;
+        int max = profile.vulkanApiMax;
+        if (min > 0 && max > 0) {
+            if (min > max) {
+                int swap = min;
+                min = max;
+                max = swap;
+            }
+            return new int[]{min, max};
+        }
+
+        int inferredMax = 0;
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinor(profile.verName));
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinor(profile.desc));
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinor(profile.releaseTag));
+        if (inferredMax > 0) return new int[]{1, inferredMax};
+        return new int[]{0, 0};
+    }
+
+    private int parseMaxVulkanMinor(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return 0;
+        int maxMinor = 0;
+        Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(raw);
+        while (matcher.find()) {
+            try {
+                maxMinor = Math.max(maxMinor, Integer.parseInt(matcher.group(1)));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return maxMinor;
+    }
+
+    private String detectVulkanSdkLaneArch(ContentProfile profile) {
+        if (profile == null) return "generic";
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " " +
+                (profile.desc == null ? "" : profile.desc) + " " +
+                (profile.releaseTag == null ? "" : profile.releaseTag) + " " +
+                (profile.remoteUrl == null ? "" : profile.remoteUrl)
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64ec")) return "arm64ec";
+        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
+        if (combined.contains("arm64")) return "arm64";
+        return "generic";
+    }
+
+    @NonNull
+    private List<ContentProfile> resolveVulkanSdkProfilesForApi(String requestedApiVersion) {
+        int requestedMinor = getVulkanApiMinor(requestedApiVersion);
+        List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
+        if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
+
+        HashMap<String, ContentProfile> bestByArch = new HashMap<>();
+        HashMap<String, Integer> bestScoreByArch = new HashMap<>();
+        HashMap<String, Integer> bestMaxByArch = new HashMap<>();
+
+        for (ContentProfile profile : profiles) {
+            if (profile == null || !profile.locallyInstalled) continue;
+            int minMinor = parseMinVulkanMinor(profile);
+            int maxMinor = parseMaxVulkanMinor(profile);
+            if (minMinor <= 0 || maxMinor <= 0) continue;
+
+            int score;
+            if (requestedMinor < minMinor) {
+                score = (minMinor - requestedMinor) + 100;
+            } else if (requestedMinor <= maxMinor) {
+                score = maxMinor - requestedMinor;
+            } else {
+                score = 1000 + (requestedMinor - maxMinor);
+            }
+
+            String archKey = detectVulkanSdkLaneArch(profile);
+            Integer currentScore = bestScoreByArch.get(archKey);
+            Integer currentMax = bestMaxByArch.get(archKey);
+            if (currentScore == null
+                    || score < currentScore
+                    || (score == currentScore && (currentMax == null || maxMinor > currentMax))) {
+                bestScoreByArch.put(archKey, score);
+                bestMaxByArch.put(archKey, maxMinor);
+                bestByArch.put(archKey, profile);
+            }
+        }
+
+        ArrayList<ContentProfile> selected = new ArrayList<>();
+        String[] preferredOrder = {"arm64", "arm64ec", "x86_64", "generic"};
+        for (String arch : preferredOrder) {
+            ContentProfile profile = bestByArch.get(arch);
+            if (profile != null) selected.add(profile);
+        }
+        for (Map.Entry<String, ContentProfile> entry : bestByArch.entrySet()) {
+            if (!selected.contains(entry.getValue())) selected.add(entry.getValue());
+        }
+        return selected;
+    }
+
+    private String joinCsv(List<String> values) {
+        if (values == null || values.isEmpty()) return "";
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append(',');
+            builder.append(value.trim());
+        }
+        return builder.toString();
+    }
+
+    private String resolveDriverVulkanPatch(String adrenoToolsDriverId) {
+        try {
+            String driverVersion = GPUInformation.getVulkanVersion(adrenoToolsDriverId, this);
+            String[] parts = driverVersion.split("\\.");
+            if (parts.length >= 3) return parts[2];
+            if (parts.length >= 2) return parts[1];
+        } catch (Exception ignored) {
+        }
+        return "0";
+    }
+
+    private void purgeLegacyVulkanSdkDirs(File rootDir) {
+        if (rootDir == null) return;
+        File legacyShare = new File(rootDir, "usr/share/vulkan-sdk");
+        File legacyLib = new File(rootDir, "usr/lib/vulkan-sdk");
+        if (legacyShare.exists()) FileUtils.delete(legacyShare);
+        if (legacyLib.exists()) FileUtils.delete(legacyLib);
     }
 
     private void applyGraphicsRouteDefaults(boolean dxvkRoute, String socClass) {
@@ -1631,6 +2017,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         File rootDir = imageFs.getRootDir();
         boolean dxvkRoute = dxwrapper.contains("dxvk");
+        boolean dgVoodooRoute = dxwrapper.contains("dgvoodoo");
         String socClass = detectSoCClass();
 
         if (dxvkRoute) {
@@ -1640,9 +2027,15 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 Log.d("GraphicsDriverExtraction", "Disabling Wrapper PATCH_OPCONSTCOMP SPIR-V pass");
                 envVars.put("WRAPPER_NO_PATCH_OPCONSTCOMP", "1");
             }
-        }
-        else {
+            envVars.put("AERO_DXWRAPPER_ACTIVE", "dxvk+vkd3d");
+        } else if (dgVoodooRoute) {
+            DgVoodooManager dgVoodooManager = new DgVoodooManager(this);
+            KeyValueSet dgConfig = DgVoodooConfigDialog.parseConfig(dxwrapperConfig);
+            DgVoodooConfigDialog.setEnvVars(this, dgConfig, envVars, dgVoodooManager);
+            envVars.put("AERO_DXWRAPPER_ACTIVE", "dgvoodoo");
+        } else {
             WineD3DConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
+            envVars.put("AERO_DXWRAPPER_ACTIVE", "wined3d");
         }
 
         String dri3Mode = preferences.getString("dri3_mode", preferences.getBoolean("use_dri3", true) ? "auto" : "off");
@@ -1676,10 +2069,74 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
         }
 
-        String vulkanVersion = graphicsDriverConfig.get("vulkanVersion");
-        String vulkanVersionPatch = GPUInformation.getVulkanVersion(adrenoToolsDriverId, this).split("\\.")[2];
-        vulkanVersion = vulkanVersion + "." + vulkanVersionPatch;
-        envVars.put("WRAPPER_VK_VERSION", vulkanVersion);
+        String requestedVulkanApi = normalizeRequestedVulkanApi(graphicsDriverConfig.get("vulkanVersion"));
+        List<ContentProfile> selectedVulkanSdkProfiles = resolveVulkanSdkProfilesForApi(requestedVulkanApi);
+        if (!selectedVulkanSdkProfiles.isEmpty()) {
+            purgeLegacyVulkanSdkDirs(rootDir);
+
+            int effectiveMinMinor = 0;
+            int effectiveMaxMinor = 0;
+            ArrayList<String> selectedEntries = new ArrayList<>();
+            ArrayList<String> selectedSdkVersions = new ArrayList<>();
+
+            for (ContentProfile profile : selectedVulkanSdkProfiles) {
+                contentsManager.applyContent(profile);
+
+                String entry = ContentsManager.getEntryName(profile);
+                if (!selectedEntries.contains(entry)) selectedEntries.add(entry);
+
+                String sdkVersion = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim();
+                if (!sdkVersion.isEmpty() && !selectedSdkVersions.contains(sdkVersion)) {
+                    selectedSdkVersions.add(sdkVersion);
+                }
+
+                int profileMinMinor = parseMinVulkanMinor(profile);
+                int profileMaxMinor = parseMaxVulkanMinor(profile);
+                if (profileMaxMinor <= 0) continue;
+
+                if (profileMinMinor > effectiveMinMinor) {
+                    effectiveMinMinor = profileMinMinor;
+                }
+                if (effectiveMaxMinor <= 0 || profileMaxMinor < effectiveMaxMinor) {
+                    effectiveMaxMinor = profileMaxMinor;
+                }
+            }
+
+            if (effectiveMaxMinor > 0 && effectiveMinMinor > effectiveMaxMinor) {
+                // If profile ranges don't intersect, fallback to broadest upper bound.
+                effectiveMinMinor = 0;
+                effectiveMaxMinor = 0;
+                for (ContentProfile profile : selectedVulkanSdkProfiles) {
+                    int profileMaxMinor = parseMaxVulkanMinor(profile);
+                    if (profileMaxMinor > effectiveMaxMinor) {
+                        effectiveMaxMinor = profileMaxMinor;
+                    }
+                }
+            }
+
+            int requestedMinor = getVulkanApiMinor(requestedVulkanApi);
+            if (effectiveMinMinor > 0 && requestedMinor < effectiveMinMinor) {
+                requestedMinor = effectiveMinMinor;
+            }
+            if (effectiveMaxMinor > 0 && requestedMinor > effectiveMaxMinor) {
+                requestedMinor = effectiveMaxMinor;
+            }
+            requestedVulkanApi = "1." + requestedMinor;
+
+            envVars.put("AERO_VULKAN_SDK_PROFILE", joinCsv(selectedEntries));
+            envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", String.valueOf(selectedEntries.size()));
+            setOrClearEnv("AERO_VULKAN_SDK_VERSION", joinCsv(selectedSdkVersions));
+            setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", effectiveMinMinor > 0 ? "1." + effectiveMinMinor : "");
+            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", effectiveMaxMinor > 0 ? "1." + effectiveMaxMinor : "");
+        } else {
+            envVars.put("AERO_VULKAN_SDK_PROFILE", "none");
+            envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", "0");
+            setOrClearEnv("AERO_VULKAN_SDK_VERSION", "");
+            setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
+            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", "");
+        }
+        envVars.put("AERO_VULKAN_API_SELECTED", requestedVulkanApi);
+        envVars.put("WRAPPER_VK_VERSION", requestedVulkanApi + "." + resolveDriverVulkanPatch(adrenoToolsDriverId));
 
         String blacklistedExtensions = graphicsDriverConfig.get("blacklistedExtensions");
         envVars.put("WRAPPER_EXTENSION_BLACKLIST", blacklistedExtensions);
@@ -1804,6 +2261,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         File rootDir = imageFs.getRootDir();
         File windowsDir = new File(rootDir, ImageFs.WINEPREFIX + "/drive_c/windows");
+        cleanupDgVoodooRuntimeStage(rootDir);
 
         if (dxwrapper.contains("dxvk")) {
             Log.d(TAG, "Extracting DXVK wrapper files, version: " + dxwrapper);
@@ -1845,10 +2303,37 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
 
             Log.d(TAG, "Finished extraction of DXVK wrapper files, version: " + dxwrapper);
+        } else if (dxwrapper.contains("dgvoodoo")) {
+            Log.d(TAG, "Staging dgVoodoo runtime for legacy API route.");
+            restoreOriginalDllFiles(dlls);
+
+            DgVoodooManager manager = new DgVoodooManager(this);
+            String shortcutPath = shortcut != null ? shortcut.path : "";
+            KeyValueSet config = DgVoodooConfigDialog.parseConfig(dxwrapperConfig);
+            File stageTarget = manager.resolveShortcutTargetDir(rootDir, shortcutPath);
+            if (stageTarget == null || !stageTarget.isDirectory()) {
+                stageTarget = new File(windowsDir, "system32");
+            }
+
+            String activeArch = manager.resolvePreferredArch(shortcutPath, config.get("dgvoodooArch"));
+            boolean staged = manager.stageRuntime(stageTarget, activeArch);
+            envVars.put("AERO_DGVOODOO_STAGE_TARGET", stageTarget.getAbsolutePath());
+            envVars.put("AERO_DGVOODOO_ARCH_ACTIVE", activeArch);
+            envVars.put("AERO_DGVOODOO_STAGE_READY", staged ? "1" : "0");
+            if (!staged) {
+                Log.w(TAG, "dgVoodoo runtime stage failed for target " + stageTarget.getAbsolutePath());
+            }
         } else if (dxwrapper.contains("wined3d")) {
             Log.d(TAG, "Restoring original DLL files for wined3d.");
             restoreOriginalDllFiles(dlls);
         }
+    }
+
+    private void cleanupDgVoodooRuntimeStage(File rootDir) {
+        if (rootDir == null || shortcut == null) return;
+        DgVoodooManager manager = new DgVoodooManager(this);
+        File stageTarget = manager.resolveShortcutTargetDir(rootDir, shortcut.path);
+        if (stageTarget != null) manager.cleanupStagedRuntime(stageTarget);
     }
 
     private static int compareVersion(String varA, String varB) {
