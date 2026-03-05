@@ -42,3 +42,5 @@ Legend:
   - bucket map initialized and linked to active matrix.
 - `2026-03-05 / pass 2`:
   - `emu/adapters` process-row metric density pattern started (`RAM + CPU` in windows list rows).
+- `2026-03-05 / pass 3`:
+  - `emu/fragments` task-manager live loop cadence aligned to donor (`750ms` refresh interval).

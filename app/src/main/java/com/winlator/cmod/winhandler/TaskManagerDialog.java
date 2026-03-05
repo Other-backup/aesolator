@@ -62,6 +62,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private static final int TAB_LINUX = 1;
     private static final int MAX_LINUX_ROWS = 80;
     private static final int MAX_WINDOWS_THREAD_PREVIEW = 12;
+    private static final long TASKMGR_REFRESH_INTERVAL_MS = 750L;
     private static final long TASKMGR_REFRESH_LOG_INTERVAL_MS = 10000L;
     private static final String WINDOWS_SORT_MEMORY_DESC = "memory_desc";
     private static final String WINDOWS_SORT_NAME_ASC = "name_asc";
@@ -238,7 +239,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             public void run() {
                 activity.runOnUiThread(TaskManagerDialog.this::update);
             }
-        }, 0, 1000);
+        }, 0, TASKMGR_REFRESH_INTERVAL_MS);
         super.show();
     }
 

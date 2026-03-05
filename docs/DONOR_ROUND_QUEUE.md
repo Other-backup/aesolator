@@ -70,3 +70,5 @@ Round 2 control artifacts:
   - MiceWine matrix + file coverage controls initialized.
 - `2026-03-05` pass 2:
   - first donor transfer landed in task manager lane: windows rows now expose `RAM + CPU` live metrics.
+- `2026-03-05` pass 3:
+  - task manager refresh cadence aligned with donor baseline (`750ms`) for tighter realtime updates.

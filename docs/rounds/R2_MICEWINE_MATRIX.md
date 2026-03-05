@@ -46,3 +46,8 @@ Round 2 can be marked `closed` only when:
 - Task-manager row telemetry uplift (donor-style density):
   - Windows process rows now show live `RAM + CPU` in list view, not RAM-only.
   - CPU value is sampled from Linux telemetry lane by process PID for real-time visibility.
+
+### 2026-03-05 / Pass 3
+
+- Task-manager refresh cadence aligned to donor baseline:
+  - update timer interval switched from `1000ms` to `750ms` for tighter real-time responsiveness.
