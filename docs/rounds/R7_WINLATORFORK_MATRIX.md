@@ -24,12 +24,12 @@ Primary code surfaces:
 | Signal Cluster | Donor Anchors | Aeolator Targets | Status | Decision |
 |---|---|---|---|---|
 | XServer lifecycle + PiP continuity semantics | `XServerDisplayActivity` (`onStart/onStop`, PiP flow) | `cmod/XServerDisplayActivity` | `integrated` | `integrate` |
-| Selective runtime diagnostics/log surface | `E03_Logcat`, `ExtraFeatures`, `ForeGroundService` | forensic center + runtime diagnostics contracts | `pending` | `integrate` |
-| Extra navigation/menu injection model | `XserverNavMenuControl`, `ExtraFeatures` | existing Aeolator nav contracts | `pending` | `reject_with_rationale` |
+| Selective runtime diagnostics/log surface | `E03_Logcat`, `ExtraFeatures`, `ForeGroundService` | forensic center + runtime diagnostics contracts | `integrated` | `integrate` |
+| Extra navigation/menu injection model | `XserverNavMenuControl`, `ExtraFeatures` | existing Aeolator nav contracts | `rejected` | `reject_with_rationale` |
 | Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `pending` | `integrate` |
 | Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `in_progress` | `integrate` |
-| XServer extension deltas (DRI3/Present/Sync) | `xserver/extensions/*`, request handlers | `cmod/xserver/*` | `pending` | `integrate` |
-| Native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `pending` | `reject_with_rationale` |
+| XServer extension deltas (DRI3/Present/Sync) | `xserver/extensions/*`, request handlers | `cmod/xserver/*` | `integrated` | `integrate` |
+| Native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `rejected` | `reject_with_rationale` |
 
 ## Closure Criteria For Round 7
 
@@ -70,3 +70,14 @@ Round 7 can be marked `closed` only when:
     - `XServer.keyboard`
     - `super.dispatchKeyEvent`
 - This removes handler-order loss where controller-handled events could be dropped by chained negative logic.
+
+### 2026-03-05 / Pass 4
+
+- Diagnostics/log-surface row closed as integrated:
+  - existing lane-scoped forensic runtime callbacks and stream marker contract already cover donor intent (`FORENSIC_STREAM_HOOKS_READY`).
+- Extra navigation/menu injection row rejected:
+  - donor submenu overlay is not ported to avoid UI contract drift and duplicated controls in Aeolator.
+- XServer extension row closed as integrated:
+  - donor `DRI3/Present/Sync` baseline is already covered/superseded in current `cmod/xserver/extensions` lane.
+- Native cpp row rejected for app-tree:
+  - low-level cpp glue is explicitly bounded to native/runtime owner repos, not Java app layer.

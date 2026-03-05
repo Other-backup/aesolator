@@ -160,3 +160,6 @@ What was added to smooth the transition:
   - forensic marker `XSERVER_PIP_CONTINUITY` added for traceability.
 - `2026-03-05` pass 3:
   - key-input dispatch fanout hardened in `XServerDisplayActivity` to prevent controller-event drop on chained negative logic.
+- `2026-03-05` pass 4:
+  - diagnostics/runtime stream row finalized as integrated (existing forensic stream hook contract reused).
+  - native cpp donor lane bounded out of app-tree (explicit reject-with-rationale boundary).

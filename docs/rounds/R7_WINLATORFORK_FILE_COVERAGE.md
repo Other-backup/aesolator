@@ -23,7 +23,7 @@ Legend:
 |---|---:|---|---|
 | `ewt45_overlay_lane` | 29 | `in_progress` | extra feature hooks, logcat, OBB/storage, nav helpers |
 | `java_mainline_lane` | 211 | `in_progress` | main app flow (`MainActivity`, `XServerDisplayActivity`, dialogs, winhandler, xserver java) |
-| `native_cpp_lane` | 285 | `pending` | native xserver/runtime glue and low-level lanes |
+| `native_cpp_lane` | 285 | `closed` | rejected for app-tree; bounded to native/runtime owner repos |
 | `res_manifest_lane` | 172 | `pending` | resources/layouts/menus/preferences/manifest |
 | `aux_plugins_lane` | 51 | `pending` | `input_controls/*` + `audio_plugin/*` |
 | `workflow_root_lane` | 12 | `pending` | root metadata/scripts + `.github/workflows` |
@@ -42,3 +42,6 @@ Legend:
   - `java_mainline_lane` sweep started with lifecycle/PiP continuity integration in `XServerDisplayActivity`.
 - `2026-03-05 / pass 3`:
   - `java_mainline_lane` extended with key-input dispatch fanout hardening in `XServerDisplayActivity`.
+- `2026-03-05 / pass 4`:
+  - `native_cpp_lane` closed with explicit boundary decision (`reject_with_rationale` for app-tree).
+  - `ewt45_overlay_lane` sweep continued: diagnostics row integrated, extra-nav row rejected.
