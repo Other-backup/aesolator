@@ -27,7 +27,7 @@ Primary code surfaces:
 | Selective runtime diagnostics/log surface | `E03_Logcat`, `ExtraFeatures`, `ForeGroundService` | forensic center + runtime diagnostics contracts | `pending` | `integrate` |
 | Extra navigation/menu injection model | `XserverNavMenuControl`, `ExtraFeatures` | existing Aeolator nav contracts | `pending` | `reject_with_rationale` |
 | Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `pending` | `integrate` |
-| Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `pending` | `integrate` |
+| Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `in_progress` | `integrate` |
 | XServer extension deltas (DRI3/Present/Sync) | `xserver/extensions/*`, request handlers | `cmod/xserver/*` | `pending` | `integrate` |
 | Native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `pending` | `reject_with_rationale` |
 
@@ -60,3 +60,13 @@ Round 7 can be marked `closed` only when:
   - runtime pause path (`savePlaytimeData`, timer stop, `pauseAllWineProcesses`) is applied only for non-PiP pause.
   - forensic marker added for PiP continuity:
     - `XSERVER_PIP_CONTINUITY` (`wine_paused=false`, `playtime_timer_kept=true`).
+
+### 2026-03-05 / Pass 3
+
+- Key-input lane moved to explicit multi-handler fanout:
+  - `dispatchKeyEvent()` now returns OR-composed handling result for:
+    - `InputControlsView`
+    - `WinHandler`
+    - `XServer.keyboard`
+    - `super.dispatchKeyEvent`
+- This removes handler-order loss where controller-handled events could be dropped by chained negative logic.

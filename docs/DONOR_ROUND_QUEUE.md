@@ -158,3 +158,5 @@ What was added to smooth the transition:
 - `2026-03-05` pass 2:
   - PiP lifecycle continuity lane landed in `XServerDisplayActivity` (no runtime pause on PiP transition).
   - forensic marker `XSERVER_PIP_CONTINUITY` added for traceability.
+- `2026-03-05` pass 3:
+  - key-input dispatch fanout hardened in `XServerDisplayActivity` to prevent controller-event drop on chained negative logic.

@@ -40,3 +40,5 @@ Legend:
   - base bucket map created from donor inventory.
 - `2026-03-05 / pass 2`:
   - `java_mainline_lane` sweep started with lifecycle/PiP continuity integration in `XServerDisplayActivity`.
+- `2026-03-05 / pass 3`:
+  - `java_mainline_lane` extended with key-input dispatch fanout hardening in `XServerDisplayActivity`.

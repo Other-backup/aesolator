@@ -2440,9 +2440,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             }
         }
 
-        // Fallback to existing input handling
-        return (!inputControlsView.onKeyEvent(event) && !winHandler.onKeyEvent(event) && xServer.keyboard.onKeyEvent(event)) ||
-                (!ExternalController.isGameController(event.getDevice()) && super.dispatchKeyEvent(event));
+        boolean handledByInputControls = inputControlsView != null && inputControlsView.onKeyEvent(event);
+        boolean handledByWinHandler = winHandler != null && winHandler.onKeyEvent(event);
+        boolean handledByXServerKeyboard = xServer != null && xServer.keyboard != null && xServer.keyboard.onKeyEvent(event);
+        boolean handledBySuper = !ExternalController.isGameController(event.getDevice()) && super.dispatchKeyEvent(event);
+
+        return handledByInputControls || handledByWinHandler || handledByXServerKeyboard || handledBySuper;
     }
 
     public InputControlsView getInputControlsView() {
