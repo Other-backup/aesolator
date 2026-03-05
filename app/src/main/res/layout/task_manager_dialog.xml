@@ -78,6 +78,65 @@
                     android:text="@string/task_manager_windows_only_windowed" />
 
                 <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTWindowsFilterAll"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_weight="1"
+                        android:minHeight="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/task_manager_filter_all"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/BTWindowsFilterWow64"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:minHeight="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/task_manager_filter_wow64"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/BTWindowsFilterArm64ec"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:minHeight="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/task_manager_filter_arm64ec"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/BTWindowsFilterNative"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:minHeight="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/task_manager_filter_native"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/LLTableHead"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

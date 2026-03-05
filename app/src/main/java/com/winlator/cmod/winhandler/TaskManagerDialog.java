@@ -58,6 +58,10 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private static final String WINDOWS_SORT_NAME_ASC = "name_asc";
     private static final String WINDOWS_SORT_PID_ASC = "pid_asc";
     private static final String WINDOWS_SORT_ARCH_LANE = "arch_lane";
+    private static final int ARCH_FILTER_ALL = 0;
+    private static final int ARCH_FILTER_WOW64 = 1;
+    private static final int ARCH_FILTER_ARM64EC = 2;
+    private static final int ARCH_FILTER_NATIVE = 3;
 
     private static final String[] RUNTIME_HINT_TOKENS = new String[] {
             "wine", "wineserver", "freewine", "box64", "box86", "proton",
@@ -80,6 +84,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private int lastLinuxVisible = 0;
     private String windowsSearchQuery = "";
     private String windowsSortMode = WINDOWS_SORT_MEMORY_DESC;
+    private int windowsArchFilterMode = ARCH_FILTER_ALL;
     private LinuxTelemetrySampler.HostSample lastHostSample;
 
     public TaskManagerDialog(XServerDisplayActivity activity) {
@@ -235,6 +240,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         ArrayList<WindowsProcessEntry> rows = new ArrayList<>();
         for (WindowsProcessEntry entry : windowsPending) {
             if (isWindowsOnlyWindowedEnabled() && !entry.windowed) continue;
+            if (!matchesArchFilter(entry)) continue;
             if (!matchesWindowsQuery(entry)) continue;
             rows.add(entry);
         }
@@ -248,6 +254,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             ((TextView) itemView.findViewById(R.id.TVPID)).setText(String.valueOf(processInfo.pid));
             ((TextView) itemView.findViewById(R.id.TVMemoryUsage)).setText(processInfo.getFormattedMemoryUsage());
             itemView.findViewById(R.id.BTMenu).setOnClickListener((v) -> showListItemMenu(v, processInfo));
+            itemView.setOnClickListener(v -> showWindowsProcessDetails(entry));
 
             ImageView ivIcon = itemView.findViewById(R.id.IVIcon);
             ivIcon.setImageResource(R.drawable.taskmgr_process);
@@ -296,6 +303,84 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         if (query == null || query.isEmpty()) return true;
         String haystack = (entry.processInfo.name + " " + entry.processInfo.pid + " " + entry.archLane).toLowerCase(Locale.ENGLISH);
         return haystack.contains(query);
+    }
+
+    private boolean matchesArchFilter(WindowsProcessEntry entry) {
+        switch (windowsArchFilterMode) {
+            case ARCH_FILTER_WOW64:
+                return entry.processInfo.wow64Process;
+            case ARCH_FILTER_ARM64EC:
+                return !entry.processInfo.wow64Process && arm64ecRuntime;
+            case ARCH_FILTER_NATIVE:
+                return !entry.processInfo.wow64Process && !arm64ecRuntime;
+            case ARCH_FILTER_ALL:
+            default:
+                return true;
+        }
+    }
+
+    private void showWindowsProcessDetails(WindowsProcessEntry entry) {
+        ProcessInfo processInfo = entry.processInfo;
+        ContentDialog dialog = new ContentDialog(activity);
+        dialog.setTitle(activity.getString(R.string.task_manager_windows_details_title, processInfo.pid));
+
+        Window focusedWindow = null;
+        if (entry.window != null) {
+            XServer xServer = activity.getXServer();
+            try (XLock xlock = xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
+                focusedWindow = xServer.windowManager.getFocusedWindow();
+            }
+        }
+
+        boolean isForeground = false;
+        if (focusedWindow != null) {
+            isForeground = focusedWindow.getProcessId() == processInfo.pid
+                    || focusedWindow == entry.window
+                    || (entry.window != null && entry.window.isAncestorOf(focusedWindow));
+        }
+
+        String yesNo = isForeground ? activity.getString(R.string.task_manager_yes) : activity.getString(R.string.task_manager_no);
+        StringBuilder details = new StringBuilder();
+        details.append(activity.getString(R.string.task_manager_windows_details_process)).append(": ")
+                .append(processInfo.name).append('\n');
+        details.append(activity.getString(R.string.task_manager_windows_details_arch)).append(": ")
+                .append(entry.archLane).append('\n');
+        details.append(activity.getString(R.string.task_manager_windows_details_memory)).append(": ")
+                .append(processInfo.getFormattedMemoryUsage()).append('\n');
+        details.append(activity.getString(R.string.task_manager_windows_details_foreground)).append(": ")
+                .append(yesNo).append('\n');
+
+        if (entry.window != null) {
+            details.append(activity.getString(R.string.task_manager_windows_details_window_status)).append(": ")
+                    .append(activity.getString(R.string.task_manager_windows_details_window_present)).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_title)).append(": ")
+                    .append(safeValue(entry.window.getName())).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_class)).append(": ")
+                    .append(safeValue(entry.window.getClassName())).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_handle)).append(": 0x")
+                    .append(Long.toHexString(entry.window.getHandle())).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_xid)).append(": 0x")
+                    .append(Integer.toHexString(entry.window.id)).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_map_state)).append(": ")
+                    .append(entry.window.getMapState().name()).append('\n');
+            details.append(activity.getString(R.string.task_manager_windows_details_window_geometry)).append(": ")
+                    .append(entry.window.getX()).append(",").append(entry.window.getY())
+                    .append(" ").append(entry.window.getWidth()).append("x").append(entry.window.getHeight());
+        } else {
+            details.append(activity.getString(R.string.task_manager_windows_details_window_status)).append(": ")
+                    .append(activity.getString(R.string.task_manager_windows_details_window_absent));
+        }
+
+        dialog.setMessage(details.toString());
+        dialog.findViewById(R.id.BTCancel).setVisibility(View.GONE);
+        dialog.show();
+    }
+
+    private String safeValue(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return activity.getString(R.string.task_manager_linux_details_not_available);
+        }
+        return value.trim();
     }
 
     private void updateCPUInfoView() {
@@ -368,6 +453,8 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             updateBottomBarSummary();
         });
 
+        setupWindowsQuickFilters();
+
         final EditText etWindowsSearch = findViewById(R.id.ETWindowsSearch);
         etWindowsSearch.addTextChangedListener(new TextWatcher() {
             @Override
@@ -420,6 +507,55 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         linuxRuntimeOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (selectedTab == TAB_LINUX) update();
         });
+    }
+
+    private void setupWindowsQuickFilters() {
+        Button btAll = findViewById(R.id.BTWindowsFilterAll);
+        Button btWow64 = findViewById(R.id.BTWindowsFilterWow64);
+        Button btArm64ec = findViewById(R.id.BTWindowsFilterArm64ec);
+        Button btNative = findViewById(R.id.BTWindowsFilterNative);
+
+        btAll.setOnClickListener(v -> {
+            windowsArchFilterMode = ARCH_FILTER_ALL;
+            refreshWindowsFilterButtons();
+            renderWindowsProcessRows();
+            updateBottomBarSummary();
+        });
+        btWow64.setOnClickListener(v -> {
+            windowsArchFilterMode = ARCH_FILTER_WOW64;
+            refreshWindowsFilterButtons();
+            renderWindowsProcessRows();
+            updateBottomBarSummary();
+        });
+        btArm64ec.setOnClickListener(v -> {
+            windowsArchFilterMode = ARCH_FILTER_ARM64EC;
+            refreshWindowsFilterButtons();
+            renderWindowsProcessRows();
+            updateBottomBarSummary();
+        });
+        btNative.setOnClickListener(v -> {
+            windowsArchFilterMode = ARCH_FILTER_NATIVE;
+            refreshWindowsFilterButtons();
+            renderWindowsProcessRows();
+            updateBottomBarSummary();
+        });
+        refreshWindowsFilterButtons();
+    }
+
+    private void refreshWindowsFilterButtons() {
+        Button btAll = findViewById(R.id.BTWindowsFilterAll);
+        Button btWow64 = findViewById(R.id.BTWindowsFilterWow64);
+        Button btArm64ec = findViewById(R.id.BTWindowsFilterArm64ec);
+        Button btNative = findViewById(R.id.BTWindowsFilterNative);
+
+        setFilterButtonState(btAll, windowsArchFilterMode == ARCH_FILTER_ALL);
+        setFilterButtonState(btWow64, windowsArchFilterMode == ARCH_FILTER_WOW64);
+        setFilterButtonState(btArm64ec, windowsArchFilterMode == ARCH_FILTER_ARM64EC);
+        setFilterButtonState(btNative, windowsArchFilterMode == ARCH_FILTER_NATIVE);
+    }
+
+    private void setFilterButtonState(Button button, boolean active) {
+        button.setAlpha(active ? 1.0f : 0.6f);
     }
 
     private void applyThemeState() {
