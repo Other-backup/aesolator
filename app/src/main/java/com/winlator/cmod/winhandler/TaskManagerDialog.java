@@ -2,6 +2,7 @@ package com.winlator.cmod.winhandler;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.text.Editable;
@@ -62,6 +63,9 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private static final int ARCH_FILTER_WOW64 = 1;
     private static final int ARCH_FILTER_ARM64EC = 2;
     private static final int ARCH_FILTER_NATIVE = 3;
+    private static final String PREF_WINDOWS_WINDOWED_ONLY = "taskmgr_windows_windowed_only";
+    private static final String PREF_WINDOWS_SORT_MODE = "taskmgr_windows_sort_mode";
+    private static final String PREF_WINDOWS_ARCH_FILTER = "taskmgr_windows_arch_filter";
 
     private static final String[] RUNTIME_HINT_TOKENS = new String[] {
             "wine", "wineserver", "freewine", "box64", "box86", "proton",
@@ -447,8 +451,15 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     }
 
     private void setupFilters() {
+        SharedPreferences preferences = getPreferences();
+        windowsSortMode = preferences.getString(PREF_WINDOWS_SORT_MODE, WINDOWS_SORT_MEMORY_DESC);
+        int savedArchFilter = preferences.getInt(PREF_WINDOWS_ARCH_FILTER, ARCH_FILTER_ALL);
+        windowsArchFilterMode = sanitizeArchFilterMode(savedArchFilter);
+
         CheckBox windowsOnlyWindowed = findViewById(R.id.CBWindowsWindowedOnly);
+        windowsOnlyWindowed.setChecked(preferences.getBoolean(PREF_WINDOWS_WINDOWED_ONLY, false));
         windowsOnlyWindowed.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            getPreferences().edit().putBoolean(PREF_WINDOWS_WINDOWED_ONLY, isChecked).apply();
             renderWindowsProcessRows();
             updateBottomBarSummary();
         });
@@ -494,6 +505,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                 String[] values = activity.getResources().getStringArray(R.array.task_manager_windows_sort_values);
                 if (position >= 0 && position < values.length) {
                     windowsSortMode = values[position];
+                    getPreferences().edit().putString(PREF_WINDOWS_SORT_MODE, windowsSortMode).apply();
                     renderWindowsProcessRows();
                     updateBottomBarSummary();
                 }
@@ -517,24 +529,28 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
         btAll.setOnClickListener(v -> {
             windowsArchFilterMode = ARCH_FILTER_ALL;
+            saveWindowsArchFilter();
             refreshWindowsFilterButtons();
             renderWindowsProcessRows();
             updateBottomBarSummary();
         });
         btWow64.setOnClickListener(v -> {
             windowsArchFilterMode = ARCH_FILTER_WOW64;
+            saveWindowsArchFilter();
             refreshWindowsFilterButtons();
             renderWindowsProcessRows();
             updateBottomBarSummary();
         });
         btArm64ec.setOnClickListener(v -> {
             windowsArchFilterMode = ARCH_FILTER_ARM64EC;
+            saveWindowsArchFilter();
             refreshWindowsFilterButtons();
             renderWindowsProcessRows();
             updateBottomBarSummary();
         });
         btNative.setOnClickListener(v -> {
             windowsArchFilterMode = ARCH_FILTER_NATIVE;
+            saveWindowsArchFilter();
             refreshWindowsFilterButtons();
             renderWindowsProcessRows();
             updateBottomBarSummary();
@@ -555,7 +571,21 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     }
 
     private void setFilterButtonState(Button button, boolean active) {
-        button.setAlpha(active ? 1.0f : 0.6f);
+        button.setBackgroundResource(active ? R.drawable.button_positive : R.drawable.button_neutral);
+        button.setAlpha(1.0f);
+    }
+
+    private void saveWindowsArchFilter() {
+        getPreferences().edit().putInt(PREF_WINDOWS_ARCH_FILTER, windowsArchFilterMode).apply();
+    }
+
+    private static int sanitizeArchFilterMode(int value) {
+        if (value < ARCH_FILTER_ALL || value > ARCH_FILTER_NATIVE) return ARCH_FILTER_ALL;
+        return value;
+    }
+
+    private SharedPreferences getPreferences() {
+        return PreferenceManager.getDefaultSharedPreferences(activity);
     }
 
     private void applyThemeState() {
