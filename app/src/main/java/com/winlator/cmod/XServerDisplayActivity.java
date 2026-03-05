@@ -64,6 +64,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileDebugLogger;
@@ -216,6 +217,26 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
     private GuestProgramLauncherComponent guestProgramLauncherComponent;
     private EnvVars overrideEnvVars;
+    private static final String TOUCHPAD_PROFILE_GLOBAL = "global";
+    private static final String TOUCHPAD_PROFILE_BALANCED = "balanced";
+    private static final String TOUCHPAD_PROFILE_AGGRESSIVE = "aggressive";
+    private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
+
+    private static final class TouchpadGestureDefaults {
+        final boolean strictFsm;
+        final int tapTimeoutMs;
+        final int tapTravelPx;
+        final int scrollStepPx;
+        final int scrollZonePx;
+
+        TouchpadGestureDefaults(boolean strictFsm, int tapTimeoutMs, int tapTravelPx, int scrollStepPx, int scrollZonePx) {
+            this.strictFsm = strictFsm;
+            this.tapTimeoutMs = tapTimeoutMs;
+            this.tapTravelPx = tapTravelPx;
+            this.scrollStepPx = scrollStepPx;
+            this.scrollZonePx = scrollZonePx;
+        }
+    }
 
     private void createNotifcationChannel() {
         String name = "Aesolator";
@@ -230,6 +251,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        if (touchpadView != null) touchpadView.toggleFullscreen();
+        if (inputControlsView != null) inputControlsView.post(inputControlsView::invalidate);
         if (configChangedCallback != null) {
             configChangedCallback.run();
             configChangedCallback = null;
@@ -1277,9 +1300,81 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
             String simTouchScreen = shortcut.getExtra("simTouchScreen");
             touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
+            applyShortcutTouchpadGestureProfile();
+        } else {
+            touchpadView.resetGestureRuntimeTuning();
         }
 
         AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
+    }
+
+    private void applyShortcutTouchpadGestureProfile() {
+        if (touchpadView == null || shortcut == null) return;
+
+        String profileIdRaw = shortcut.getExtra("touchpadGestureProfile", TOUCHPAD_PROFILE_GLOBAL);
+        String profileId = profileIdRaw == null
+                ? TOUCHPAD_PROFILE_GLOBAL
+                : profileIdRaw.trim().toLowerCase(Locale.ENGLISH);
+        if (profileId.isEmpty()) profileId = TOUCHPAD_PROFILE_GLOBAL;
+
+        TouchpadGestureDefaults defaults = resolveTouchpadGestureDefaults(profileId);
+        String strictRaw = shortcut.getExtra("touchpadStrictGestureFsm", "");
+        String tapTimeoutRaw = shortcut.getExtra("touchpadTapTimeoutMs", "");
+        String tapTravelRaw = shortcut.getExtra("touchpadTapTravelPx", "");
+        String scrollStepRaw = shortcut.getExtra("touchpadScrollStepPx", "");
+        String scrollZoneRaw = shortcut.getExtra("touchpadScrollZonePx", "");
+
+        boolean strict = strictRaw.isEmpty() ? defaults.strictFsm : parseBoolean(strictRaw);
+        int tapTimeoutMs = parseBoundedInt(tapTimeoutRaw, defaults.tapTimeoutMs, 80, 500);
+        int tapTravelPx = parseBoundedInt(tapTravelRaw, defaults.tapTravelPx, 4, 24);
+        int scrollStepPx = parseBoundedInt(scrollStepRaw, defaults.scrollStepPx, 40, 240);
+        int scrollZonePx = parseBoundedInt(scrollZoneRaw, defaults.scrollZonePx, 120, 700);
+
+        touchpadView.setGestureRuntimeTuning(tapTimeoutMs, tapTravelPx, scrollStepPx, scrollZonePx);
+        touchpadView.setStrictGestureFsmOverride(strict);
+
+        if (TOUCHPAD_PROFILE_GLOBAL.equals(profileId)
+                && strictRaw.isEmpty()
+                && tapTimeoutRaw.isEmpty()
+                && tapTravelRaw.isEmpty()
+                && scrollStepRaw.isEmpty()
+                && scrollZoneRaw.isEmpty()) {
+            touchpadView.resetGestureRuntimeTuning();
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "TOUCHPAD_PROFILE_APPLIED",
+                shortcut.path,
+                "touchpad",
+                "gesture_profile_applied",
+                ForensicLogger.fields(
+                        "profile_id", profileId,
+                        "strict_fsm", strict ? 1 : 0,
+                        "tap_timeout_ms", tapTimeoutMs,
+                        "tap_travel_px", tapTravelPx,
+                        "scroll_step_px", scrollStepPx,
+                        "scroll_zone_px", scrollZonePx
+                )
+        );
+    }
+
+    private TouchpadGestureDefaults resolveTouchpadGestureDefaults(String profileId) {
+        return switch (profileId) {
+            case TOUCHPAD_PROFILE_BALANCED -> new TouchpadGestureDefaults(true, 190, 10, 95, 350);
+            case TOUCHPAD_PROFILE_AGGRESSIVE -> new TouchpadGestureDefaults(true, 145, 8, 75, 300);
+            case TOUCHPAD_PROFILE_COMPAT -> new TouchpadGestureDefaults(false, 240, 14, 130, 430);
+            case TOUCHPAD_PROFILE_GLOBAL -> new TouchpadGestureDefaults(false, 200, 10, 100, 350);
+            default -> new TouchpadGestureDefaults(true, 190, 10, 95, 350);
+        };
+    }
+
+    private int parseBoundedInt(String raw, int fallback, int min, int max) {
+        if (raw == null || raw.trim().isEmpty()) return fallback;
+        int parsed = safeParseInt(raw.trim());
+        if (parsed <= 0) return fallback;
+        return Math.max(min, Math.min(max, parsed));
     }
 
 
@@ -1465,6 +1560,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             touchpadView.setOnTouchListener((v, event) -> {
                 int action = event.getAction();
                 if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
+                    if (action == MotionEvent.ACTION_DOWN) {
+                        try {
+                            v.requestUnbufferedDispatch(event);
+                        }
+                        catch (Throwable ignored) {}
+                    }
                     // Reset the timeout on any touch event
                     //Log.d("XServerDisplayActivity", "Touch detected, resetting timeout.");
 
@@ -1950,6 +2051,11 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             String lane = runtimeContract.optString("lane", "").trim();
             if (!lane.isEmpty()) envVars.put("AERO_GRAPHICS_WRAPPER_LANE", lane);
 
+            String runtimeRoute = runtimeContract.optString("runtimeRoute", "").trim();
+            if (!runtimeRoute.isEmpty()) envVars.put("AERO_RUNTIME_ROUTE", runtimeRoute);
+            String compatLayer = runtimeContract.optString("compatLayer", "").trim();
+            if (!compatLayer.isEmpty()) envVars.put("AERO_RUNTIME_COMPAT_LAYER", compatLayer);
+
             JSONObject wrapperContract = runtimeContract.optJSONObject("wrapperContract");
             if (wrapperContract == null) return;
 
@@ -1981,6 +2087,16 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 if (!primaryProvider.isEmpty()) envVars.put("AERO_GRAPHICS_PRIMARY_PROVIDER", primaryProvider);
                 if (!fallbackProvider.isEmpty()) envVars.put("AERO_GRAPHICS_FALLBACK_PROVIDER", fallbackProvider);
                 if (!legacyEngine.isEmpty()) envVars.put("AERO_GL_FALLBACK_ENGINE", legacyEngine);
+                String passthroughTool = routeHints.optString("passthroughTool", "").trim();
+                if (!passthroughTool.isEmpty()) envVars.put("AERO_RUNTIME_PASSTHROUGH_TOOL", passthroughTool);
+            }
+
+            if (wrapperContract.has("noProton")) {
+                envVars.put("AERO_RUNTIME_NO_PROTON", wrapperContract.optBoolean("noProton", false) ? "1" : "0");
+            }
+            String wrapperCompatLayer = wrapperContract.optString("compatLayer", "").trim();
+            if (!wrapperCompatLayer.isEmpty()) {
+                envVars.put("AERO_RUNTIME_COMPAT_LAYER", wrapperCompatLayer);
             }
 
             envVars.put("AERO_GRAPHICS_WRAPPER_PROFILE", selectedProfile);
