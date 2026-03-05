@@ -36,25 +36,25 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 |---:|---|---|---|
 | 1 | `utkarshdalal/GameNative` | `gate_hold` | soft-handoff completed; closure deferred by owner decision |
 | 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 3 | `Open-Wine-Components/umu-launcher` | `active` | opened after Round 2 closure |
-| 4 | `khanhduytran0/ExagearAndroidX11Server` | `pending` | unlocks after Round 3 = `closed` |
+| 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
+| 4 | `khanhduytran0/ExagearAndroidX11Server` | `active` | opened after Round 3 closure |
 | 5 | `olegos2/mobox` | `pending` | unlocks after Round 4 = `closed` |
 | 6 | `ewt45/termux-x11-fork` | `pending` | unlocks after Round 5 = `closed` |
 | 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
-## Round 3 (umu-launcher) Immediate Workset
+## Round 4 (ExagearAndroidX11Server) Immediate Workset
 
-1. Rebuild strict file inventory for `umu-launcher` and lock module buckets.
-2. Re-open transfer matrix by lanes (`runtime_fetch`, `runtime_route`, `provenance`, `delta_update`, `plugins`).
+1. Rebuild strict file inventory for `ExagearAndroidX11Server` and lock module buckets.
+2. Re-open transfer matrix by lanes (`gesture_fsm`, `touch_fanout`, `surface_transform`, `x11_focus_window`, `overlays`).
 3. Mark every signal `integrate` or `reject_with_rationale`.
 4. Land only no-regression deltas in Aeolator tree with forensic visibility.
-5. Prepare `active -> gate` checklist with runtime update + provenance anchors.
+5. Prepare `active -> gate` checklist with gesture/X11 runtime-smoke anchors.
 
-Round 3 control artifacts:
-- `docs/rounds/R3_UMU_MATRIX.md`
-- `docs/rounds/R3_UMU_FILE_COVERAGE.md`
+Round 4 control artifacts:
+- `docs/rounds/R4_EXAGEAR_MATRIX.md`
+- `docs/rounds/R4_EXAGEAR_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -97,3 +97,13 @@ What was added to smooth the transition:
   - `R3_UMU_MATRIX` and `R3_UMU_FILE_COVERAGE` initialized.
 - `2026-03-05` pass 2:
   - runtime provenance markers added for wrapper contract/env source tracking.
+- `2026-03-05` pass 3:
+  - runtime contract forensic marker event landed (`RUNTIME_WRAPPER_CONTRACT_APPLIED`).
+- `2026-03-05` closure:
+  - Round 3 moved to `closed`.
+
+## Round 4 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 4 opened as `active`.
+  - `R4_EXAGEAR_MATRIX` and `R4_EXAGEAR_FILE_COVERAGE` initialized.

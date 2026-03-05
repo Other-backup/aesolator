@@ -1,7 +1,7 @@
 # Round 3 Coverage: `umu-launcher` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -20,13 +20,13 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `runtime_orchestration` | 3 | `in_progress` | `umu_run.py`, `umu_runtime.py`, `umu_proton.py` |
-| `delta_update` | 1 | `pending` | `umu_bspatch.py` |
-| `plugin_layer` | 1 | `pending` | `umu_plugins.py` (likely reject lane) |
-| `logging` | 1 | `pending` | `umu_log.py` forensic parity |
-| `consts/util` | 2 | `pending` | `umu_consts.py`, `umu_util.py` |
-| `vdf_glue` | 2 | `pending` | `umu/vdf/*` (likely reject lane) |
-| `tests_entrypoints` | 4 | `pending` | `umu_test*.py`, `__main__.py`, `__init__.py` |
+| `runtime_orchestration` | 3 | `closed` | resume-safe fetch + route semantics integrated |
+| `delta_update` | 1 | `closed` | explicitly rejected (binary delta risk vs replace flow) |
+| `plugin_layer` | 1 | `closed` | explicitly rejected (no plugin execution contract) |
+| `logging` | 1 | `closed` | forensic runtime contract marker coverage integrated |
+| `consts/util` | 2 | `closed` | no blocking deltas after sweep |
+| `vdf_glue` | 2 | `closed` | explicitly rejected (out-of-scope Steam metadata lane) |
+| `tests_entrypoints` | 4 | `closed` | donor test-entry logic not required for app runtime |
 
 ## Current strict-round note
 
@@ -39,3 +39,7 @@ Legend:
   - bucket map initialized and linked to active matrix.
 - `2026-03-05 / pass 2`:
   - `runtime_orchestration` bucket started with runtime provenance source markers in wrapper contract lane.
+- `2026-03-05 / pass 3`:
+  - runtime contract forensic event marker landed (`RUNTIME_WRAPPER_CONTRACT_APPLIED`).
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 3 file coverage completed.

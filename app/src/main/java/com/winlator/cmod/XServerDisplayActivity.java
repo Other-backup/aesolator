@@ -2116,6 +2116,25 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
             envVars.put("AERO_GRAPHICS_WRAPPER_PROFILE", selectedProfile);
             envVars.put("AERO_GRAPHICS_WRAPPER_SOC_CLASS", socClass);
+
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "RUNTIME_WRAPPER_CONTRACT_APPLIED",
+                    null,
+                    "runtime_contract",
+                    ContentsManager.getEntryName(profile),
+                    ForensicLogger.fields(
+                            "wrapper_package", ContentsManager.getEntryName(profile),
+                            "wrapper_version", profile.verName == null ? "" : profile.verName,
+                            "wrapper_lane", lane,
+                            "runtime_route", envVars.get("AERO_RUNTIME_ROUTE"),
+                            "compat_layer", envVars.get("AERO_RUNTIME_COMPAT_LAYER"),
+                            "wrapper_profile", selectedProfile,
+                            "no_proton", envVars.get("AERO_RUNTIME_NO_PROTON"),
+                            "passthrough_tool", envVars.get("AERO_RUNTIME_PASSTHROUGH_TOOL")
+                    )
+            );
         } catch (Exception e) {
             Log.w(TAG, "Unable to parse runtime contract for profile " + profile.verName, e);
         }

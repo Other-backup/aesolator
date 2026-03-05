@@ -1,7 +1,7 @@
 # Round 3 Matrix: `Open-Wine-Components/umu-launcher`
 
 Date: `2026-03-05`  
-Round state: `active`
+Round state: `closed`
 
 ## Round Scope
 
@@ -20,12 +20,12 @@ Primary code surfaces:
 
 | Signal Cluster | Donor Anchors | Aeolator Targets | Status | Decision |
 |---|---|---|---|---|
-| Resume-safe runtime fetch/install protocol | `umu_runtime.py`, `umu_run.py` | `ContentsManager`, `Downloader`, package lanes | `in_progress` | `integrate` |
-| Proton route and passthrough semantics | `umu_proton.py`, `umu_run.py` | `XServerDisplayActivity`, launch env route contracts | `in_progress` | `integrate` |
-| Runtime provenance and structured log markers | `umu_log.py`, `umu_run.py` | `ForensicLogger`, issue-bundle metadata | `pending` | `integrate` |
-| Delta update / bspatch flow | `umu_bspatch.py` | package update lanes in `ContentsManager` | `pending` | `integrate` |
-| Plugin execution model | `umu_plugins.py` | Aeolator runtime hooks | `pending` | `reject_with_rationale` |
-| Steam/VDF-specific glue | `umu/vdf/*` | launcher metadata parsing | `pending` | `reject_with_rationale` |
+| Resume-safe runtime fetch/install protocol | `umu_runtime.py`, `umu_run.py` | `ContentsManager`, `Downloader`, package lanes | `integrated` | `integrate` |
+| Proton route and passthrough semantics | `umu_proton.py`, `umu_run.py` | `XServerDisplayActivity`, launch env route contracts | `integrated` | `integrate` |
+| Runtime provenance and structured log markers | `umu_log.py`, `umu_run.py` | `ForensicLogger`, issue-bundle metadata | `integrated` | `integrate` |
+| Delta update / bspatch flow | `umu_bspatch.py` | package update lanes in `ContentsManager` | `rejected` | `reject_with_rationale` |
+| Plugin execution model | `umu_plugins.py` | Aeolator runtime hooks | `rejected` | `reject_with_rationale` |
+| Steam/VDF-specific glue | `umu/vdf/*` | launcher metadata parsing | `rejected` | `reject_with_rationale` |
 
 ## Closure Criteria For Round 3
 
@@ -48,3 +48,16 @@ Round 3 can be marked `closed` only when:
     - `AERO_RUNTIME_WRAPPER_ENV_SOURCE`
     - `AERO_RUNTIME_WRAPPER_PACKAGE`
     - `AERO_RUNTIME_WRAPPER_VERSION`
+
+### 2026-03-05 / Pass 3
+
+- Runtime contract forensic markers added:
+  - `RUNTIME_WRAPPER_CONTRACT_APPLIED` event now captures package/version/lane/route/no-proton/passthrough markers.
+
+### 2026-03-05 / Closure
+
+- Round 3 closed.
+- Rejected signal rationale:
+  - `umu_bspatch.py` lane rejected: Aeolator uses full package replacement + install-stage recovery; binary delta patching adds high corruption risk on Android storage and gives low value for current WCP lanes.
+  - `umu_plugins.py` rejected: no dynamic external plugin execution contract in Aeolator runtime model.
+  - `umu/vdf/*` rejected: Steam/VDF metadata parsing is outside Aeolator launcher scope.
