@@ -32,7 +32,7 @@ Rules:
 Round queue and per-round acceptance criteria are tracked in:
 - `docs/DONOR_ROUND_QUEUE.md`
 - Latest closed transfer matrix:
-  - `docs/rounds/R8_COFFINCOLORS_MATRIX.md`
+  - `docs/rounds/R9_GAMEHUBAPK_MATRIX.md`
 
 All donors were mirrored to local analysis workspace:
 - `/home/mikhail/work/donor-analysis/src`
@@ -211,6 +211,9 @@ Applied in current tree (incremental):
 - `coffincolors/winlator` cmod-bionic deltas were folded into runtime/env and issue metadata:
   - `composeLaunchEnvVars()` now exports explicit bionic/runtime markers (`AERO_RUNTIME_LIBC`, `AERO_RUNTIME_ANDROID_BIONIC_ONLY`, SDK/release, ABI list, wow-route).
   - `ForensicIssueComposer` now stores these compatibility markers in `issue-metadata.json` (`runtimeLibc`, `runtimeBionicOnly`, `supportedAbis`, `hostArch`).
+- `GameHub-Lite-5.3.3-RC2.apk` winmonitor/perf donor signals were folded into forensic capture contract:
+  - `ForensicRuntimeSnapshot` captures host/process runtime state from `/proc` with deterministic contract id (`apk_gamehub_winmonitor_perf_lane_v1`).
+  - `ForensicIssueComposer` now packs `runtime-snapshot.json` into issue bundles and emits explicit capture outcome events.
 
 ## One Round = One Donor Ledger
 
@@ -226,7 +229,7 @@ Previous mixed-source task ledger is archived as baseline only; execution now fo
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed |
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed |
 | 8 | `coffincolors/winlator` | `closed` | donor sweep completed |
-| 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | starts after Round 8 = `closed` |
+| 9 | `GameHub-Lite-5.3.3-RC2.apk` | `closed` | donor sweep completed |
 
 ## Reflective Re-Run (Round 2 Gap Matrix, Historical Baseline)
 
@@ -288,7 +291,7 @@ Stages:
 5. Convert useful findings into lane-ready contracts, not raw copy.
 
 Status:
-- `in_progress` (jadx partial complete; process ended with OOM at ~65%, targeted namespaces extracted).
+- `closed` (APK donor lanes finalized in strict round mode with integrate/reject decisions).
 
 Artifacts already generated:
 - `/home/mikhail/work/apk-analysis/GameHub-Lite-5.3.3-RC2/inventory.txt`

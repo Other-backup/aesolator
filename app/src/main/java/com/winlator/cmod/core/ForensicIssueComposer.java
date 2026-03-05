@@ -79,6 +79,35 @@ public final class ForensicIssueComposer {
             includedFiles.put(prefix, copied);
         }
 
+        try {
+            JSONObject runtimeSnapshot = ForensicRuntimeSnapshot.capture();
+            File runtimeSnapshotFile = new File(bundleDir, "runtime-snapshot.json");
+            writeText(runtimeSnapshotFile, runtimeSnapshot.toString(2));
+            includedFiles.put("runtime_snapshot", runtimeSnapshotFile);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "FORENSIC_RUNTIME_SNAPSHOT_CAPTURED",
+                    null,
+                    "issue_bundle",
+                    "Runtime snapshot captured for issue bundle",
+                    ForensicLogger.fields(
+                            "process_count", runtimeSnapshot.optInt("processCount", -1),
+                            "snapshot_contract", runtimeSnapshot.optString("snapshotContract", "")
+                    )
+            );
+        }
+        catch (Throwable t) {
+            ForensicLogger.warn(
+                    context,
+                    "FORENSIC_RUNTIME_SNAPSHOT_FAILED",
+                    null,
+                    "issue_bundle",
+                    "Failed to capture runtime snapshot for issue bundle",
+                    ForensicLogger.fields("error", String.valueOf(t.getMessage()))
+            );
+        }
+
         if (extraTextFiles != null) {
             for (Map.Entry<String, String> entry : extraTextFiles.entrySet()) {
                 if (entry.getKey() == null || entry.getKey().trim().isEmpty()) continue;
@@ -129,6 +158,8 @@ public final class ForensicIssueComposer {
                 for (String abi : Build.SUPPORTED_ABIS) abiList.put(abi);
             }
             obj.put("supportedAbis", abiList);
+            obj.put("runtimeSnapshotIncluded", includedFiles.containsKey("runtime_snapshot"));
+            obj.put("runtimeSnapshotContract", ForensicRuntimeSnapshot.SNAPSHOT_CONTRACT);
             obj.put("forensicConfig", ForensicConfig.toJson(context, config));
             obj.put("latestTraceSummary", ForensicLogger.describeLatestTrace(context));
 

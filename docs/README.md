@@ -27,6 +27,8 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R7_WINLATORFORK_FILE_COVERAGE.md` - file-level coverage control for Round 7 donor sweep, closed.
 - `docs/rounds/R8_COFFINCOLORS_MATRIX.md` - Round 8 donor transfer matrix (`coffincolors/winlator`), closed.
 - `docs/rounds/R8_COFFINCOLORS_FILE_COVERAGE.md` - file-level coverage control for Round 8 donor sweep, closed.
+- `docs/rounds/R9_GAMEHUBAPK_MATRIX.md` - Round 9 donor transfer matrix (`GameHub-Lite-5.3.3-RC2.apk`), closed.
+- `docs/rounds/R9_GAMEHUBAPK_FILE_COVERAGE.md` - file-level coverage control for Round 9 APK donor sweep, closed.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 

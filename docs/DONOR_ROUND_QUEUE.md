@@ -42,7 +42,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 8 | `coffincolors/winlator` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
+| 9 | `GameHub-Lite-5.3.3-RC2.apk` | `closed` | APK donor sweep completed (`integrated/rejected` finalized) |
 
 ## Round 6 (termux-x11-fork) Historical Workset (Completed)
 
@@ -79,6 +79,18 @@ Round 7 control artifacts:
 Round 8 control artifacts:
 - `docs/rounds/R8_COFFINCOLORS_MATRIX.md`
 - `docs/rounds/R8_COFFINCOLORS_FILE_COVERAGE.md`
+
+## Round 9 (GameHub APK donor lane) Historical Workset (Completed)
+
+1. Rebuilt strict APK inventory from analysis workspace (`reports/*`) and locked module buckets (`winmonitor_schema`, `perf_renderdoc`, `trans_layer`, `native_binary`).
+2. Opened transfer matrix by lanes (`winmonitor_contract`, `perf_diagnostics`, `trans_layer_contract`, `native_boundary`).
+3. Marked each signal `integrate` or `reject_with_rationale`.
+4. Landed no-regression app-tree deltas as contracts (forensic runtime snapshot + issue-bundle inclusion).
+5. Completed round closure (`active -> closed`) with forensic/runtime snapshot anchors.
+
+Round 9 control artifacts:
+- `docs/rounds/R9_GAMEHUBAPK_MATRIX.md`
+- `docs/rounds/R9_GAMEHUBAPK_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -196,3 +208,15 @@ What was added to smooth the transition:
   - transfer rows finalized across bionic/runtime, launcher, graphics/dialog, task-manager and xserver java lanes.
 - `2026-03-05` closure:
   - Round 8 moved to `closed`.
+
+## Round 9 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 9 opened as `active`.
+  - `R9_GAMEHUBAPK_MATRIX` and `R9_GAMEHUBAPK_FILE_COVERAGE` initialized from APK analysis reports.
+- `2026-03-05` pass 2:
+  - forensic runtime snapshot lane landed:
+    - new runtime capture contract file: `runtime-snapshot.json` in issue bundles;
+    - forensic events: `FORENSIC_RUNTIME_SNAPSHOT_CAPTURED` / `FORENSIC_RUNTIME_SNAPSHOT_FAILED`.
+- `2026-03-05` closure:
+  - Round 9 moved to `closed`.
