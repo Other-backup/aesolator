@@ -124,16 +124,52 @@ jobs:
 
       - name: Publish to Winlator release
         if: github.event_name != 'pull_request'
-        uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.AEO_RELEASE_TOKEN || github.token }}
-          owner: ${{ env.APP_RELEASE_OWNER }}
-          repo: ${{ env.APP_RELEASE_REPO }}
-          tag: winlator-latest
-          name: Ae.solator Latest (0.9c+ line)
-          allowUpdates: true
-          prerelease: true
-          removeArtifacts: true
-          artifacts: out/winlator/*.apk,out/winlator/SHA256SUMS,docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md
-          artifactErrorsFailBuild: true
-          bodyFile: RELEASE_NOTES.md
+        env:
+          GH_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          REPO="${APP_RELEASE_OWNER}/${APP_RELEASE_REPO}"
+          TAG="winlator-latest"
+          TITLE="Ae.solator Latest (0.9c+ line)"
+          ASSETS=(
+            out/winlator/*.apk
+            out/winlator/SHA256SUMS
+            docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md
+          )
+
+          for asset in "${ASSETS[@]}"; do
+            if [[ ! -f "${asset}" ]]; then
+              echo "::error::Missing release asset: ${asset}"
+              exit 1
+            fi
+          done
+
+          publish_once() {
+            if ! gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+              gh release create "${TAG}" \
+                --repo "${REPO}" \
+                --title "${TITLE}" \
+                --notes-file RELEASE_NOTES.md \
+                --prerelease
+            else
+              mapfile -t existing_assets < <(gh release view "${TAG}" --repo "${REPO}" --json assets --jq '.assets[].name')
+              for name in "${existing_assets[@]}"; do
+                gh release delete-asset "${TAG}" "${name}" --repo "${REPO}" -y || true
+              done
+            fi
+
+            gh release upload "${TAG}" "${ASSETS[@]}" --repo "${REPO}" --clobber
+            gh release edit "${TAG}" --repo "${REPO}" --title "${TITLE}" --notes-file RELEASE_NOTES.md --prerelease
+          }
+
+          for attempt in 1 2 3 4 5; do
+            if publish_once; then
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 5 ]]; then
+              sleep "$((attempt * 10))"
+            fi
+          done
+
+          echo "::error::Failed to publish release after retry budget"
+          exit 1
