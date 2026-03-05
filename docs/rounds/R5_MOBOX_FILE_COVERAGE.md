@@ -1,7 +1,7 @@
 # Round 5 Coverage: `mobox` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -21,12 +21,12 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `bootstrap_script` | 1 | `in_progress` | `install` orchestration and runtime/bootstrap semantics |
-| `box_path_patches` | 2 | `in_progress` | `box64-setdirs.patch`, `box86-setdirs.patch` |
-| `wine_runtime_patches` | 2 | `in_progress` | `fix-address-space.diff`, `ge-8-25.patch` (boundary-check lane) |
-| `binary_components` | 6 | `pending` | apk/deb distribution model and trust/provenance policy |
-| `docs_readme` | 9 | `in_progress` | behavior semantics from README family |
-| `metadata` | 1 | `pending` | `.github/FUNDING.yml` |
+| `bootstrap_script` | 1 | `closed` | translated to launcher runtime contract (no shell copy) |
+| `box_path_patches` | 2 | `closed` | path normalization reflected in launcher runtime path assembly |
+| `wine_runtime_patches` | 2 | `closed` | rejected in app-tree; forwarded to runtime-source boundary |
+| `binary_components` | 6 | `closed` | covered by contents trust/provenance policy lane |
+| `docs_readme` | 9 | `closed` | semantics extracted into transfer decisions |
+| `metadata` | 1 | `closed` | non-runtime metadata, no transfer required |
 
 ## Current strict-round note
 
@@ -40,3 +40,7 @@ Legend:
 - `2026-03-05 / pass 2`:
   - donor inventory fixed (`21` files total).
   - high-signal buckets opened (`bootstrap_script`, `box_path_patches`, `wine_runtime_patches`, `docs_readme`).
+- `2026-03-05 / pass 3`:
+  - launcher runtime bootstrap/path contract integrated in app-tree.
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 5 coverage completed.

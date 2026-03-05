@@ -38,23 +38,23 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 2 | `KreitinnSoftware/MiceWine-Application` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 3 | `Open-Wine-Components/umu-launcher` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 5 | `olegos2/mobox` | `active` | opened after Round 4 closure |
-| 6 | `ewt45/termux-x11-fork` | `pending` | unlocks after Round 5 = `closed` |
+| 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
+| 6 | `ewt45/termux-x11-fork` | `active` | opened after Round 5 closure |
 | 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
-## Round 5 (mobox) Immediate Workset
+## Round 6 (termux-x11-fork) Immediate Workset
 
-1. Rebuild strict file inventory for `mobox` and lock module buckets (`install`, `patches`, `components`, `docs`).
-2. Re-open transfer matrix by lanes (`bootstrap_shell`, `path_normalization`, `artifact_policy`, `runtime_patch_boundary`).
+1. Rebuild strict file inventory for `termux-x11-fork` and lock module buckets (`app/java`, `app/cpp`, `shell-loader`, `res`).
+2. Re-open transfer matrix by lanes (`loader_trust`, `touch_input_strategy`, `clipboard_sync`, `key_interceptor`, `native_xtrans`).
 3. Mark every signal `integrate` or `reject_with_rationale`.
-4. Land only no-regression deltas in Aeolator app-tree as contracts (no raw donor script/patch copy).
-5. Prepare `active -> gate` checklist with contents/runtime bootstrap smoke anchors.
+4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
+5. Prepare `active -> gate` checklist with X11 launch/input/clipboard smoke anchors.
 
-Round 5 control artifacts:
-- `docs/rounds/R5_MOBOX_MATRIX.md`
-- `docs/rounds/R5_MOBOX_FILE_COVERAGE.md`
+Round 6 control artifacts:
+- `docs/rounds/R6_TERMUXX11_MATRIX.md`
+- `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -122,3 +122,13 @@ What was added to smooth the transition:
 - `2026-03-05` pass 2:
   - donor anchors fixed for `install`, `patches/*`, `components/*`.
   - boundary rule recorded: runtime patch rows routed to runtime/build repos, not app-tree.
+- `2026-03-05` pass 3:
+  - launcher runtime bootstrap/path contract landed in `GuestProgramLauncherComponent`.
+- `2026-03-05` closure:
+  - Round 5 moved to `closed`.
+
+## Round 6 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 6 opened as `active`.
+  - `R6_TERMUXX11_MATRIX` and `R6_TERMUXX11_FILE_COVERAGE` initialized.

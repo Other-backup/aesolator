@@ -258,6 +258,44 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         this.bindingPaths = normalized.isEmpty() ? null : normalized.toArray(new String[0]);
     }
 
+    private String buildRuntimePath(File rootDir, String winePath) {
+        LinkedHashSet<String> segments = new LinkedHashSet<>();
+        if (winePath != null && !winePath.trim().isEmpty()) {
+            segments.add(winePath.trim());
+        }
+
+        File glibcBin = new File(rootDir, "/usr/glibc/bin");
+        if (glibcBin.exists() && glibcBin.isDirectory()) {
+            segments.add(glibcBin.getPath());
+        }
+
+        File usrBin = new File(rootDir, "/usr/bin");
+        if (usrBin.exists() && usrBin.isDirectory()) {
+            segments.add(usrBin.getPath());
+        }
+
+        segments.add("/system/bin");
+        return String.join(":", segments);
+    }
+
+    private void applyMoboxRuntimeContracts(EnvVars launchEnv, File rootDir, String winePath) {
+        launchEnv.put("PATH", buildRuntimePath(rootDir, winePath));
+
+        File runtimeTmpDir = new File(rootDir, "/usr/tmp");
+        if (!runtimeTmpDir.exists()) {
+            runtimeTmpDir.mkdirs();
+        }
+        String runtimeTmpPath = runtimeTmpDir.getPath();
+        if (!launchEnv.has("TMPDIR")) launchEnv.put("TMPDIR", runtimeTmpPath);
+        if (!launchEnv.has("TEMP")) launchEnv.put("TEMP", runtimeTmpPath);
+        if (!launchEnv.has("TMP")) launchEnv.put("TMP", runtimeTmpPath);
+
+        boolean hasGlibcBin = new File(rootDir, "/usr/glibc/bin").isDirectory();
+        launchEnv.put("AERO_RUNTIME_BOOTSTRAP_MODEL", "contents_contract");
+        launchEnv.put("AERO_RUNTIME_COMPONENT_MODEL", "wcp_contents");
+        launchEnv.put("AERO_RUNTIME_MOBOX_PATH_COMPAT", hasGlibcBin ? "1" : "0");
+    }
+
     public EnvVars getEnvVars() {
         return envVars;
     }
@@ -345,7 +383,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
 
-        launchEnv.put("PATH", winePath + ":" + rootDir.getPath() + "/usr/bin:/system/bin");
+        applyMoboxRuntimeContracts(launchEnv, rootDir, winePath);
 
 
         launchEnv.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);

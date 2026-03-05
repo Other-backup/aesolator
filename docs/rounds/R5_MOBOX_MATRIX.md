@@ -1,7 +1,7 @@
 # Round 5 Matrix: `olegos2/mobox`
 
 Date: `2026-03-05`  
-Round state: `active`
+Round state: `closed`
 
 ## Round Scope
 
@@ -20,12 +20,12 @@ Primary code surfaces:
 
 | Signal Cluster | Donor Anchors | Aeolator Targets | Status | Decision |
 |---|---|---|---|---|
-| Bootstrap shell orchestration for runtime bootstrap/install | `install` | `ContentsManager`, package/bootstrap flow docs/contracts | `in_progress` | `integrate` |
-| Termux+glibc path normalization for box86/box64 | `patches/box64-setdirs.patch`, `patches/box86-setdirs.patch` | runtime env/path contract (`AERO_*`, launcher bind/path lane) | `in_progress` | `integrate` |
-| Termux esync/tmp and wineserver path rewrites | `patches/ge-8-25.patch` | FreeWine/runtime lanes (out of app-tree) | `pending` | `reject_with_rationale` |
-| Address-space cap patching | `patches/fix-address-space.diff` | FreeWine memory map policy lane (out of app-tree) | `pending` | `reject_with_rationale` |
-| Bundled binary component distribution model | `components/*.apk`, `components/*.deb` | Contents provenance/trust policy and source-lane modeling | `pending` | `integrate` |
-| Interactive shell UX and menu flow | `install` interactive prompts | Aeolator in-app UX | `pending` | `reject_with_rationale` |
+| Bootstrap shell orchestration for runtime bootstrap/install | `install` | `ContentsManager`, package/bootstrap flow docs/contracts | `integrated` | `integrate` |
+| Termux+glibc path normalization for box86/box64 | `patches/box64-setdirs.patch`, `patches/box86-setdirs.patch` | runtime env/path contract (`AERO_*`, launcher bind/path lane) | `integrated` | `integrate` |
+| Termux esync/tmp and wineserver path rewrites | `patches/ge-8-25.patch` | FreeWine/runtime lanes (out of app-tree) | `rejected` | `reject_with_rationale` |
+| Address-space cap patching | `patches/fix-address-space.diff` | FreeWine memory map policy lane (out of app-tree) | `rejected` | `reject_with_rationale` |
+| Bundled binary component distribution model | `components/*.apk`, `components/*.deb` | Contents provenance/trust policy and source-lane modeling | `integrated` | `integrate` |
+| Interactive shell UX and menu flow | `install` interactive prompts | Aeolator in-app UX | `rejected` | `reject_with_rationale` |
 
 ## Closure Criteria For Round 5
 
@@ -50,3 +50,24 @@ Round 5 can be marked `closed` only when:
   - components bucket identified (`inputbridge.apk`, `termux-x11.apk`, `.deb` payloads).
 - Initial boundary decision prepared:
   - raw Wine/box patch application belongs to runtime/build repos, not to Aeolator app-tree.
+
+### 2026-03-05 / Pass 3
+
+- App-tree transfer landed in launcher contract:
+  - `GuestProgramLauncherComponent` now exports deterministic runtime bootstrap markers:
+    - `AERO_RUNTIME_BOOTSTRAP_MODEL=contents_contract`
+    - `AERO_RUNTIME_COMPONENT_MODEL=wcp_contents`
+    - `AERO_RUNTIME_MOBOX_PATH_COMPAT=<0|1>`
+  - Runtime path assembly now includes `usr/glibc/bin` when present and remains de-duplicated.
+  - Runtime tmp contract (`TMPDIR`/`TEMP`/`TMP`) is initialized to imagefs `usr/tmp` when absent.
+- Existing contents trust/provenance lane confirms `components/*` model transfer:
+  - strict URL scheme policy (`https`, localhost-only `http`);
+  - archive suffix allowlist;
+  - optional SHA-256 verification path for package payloads.
+
+### 2026-03-05 / Closure
+
+- Round 5 moved to `closed`.
+- Reject rationale:
+  - `ge-8-25.patch` and `fix-address-space.diff` are runtime-source concerns for FreeWine/build repos, not Aeolator app-tree.
+  - Interactive shell/menu flow from `install` is intentionally not ported into in-app UI contract.
