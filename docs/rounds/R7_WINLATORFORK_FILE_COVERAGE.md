@@ -47,3 +47,5 @@ Legend:
   - `ewt45_overlay_lane` sweep continued: diagnostics row integrated, extra-nav row rejected.
 - `2026-03-05 / pass 5`:
   - `java_mainline_lane` extended with storage-permission forensic hooks in `MainActivity`.
+- `2026-03-05 / pass 6`:
+  - `java_mainline_lane` extended with keyboard event-consumption hardening in `xserver/Keyboard`.

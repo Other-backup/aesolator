@@ -90,3 +90,10 @@ Round 7 can be marked `closed` only when:
     - `STORAGE_ALL_FILES_ACCESS_OPEN_SETTINGS`
     - `STORAGE_ALL_FILES_ACCESS_DECLINED`
 - This ports donor `E11_ManageStorage` intent (permission orchestration visibility) into Aeolator forensic-first contract without cloning donor UI fragments.
+
+### 2026-03-05 / Pass 6
+
+- Key-input lane continued in xserver keyboard path:
+  - `Keyboard.onKeyEvent()` no longer consumes `ACTION_MULTIPLE` events blindly.
+  - non-handled key actions now return `false` instead of unconditional `true`.
+- This removes silent event swallowing and keeps composition events available to framework/IME path while preserving explicit down/up injection.

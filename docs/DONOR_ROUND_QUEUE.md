@@ -165,3 +165,5 @@ What was added to smooth the transition:
   - native cpp donor lane bounded out of app-tree (explicit reject-with-rationale boundary).
 - `2026-03-05` pass 5:
   - storage permission lane moved to forensic-visible contract in `MainActivity` (`all-files-access` prompt/actions logged).
+- `2026-03-05` pass 6:
+  - keyboard event consumption hardened (`ACTION_MULTIPLE` passthrough + no unconditional consume in `Keyboard.onKeyEvent`).
