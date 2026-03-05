@@ -109,6 +109,33 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/use_dri3_extension" />
+
+                <TextView
+                    android:id="@+id/TVForensicDri3ModeLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/dri3_mode_title" />
+
+                <Spinner
+                    android:id="@+id/SForensicDri3Mode"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:entries="@array/dri3_mode_entries"
+                    android:spinnerMode="dialog" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicDri3PresentWait"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dri3_present_wait" />
+
+                <CheckBox
+                    android:id="@+id/CBForensicDri3ForceSwWsi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dri3_force_sw_wsi" />
             </LinearLayout>
 
             <LinearLayout

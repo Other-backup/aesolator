@@ -309,20 +309,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             final PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
 
             TextView tvWebpage = dialog.findViewById(R.id.TVWebpage);
-            tvWebpage.setText(Html.fromHtml("<a href=\"https://www.winlator.org\">winlator.org</a>", Html.FROM_HTML_MODE_LEGACY));
+            tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/aesolator\">github.com/kosoymiki/aesolator</a>", Html.FROM_HTML_MODE_LEGACY));
             tvWebpage.setMovementMethod(LinkMovementMethod.getInstance());
 
             ((TextView) dialog.findViewById(R.id.TVAppVersion)).setText(getString(R.string.version) + " " + pInfo.versionName);
 
             String creditsAndThirdPartyAppsHTML = String.join("<br />",
-                    "Winlator Cmod by coffincolors, me (<a href=\"https://github.com/coffincolors/winlator\">Fork</a>, <a href=\"https://github.com/Pipetto-crypto/winlator\">Fork</a>)",
-                    "Big Picture Mode Music by",
-                    "Dale Melvin Blevens III (Fumer)",
+                    "Aesolator by Ae team",
+                    "Runtime model: FreeWine + lane-based graphics stack",
                     "---",
-                    "Termux Package(<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
+                    "Termux Package (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
                     "Wine (<a href=\"https://www.winehq.org\">winehq.org</a>)",
                     "Box64 (<a href=\"https://github.com/ptitSeb/box64\">github.com/ptitSeb/box64</a>)",
-                    "Mesa (Turnip/Zink/Wrapper) (<a href=\"https://github.com/xMeM/mesa/tree/wrapper\">github.com/xMeM/mesa</a>)",
+                    "Mesa / Turnip / Zink (<a href=\"https://gitlab.freedesktop.org/mesa/mesa\">gitlab.freedesktop.org/mesa/mesa</a>)",
                     "DXVK (<a href=\"https://github.com/doitsujin/dxvk\">github.com/doitsujin/dxvk</a>)",
                     "VKD3D (<a href=\"https://gitlab.winehq.org/wine/vkd3d\">gitlab.winehq.org/wine/vkd3d</a>)",
                     "D8VK (<a href=\"https://github.com/AlpyneDreams/d8vk\">github.com/AlpyneDreams/d8vk</a>)",
@@ -336,7 +335,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             tvCreditsAndThirdPartyApps.setMovementMethod(LinkMovementMethod.getInstance());
 
             String glibcExpVersionForkHTML = String.join("<br />",
-                    "longjunyu2's <a href=\"https://github.com/longjunyu2/winlator/tree/use-glibc-instead-of-proot\">(GLIBC Fork)</a>");
+                    "Aesolator runtime branch and contracts are maintained in-repo.");
             TextView tvGlibcExpVersionFork = dialog.findViewById(R.id.TVGlibcExpVersionFork);
             tvGlibcExpVersionFork.setText(Html.fromHtml(glibcExpVersionForkHTML, Html.FROM_HTML_MODE_LEGACY));
             tvGlibcExpVersionFork.setMovementMethod(LinkMovementMethod.getInstance());

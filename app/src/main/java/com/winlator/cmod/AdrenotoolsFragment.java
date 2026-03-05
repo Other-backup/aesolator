@@ -2,6 +2,7 @@ package com.winlator.cmod;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import com.winlator.cmod.R;
 
@@ -14,6 +15,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -53,11 +55,36 @@ public class AdrenotoolsFragment extends Fragment {
 
         View btOpenContentsGraphics = layout.findViewById(R.id.BTOpenContentsGraphics);
         btOpenContentsGraphics.setOnClickListener(v -> {
+            openContents();
+        });
+
+        layout.findViewById(R.id.BTLaneTurnip).setOnClickListener(v ->
+                openContentsForType("TurnipDriver"));
+        layout.findViewById(R.id.BTLaneOpenGL).setOnClickListener(v ->
+                openContentsForType("OpenGLDriver"));
+        layout.findViewById(R.id.BTLaneDgVoodoo).setOnClickListener(v ->
+                openContentsForType("DgVoodoo"));
+        layout.findViewById(R.id.BTLaneDxvkVkd3d).setOnClickListener(v ->
+                openContentsForType("DXVK"));
+        layout.findViewById(R.id.BTLaneVulkanSdk).setOnClickListener(v ->
+                openContentsForType("VulkanSDK"));
+
+        layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> {
             if (getActivity() instanceof MainActivity) {
                 NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
                 if (navigationView != null) {
-                    navigationView.setCheckedItem(R.id.main_menu_contents);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_contents));
+                    navigationView.setCheckedItem(R.id.main_menu_settings);
+                    ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_settings));
+                }
+            }
+        });
+
+        layout.findViewById(R.id.BTForensicCenter).setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
+                if (navigationView != null) {
+                    navigationView.setCheckedItem(R.id.main_menu_diagnostics);
+                    ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_diagnostics));
                 }
             }
         });
@@ -147,6 +174,22 @@ public class AdrenotoolsFragment extends Fragment {
             else if (normalized.contains("arm64")) arch = "ARM64";
             else arch = "generic";
             return "Installed • " + arch;
+        }
+    }
+
+    private void openContentsForType(String typeName) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(requireContext());
+        preferences.edit().putString("contents_preselected_type", typeName).apply();
+        openContents();
+    }
+
+    private void openContents() {
+        if (getActivity() instanceof MainActivity) {
+            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
+            if (navigationView != null) {
+                navigationView.setCheckedItem(R.id.main_menu_contents);
+                ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_contents));
+            }
         }
     }
 }

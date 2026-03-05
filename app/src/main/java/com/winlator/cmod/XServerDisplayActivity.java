@@ -1645,8 +1645,16 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             WineD3DConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
         }
 
-        boolean useDRI3 = preferences.getBoolean("use_dri3", true);
-        if (!useDRI3) {
+        String dri3Mode = preferences.getString("dri3_mode", preferences.getBoolean("use_dri3", true) ? "auto" : "off");
+        if (dri3Mode == null || dri3Mode.trim().isEmpty()) dri3Mode = "auto";
+        boolean useDRI3 = !"off".equalsIgnoreCase(dri3Mode);
+        boolean dri3PresentWait = preferences.getBoolean("dri3_present_wait", true);
+        boolean dri3ForceSwWsi = preferences.getBoolean("dri3_force_sw_wsi", false);
+        envVars.put("AERO_DRI3_MODE", dri3Mode);
+        envVars.put("AERO_DRI3_ENABLED", useDRI3 ? "1" : "0");
+        envVars.put("AERO_DRI3_PRESENT_WAIT", dri3PresentWait ? "1" : "0");
+        envVars.put("AERO_DRI3_FORCE_SW_WSI", dri3ForceSwWsi ? "1" : "0");
+        if (!useDRI3 || dri3ForceSwWsi) {
             envVars.put("MESA_VK_WSI_DEBUG", "sw");
         }
 
@@ -1697,10 +1705,11 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         envVars.put("WRAPPER_RESOURCE_TYPE", resourceType);
 
         String syncFrame = graphicsDriverConfig.get("syncFrame");
-        if (syncFrame.equals("1"))
+        if (syncFrame.equals("1") && !dri3ForceSwWsi && useDRI3)
             envVars.put("MESA_VK_WSI_DEBUG", "forcesync");
 
         String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
+        if (!dri3PresentWait) disablePresentWait = "1";
         envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
 
         String bcnEmulation = graphicsDriverConfig.get("bcnEmulation");

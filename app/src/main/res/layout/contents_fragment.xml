@@ -26,6 +26,70 @@
 
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/TVContentsSourcesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/contents_sources" />
+
+    <LinearLayout
+        android:id="@+id/LLContentsSources"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <CheckBox
+            android:id="@+id/CBSourceWcpHub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_source_wcphub" />
+
+        <CheckBox
+            android:id="@+id/CBSourceFallback"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_source_fallback" />
+
+        <CheckBox
+            android:id="@+id/CBSourceAesolator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_source_aesolator" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/TVContentsFiltersLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/contents_filters" />
+
+    <LinearLayout
+        android:id="@+id/LLContentsFilters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <CheckBox
+            android:id="@+id/CBFilterArm64ec"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_filter_arm64ec" />
+
+        <CheckBox
+            android:id="@+id/CBFilterX64"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_filter_x64" />
+
+        <CheckBox
+            android:id="@+id/CBFilterBeta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/contents_filter_beta" />
+    </LinearLayout>
+
 
     <View style="@style/HorizontalLine" />
 

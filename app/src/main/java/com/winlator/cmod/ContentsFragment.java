@@ -13,6 +13,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
@@ -75,6 +77,18 @@ public class ContentsFragment extends Fragment {
     private ContentProfile.ContentType currentContentType = ContentProfile.ContentType.CONTENT_TYPE_WINE;
     private Spinner sContentType;
     private boolean isDarkMode;
+    private CheckBox cbSourceWcpHub;
+    private CheckBox cbSourceFallback;
+    private CheckBox cbSourceAesolator;
+    private CheckBox cbFilterArm64ec;
+    private CheckBox cbFilterX64;
+    private CheckBox cbFilterBeta;
+    private boolean sourceWcpHubEnabled;
+    private boolean sourceFallbackEnabled;
+    private boolean sourceAesolatorEnabled;
+    private boolean filterArm64ecEnabled;
+    private boolean filterX64Enabled;
+    private boolean filterBetaEnabled;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -84,6 +98,12 @@ public class ContentsFragment extends Fragment {
         manager.syncContents();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireActivity());
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        sourceWcpHubEnabled = sharedPreferences.getBoolean("contents_source_wcphub", true);
+        sourceFallbackEnabled = sharedPreferences.getBoolean("contents_source_fallback", true);
+        sourceAesolatorEnabled = sharedPreferences.getBoolean("contents_source_aesolator", true);
+        filterArm64ecEnabled = sharedPreferences.getBoolean("contents_filter_arm64ec", true);
+        filterX64Enabled = sharedPreferences.getBoolean("contents_filter_x64", true);
+        filterBetaEnabled = sharedPreferences.getBoolean("contents_filter_beta", false);
     }
 
     @Override
@@ -115,13 +135,46 @@ public class ContentsFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 currentContentType = SUPPORTED_CONTENT_TYPES.get(position);
-                loadContentList();
+                if (emptyText != null && recyclerView != null) {
+                    loadContentList();
+                }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+        applyPreferredContentTypeSelection();
+
+        cbSourceWcpHub = layout.findViewById(R.id.CBSourceWcpHub);
+        cbSourceFallback = layout.findViewById(R.id.CBSourceFallback);
+        cbSourceAesolator = layout.findViewById(R.id.CBSourceAesolator);
+        cbFilterArm64ec = layout.findViewById(R.id.CBFilterArm64ec);
+        cbFilterX64 = layout.findViewById(R.id.CBFilterX64);
+        cbFilterBeta = layout.findViewById(R.id.CBFilterBeta);
+
+        cbSourceWcpHub.setChecked(sourceWcpHubEnabled);
+        cbSourceFallback.setChecked(sourceFallbackEnabled);
+        cbSourceAesolator.setChecked(sourceAesolatorEnabled);
+        cbFilterArm64ec.setChecked(filterArm64ecEnabled);
+        cbFilterX64.setChecked(filterX64Enabled);
+        cbFilterBeta.setChecked(filterBetaEnabled);
+
+        CompoundButton.OnCheckedChangeListener refreshRemoteListener = (buttonView, isChecked) -> {
+            updateFilterPreferencesFromUi();
+            reloadRemoteContents();
+        };
+        CompoundButton.OnCheckedChangeListener refreshListListener = (buttonView, isChecked) -> {
+            updateFilterPreferencesFromUi();
+            loadContentList();
+        };
+
+        cbSourceWcpHub.setOnCheckedChangeListener(refreshRemoteListener);
+        cbSourceFallback.setOnCheckedChangeListener(refreshRemoteListener);
+        cbSourceAesolator.setOnCheckedChangeListener(refreshRemoteListener);
+        cbFilterArm64ec.setOnCheckedChangeListener(refreshListListener);
+        cbFilterX64.setOnCheckedChangeListener(refreshListListener);
+        cbFilterBeta.setOnCheckedChangeListener(refreshListListener);
 
         emptyText = layout.findViewById(R.id.TVEmptyText);
 
@@ -176,19 +229,88 @@ public class ContentsFragment extends Fragment {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return new ArrayList<>();
 
-        if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-            ArrayList<ContentProfile> filtered = new ArrayList<>();
-            for (ContentProfile profile : profiles) {
-                if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_WINE && !isProtonLike(profile)) {
-                    filtered.add(profile);
-                } else if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON && isProtonLike(profile)) {
-                    filtered.add(profile);
-                }
+        ArrayList<ContentProfile> filtered = new ArrayList<>();
+        for (ContentProfile profile : profiles) {
+            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_WINE && isProtonLike(profile)) {
+                continue;
             }
-            return filtered;
+            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON && !isProtonLike(profile)) {
+                continue;
+            }
+            if (!filterBetaEnabled && profile.isBetaLike()) {
+                continue;
+            }
+            if (isGraphicsStackType(currentContentType)) {
+                boolean arm64ec = isArm64EcProfile(profile);
+                boolean x64 = isX64Profile(profile);
+                if (arm64ec && !filterArm64ecEnabled) continue;
+                if (x64 && !filterX64Enabled) continue;
+            }
+            filtered.add(profile);
         }
-        return profiles;
+        return filtered;
+    }
+
+    private void updateFilterPreferencesFromUi() {
+        sourceWcpHubEnabled = cbSourceWcpHub != null && cbSourceWcpHub.isChecked();
+        sourceFallbackEnabled = cbSourceFallback != null && cbSourceFallback.isChecked();
+        sourceAesolatorEnabled = cbSourceAesolator != null && cbSourceAesolator.isChecked();
+        filterArm64ecEnabled = cbFilterArm64ec != null && cbFilterArm64ec.isChecked();
+        filterX64Enabled = cbFilterX64 != null && cbFilterX64.isChecked();
+        filterBetaEnabled = cbFilterBeta != null && cbFilterBeta.isChecked();
+
+        sharedPreferences.edit()
+                .putBoolean("contents_source_wcphub", sourceWcpHubEnabled)
+                .putBoolean("contents_source_fallback", sourceFallbackEnabled)
+                .putBoolean("contents_source_aesolator", sourceAesolatorEnabled)
+                .putBoolean("contents_filter_arm64ec", filterArm64ecEnabled)
+                .putBoolean("contents_filter_x64", filterX64Enabled)
+                .putBoolean("contents_filter_beta", filterBetaEnabled)
+                .apply();
+    }
+
+    private void applyPreferredContentTypeSelection() {
+        String preferredType = sharedPreferences.getString("contents_preselected_type", "");
+        if (preferredType == null || preferredType.trim().isEmpty()) return;
+        ContentProfile.ContentType preferred = ContentProfile.ContentType.getTypeByName(preferredType.trim());
+        if (preferred == null) return;
+        int index = SUPPORTED_CONTENT_TYPES.indexOf(preferred);
+        if (index >= 0) {
+            sContentType.setSelection(index);
+            currentContentType = preferred;
+        }
+        sharedPreferences.edit().remove("contents_preselected_type").apply();
+    }
+
+    private boolean isGraphicsStackType(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
+                || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+    }
+
+    private boolean isArm64EcProfile(ContentProfile profile) {
+        if (profile == null) return false;
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " " +
+                        (profile.desc == null ? "" : profile.desc) + " " +
+                        (profile.remoteUrl == null ? "" : profile.remoteUrl) + " " +
+                        (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        return combined.contains("arm64ec") || combined.contains("arm64-ec");
+    }
+
+    private boolean isX64Profile(ContentProfile profile) {
+        if (profile == null) return false;
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " " +
+                        (profile.desc == null ? "" : profile.desc) + " " +
+                        (profile.remoteUrl == null ? "" : profile.remoteUrl) + " " +
+                        (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        return combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64");
     }
 
     private void reloadRemoteContents() {
@@ -196,14 +318,29 @@ public class ContentsFragment extends Fragment {
             try {
                 ArrayList<String> payloads = new ArrayList<>();
                 HashSet<String> sources = new HashSet<>();
+                boolean useWcpHub = sourceWcpHubEnabled;
+                boolean useFallback = sourceFallbackEnabled;
+                boolean useAesolator = sourceAesolatorEnabled;
 
                 String preferredUrl = sharedPreferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
-                addRemoteFeed(payloads, sources, preferredUrl);
-                addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES);
-                addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES_FALLBACK);
-                addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES_AE);
+                if (preferredUrl != null && !preferredUrl.trim().isEmpty()
+                        && !ContentsManager.REMOTE_PROFILES.equals(preferredUrl.trim())
+                        && !ContentsManager.REMOTE_PROFILES_FALLBACK.equals(preferredUrl.trim())
+                        && !ContentsManager.REMOTE_PROFILES_AE.equals(preferredUrl.trim())) {
+                    addRemoteFeed(payloads, sources, preferredUrl);
+                }
+                if (useWcpHub) addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES);
+                if (useFallback) addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES_FALLBACK);
+                if (useAesolator) addRemoteFeed(payloads, sources, ContentsManager.REMOTE_PROFILES_AE);
 
-                if (payloads.isEmpty() || !isAdded() || getActivity() == null) return;
+                if (!isAdded() || getActivity() == null) return;
+                if (payloads.isEmpty()) {
+                    getActivity().runOnUiThread(() -> {
+                        manager.setRemoteProfiles("[]");
+                        loadContentList();
+                    });
+                    return;
+                }
 
                 String merged = mergeJsonArrays(payloads);
                 getActivity().runOnUiThread(() -> {
