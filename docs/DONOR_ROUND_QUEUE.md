@@ -40,7 +40,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 7 | `ewt45/winlator-fork` | `active` | opened after Round 6 closure |
+| 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
@@ -56,13 +56,13 @@ Round 6 control artifacts:
 - `docs/rounds/R6_TERMUXX11_MATRIX.md`
 - `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md`
 
-## Round 7 (winlator-fork) Immediate Workset
+## Round 7 (winlator-fork) Historical Workset (Completed)
 
-1. Rebuild strict file inventory for `winlator-fork` and lock module buckets (`ewt45 overlay`, `java mainline`, `native cpp`, `res`).
-2. Open transfer matrix by lanes (`xserver_lifecycle`, `diagnostics_hooks`, `storage_obb`, `key_input`, `xserver_ext`, `native_boundary`).
-3. Mark each signal `integrate` or `reject_with_rationale`.
-4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
-5. Prepare `active -> gate` checklist with launch/PiP/input/forensic anchors.
+1. Rebuilt strict file inventory for `winlator-fork` and locked module buckets (`ewt45 overlay`, `java mainline`, `native cpp`, `res`).
+2. Opened transfer matrix by lanes (`xserver_lifecycle`, `diagnostics_hooks`, `storage_obb`, `key_input`, `xserver_ext`, `native_boundary`).
+3. Marked each signal `integrate` or `reject_with_rationale`.
+4. Landed no-regression app-tree deltas as contracts (no blind donor copy).
+5. Completed round closure (`active -> closed`) with launch/PiP/input/forensic anchors.
 
 Round 7 control artifacts:
 - `docs/rounds/R7_WINLATORFORK_MATRIX.md`
@@ -167,3 +167,8 @@ What was added to smooth the transition:
   - storage permission lane moved to forensic-visible contract in `MainActivity` (`all-files-access` prompt/actions logged).
 - `2026-03-05` pass 6:
   - keyboard event consumption hardened (`ACTION_MULTIPLE` passthrough + no unconditional consume in `Keyboard.onKeyEvent`).
+- `2026-03-05` pass 7:
+  - storage/obb lane finalized as bounded integrate decision under contents-first contract.
+  - key-input lane finalized (stable fanout + consumption semantics; donor unicode remap hack rejected).
+- `2026-03-05` closure:
+  - Round 7 moved to `closed`.

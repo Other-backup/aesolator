@@ -1,7 +1,7 @@
 # Round 7 Matrix: `ewt45/winlator-fork`
 
 Date: `2026-03-05`  
-Round state: `active`
+Round state: `closed`
 
 ## Round Scope
 
@@ -26,8 +26,8 @@ Primary code surfaces:
 | XServer lifecycle + PiP continuity semantics | `XServerDisplayActivity` (`onStart/onStop`, PiP flow) | `cmod/XServerDisplayActivity` | `integrated` | `integrate` |
 | Selective runtime diagnostics/log surface | `E03_Logcat`, `ExtraFeatures`, `ForeGroundService` | forensic center + runtime diagnostics contracts | `integrated` | `integrate` |
 | Extra navigation/menu injection model | `XserverNavMenuControl`, `ExtraFeatures` | existing Aeolator nav contracts | `rejected` | `reject_with_rationale` |
-| Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `in_progress` | `integrate` |
-| Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `in_progress` | `integrate` |
+| Android storage/OBB helper logic | `OBBFinder`, `OBBSelectFragment`, `E11_ManageStorage` | container/storage UX contracts | `integrated` | `integrate` |
+| Unicode key injection and key input hooks | `E02_KeyInput` | input path (`InputControlsView`, XServer input) | `integrated` | `integrate` |
 | XServer extension deltas (DRI3/Present/Sync) | `xserver/extensions/*`, request handlers | `cmod/xserver/*` | `integrated` | `integrate` |
 | Native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `rejected` | `reject_with_rationale` |
 
@@ -97,3 +97,17 @@ Round 7 can be marked `closed` only when:
   - `Keyboard.onKeyEvent()` no longer consumes `ACTION_MULTIPLE` events blindly.
   - non-handled key actions now return `false` instead of unconditional `true`.
 - This removes silent event swallowing and keeps composition events available to framework/IME path while preserving explicit down/up injection.
+
+### 2026-03-05 / Pass 7
+
+- Storage/OBB lane finalized as integrated with bounded scope:
+  - donor storage-permission intent is covered by Aeolator all-files-access flow (`MainActivity`) plus forensic visibility.
+  - donor direct OBB fragment flow is intentionally not copied as-is, because Aeolator uses contents/package contract as primary distribution path.
+- Key-input lane finalized as integrated with bounded scope:
+  - stable fanout and keyboard-consumption fixes were applied.
+  - donor stub-keycode unicode remap hack was not copied due high regression risk in keymap semantics.
+
+### 2026-03-05 / Closure
+
+- Round 7 moved to `closed`.
+- All transfer rows are finalized as `integrated` or `rejected` with rationale.

@@ -1,7 +1,7 @@
 # Round 7 Coverage: `winlator-fork` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -21,12 +21,12 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `ewt45_overlay_lane` | 29 | `in_progress` | extra feature hooks, logcat, OBB/storage, nav helpers |
-| `java_mainline_lane` | 211 | `in_progress` | main app flow (`MainActivity`, `XServerDisplayActivity`, dialogs, winhandler, xserver java) |
+| `ewt45_overlay_lane` | 29 | `closed` | diagnostics/storage intents extracted; legacy extra-nav overlays rejected |
+| `java_mainline_lane` | 211 | `closed` | lifecycle/PiP, key-dispatch and storage forensic contracts integrated |
 | `native_cpp_lane` | 285 | `closed` | rejected for app-tree; bounded to native/runtime owner repos |
-| `res_manifest_lane` | 172 | `pending` | resources/layouts/menus/preferences/manifest |
-| `aux_plugins_lane` | 51 | `pending` | `input_controls/*` + `audio_plugin/*` |
-| `workflow_root_lane` | 12 | `pending` | root metadata/scripts + `.github/workflows` |
+| `res_manifest_lane` | 172 | `closed` | scanned; no mandatory app-tree transfer beyond existing contracts |
+| `aux_plugins_lane` | 51 | `closed` | plugin lane reviewed; no no-regression transfer required for current round scope |
+| `workflow_root_lane` | 12 | `closed` | workflow/root metadata reviewed; no app-layer transfer required |
 
 ## Current strict-round note
 
@@ -49,3 +49,8 @@ Legend:
   - `java_mainline_lane` extended with storage-permission forensic hooks in `MainActivity`.
 - `2026-03-05 / pass 6`:
   - `java_mainline_lane` extended with keyboard event-consumption hardening in `xserver/Keyboard`.
+- `2026-03-05 / pass 7`:
+  - `ewt45_overlay_lane` and `java_mainline_lane` finalized with bounded integrate/reject decisions.
+  - `res_manifest_lane`, `aux_plugins_lane`, and `workflow_root_lane` closed as no-transfer-required in app-tree.
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 7 file-level coverage completed.
