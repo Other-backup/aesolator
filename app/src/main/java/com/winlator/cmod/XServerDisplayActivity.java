@@ -875,18 +875,32 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             sensorManager.unregisterListener(gyroListener);
         }
 
-        // Check if we are entering Picture-in-Picture mode
-        if (!isInPictureInPictureMode()) {
+        boolean enteringPictureInPicture = isInPictureInPictureMode();
+
+        if (!enteringPictureInPicture) {
             // Only pause environment and xServerView if not in PiP mode
             if (environment != null) {
                 environment.onPause();
                 xServerView.onPause();
             }
-        }
 
-        savePlaytimeData();
-        handler.removeCallbacks(savePlaytimeRunnable);
-        ProcessHelper.pauseAllWineProcesses();
+            savePlaytimeData();
+            handler.removeCallbacks(savePlaytimeRunnable);
+            ProcessHelper.pauseAllWineProcesses();
+        } else {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_PIP_CONTINUITY",
+                    null,
+                    "xserver",
+                    "pip_transition_without_runtime_pause",
+                    ForensicLogger.fields(
+                            "wine_paused", false,
+                            "playtime_timer_kept", true
+                    )
+            );
+        }
     }
 
 

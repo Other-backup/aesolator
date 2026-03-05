@@ -40,7 +40,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 4 | `khanhduytran0/ExagearAndroidX11Server` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 7 | `ewt45/winlator-fork` | `pending` | unlocks after Round 6 = `closed` |
+| 7 | `ewt45/winlator-fork` | `active` | opened after Round 6 closure |
 | 8 | `coffincolors/winlator` | `pending` | unlocks after Round 7 = `closed` |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
@@ -55,6 +55,18 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 Round 6 control artifacts:
 - `docs/rounds/R6_TERMUXX11_MATRIX.md`
 - `docs/rounds/R6_TERMUXX11_FILE_COVERAGE.md`
+
+## Round 7 (winlator-fork) Immediate Workset
+
+1. Rebuild strict file inventory for `winlator-fork` and lock module buckets (`ewt45 overlay`, `java mainline`, `native cpp`, `res`).
+2. Open transfer matrix by lanes (`xserver_lifecycle`, `diagnostics_hooks`, `storage_obb`, `key_input`, `xserver_ext`, `native_boundary`).
+3. Mark each signal `integrate` or `reject_with_rationale`.
+4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
+5. Prepare `active -> gate` checklist with launch/PiP/input/forensic anchors.
+
+Round 7 control artifacts:
+- `docs/rounds/R7_WINLATORFORK_MATRIX.md`
+- `docs/rounds/R7_WINLATORFORK_FILE_COVERAGE.md`
 
 ## Round 1 -> Round 2 Soft Handoff (Smoothed Transition)
 
@@ -137,3 +149,12 @@ What was added to smooth the transition:
   - clipboard policy forensic marker lane landed.
 - `2026-03-05` closure:
   - Round 6 moved to `closed`.
+
+## Round 7 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 7 opened as `active`.
+  - `R7_WINLATORFORK_MATRIX` and `R7_WINLATORFORK_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - PiP lifecycle continuity lane landed in `XServerDisplayActivity` (no runtime pause on PiP transition).
+  - forensic marker `XSERVER_PIP_CONTINUITY` added for traceability.
