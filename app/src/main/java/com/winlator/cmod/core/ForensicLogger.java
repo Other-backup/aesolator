@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -242,6 +243,38 @@ public final class ForensicLogger {
             catch (JSONException ignored) {}
         }
         return out;
+    }
+
+    public static String readLatestTraceTail(Context context, int maxLines, int maxChars) {
+        if (context == null) return "";
+        File file = getLatestLogFile(context);
+        if (file == null || !file.isFile()) return "";
+
+        int safeMaxLines = Math.max(1, maxLines);
+        int safeMaxChars = Math.max(0, maxChars);
+        ArrayDeque<String> lines = new ArrayDeque<>(safeMaxLines);
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (lines.size() >= safeMaxLines) lines.removeFirst();
+                lines.addLast(line);
+            }
+        } catch (IOException e) {
+            return "Failed reading forensic log: " + e.getMessage();
+        }
+
+        if (lines.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            sb.append(line).append('\n');
+        }
+
+        if (safeMaxChars > 0 && sb.length() > safeMaxChars) {
+            return "[tail truncated]\n" + sb.substring(sb.length() - safeMaxChars);
+        }
+        return sb.toString().trim();
     }
 
     private static void logcat(String severity, String line) {

@@ -3,6 +3,8 @@ package com.winlator.cmod;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import com.winlator.cmod.R;
 
@@ -10,10 +12,12 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
@@ -79,6 +83,7 @@ public class AdrenotoolsFragment extends Fragment {
                 }
             }
         });
+        styleGraphicsCenterButtons(layout);
         return layout;
     }
     
@@ -191,5 +196,41 @@ public class AdrenotoolsFragment extends Fragment {
                 ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_contents));
             }
         }
+    }
+
+    private void styleGraphicsCenterButtons(View root) {
+        boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(requireContext()).getBoolean("dark_mode", false);
+        styleLaneButton(root, R.id.BTLaneTurnip, R.color.contents_lane_turnip, R.color.contents_lane_turnip_dark, isDarkMode);
+        styleLaneButton(root, R.id.BTLaneOpenGL, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark, isDarkMode);
+        styleLaneButton(root, R.id.BTLaneDgVoodoo, R.color.contents_lane_dgvoodoo, R.color.contents_lane_dgvoodoo_dark, isDarkMode);
+        styleLaneButton(root, R.id.BTLaneDxvkVkd3d, R.color.contents_lane_dxvk, R.color.contents_lane_dxvk_dark, isDarkMode);
+        styleLaneButton(root, R.id.BTLaneVulkanSdk, R.color.contents_lane_vulkansdk, R.color.contents_lane_vulkansdk_dark, isDarkMode);
+        styleLaneButton(root, R.id.BTDri3Settings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode);
+        styleLaneButton(root, R.id.BTForensicCenter, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode);
+    }
+
+    private void styleLaneButton(View root, int buttonId, int lightColorRes, int darkColorRes, boolean isDarkMode) {
+        View rawButton = root.findViewById(buttonId);
+        if (!(rawButton instanceof Button)) return;
+        Button button = (Button) rawButton;
+        int accent = ContextCompat.getColor(requireContext(), isDarkMode ? darkColorRes : lightColorRes);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dpToPx(10f));
+        bg.setColor(withAlpha(accent, isDarkMode ? 62 : 26));
+        bg.setStroke(dpToPx(1f), withAlpha(accent, isDarkMode ? 238 : 180));
+
+        button.setBackground(bg);
+        button.setTextColor(isDarkMode ? Color.WHITE : accent);
+    }
+
+    private int dpToPx(float dp) {
+        return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        int clampedAlpha = Math.max(0, Math.min(255, alpha));
+        return (color & 0x00ffffff) | (clampedAlpha << 24);
     }
 }

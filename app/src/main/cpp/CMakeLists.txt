@@ -6,7 +6,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
-add_subdirectory(adrenotools)
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/adrenotools/CMakeLists.txt")
+    add_subdirectory(adrenotools)
+    set(HAS_ADRENOTOOLS ON)
+else()
+    message(WARNING "adrenotools native submodule is missing; building without native adrenotools target")
+    set(HAS_ADRENOTOOLS OFF)
+endif()
 
 # Add Winlator shared library
 add_library(winlator SHARED
@@ -25,6 +31,7 @@ add_library(winlator SHARED
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
+target_compile_definitions(winlator PRIVATE AERO_HAS_ADRENOTOOLS=$<BOOL:${HAS_ADRENOTOOLS}>)
 
 target_link_libraries(winlator
         log
@@ -35,5 +42,8 @@ target_link_libraries(winlator
         EGL
         GLESv2
         GLESv3
-        adrenotools
 )
+
+if (HAS_ADRENOTOOLS)
+    target_link_libraries(winlator adrenotools)
+endif()

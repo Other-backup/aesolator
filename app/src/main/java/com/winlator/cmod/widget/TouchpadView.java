@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
@@ -31,6 +32,7 @@ public class TouchpadView extends View {
     private static final String PREF_STRICT_GESTURE_FSM = "touchpad_strict_gesture_fsm";
     private static final byte MAX_FINGERS = 4;
     private static final short MAX_TWO_FINGERS_SCROLL_DISTANCE = 350;
+    private static final short DEFAULT_SCROLL_STEP_DISTANCE = 100;
     public static final byte MAX_TAP_TRAVEL_DISTANCE = 10;
     public static final short MAX_TAP_MILLISECONDS = 200;
     public static final float CURSOR_ACCELERATION = 1.25f;
@@ -61,6 +63,11 @@ public class TouchpadView extends View {
 
     private SharedPreferences preferences;
     private GestureMode gestureMode = GestureMode.NONE;
+    private short tapMilliseconds = MAX_TAP_MILLISECONDS;
+    private byte tapTravelDistance = MAX_TAP_TRAVEL_DISTANCE;
+    private short twoFingersScrollDistance = MAX_TWO_FINGERS_SCROLL_DISTANCE;
+    private short scrollStepDistance = DEFAULT_SCROLL_STEP_DISTANCE;
+    private @Nullable Boolean strictGestureFsmOverride = null;
 
     private enum GestureMode {
         NONE,
@@ -113,10 +120,25 @@ public class TouchpadView extends View {
     }
 
     private void updateXform(int outerWidth, int outerHeight, int innerWidth, int innerHeight) {
+        if (outerWidth <= 0 || outerHeight <= 0 || innerWidth <= 0 || innerHeight <= 0) {
+            XForm.identity(xform);
+            return;
+        }
+
         ViewTransformation viewTransformation = new ViewTransformation();
         viewTransformation.update(outerWidth, outerHeight, innerWidth, innerHeight);
 
+        if (!Float.isFinite(viewTransformation.aspect) || viewTransformation.aspect == 0.0f) {
+            XForm.identity(xform);
+            return;
+        }
+
         float invAspect = 1.0f / viewTransformation.aspect;
+        if (!Float.isFinite(invAspect)) {
+            XForm.identity(xform);
+            return;
+        }
+
         if (!xServer.getRenderer().isFullscreen()) {
             XForm.makeTranslation(xform, -viewTransformation.viewOffsetX, -viewTransformation.viewOffsetY);
             XForm.scale(xform, invAspect, invAspect);
@@ -161,7 +183,7 @@ public class TouchpadView extends View {
         }
 
         private boolean isTap() {
-            return (System.currentTimeMillis() - touchTime) < MAX_TAP_MILLISECONDS && travelDistance() < MAX_TAP_TRAVEL_DISTANCE;
+            return (System.currentTimeMillis() - touchTime) < tapMilliseconds && travelDistance() < tapTravelDistance;
         }
 
         private float travelDistance() {
@@ -328,9 +350,17 @@ public class TouchpadView extends View {
                                 fingers[i].update(event.getX(pointerIndex), event.getY(pointerIndex));
                                 handleFingerMove(fingers[i]);
                             } else {
-                                handleFingerUp(fingers[i]);
+                                // Pointer disappeared without ACTION_POINTER_UP.
+                                // Drop it without tap synthesis to avoid phantom clicks.
+                                dropMissingFinger(fingers[i]);
                                 fingers[i] = null;
                                 numFingers--;
+                                if (numFingers <= 0) {
+                                    numFingers = 0;
+                                    scrolling = false;
+                                    scrollAccumY = 0;
+                                    gestureMode = GestureMode.NONE;
+                                }
                             }
                         }
                     }
@@ -386,6 +416,12 @@ public class TouchpadView extends View {
         if (rightOwner != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
         }
+    }
+
+    private void dropMissingFinger(Finger finger) {
+        if (finger == null) return;
+        releasePointerButtonLeft(finger);
+        releasePointerButtonRight(finger);
     }
 
     private boolean handleTouchscreenEvent(MotionEvent event) {
@@ -532,10 +568,10 @@ public class TouchpadView extends View {
 
             if (strictFsmEnabled) {
                 if (gestureMode == GestureMode.NONE) {
-                    if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
+                    if (currDistance < twoFingersScrollDistance) {
                         gestureMode = GestureMode.TWO_FINGER_SCROLL;
                     } else if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)
-                            && finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
+                            && finger2.travelDistance() < tapTravelDistance) {
                         pressPointerButtonLeft(finger1);
                         gestureMode = GestureMode.TWO_FINGER_DRAG;
                         skipPointerMove = true;
@@ -546,11 +582,11 @@ public class TouchpadView extends View {
 
                 if (gestureMode == GestureMode.TWO_FINGER_SCROLL) {
                     scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
-                    if (scrollAccumY < -100) {
+                    if (scrollAccumY < -scrollStepDistance) {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                         scrollAccumY = 0;
-                    } else if (scrollAccumY > 100) {
+                    } else if (scrollAccumY > scrollStepDistance) {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
                         scrollAccumY = 0;
@@ -561,23 +597,23 @@ public class TouchpadView extends View {
                     scrolling = false;
                 }
             } else {
-                if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
+                if (currDistance < twoFingersScrollDistance) {
                     scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
 
-                    if (scrollAccumY < -100) {
+                    if (scrollAccumY < -scrollStepDistance) {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                         scrollAccumY = 0;
                     }
-                    else if (scrollAccumY > 100) {
+                    else if (scrollAccumY > scrollStepDistance) {
                         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
                         xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
                         scrollAccumY = 0;
                     }
                     scrolling = true;
                 }
-                else if (currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
-                         finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
+                else if (currDistance >= twoFingersScrollDistance && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
+                         finger2.travelDistance() < tapTravelDistance) {
                     pressPointerButtonLeft(finger1);
                     skipPointerMove = true;
                 }
@@ -615,6 +651,7 @@ public class TouchpadView extends View {
     }
 
     private boolean isStrictGestureFsmEnabled() {
+        if (strictGestureFsmOverride != null) return strictGestureFsmOverride;
         return preferences != null && preferences.getBoolean(PREF_STRICT_GESTURE_FSM, false);
     }
 
@@ -786,6 +823,25 @@ public class TouchpadView extends View {
 
     public boolean isSimTouchScreen() {
         return simTouchScreen;
+    }
+
+    public void setStrictGestureFsmOverride(@Nullable Boolean strictGestureFsmOverride) {
+        this.strictGestureFsmOverride = strictGestureFsmOverride;
+    }
+
+    public void setGestureRuntimeTuning(int tapTimeoutMs, int tapTravelPx, int scrollStepPx, int twoFingerScrollThresholdPx) {
+        tapMilliseconds = (short) Math.max(80, Math.min(500, tapTimeoutMs));
+        tapTravelDistance = (byte) Math.max(4, Math.min(24, tapTravelPx));
+        scrollStepDistance = (short) Math.max(40, Math.min(240, scrollStepPx));
+        twoFingersScrollDistance = (short) Math.max(120, Math.min(700, twoFingerScrollThresholdPx));
+    }
+
+    public void resetGestureRuntimeTuning() {
+        tapMilliseconds = MAX_TAP_MILLISECONDS;
+        tapTravelDistance = MAX_TAP_TRAVEL_DISTANCE;
+        scrollStepDistance = DEFAULT_SCROLL_STEP_DISTANCE;
+        twoFingersScrollDistance = MAX_TWO_FINGERS_SCROLL_DISTANCE;
+        strictGestureFsmOverride = null;
     }
 
     public void toggleFullscreen() {

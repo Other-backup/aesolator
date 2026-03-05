@@ -137,9 +137,15 @@ public class WineInfo implements Parcelable {
         ParsedIdentifier parsed = null;
         String path = "";
 
-        if (wineProfile != null && wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE ) {
+        if (wineProfile != null && wineProfile.isWineProtonFamily()) {
             path = contentsManager.getInstallDir(context, wineProfile).getPath();
-            parsed = parseIdentifier(wineProfile.verName);
+            parsed = parseIdentifier(normalizedIdentifier);
+            if (parsed != null) {
+                String profileType = wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON ? "proton" : "wine";
+                if (!profileType.equals(parsed.type)) {
+                    parsed = new ParsedIdentifier(profileType, parsed.version, parsed.arch);
+                }
+            }
         }
 
         if (parsed == null) {

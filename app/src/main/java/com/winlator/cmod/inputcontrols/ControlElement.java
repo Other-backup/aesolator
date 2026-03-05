@@ -6,6 +6,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.view.MotionEvent;
 
 import androidx.core.graphics.ColorUtils;
 
@@ -771,6 +772,17 @@ public class ControlElement {
             return true;
         }
         return false;
+    }
+
+    public boolean resetTouchState() {
+        if (currentPointerId == -1) return false;
+        return handleTouchUp(currentPointerId);
+    }
+
+    public boolean releaseIfPointerMissing(MotionEvent event) {
+        if (currentPointerId == -1 || event == null) return false;
+        if (event.findPointerIndex(currentPointerId) >= 0) return false;
+        return handleTouchUp(currentPointerId);
     }
 
     public PointF getCurrentPosition() {

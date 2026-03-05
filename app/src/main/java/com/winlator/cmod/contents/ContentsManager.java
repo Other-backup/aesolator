@@ -43,6 +43,7 @@ public class ContentsManager {
     private static final String[] CONTENT_ARCHIVE_SUFFIXES = {
             ".wcp", ".zip", ".tar", ".txz", ".tzst", ".tar.xz", ".tar.zst"
     };
+    private static final String INSTALL_STAGE_MARKER_SUFFIX = ".install-stage.json";
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -272,7 +273,7 @@ public class ContentsManager {
             }
         }
 
-        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE) {
+        if (profile.isWineProtonFamily()) {
             File bin = new File(file, profile.wineBinPath);
             File lib = new File(file, profile.wineLibPath);
             File cp = new File(file, profile.winePrefixPack);
@@ -300,6 +301,10 @@ public class ContentsManager {
             return;
         }
 
+        recoverInterruptedInstall(typeDir, installPath);
+        File stageMarker = getInstallStageMarker(typeDir, installPath);
+        clearInstallStageMarker(stageMarker);
+
         File backupPath = null;
         if (installPath.exists()) {
             if (!isUpdatableLane(profile.type)) {
@@ -308,6 +313,11 @@ public class ContentsManager {
             }
             backupPath = new File(typeDir, installPath.getName() + ".bak-" + UUID.randomUUID().toString().replace("-", ""));
             if (!installPath.renameTo(backupPath)) {
+                callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+                return;
+            }
+            if (!writeInstallStageMarker(stageMarker, installPath, backupPath)) {
+                backupPath.renameTo(installPath);
                 callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
                 return;
             }
@@ -326,6 +336,7 @@ public class ContentsManager {
             if (backupPath != null && backupPath.exists() && !installPath.exists()) {
                 backupPath.renameTo(installPath);
             }
+            clearInstallStageMarker(stageMarker);
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
@@ -333,8 +344,54 @@ public class ContentsManager {
         if (backupPath != null && backupPath.exists()) {
             FileUtils.delete(backupPath);
         }
+        clearInstallStageMarker(stageMarker);
 
         callback.onSucceed(profile);
+    }
+
+    private File getInstallStageMarker(File typeDir, File installPath) {
+        return new File(typeDir, installPath.getName() + INSTALL_STAGE_MARKER_SUFFIX);
+    }
+
+    private boolean writeInstallStageMarker(File markerFile, File installPath, File backupPath) {
+        try {
+            JSONObject marker = new JSONObject();
+            marker.put("target", installPath.getAbsolutePath());
+            marker.put("backup", backupPath.getAbsolutePath());
+            marker.put("ts", System.currentTimeMillis());
+            return FileUtils.writeString(markerFile, marker.toString());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void clearInstallStageMarker(File markerFile) {
+        if (markerFile != null && markerFile.exists()) {
+            markerFile.delete();
+        }
+    }
+
+    private void recoverInterruptedInstall(File typeDir, File installPath) {
+        File markerFile = getInstallStageMarker(typeDir, installPath);
+        if (!markerFile.isFile()) return;
+        try {
+            JSONObject marker = new JSONObject(FileUtils.readString(markerFile));
+            File target = new File(marker.optString("target", installPath.getAbsolutePath()));
+            File backup = new File(marker.optString("backup", ""));
+            if (!backup.exists()) {
+                clearInstallStageMarker(markerFile);
+                return;
+            }
+            if (target.exists()) {
+                FileUtils.delete(backup);
+                clearInstallStageMarker(markerFile);
+                return;
+            }
+            if (backup.renameTo(target)) {
+                clearInstallStageMarker(markerFile);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     public ContentProfile readProfile(File file) {
@@ -373,7 +430,10 @@ public class ContentsManager {
 
             if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
                     || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-                JSONObject wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
+                JSONObject wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_PROTON);
+                if (wineJSONObject == null) {
+                    wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
+                }
                 if (wineJSONObject != null) {
                     profile.wineLibPath = wineJSONObject.optString(ContentProfile.MARK_WINE_LIBPATH, "");
                     profile.wineBinPath = wineJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, "");

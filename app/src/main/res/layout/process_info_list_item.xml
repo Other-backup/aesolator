@@ -32,14 +32,22 @@
         android:layout_height="wrap_content"
         android:paddingLeft="4dp" />
 
-    <RelativeLayout
-        android:layout_width="40dp"
+    <LinearLayout
+        android:layout_width="80dp"
         android:layout_height="40dp"
-        android:gravity="center">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            style="@style/ListMenuButton"
+            android:id="@+id/BTQuickEnd"
+            android:contentDescription="@string/end_process"
+            android:src="@drawable/icon_popup_menu_remove" />
 
         <ImageButton
             style="@style/ListMenuButton"
             android:id="@+id/BTMenu"
+            android:contentDescription="@string/options"
             android:src="@drawable/icon_list_item_menu" />
-    </RelativeLayout>
+    </LinearLayout>
 </LinearLayout>

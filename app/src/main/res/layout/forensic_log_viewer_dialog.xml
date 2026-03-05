@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <TextView
+        android:id="@+id/TVForensicLogFile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/BTForensicExportLog"
+        style="@style/ButtonNeutral"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/diagnostics_forensic_log_export" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="360dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/edit_text"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/TVForensicLogBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textIsSelectable="true"
+            android:textSize="12sp"
+            android:typeface="monospace" />
+    </ScrollView>
+</LinearLayout>

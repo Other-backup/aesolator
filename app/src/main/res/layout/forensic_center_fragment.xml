@@ -288,6 +288,14 @@
                         android:layout_weight="1"
                         android:text="@string/save" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/BTViewForensicLog"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/diagnostics_view_forensic_log" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

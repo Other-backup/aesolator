@@ -55,11 +55,31 @@ import java.util.List;
 import java.util.Locale;
 
 public class ShortcutSettingsDialog extends ContentDialog {
+    private static final String TOUCHPAD_PROFILE_GLOBAL = "global";
+    private static final String TOUCHPAD_PROFILE_BALANCED = "balanced";
+    private static final String TOUCHPAD_PROFILE_AGGRESSIVE = "aggressive";
+    private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
     private final ShortcutsFragment fragment;
     private final Shortcut shortcut;
     private InputControlsManager inputControlsManager;
     private TextView tvGraphicsDriverVersion;
     private String box64Version;
+
+    private static final class TouchpadGestureDefaults {
+        final boolean strictFsm;
+        final int tapTimeoutMs;
+        final int tapTravelPx;
+        final int scrollStepPx;
+        final int scrollZonePx;
+
+        TouchpadGestureDefaults(boolean strictFsm, int tapTimeoutMs, int tapTravelPx, int scrollStepPx, int scrollZonePx) {
+            this.strictFsm = strictFsm;
+            this.tapTimeoutMs = tapTimeoutMs;
+            this.tapTravelPx = tapTravelPx;
+            this.scrollStepPx = scrollStepPx;
+            this.scrollZonePx = scrollZonePx;
+        }
+    }
 
 
     public ShortcutSettingsDialog(ShortcutsFragment fragment, Shortcut shortcut) {
@@ -189,8 +209,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedVersion = parent.getItemAtPosition(position).toString();
-                box64Version = selectedVersion;  // Update the class-level variable
-                // Update the shortcut extra immediately, or wait until saveData() is called
+                if (AppUtils.isMissingComponentValue(selectedVersion)) return;
+                box64Version = selectedVersion;
                 shortcut.putExtra("box64Version", selectedVersion);
             }
 
@@ -251,6 +271,77 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final CheckBox cbSimTouchScreen = findViewById(R.id.CBTouchscreenMode);
         String isTouchScreenMode = shortcut.getExtra("simTouchScreen");
         cbSimTouchScreen.setChecked(isTouchScreenMode.equals("1") ? true : false);
+        final Spinner sTouchpadGestureProfile = findViewById(R.id.STouchpadGestureProfile);
+        final CheckBox cbTouchpadStrictGestureFsm = findViewById(R.id.CBTouchpadStrictGestureFsm);
+        final SeekBar sbTapTimeoutMs = findViewById(R.id.SBTapTimeoutMs);
+        final SeekBar sbTapTravelPx = findViewById(R.id.SBTapTravelPx);
+        final SeekBar sbScrollStepPx = findViewById(R.id.SBScrollStepPx);
+        final SeekBar sbScrollZonePx = findViewById(R.id.SBScrollZonePx);
+        final TextView tvTapTimeoutMs = findViewById(R.id.TVTapTimeoutMs);
+        final TextView tvTapTravelPx = findViewById(R.id.TVTapTravelPx);
+        final TextView tvScrollStepPx = findViewById(R.id.TVScrollStepPx);
+        final TextView tvScrollZonePx = findViewById(R.id.TVScrollZonePx);
+        final String[] touchpadProfileValues = context.getResources().getStringArray(R.array.touchpad_gesture_profile_values);
+        String shortcutTouchpadProfile = shortcut.getExtra("touchpadGestureProfile", TOUCHPAD_PROFILE_GLOBAL);
+        int touchpadProfileIndex = findStringValueIndex(touchpadProfileValues, shortcutTouchpadProfile);
+        if (touchpadProfileIndex < 0) touchpadProfileIndex = 0;
+        sTouchpadGestureProfile.setSelection(touchpadProfileIndex, false);
+
+        final Runnable updateGestureMetricLabels = () -> {
+            tvTapTimeoutMs.setText(sbTapTimeoutMs.getProgress() + " ms");
+            tvTapTravelPx.setText(sbTapTravelPx.getProgress() + " px");
+            tvScrollStepPx.setText(sbScrollStepPx.getProgress() + " px");
+            tvScrollZonePx.setText(sbScrollZonePx.getProgress() + " px");
+        };
+
+        final Runnable bindTouchpadProfileControls = () -> {
+            int selectedIndex = Math.max(0, sTouchpadGestureProfile.getSelectedItemPosition());
+            if (selectedIndex >= touchpadProfileValues.length) selectedIndex = 0;
+            String selectedProfileId = touchpadProfileValues[selectedIndex];
+            TouchpadGestureDefaults defaults = resolveTouchpadGestureDefaults(selectedProfileId);
+            boolean isGlobalProfile = TOUCHPAD_PROFILE_GLOBAL.equals(selectedProfileId);
+
+            cbTouchpadStrictGestureFsm.setEnabled(!isGlobalProfile);
+            sbTapTimeoutMs.setEnabled(!isGlobalProfile);
+            sbTapTravelPx.setEnabled(!isGlobalProfile);
+            sbScrollStepPx.setEnabled(!isGlobalProfile);
+            sbScrollZonePx.setEnabled(!isGlobalProfile);
+
+            cbTouchpadStrictGestureFsm.setChecked(defaults.strictFsm);
+            sbTapTimeoutMs.setProgress(defaults.tapTimeoutMs);
+            sbTapTravelPx.setProgress(defaults.tapTravelPx);
+            sbScrollStepPx.setProgress(defaults.scrollStepPx);
+            sbScrollZonePx.setProgress(defaults.scrollZonePx);
+            updateGestureMetricLabels.run();
+        };
+
+        sTouchpadGestureProfile.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                bindTouchpadProfileControls.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        sbTapTimeoutMs.setOnSeekBarChangeListener(new SimpleSeekbarListener(updateGestureMetricLabels));
+        sbTapTravelPx.setOnSeekBarChangeListener(new SimpleSeekbarListener(updateGestureMetricLabels));
+        sbScrollStepPx.setOnSeekBarChangeListener(new SimpleSeekbarListener(updateGestureMetricLabels));
+        sbScrollZonePx.setOnSeekBarChangeListener(new SimpleSeekbarListener(updateGestureMetricLabels));
+        bindTouchpadProfileControls.run();
+
+        String shortcutStrictGesture = shortcut.getExtra("touchpadStrictGestureFsm", "");
+        String shortcutTapTimeoutMs = shortcut.getExtra("touchpadTapTimeoutMs", "");
+        String shortcutTapTravelPx = shortcut.getExtra("touchpadTapTravelPx", "");
+        String shortcutScrollStepPx = shortcut.getExtra("touchpadScrollStepPx", "");
+        String shortcutScrollZonePx = shortcut.getExtra("touchpadScrollZonePx", "");
+        if (!shortcutStrictGesture.isEmpty()) cbTouchpadStrictGestureFsm.setChecked(parseBooleanValue(shortcutStrictGesture));
+        if (!shortcutTapTimeoutMs.isEmpty()) sbTapTimeoutMs.setProgress(parseBoundedInt(shortcutTapTimeoutMs, sbTapTimeoutMs.getProgress(), 80, 500));
+        if (!shortcutTapTravelPx.isEmpty()) sbTapTravelPx.setProgress(parseBoundedInt(shortcutTapTravelPx, sbTapTravelPx.getProgress(), 4, 24));
+        if (!shortcutScrollStepPx.isEmpty()) sbScrollStepPx.setProgress(parseBoundedInt(shortcutScrollStepPx, sbScrollStepPx.getProgress(), 40, 240));
+        if (!shortcutScrollZonePx.isEmpty()) sbScrollZonePx.setProgress(parseBoundedInt(shortcutScrollZonePx, sbScrollZonePx.getProgress(), 120, 700));
+        updateGestureMetricLabels.run();
 
         ContainerDetailFragment.createWinComponentsTabFromShortcut(this, getContentView(),
                 shortcut.getExtra("wincomponents", shortcut.container.getWinComponents()), isDarkMode);
@@ -372,6 +463,23 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
                 boolean touchscreenMode = cbSimTouchScreen.isChecked();
                 shortcut.putExtra("simTouchScreen", touchscreenMode ? "1" : "0");
+                int selectedGestureProfileIndex = Math.max(0, sTouchpadGestureProfile.getSelectedItemPosition());
+                if (selectedGestureProfileIndex >= touchpadProfileValues.length) selectedGestureProfileIndex = 0;
+                String selectedGestureProfile = touchpadProfileValues[selectedGestureProfileIndex];
+                shortcut.putExtra("touchpadGestureProfile", selectedGestureProfile);
+                if (TOUCHPAD_PROFILE_GLOBAL.equals(selectedGestureProfile)) {
+                    shortcut.putExtra("touchpadStrictGestureFsm", null);
+                    shortcut.putExtra("touchpadTapTimeoutMs", null);
+                    shortcut.putExtra("touchpadTapTravelPx", null);
+                    shortcut.putExtra("touchpadScrollStepPx", null);
+                    shortcut.putExtra("touchpadScrollZonePx", null);
+                } else {
+                    shortcut.putExtra("touchpadStrictGestureFsm", cbTouchpadStrictGestureFsm.isChecked() ? "1" : "0");
+                    shortcut.putExtra("touchpadTapTimeoutMs", String.valueOf(sbTapTimeoutMs.getProgress()));
+                    shortcut.putExtra("touchpadTapTravelPx", String.valueOf(sbTapTravelPx.getProgress()));
+                    shortcut.putExtra("touchpadScrollStepPx", String.valueOf(sbScrollStepPx.getProgress()));
+                    shortcut.putExtra("touchpadScrollZonePx", String.valueOf(sbScrollZonePx.getProgress()));
+                }
 
                 String execArgs = etExecArgs.getText().toString();
                 shortcut.putExtra("execArgs", !execArgs.isEmpty() ? execArgs : null);
@@ -393,8 +501,10 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 String envVars = envVarsView.getEnvVars();
                 shortcut.putExtra("envVars", !envVars.isEmpty() ? envVars : null);
 
-                String fexcoreVersion = sFEXCoreVersion.getSelectedItem().toString();
-                shortcut.putExtra("fexcoreVersion", fexcoreVersion);
+                String fexcoreVersion = sFEXCoreVersion.getSelectedItem() != null ? sFEXCoreVersion.getSelectedItem().toString() : "";
+                if (!AppUtils.isMissingComponentValue(fexcoreVersion)) {
+                    shortcut.putExtra("fexcoreVersion", fexcoreVersion);
+                }
 
                 String fexcorePreset = FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset);
                 shortcut.putExtra("fexcorePreset", fexcorePreset);
@@ -457,6 +567,64 @@ public class ShortcutSettingsDialog extends ContentDialog {
         applyFieldSetLabelStylesDynamically(llContent, isDarkMode);
     }
 
+    private static final class SimpleSeekbarListener implements SeekBar.OnSeekBarChangeListener {
+        private final Runnable onValueChanged;
+
+        SimpleSeekbarListener(Runnable onValueChanged) {
+            this.onValueChanged = onValueChanged;
+        }
+
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            if (onValueChanged != null) onValueChanged.run();
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {}
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {}
+    }
+
+    private TouchpadGestureDefaults resolveTouchpadGestureDefaults(String profileId) {
+        String normalized = profileId == null ? TOUCHPAD_PROFILE_GLOBAL : profileId.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case TOUCHPAD_PROFILE_BALANCED -> new TouchpadGestureDefaults(true, 190, 10, 95, 350);
+            case TOUCHPAD_PROFILE_AGGRESSIVE -> new TouchpadGestureDefaults(true, 145, 8, 75, 300);
+            case TOUCHPAD_PROFILE_COMPAT -> new TouchpadGestureDefaults(false, 240, 14, 130, 430);
+            case TOUCHPAD_PROFILE_GLOBAL -> new TouchpadGestureDefaults(false, 200, 10, 100, 350);
+            default -> new TouchpadGestureDefaults(true, 190, 10, 95, 350);
+        };
+    }
+
+    private int findStringValueIndex(String[] values, String target) {
+        if (values == null || values.length == 0) return -1;
+        String normalizedTarget = target == null ? "" : target.trim().toLowerCase(Locale.ENGLISH);
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != null && values[i].trim().toLowerCase(Locale.ENGLISH).equals(normalizedTarget)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int parseBoundedInt(String value, int fallback, int min, int max) {
+        if (value == null || value.trim().isEmpty()) return fallback;
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            if (parsed <= 0) return fallback;
+            return Math.max(min, Math.min(max, parsed));
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private boolean parseBooleanValue(String value) {
+        return "1".equals(value)
+                || "true".equalsIgnoreCase(value)
+                || "yes".equalsIgnoreCase(value);
+    }
+
 
     public static void loadScreenSizeSpinner(View view, String selectedValue, boolean isDarkMode) {
         final Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
@@ -505,6 +673,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
+        Spinner sTouchpadGestureProfile = view.findViewById(R.id.STouchpadGestureProfile);
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
         
 
@@ -520,6 +689,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sTouchpadGestureProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
 //        EditText etLC_ALL = view.findViewById(R.id.ETlcall);
@@ -655,25 +825,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
     }
 
     public static void loadBox64VersionSpinner(Context context, ContentsManager manager, Spinner spinner, boolean isArm64EC) {
-        List<String> itemList;
-        if (isArm64EC)
-            itemList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.wowbox64_version_entries)));
-        else
-            itemList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.box64_version_entries)));
-        if (!isArm64EC) {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)) {
-                String entryName = ContentsManager.getEntryName(profile);
-                int firstDashIndex = entryName.indexOf('-');
-                itemList.add(entryName.substring(firstDashIndex + 1));
-            }
-        } else {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)) {
-                String entryName = ContentsManager.getEntryName(profile);
-                int firstDashIndex = entryName.indexOf('-');
-                itemList.add(entryName.substring(firstDashIndex + 1));
-            }
-        }
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        ContainerDetailFragment.loadBox64VersionSpinner(context, null, manager, spinner, isArm64EC);
     }
     
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {

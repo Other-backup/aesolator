@@ -175,6 +175,18 @@
         <item>pid_asc</item>
         <item>arch_lane</item>
     </string-array>
+    <string-array name="touchpad_gesture_profile_entries">
+        <item>@string/touchpad_gesture_profile_global</item>
+        <item>@string/touchpad_gesture_profile_balanced</item>
+        <item>@string/touchpad_gesture_profile_aggressive</item>
+        <item>@string/touchpad_gesture_profile_compat</item>
+    </string-array>
+    <string-array name="touchpad_gesture_profile_values">
+        <item>global</item>
+        <item>balanced</item>
+        <item>aggressive</item>
+        <item>compat</item>
+    </string-array>
     <string-array name="some_lc_all">
         <item>ar_EG</item>
         <item>ar_SA</item>

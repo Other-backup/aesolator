@@ -1,6 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -15,6 +16,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.VKD3DVersionItem;
@@ -23,9 +25,12 @@ import com.winlator.cmod.xenvironment.ImageFs;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import androidx.preference.PreferenceManager;
 
 public class DXVKConfigDialog extends ContentDialog {
     public static final String DEFAULT_CONFIG = Container.DEFAULT_DXWRAPPERCONFIG;
@@ -88,6 +93,7 @@ public class DXVKConfigDialog extends ContentDialog {
         swAsyncCache = findViewById(R.id.SWAsyncCache);
         llAsync = findViewById(R.id.LLAsync);
         llAsyncCache = findViewById(R.id.LLAsyncCache);
+        applyPopupTheme(sDXVKVersion, sVKD3DVersion, sFramerate, sVKD3DFeatureLevel);
 
         ContentsManager contentsManager = new ContentsManager(context);
         contentsManager.syncContents();
@@ -124,13 +130,15 @@ public class DXVKConfigDialog extends ContentDialog {
         sVKD3DVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selectedVersion = sVKD3DVersion.getSelectedItem().toString();
+                VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
+                String selectedVersion = selectedItem != null ? selectedItem.getIdentifier() : "";
                 String currentDXVKVersion = config.get("version");
 
-                if (!selectedVersion.equals("None")) {
+                if (!"None".equalsIgnoreCase(selectedVersion) && !AppUtils.isMissingComponentValue(selectedVersion)) {
                     ArrayList<String> versions = new ArrayList<>();
 
                     for (int i = 0; i < dxvkVersions.size(); i++) {
+                        if (AppUtils.isMissingComponentValue(dxvkVersions.get(i))) continue;
                         Integer major = tryGetMajor(dxvkVersions.get(i));
                         if (major != null && major < 2) {
                             versions.add(dxvkVersions.get(i));
@@ -138,9 +146,13 @@ public class DXVKConfigDialog extends ContentDialog {
                     }
 
                     dxvkVersions.removeAll(versions);
+                    if (dxvkVersions.isEmpty()) {
+                        dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+                    }
 
                     ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
                     sDXVKVersion.setAdapter(adapter);
+                    sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
 
                     Integer curMajor = tryGetMajor(currentDXVKVersion);
                     AppUtils.setSpinnerSelectionFromIdentifier(
@@ -161,12 +173,16 @@ public class DXVKConfigDialog extends ContentDialog {
         });
 
         setOnConfirmCallback(() -> {
-            config.put("version", sDXVKVersion.getSelectedItem().toString());
+            String selectedDxvkVersion = sDXVKVersion.getSelectedItem() != null ? sDXVKVersion.getSelectedItem().toString() : "";
+            if (!AppUtils.isMissingComponentValue(selectedDxvkVersion)) {
+                config.put("version", selectedDxvkVersion);
+            }
             config.put("framerate", StringUtils.parseNumber(sFramerate.getSelectedItem()));
             config.put("async", ((swAsync.isChecked())&&(llAsync.getVisibility()==View.VISIBLE))?"1":"0");
             config.put("asyncCache", ((swAsyncCache.isChecked())&&(llAsyncCache.getVisibility()==View.VISIBLE))?"1":"0");
             VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
-            config.put("vkd3dVersion", selectedItem.getIdentifier());
+            String selectedVkd3dIdentifier = selectedItem != null ? selectedItem.getIdentifier() : "None";
+            config.put("vkd3dVersion", AppUtils.isMissingComponentValue(selectedVkd3dIdentifier) ? "None" : selectedVkd3dIdentifier);
             config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
             // Legacy DDraw wrapper key is removed from DXVK config; dgVoodoo has its own wrapper mode.
             config.remove("ddrawrapper");
@@ -188,7 +204,9 @@ public class DXVKConfigDialog extends ContentDialog {
     }
 
     private int getDXVKType(int pos) {
+        if (dxvkVersions == null || pos < 0 || pos >= dxvkVersions.size()) return DXVK_TYPE_NONE;
         final String v = dxvkVersions.get(pos);
+        if (AppUtils.isMissingComponentValue(v)) return DXVK_TYPE_NONE;
         int dxvkType = DXVK_TYPE_NONE;
         if (v.contains("gplasync"))
             dxvkType = DXVK_TYPE_GPLASYNC;
@@ -198,12 +216,18 @@ public class DXVKConfigDialog extends ContentDialog {
     }
 
     private void setDXVKSpinner(Spinner sDXVKVersion, KeyValueSet config, ContentsManager contentsManager, boolean isARM64EC) {
+        if (dxvkVersions == null || dxvkVersions.isEmpty() || AppUtils.isMissingComponentValue(dxvkVersions.get(0))) {
+            sDXVKVersion.setSelection(0, false);
+            return;
+        }
+
         String selectedVersion = config.get("vkd3dVersion");
         String currentDXVKVersion = config.get("version");
         if (!selectedVersion.equals("None")) {
             ArrayList<String> versions = new ArrayList<>();
 
             for (int i = 0; i < dxvkVersions.size(); i++) {
+                if (AppUtils.isMissingComponentValue(dxvkVersions.get(i))) continue;
                 Integer major = tryGetMajor(dxvkVersions.get(i));
                 if (major != null && major < 2) {
                     versions.add(dxvkVersions.get(i));
@@ -211,9 +235,13 @@ public class DXVKConfigDialog extends ContentDialog {
             }
 
             dxvkVersions.removeAll(versions);
+            if (dxvkVersions.isEmpty()) {
+                dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+            }
 
             ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
             sDXVKVersion.setAdapter(adapter);
+            sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
 
             Integer curMajor = tryGetMajor(currentDXVKVersion);
             AppUtils.setSpinnerSelectionFromIdentifier(
@@ -258,41 +286,87 @@ public class DXVKConfigDialog extends ContentDialog {
 
     private void loadDxvkVersionSpinner(ContentsManager manager, Spinner spinner, boolean isARM64EC) {
         this.isARM64EC = isARM64EC;
-        String[] originalItems = context.getResources().getStringArray(R.array.dxvk_version_entries);
-        List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
+        List<String> itemList = new ArrayList<>();
 
-        for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK)) {
-            String entryName = ContentsManager.getEntryName(profile);
-            int firstDashIndex = entryName.indexOf('-');
-            itemList.add(entryName.substring(firstDashIndex + 1));
+        String[] originalItems = context.getResources().getStringArray(R.array.dxvk_version_entries);
+        for (String version : originalItems) {
+            if (FileUtils.getSize(context, "dxwrapper/dxvk-" + version + ".tzst") > 0) {
+                itemList.add(version);
+            }
         }
 
-        for (int i = 0; i < itemList.size(); i++) {
-            if (itemList.get(i).contains("arm64ec") && !isARM64EC)
-                itemList.remove(i);
+        List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
+        if (profiles != null) {
+            for (ContentProfile profile : profiles) {
+                if (profile == null || !profile.locallyInstalled) continue;
+                if (profile.verName == null || profile.verName.trim().isEmpty()) continue;
+                if (!itemList.contains(profile.verName)) {
+                    itemList.add(profile.verName);
+                }
+            }
+        }
+
+        Iterator<String> iterator = itemList.iterator();
+        while (iterator.hasNext()) {
+            String value = iterator.next();
+            if (value.contains("arm64ec") && !isARM64EC) {
+                iterator.remove();
+            }
+        }
+
+        boolean hasVersions = !itemList.isEmpty();
+        if (!hasVersions) {
+            itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
 
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setEnabled(hasVersions);
         dxvkVersions = itemList;
     }
 
     private void loadVkd3dVersionSpinner(ContentsManager manager, Spinner spinner) {
         List<VKD3DVersionItem> itemList = new ArrayList<>();
+        boolean hasRuntimeVersions = false;
 
-        // Add predefined versions
+        // Add predefined bundled versions when embedded archives exist.
         String[] originalItems = context.getResources().getStringArray(R.array.vkd3d_version_entries);
         for (String version : originalItems) {
-            itemList.add(new VKD3DVersionItem(version)); // For predefined versions, use 0 as verCode
+            if ("None".equalsIgnoreCase(version)) continue;
+            if (FileUtils.getSize(context, "dxwrapper/vkd3d-" + version + ".tzst") > 0) {
+                itemList.add(new VKD3DVersionItem(version));
+                hasRuntimeVersions = true;
+            }
         }
 
         // Add installed content profiles
-        for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)) {
-            String displayName = profile.verName;  // Display name for the spinner
-            int versionCode = profile.verCode;     // Unique version code if available
-            itemList.add(new VKD3DVersionItem(displayName, versionCode));
+        List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D);
+        if (profiles != null) {
+            for (ContentProfile profile : profiles) {
+                if (profile == null || !profile.locallyInstalled) continue;
+                String displayName = profile.verName;
+                int versionCode = profile.verCode;
+                itemList.add(new VKD3DVersionItem(displayName, versionCode));
+                hasRuntimeVersions = true;
+            }
+        }
+
+        if (hasRuntimeVersions) {
+            itemList.add(0, new VKD3DVersionItem("None"));
+        } else {
+            itemList.add(new VKD3DVersionItem(AppUtils.MISSING_COMPONENT_PLACEHOLDER));
         }
 
         ArrayAdapter<VKD3DVersionItem> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList);
         spinner.setAdapter(adapter);
+        spinner.setEnabled(hasRuntimeVersions);
+    }
+
+    private void applyPopupTheme(Spinner... spinners) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean isDarkMode = preferences.getBoolean("dark_mode", false);
+        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        for (Spinner spinner : spinners) {
+            if (spinner != null) spinner.setPopupBackgroundResource(popupBg);
+        }
     }
 }

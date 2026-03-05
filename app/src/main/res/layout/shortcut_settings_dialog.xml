@@ -2,11 +2,12 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:fillViewport="true">
 
     <LinearLayout
         android:id="@+id/LLContent"
-        android:layout_width="340dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="8dp">
@@ -492,6 +493,125 @@
                     style="@style/FieldSetLabel"
                     android:background="#ffffff"
                     android:text="@string/input_controls" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout style="@style/FieldSet">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/touchpad_gesture_profile" />
+
+                    <Spinner
+                        style="@style/ComboBox"
+                        android:id="@+id/STouchpadGestureProfile"
+                        android:layout_width="match_parent"
+                        android:entries="@array/touchpad_gesture_profile_entries"
+                        android:spinnerMode="dialog" />
+
+                    <CheckBox
+                        android:id="@+id/CBTouchpadStrictGestureFsm"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/touchpad_strict_gesture_fsm_title" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/touchpad_tap_timeout_ms" />
+                        <TextView
+                            android:id="@+id/TVTapTimeoutMs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="200 ms" />
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/SBTapTimeoutMs"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:min="80"
+                        android:max="500" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/touchpad_tap_travel_px" />
+                        <TextView
+                            android:id="@+id/TVTapTravelPx"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="10 px" />
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/SBTapTravelPx"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:min="4"
+                        android:max="24" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/touchpad_scroll_step_px" />
+                        <TextView
+                            android:id="@+id/TVScrollStepPx"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="100 px" />
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/SBScrollStepPx"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:min="40"
+                        android:max="240" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/touchpad_scroll_zone_px" />
+                        <TextView
+                            android:id="@+id/TVScrollZonePx"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="350 px" />
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/SBScrollZonePx"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:min="120"
+                        android:max="700" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/FieldSetLabel"
+                    android:background="#ffffff"
+                    android:text="@string/touchpad_help" />
             </FrameLayout>
 
             <FrameLayout

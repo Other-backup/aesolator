@@ -1,6 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
@@ -8,6 +9,8 @@ import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
+
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.DgVoodooManager;
@@ -27,6 +30,10 @@ public class DgVoodooConfigDialog extends ContentDialog {
         super(anchor.getContext());
         Context context = anchor.getContext();
         DgVoodooManager manager = new DgVoodooManager(context);
+        boolean packageInstalled = manager.isInstalled();
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean isDarkMode = preferences.getBoolean("dark_mode", false);
+        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
 
         setIcon(R.drawable.icon_settings);
         setTitle(R.string.dgvoodoo_configuration);
@@ -43,7 +50,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
         TextView stateView = new TextView(context);
         stateView.setText(context.getString(
                 R.string.dgvoodoo_config_summary,
-                manager.isInstalled()
+                packageInstalled
                         ? context.getString(R.string.dgvoodoo_package_state_ready, manager.getVersionHint())
                         : context.getString(R.string.dgvoodoo_package_state_missing)
         ));
@@ -60,41 +67,56 @@ public class DgVoodooConfigDialog extends ContentDialog {
         layout.addView(labelView);
 
         Spinner archSpinner = new Spinner(context);
-        String[] labels = {
-                context.getString(R.string.dgvoodoo_arch_auto),
-                context.getString(R.string.dgvoodoo_arch_x86),
-                context.getString(R.string.dgvoodoo_arch_x64),
-                context.getString(R.string.dgvoodoo_arch_arm64),
-                context.getString(R.string.dgvoodoo_arch_arm64ec)
-        };
-        String[] values = {"auto", "x86", "x64", "arm64", "arm64ec"};
+        String[] labels = packageInstalled
+                ? new String[]{
+                        context.getString(R.string.dgvoodoo_arch_auto),
+                        context.getString(R.string.dgvoodoo_arch_x86),
+                        context.getString(R.string.dgvoodoo_arch_x64),
+                        context.getString(R.string.dgvoodoo_arch_arm64),
+                        context.getString(R.string.dgvoodoo_arch_arm64ec)
+                }
+                : new String[]{AppUtils.MISSING_COMPONENT_PLACEHOLDER};
+        String[] values = packageInstalled
+                ? new String[]{"auto", "x86", "x64", "arm64", "arm64ec"}
+                : new String[]{"auto"};
         archSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, labels));
+        archSpinner.setPopupBackgroundResource(popupBg);
         KeyValueSet config = parseConfig(anchor.getTag());
-        AppUtils.setSpinnerSelectionFromValue(archSpinner, labels[indexOf(values, normalizeArch(config.get("dgvoodooArch")))]);
+        if (packageInstalled) {
+            AppUtils.setSpinnerSelectionFromValue(archSpinner, labels[indexOf(values, normalizeArch(config.get("dgvoodooArch")))]);
+        } else {
+            archSpinner.setSelection(0, false);
+        }
+        archSpinner.setEnabled(packageInstalled);
         layout.addView(archSpinner);
 
         Switch forceD3D11Switch = new Switch(context);
         forceD3D11Switch.setText(R.string.dgvoodoo_force_d3d11);
         forceD3D11Switch.setChecked(parseSwitch(config.get("dgvoodooForceD3D11"), false));
+        forceD3D11Switch.setEnabled(packageInstalled);
         layout.addView(forceD3D11Switch);
 
         Switch vsyncSwitch = new Switch(context);
         vsyncSwitch.setText(R.string.dgvoodoo_vsync);
         vsyncSwitch.setChecked(parseSwitch(config.get("dgvoodooVSync"), false));
+        vsyncSwitch.setEnabled(packageInstalled);
         layout.addView(vsyncSwitch);
 
         Switch flipModelSwitch = new Switch(context);
         flipModelSwitch.setText(R.string.dgvoodoo_flip_model);
         flipModelSwitch.setChecked(parseSwitch(config.get("dgvoodooFlipModel"), true));
+        flipModelSwitch.setEnabled(packageInstalled);
         layout.addView(flipModelSwitch);
 
         frameLayout.addView(layout);
 
         setOnConfirmCallback(() -> {
-            config.put("dgvoodooArch", values[archSpinner.getSelectedItemPosition()]);
-            config.put("dgvoodooForceD3D11", forceD3D11Switch.isChecked() ? "1" : "0");
-            config.put("dgvoodooVSync", vsyncSwitch.isChecked() ? "1" : "0");
-            config.put("dgvoodooFlipModel", flipModelSwitch.isChecked() ? "1" : "0");
+            if (packageInstalled) {
+                config.put("dgvoodooArch", values[archSpinner.getSelectedItemPosition()]);
+                config.put("dgvoodooForceD3D11", forceD3D11Switch.isChecked() ? "1" : "0");
+                config.put("dgvoodooVSync", vsyncSwitch.isChecked() ? "1" : "0");
+                config.put("dgvoodooFlipModel", flipModelSwitch.isChecked() ? "1" : "0");
+            }
             config.put("dgvoodooVersionHint", manager.getVersionHint());
             anchor.setTag(config.toString());
         });

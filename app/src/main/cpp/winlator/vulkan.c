@@ -9,7 +9,9 @@
 #include <string.h>
 #include <fcntl.h>
 #include <android/api-level.h>
+#if AERO_HAS_ADRENOTOOLS
 #include "../adrenotools/include/adrenotools/driver.h"
+#endif
 
 #define LOG_TAG "System.out"
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -83,6 +85,7 @@ static void init_original_vulkan() {
 }
 
 static void init_vulkan(JNIEnv  *env, jobject context, const char *driver_name) {
+#if AERO_HAS_ADRENOTOOLS
     char *tmpdir;
     char *library_name;
     char *native_library_dir;
@@ -97,6 +100,12 @@ static void init_vulkan(JNIEnv  *env, jobject context, const char *driver_name) 
     }
 
     vulkan_handle = adrenotools_open_libvulkan(RTLD_LOCAL | RTLD_NOW, ADRENOTOOLS_DRIVER_CUSTOM, tmpdir, native_library_dir, driver_path, library_name, NULL, NULL);
+#else
+    (void)env;
+    (void)context;
+    (void)driver_name;
+    init_original_vulkan();
+#endif
 }
 
 static VkResult create_instance(jstring driverName, JNIEnv *env, jobject context) {

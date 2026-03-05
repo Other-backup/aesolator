@@ -38,6 +38,7 @@ public final class RuntimeProfileManager {
         envVars.put("AERO_RUNTIME_PROFILE_REQUESTED", requestedId);
         envVars.put("AERO_RUNTIME_PROFILE_EFFECTIVE", id);
         envVars.put("AERO_RUNTIME_SOC_CLASS", detectSoCClass(context));
+        envVars.put("AERO_RUNTIME_POLICY_SOURCE", "runtime_profile_manager");
 
         // Baseline shared knobs (independent from FEX/Box profile overlays).
         envVars.put("WINEESYNC", "1");
@@ -46,6 +47,11 @@ public final class RuntimeProfileManager {
         envVars.put("vblank_mode", "0");
         envVars.put("MESA_SHADER_CACHE_DISABLE", "0");
         envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "512M");
+        envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+        envVars.put("AERO_RUNTIME_DRI3_POLICY", "auto");
+        envVars.put("BOX64_DYNAREC_BIGBLOCK", "1");
+        envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
+        envVars.put("BOX64_DYNAREC_SAFEFLAGS", "1");
 
         switch (id) {
             case RuntimeProfile.LEGACY_LOW_2026 -> {
@@ -53,30 +59,46 @@ public final class RuntimeProfileManager {
                 envVars.put("MESA_NO_ERROR", "0");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "256M");
                 envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "conservative");
+                envVars.put("AERO_RUNTIME_DRI3_POLICY", "off");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "0");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "2");
             }
             case RuntimeProfile.MID_2026 -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "0");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "512M");
                 envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "1");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
             case RuntimeProfile.UPPER_MID_2026 -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "1");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "1G");
                 envVars.put("DXVK_ASYNC", "1");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "performance");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "2");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
             case RuntimeProfile.FLAGSHIP_2026 -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "1");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "2G");
                 envVars.put("DXVK_ASYNC", "1");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "performance_plus");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "3");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "0");
             }
             case RuntimeProfile.S8G1_BALANCED -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "0");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "1G");
                 envVars.put("DXVK_ASYNC", "1");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "2");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
             case RuntimeProfile.S8G1_SUPER -> {
                 envVars.put("mesa_glthread", "true");
@@ -84,18 +106,27 @@ public final class RuntimeProfileManager {
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "2G");
                 envVars.put("DXVK_ASYNC", "1");
                 envVars.put("WINE_LARGE_ADDRESS_AWARE", "1");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "performance_plus");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "3");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "0");
             }
             case RuntimeProfile.AUTO -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "0");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "768M");
                 envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "1");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
             default -> {
                 envVars.put("mesa_glthread", "true");
                 envVars.put("MESA_NO_ERROR", "0");
                 envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "768M");
                 envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "1");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
         }
 

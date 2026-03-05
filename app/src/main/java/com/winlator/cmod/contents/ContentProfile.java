@@ -14,6 +14,7 @@ public class ContentProfile {
     public static final String MARK_FILE_SOURCE = "source";
     public static final String MARK_FILE_TARGET = "target";
     public static final String MARK_WINE = "wine";
+    public static final String MARK_PROTON = "proton";
     public static final String MARK_WINE_BINPATH = "binPath";
     public static final String MARK_WINE_LIBPATH = "libPath";
     public static final String MARK_WINE_PREFIX_PACK = "prefixPack";

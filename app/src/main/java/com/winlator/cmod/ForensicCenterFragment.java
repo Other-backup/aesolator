@@ -5,6 +5,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,13 +18,20 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.navigation.NavigationView;
-import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicConfig;
+import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.contentdialog.ContentDialog;
+
+import java.io.File;
+import java.util.Date;
+import java.util.Locale;
 
 public class ForensicCenterFragment extends Fragment {
     private SharedPreferences preferences;
@@ -169,6 +177,8 @@ public class ForensicCenterFragment extends Fragment {
             AppUtils.showToast(getContext(), R.string.diagnostics_saved);
         });
 
+        view.findViewById(R.id.BTViewForensicLog).setOnClickListener(v -> showForensicLogViewer());
+
         view.findViewById(R.id.BTForensicOpenX11).setOnClickListener(v -> {
             if (getActivity() instanceof MainActivity) {
                 NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
@@ -205,5 +215,68 @@ public class ForensicCenterFragment extends Fragment {
         boolean enabled = cbUseDri3.isChecked() && !"off".equalsIgnoreCase(mode);
         cbDri3PresentWait.setEnabled(enabled);
         cbDri3ForceSwWsi.setEnabled(enabled);
+    }
+
+    private void showForensicLogViewer() {
+        Context context = getContext();
+        if (context == null) return;
+
+        File latestFile = ForensicLogger.getLatestLogFile(context);
+        String tail = ForensicLogger.readLatestTraceTail(context, 1200, 150000);
+        if (tail == null || tail.trim().isEmpty()) {
+            tail = getString(R.string.diagnostics_forensic_log_empty);
+        }
+
+        ContentDialog dialog = new ContentDialog(context, R.layout.forensic_log_viewer_dialog);
+        dialog.setTitle(R.string.diagnostics_forensic_log_title);
+        dialog.setBottomBarText(null);
+        View dialogMessage = dialog.findViewById(R.id.TVMessage);
+        if (dialogMessage != null) dialogMessage.setVisibility(View.GONE);
+
+        TextView tvFile = dialog.findViewById(R.id.TVForensicLogFile);
+        TextView tvBody = dialog.findViewById(R.id.TVForensicLogBody);
+        tvFile.setText(getString(R.string.diagnostics_forensic_log_file, latestFile != null ? latestFile.getName() : "-"));
+        tvBody.setText(tail);
+
+        View btConfirm = dialog.findViewById(R.id.BTConfirm);
+        View btCancel = dialog.findViewById(R.id.BTCancel);
+        if (btConfirm instanceof TextView) {
+            ((TextView) btConfirm).setText(R.string.copy);
+        }
+        if (btCancel instanceof TextView) {
+            ((TextView) btCancel).setText(R.string.cancel);
+        }
+
+        final String finalTail = tail;
+        dialog.setOnConfirmCallback(() -> {
+            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", finalTail));
+                AppUtils.showToast(context, R.string.copied_to_clipboard);
+            }
+        });
+
+        View btExport = dialog.findViewById(R.id.BTForensicExportLog);
+        btExport.setOnClickListener(v -> {
+            File rootDir = context.getExternalFilesDir(null);
+            if (rootDir == null) {
+                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+                return;
+            }
+            File outDir = new File(rootDir, "forensics/exports");
+            if (!outDir.exists() && !outDir.mkdirs()) {
+                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+                return;
+            }
+            String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
+            File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
+            if (FileUtils.writeString(outFile, finalTail)) {
+                AppUtils.showToast(context, getString(R.string.diagnostics_forensic_log_export_ok, outFile.getAbsolutePath()));
+            } else {
+                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+            }
+        });
+
+        dialog.show();
     }
 }

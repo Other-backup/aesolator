@@ -298,6 +298,38 @@
                     android:text="Path Settings" />
             </FrameLayout>
 
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout style="@style/FieldSet">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/runtime_profile_global" />
+
+                    <Spinner
+                        android:id="@+id/SRuntimeProfileGlobal"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:spinnerMode="dialog" />
+
+                    <Button
+                        style="@style/ButtonNeutral"
+                        android:id="@+id/BTOpenForensicCenter"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/open_forensic_center" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVRuntimeProfileGlobal"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/diagnostics" />
+            </FrameLayout>
+
 
             <!-- Big Picture Mode -->
 

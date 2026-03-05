@@ -77,6 +77,7 @@ public class InputControlsView extends View {
     private ControlElement stickElement;
 
     private boolean focusOnStick = false; // A flag to determine if we are focusing on the stick
+    private boolean pendingBoundsClamp = false;
 
     public boolean isFocusedOnStick() {
         return focusOnStick;
@@ -184,6 +185,10 @@ public class InputControlsView extends View {
 
         if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
             if (!profile.isElementsLoaded()) profile.loadElements(this);
+            if (pendingBoundsClamp) {
+                clampOverlayElementsToBounds();
+                pendingBoundsClamp = false;
+            }
             for (ControlElement element : profile.getElements()) {
                 element.draw(canvas);
             }
@@ -322,8 +327,10 @@ public class InputControlsView extends View {
         if (profile != null) {
             this.profile = profile;
             deselectAllElements();
+            pendingBoundsClamp = true;
         }
         else this.profile = null;
+        invalidate();
     }
 
     public boolean isShowTouchscreenControls() {
@@ -332,6 +339,12 @@ public class InputControlsView extends View {
 
     public void setShowTouchscreenControls(boolean showTouchscreenControls) {
         this.showTouchscreenControls = showTouchscreenControls;
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (w > 0 && h > 0) pendingBoundsClamp = true;
     }
 
     public int getPrimaryColor() {
@@ -349,6 +362,37 @@ public class InputControlsView extends View {
             }
         }
         return null;
+    }
+
+    private synchronized void clampOverlayElementsToBounds() {
+        if (profile == null || !profile.isElementsLoaded()) return;
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0) return;
+
+        boolean changed = false;
+        for (ControlElement element : profile.getElements()) {
+            Rect box = element.getBoundingBox();
+            int dx = 0;
+            int dy = 0;
+
+            if (box.left < 0) dx = -box.left;
+            else if (box.right > width) dx = width - box.right;
+
+            if (box.top < 0) dy = -box.top;
+            else if (box.bottom > height) dy = height - box.bottom;
+
+            if (dx != 0 || dy != 0) {
+                element.setX(element.getX() + dx);
+                element.setY(element.getY() + dy);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            profile.save();
+            invalidate();
+        }
     }
 
     public Paint getPaint() {
@@ -625,23 +669,32 @@ public class InputControlsView extends View {
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
+                    boolean anyHandled = false;
                     for (byte i = 0, count = (byte)event.getPointerCount(); i < count; i++) {
+                        int movingPointerId = event.getPointerId(i);
                         float x = event.getX(i);
                         float y = event.getY(i);
 
-                        handled = false;
+                        boolean pointerHandled = false;
                         for (ControlElement element : profile.getElements()) {
-                            if (element.handleTouchMove(i, x, y)) handled = true;
+                            if (element.handleTouchMove(movingPointerId, x, y)) pointerHandled = true;
                         }
-                        if (!handled) touchpadView.onTouchEvent(event);
+                        if (pointerHandled) anyHandled = true;
                     }
+                    for (ControlElement element : profile.getElements()) {
+                        if (element.releaseIfPointerMissing(event)) anyHandled = true;
+                    }
+                    if (!anyHandled) touchpadView.onTouchEvent(event);
                     break;
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL:
                     for (ControlElement element : profile.getElements()) if (element.handleTouchUp(pointerId)) handled = true;
                     if (!handled) touchpadView.onTouchEvent(event);
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                    for (ControlElement element : profile.getElements()) if (element.resetTouchState()) handled = true;
+                    touchpadView.onTouchEvent(event);
                     break;
             }
         }

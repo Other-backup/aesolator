@@ -78,6 +78,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -487,8 +488,20 @@ public class ContainerDetailFragment extends Fragment {
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 String cpuListWoW64 = cpuListViewWoW64.getCheckedCPUListAsString();
                 byte startupSelection = (byte) sStartupSelection.getSelectedItemPosition();
-                String box64Version = sBox64Version.getSelectedItem().toString();
-                String fexcoreVersion = sFEXCoreVersion.getSelectedItem().toString();
+                String selectedWineVersion = sWineVersion.getSelectedItem() != null ? sWineVersion.getSelectedItem().toString() : "";
+                if (AppUtils.isMissingComponentValue(selectedWineVersion)) {
+                    selectedWineVersion = isEditMode() ? container.getWineVersion() : WineInfo.MAIN_WINE_VERSION.identifier();
+                }
+
+                String box64Version = sBox64Version.getSelectedItem() != null ? sBox64Version.getSelectedItem().toString() : "";
+                if (AppUtils.isMissingComponentValue(box64Version)) {
+                    box64Version = isEditMode() ? container.getBox64Version() : "";
+                }
+
+                String fexcoreVersion = sFEXCoreVersion.getSelectedItem() != null ? sFEXCoreVersion.getSelectedItem().toString() : "";
+                if (AppUtils.isMissingComponentValue(fexcoreVersion)) {
+                    fexcoreVersion = isEditMode() ? container.getFEXCoreVersion() : "";
+                }
                 String fexcorePreset = FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset);
                 String box64Preset = Box64PresetManager.getSpinnerSelectedId(sBox64Preset);
                 String desktopTheme = getDesktopTheme(view);
@@ -577,7 +590,7 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("fexcoreVersion", fexcoreVersion);
                     data.put("fexcorePreset", fexcorePreset);
                     data.put("desktopTheme", desktopTheme);
-                    data.put("wineVersion", sWineVersion.getSelectedItem().toString());
+                    data.put("wineVersion", selectedWineVersion);
                     data.put("midiSoundFont", midiSoundFont);
                     data.put("lc_all", lc_all);
                     data.put("primaryController", primaryController);
@@ -966,8 +979,7 @@ public class ContainerDetailFragment extends Fragment {
 
     private void loadWineVersionSpinner(final View view, Spinner sWineVersion, Spinner sBox64Version) {
         final Context context = getContext();
-        sWineVersion.setEnabled(!isEditMode());
-//
+
         sWineVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
@@ -977,7 +989,18 @@ public class ContainerDetailFragment extends Fragment {
                 Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
                 View vDXWrapperConfig = view.findViewById(R.id.BTDXWrapperConfig);
                 sEmulator64.setEnabled(false);
-                String wineVersion = sWineVersion.getSelectedItem().toString();
+
+                String wineVersion = sWineVersion.getSelectedItem() != null ? sWineVersion.getSelectedItem().toString() : "";
+                if (AppUtils.isMissingComponentValue(wineVersion)) {
+                    fexcoreFL.setVisibility(View.GONE);
+                    sEmulator.setEnabled(false);
+                    AppUtils.setSpinnerSelectionFromIdentifier(sEmulator, "box64");
+                    sEmulator64.setSelection(1, false);
+                    loadBox64VersionSpinner(context, container, contentsManager, sBox64Version, false);
+                    setupDXWrapperSpinner(sDXWrapper, vDXWrapperConfig, false);
+                    return;
+                }
+
                 WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
                 if (wineInfo.isArm64EC()) {
                     fexcoreFL.setVisibility(View.VISIBLE);
@@ -1001,13 +1024,38 @@ public class ContainerDetailFragment extends Fragment {
 
 
         view.findViewById(R.id.LLWineVersion).setVisibility(View.VISIBLE);
-        String[] versions = getResources().getStringArray(R.array.wine_entries);
-        ArrayList<String> wineVersions = new ArrayList<>();
-        wineVersions.addAll(Arrays.asList(versions));
-        for (ContentProfile profile : contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE))
-            wineVersions.add(ContentsManager.getEntryName(profile));
+        LinkedHashSet<String> wineVersionSet = new LinkedHashSet<>();
+        for (String version : getResources().getStringArray(R.array.wine_entries)) {
+            if (hasEmbeddedWineVersion(context, version)) {
+                wineVersionSet.add(version);
+            }
+        }
+        List<ContentProfile> wineProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE);
+        if (wineProfiles != null) {
+            for (ContentProfile profile : wineProfiles) {
+                if (profile == null || !profile.locallyInstalled) continue;
+                wineVersionSet.add(ContentsManager.getEntryName(profile));
+            }
+        }
+        List<ContentProfile> protonProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON);
+        if (protonProfiles != null) {
+            for (ContentProfile profile : protonProfiles) {
+                if (profile == null || !profile.locallyInstalled) continue;
+                wineVersionSet.add(ContentsManager.getEntryName(profile));
+            }
+        }
+        ArrayList<String> wineVersions = new ArrayList<>(wineVersionSet);
+        boolean hasWineVersion = !wineVersions.isEmpty();
+        if (!hasWineVersion) {
+            wineVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+        }
+
         sWineVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wineVersions));
-        if (isEditMode()) AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
+        sWineVersion.setEnabled(hasWineVersion);
+
+        if (isEditMode() && hasWineVersion) {
+            AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
+        }
     }
 
     public String getControllerMapping(View view) {
@@ -1055,33 +1103,66 @@ public class ContainerDetailFragment extends Fragment {
     }
 
     public static void loadBox64VersionSpinner(Context context, Container container, ContentsManager manager, Spinner spinner, boolean isArm64EC) {
-        List<String> itemList;
-        if (isArm64EC) {
-            String[] originalItems = context.getResources().getStringArray(R.array.wowbox64_version_entries);
-            itemList = new ArrayList<>(Arrays.asList(originalItems));
-        }
-        else {
-            String[] originalItems = context.getResources().getStringArray(R.array.box64_version_entries);
-            itemList = new ArrayList<>(Arrays.asList(originalItems));
-        }
-        if (!isArm64EC) {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)) {
-                String entryName = ContentsManager.getEntryName(profile);
-                int firstDashIndex = entryName.indexOf('-');
-                itemList.add(entryName.substring(firstDashIndex + 1));
-            }
-        } else {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)) {
-                String entryName = ContentsManager.getEntryName(profile);
-                int firstDashIndex = entryName.indexOf('-');
-                itemList.add(entryName.substring(firstDashIndex + 1));
+        List<String> itemList = new ArrayList<>();
+        String[] embeddedEntries = context.getResources().getStringArray(
+                isArm64EC ? R.array.wowbox64_version_entries : R.array.box64_version_entries
+        );
+        for (String version : embeddedEntries) {
+            String assetPath = isArm64EC
+                    ? "wowbox64/wowbox64-" + version + ".tzst"
+                    : "box64/box64-" + version + ".tzst";
+            if (hasEmbeddedArchive(context, assetPath)) {
+                itemList.add(version);
             }
         }
+
+        List<ContentProfile> profiles = manager.getProfiles(
+                isArm64EC ? ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64 : ContentProfile.ContentType.CONTENT_TYPE_BOX64
+        );
+        appendInstalledContentVersions(itemList, profiles);
+
+        boolean hasVersions = !itemList.isEmpty();
+        if (!hasVersions) {
+            itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+        }
+
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
-        if (container != null)
-            AppUtils.setSpinnerSelectionFromValue(spinner, container.getBox64Version());
-        else
-            AppUtils.setSpinnerSelectionFromValue(spinner, (isArm64EC) ? DefaultVersion.WOWBOX64 : DefaultVersion.BOX64);
+        spinner.setEnabled(hasVersions);
+
+        if (!hasVersions) return;
+
+        if (container != null && AppUtils.setSpinnerSelectionFromValue(spinner, container.getBox64Version())) {
+            return;
+        }
+
+        String defaultValue = isArm64EC ? DefaultVersion.WOWBOX64 : DefaultVersion.BOX64;
+        AppUtils.setSpinnerSelectionFromValue(spinner, defaultValue);
+    }
+
+    private static boolean hasEmbeddedWineVersion(Context context, String version) {
+        try {
+            ImageFs imageFs = ImageFs.find(context);
+            if (imageFs == null) return false;
+            File wineDir = new File(imageFs.getRootDir(), "opt/" + version);
+            return wineDir.isDirectory();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasEmbeddedArchive(Context context, String assetPath) {
+        return FileUtils.getSize(context, assetPath) > 0;
+    }
+
+    private static void appendInstalledContentVersions(List<String> targetList, List<ContentProfile> profiles) {
+        if (profiles == null) return;
+        for (ContentProfile profile : profiles) {
+            if (profile == null || !profile.locallyInstalled) continue;
+            if (profile.verName == null || profile.verName.trim().isEmpty()) continue;
+            if (!targetList.contains(profile.verName)) {
+                targetList.add(profile.verName);
+            }
+        }
     }
 
 }

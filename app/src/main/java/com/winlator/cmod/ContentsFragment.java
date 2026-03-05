@@ -2,12 +2,14 @@ package com.winlator.cmod;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.database.Cursor;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -60,6 +62,13 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ContentsFragment extends Fragment {
+    private enum ImportArchHint {
+        UNKNOWN,
+        ARM64EC,
+        X86_64,
+        ARM64
+    }
+
     private static final String PREF_REMOTE_CACHE_JSON = "contents_remote_cache_json";
     private static final List<ContentProfile.ContentType> SUPPORTED_CONTENT_TYPES = Arrays.asList(
             ContentProfile.ContentType.CONTENT_TYPE_WINE,
@@ -369,6 +378,12 @@ public class ContentsFragment extends Fragment {
                 boolean useWcpHub = sourceWcpHubEnabled;
                 boolean useFallback = sourceFallbackEnabled;
                 boolean useAesolator = sourceAesolatorEnabled;
+                boolean autoEnabledHub = false;
+                if (!useWcpHub && !useFallback && !useAesolator) {
+                    useWcpHub = true;
+                    autoEnabledHub = true;
+                }
+                final boolean autoEnabledHubFinal = autoEnabledHub;
 
                 String preferredUrl = sharedPreferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
                 if (preferredUrl != null && !preferredUrl.trim().isEmpty()
@@ -394,7 +409,11 @@ public class ContentsFragment extends Fragment {
                                 null,
                                 "contents",
                                 useCached ? "all_sources_failed_use_cached" : "all_sources_failed_empty",
-                                ForensicLogger.fields("sources_enabled", sources.size(), "cached_used", useCached)
+                                ForensicLogger.fields(
+                                        "sources_enabled", sources.size(),
+                                        "cached_used", useCached,
+                                        "auto_enabled_wcphub", autoEnabledHubFinal
+                                )
                         );
                         loadContentList();
                     });
@@ -415,7 +434,8 @@ public class ContentsFragment extends Fragment {
                             ForensicLogger.fields(
                                     "sources_polled", sources.size(),
                                     "payloads_received", payloads.size(),
-                                    "merged_size", merged.length()
+                                    "merged_size", merged.length(),
+                                    "auto_enabled_wcphub", autoEnabledHubFinal
                             )
                     );
                     loadContentList();
@@ -433,7 +453,10 @@ public class ContentsFragment extends Fragment {
                             null,
                             "contents",
                             useCached ? "refresh_exception_use_cached" : "refresh_exception_empty",
-                            ForensicLogger.fields("cached_used", useCached)
+                            ForensicLogger.fields(
+                                    "cached_used", useCached,
+                                    "auto_enabled_wcphub", false
+                            )
                     );
                     loadContentList();
                 });
@@ -579,11 +602,44 @@ public class ContentsFragment extends Fragment {
             PreloaderDialog preloaderDialog = new PreloaderDialog(requireActivity());
             preloaderDialog.showOnUiThread(R.string.installing_content);
             try {
+                final Uri importUri = data.getData();
+                if (importUri == null) {
+                    preloaderDialog.closeOnUiThread();
+                    AppUtils.showToast(getContext(), R.string.unable_to_import_profile);
+                    return;
+                }
+                final String importFileName = resolveImportFileName(importUri);
+                final ContentProfile.ContentType expectedType = detectExpectedTypeFromName(importFileName);
+                final ImportArchHint expectedArch = detectExpectedArchFromName(importFileName);
+                final boolean glibcTaggedArchive = detectGlibcTaggedArchive(importFileName);
                 ContentsManager.OnInstallFinishedCallback callback = new ContentsManager.OnInstallFinishedCallback() {
                     private boolean isExtracting = true;
 
                     @Override
                     public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
+                        String reasonCode = switch (reason) {
+                            case ERROR_BADTAR -> "bad_archive";
+                            case ERROR_NOPROFILE -> "missing_profile";
+                            case ERROR_BADPROFILE -> "invalid_profile";
+                            case ERROR_EXIST -> "already_exists";
+                            case ERROR_MISSINGFILES -> "missing_files";
+                            case ERROR_UNTRUSTPROFILE -> "untrusted_profile";
+                            default -> "unknown";
+                        };
+                        ForensicLogger.logEvent(
+                                getContext(),
+                                "warn",
+                                "CONTENTS_IMPORT_REJECTED",
+                                null,
+                                "contents_import",
+                                "import_rejected",
+                                ForensicLogger.fields(
+                                        "reason", reasonCode,
+                                        "file_name", importFileName,
+                                        "expected_type", expectedType != null ? expectedType.toString() : "-",
+                                        "expected_arch", getImportArchLabel(expectedArch)
+                                )
+                        );
                         int msgId = switch (reason) {
                             case ERROR_BADTAR -> R.string.file_cannot_be_recognied;
                             case ERROR_NOPROFILE -> R.string.profile_not_found_in_content;
@@ -603,6 +659,90 @@ public class ContentsFragment extends Fragment {
                     @Override
                     public void onSucceed(ContentProfile profile) {
                         if (isExtracting) {
+                            if (expectedType != null && profile.type != expectedType) {
+                                ForensicLogger.logEvent(
+                                        getContext(),
+                                        "warn",
+                                        "CONTENTS_IMPORT_REJECTED",
+                                        null,
+                                        "contents_import",
+                                        "import_rejected",
+                                        ForensicLogger.fields(
+                                                "reason", "type_mismatch",
+                                                "file_name", importFileName,
+                                                "expected_type", expectedType.toString(),
+                                                "detected_type", profile.type.toString(),
+                                                "expected_arch", getImportArchLabel(expectedArch)
+                                        )
+                                );
+                                preloaderDialog.closeOnUiThread();
+                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                                        getContext(),
+                                        getString(R.string.install_failed) + ": "
+                                                + getString(R.string.content_type_mismatch_import,
+                                                getTypeLabel(expectedType),
+                                                getTypeLabel(profile.type)),
+                                        null
+                                ));
+                                return;
+                            }
+
+                            if (glibcTaggedArchive
+                                    && (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON)) {
+                                ForensicLogger.logEvent(
+                                        getContext(),
+                                        "warn",
+                                        "CONTENTS_IMPORT_REJECTED",
+                                        null,
+                                        "contents_import",
+                                        "import_rejected",
+                                        ForensicLogger.fields(
+                                                "reason", "glibc_variant_unsupported",
+                                                "file_name", importFileName,
+                                                "detected_type", profile.type.toString(),
+                                                "expected_arch", getImportArchLabel(expectedArch)
+                                        )
+                                );
+                                preloaderDialog.closeOnUiThread();
+                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                                        getContext(),
+                                        getString(R.string.install_failed) + ": "
+                                                + getString(R.string.content_glibc_import_unsupported),
+                                        null
+                                ));
+                                return;
+                            }
+
+                            ImportArchHint detectedArch = detectProfileArch(profile);
+                            if (isImportArchMismatch(expectedArch, detectedArch)) {
+                                ForensicLogger.logEvent(
+                                        getContext(),
+                                        "warn",
+                                        "CONTENTS_IMPORT_REJECTED",
+                                        null,
+                                        "contents_import",
+                                        "import_rejected",
+                                        ForensicLogger.fields(
+                                                "reason", "arch_mismatch",
+                                                "file_name", importFileName,
+                                                "detected_type", profile.type.toString(),
+                                                "expected_arch", getImportArchLabel(expectedArch),
+                                                "detected_arch", getImportArchLabel(detectedArch)
+                                        )
+                                );
+                                preloaderDialog.closeOnUiThread();
+                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                                        getContext(),
+                                        getString(R.string.install_failed) + ": "
+                                                + getString(R.string.content_arch_mismatch_import,
+                                                getImportArchLabel(expectedArch),
+                                                getImportArchLabel(detectedArch)),
+                                        null
+                                ));
+                                return;
+                            }
+
                             ContentsManager.OnInstallFinishedCallback cb = this;
                             requireActivity().runOnUiThread(() -> {
                                 ContentInfoDialog dialog = new ContentInfoDialog(getContext(), profile);
@@ -632,7 +772,7 @@ public class ContentsFragment extends Fragment {
                         }
                     }
                 };
-                Executors.newSingleThreadExecutor().execute(() -> manager.extraContentFile(data.getData(), callback));
+                Executors.newSingleThreadExecutor().execute(() -> manager.extraContentFile(importUri, callback));
             } catch (Exception e) {
                 preloaderDialog.closeOnUiThread();
                 AppUtils.showToast(getContext(), R.string.unable_to_import_profile);
@@ -692,6 +832,79 @@ public class ContentsFragment extends Fragment {
 
     private String getDisplayTypeLabel(ContentProfile.ContentType type) {
         return getTypeLabel(type);
+    }
+
+    private String resolveImportFileName(@Nullable Uri uri) {
+        if (uri == null) return "";
+        String fileName = "";
+        try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (nameIndex >= 0) fileName = cursor.getString(nameIndex);
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (fileName == null || fileName.trim().isEmpty()) {
+            String fallback = uri.getLastPathSegment();
+            fileName = fallback == null ? "" : fallback;
+        }
+        return fileName.trim();
+    }
+
+    private ContentProfile.ContentType detectExpectedTypeFromName(String fileName) {
+        if (fileName == null) return null;
+        String lower = fileName.trim().toLowerCase(Locale.US);
+        if (lower.isEmpty()) return null;
+        boolean containsWine = lower.contains("wine");
+        boolean containsProton = lower.contains("proton");
+        if (containsProton && !containsWine) return ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+        if (containsWine && !containsProton) return ContentProfile.ContentType.CONTENT_TYPE_WINE;
+        return null;
+    }
+
+    private boolean detectGlibcTaggedArchive(String fileName) {
+        if (fileName == null) return false;
+        return fileName.trim().toLowerCase(Locale.US).contains("glibc");
+    }
+
+    private ImportArchHint detectExpectedArchFromName(String fileName) {
+        if (fileName == null) return ImportArchHint.UNKNOWN;
+        String lower = fileName.trim().toLowerCase(Locale.US);
+        if (lower.isEmpty()) return ImportArchHint.UNKNOWN;
+        if (lower.contains("arm64ec") || lower.contains("arm64-ec")) return ImportArchHint.ARM64EC;
+        if (lower.contains("x86_64") || lower.contains("x86-64") || lower.contains("amd64")) return ImportArchHint.X86_64;
+        if (lower.contains("arm64")) return ImportArchHint.ARM64;
+        return ImportArchHint.UNKNOWN;
+    }
+
+    private ImportArchHint detectProfileArch(ContentProfile profile) {
+        if (profile == null) return ImportArchHint.UNKNOWN;
+        if (isArm64EcProfile(profile)) return ImportArchHint.ARM64EC;
+        if (isX64Profile(profile)) return ImportArchHint.X86_64;
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " " +
+                        (profile.desc == null ? "" : profile.desc) + " " +
+                        (profile.remoteUrl == null ? "" : profile.remoteUrl) + " " +
+                        (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64")) return ImportArchHint.ARM64;
+        return ImportArchHint.UNKNOWN;
+    }
+
+    private boolean isImportArchMismatch(ImportArchHint expected, ImportArchHint detected) {
+        if (expected == ImportArchHint.UNKNOWN || detected == ImportArchHint.UNKNOWN) return false;
+        return expected != detected;
+    }
+
+    private String getImportArchLabel(ImportArchHint archHint) {
+        if (archHint == null) return "unknown";
+        return switch (archHint) {
+            case ARM64EC -> "arm64ec";
+            case X86_64 -> "x86_64";
+            case ARM64 -> "arm64";
+            default -> "unknown";
+        };
     }
 
     private int resolveProfileAccentColor(ContentProfile profile) {

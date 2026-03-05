@@ -1,6 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.view.View;
@@ -11,6 +12,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -167,6 +169,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sBCnEmulationCache = findViewById(R.id.SGraphicsDriverBCnEmulationCache);
         cbSyncFrame = findViewById(R.id.CBSyncFrame);
         cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
+        applyPopupTheme(anchor.getContext());
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
@@ -188,6 +191,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedVersion = sVersion.getSelectedItem().toString();
+                if (AppUtils.isMissingComponentValue(selectedVersion)) {
+                    mscAvailableExtensions.setItems(new String[0], "Extensions");
+                    return;
+                }
                 String[] availableExtensions = queryAvailableExtensions(selectedVersion, anchor.getContext());
                 String blacklistedExtensions = "";
 
@@ -329,6 +336,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         populateGraphicsDriverVersions(anchor.getContext(), contentsManager, vulkanVersion, initialVersion, blExtensions, gpuName, maxDeviceMemory, presentMode, resourceType, bcnEmulation, bcnEmulationType, bcnEmulationCache, graphicsDriver);
 
         setOnConfirmCallback(() -> {
+            if (AppUtils.isMissingComponentValue(selectedVersion)) {
+                selectedVersion = initialVersion != null ? initialVersion : "";
+            }
             blacklistedExtensions = mscAvailableExtensions.getUnSelectedItemsAsString();
 
             if (graphicsDriverVersionView != null)
@@ -352,10 +362,16 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         wrapperVersions.addAll(adrenotoolsManager.enumarateInstalledDrivers());
 
         // Set the adapter and select the initial version
+        boolean hasVersions = !wrapperVersions.isEmpty();
+        if (!hasVersions) {
+            wrapperVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+        }
         ArrayAdapter<String> wrapperAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wrapperVersions);
-        
+
         sVersion.setAdapter(wrapperAdapter);
-        
+        sVersion.setEnabled(hasVersions);
+        mscAvailableExtensions.setEnabled(hasVersions);
+
         // We can start logging selected graphics driver and initial version
         Log.d(TAG, "Graphics driver: " + graphicsDriver);
         Log.d(TAG, "Initial version: " + initialVersion);
@@ -364,7 +380,12 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         populateVulkanVersionSpinner(context, contentsManager, vulkanVersion);
 
         // Use the custom selection logic
-        setSpinnerSelectionWithFallback(sVersion, initialVersion, graphicsDriver);
+        if (hasVersions) {
+            setSpinnerSelectionWithFallback(sVersion, initialVersion, graphicsDriver);
+        } else {
+            selectedVersion = AppUtils.MISSING_COMPONENT_PLACEHOLDER;
+            sVersion.setSelection(0, false);
+        }
         AppUtils.setSpinnerSelectionFromValue(sGPUName, gpuName);
         AppUtils.setSpinnerSelectionFromNumber(sMaxDeviceMemory, maxDeviceMemory);
         AppUtils.setSpinnerSelectionFromValue(sPresentMode, presentMode);
@@ -460,6 +481,14 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     private void setSpinnerSelectionWithFallback(Spinner spinner, String version, String graphicsDriver) {
+        if (spinner.getCount() == 0) return;
+        String firstItem = spinner.getItemAtPosition(0).toString();
+        if (AppUtils.isMissingComponentValue(firstItem)) {
+            spinner.setSelection(0, false);
+            selectedVersion = firstItem;
+            return;
+        }
+
         // First, attempt to find an exact match (case-insensitive)
         for (int i = 0; i < spinner.getCount(); i++) {
             String item = spinner.getItemAtPosition(i).toString();
@@ -470,6 +499,21 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         }
 
         AppUtils.setSpinnerSelectionFromValue(spinner, GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, getContext()) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
+    }
+
+    private void applyPopupTheme(Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean isDarkMode = preferences.getBoolean("dark_mode", false);
+        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        sVersion.setPopupBackgroundResource(popupBg);
+        sVulkanVersion.setPopupBackgroundResource(popupBg);
+        sPresentMode.setPopupBackgroundResource(popupBg);
+        sGPUName.setPopupBackgroundResource(popupBg);
+        sMaxDeviceMemory.setPopupBackgroundResource(popupBg);
+        sResourceType.setPopupBackgroundResource(popupBg);
+        sBCnEmulation.setPopupBackgroundResource(popupBg);
+        sBCnEmulationType.setPopupBackgroundResource(popupBg);
+        sBCnEmulationCache.setPopupBackgroundResource(popupBg);
     }
 
 }

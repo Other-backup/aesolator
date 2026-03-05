@@ -39,6 +39,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public abstract class AppUtils {
+    public static final String MISSING_COMPONENT_PLACEHOLDER = "—";
     private static WeakReference<Toast> globalToastReference = null;
 
     public static void keepScreenOn(Activity activity) {
@@ -258,6 +259,12 @@ public abstract class AppUtils {
             }
         }
         return false;
+    }
+
+    public static boolean isMissingComponentValue(String value) {
+        if (value == null) return true;
+        String normalized = value.trim();
+        return normalized.isEmpty() || MISSING_COMPONENT_PLACEHOLDER.equals(normalized);
     }
 
     public static boolean setSpinnerSelectionFromIdentifier(Spinner spinner, String identifier) {
