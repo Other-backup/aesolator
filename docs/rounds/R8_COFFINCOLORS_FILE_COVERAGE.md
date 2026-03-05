@@ -1,7 +1,7 @@
 # Round 8 Coverage: `coffincolors/winlator` File-Level Control
 
 Date: `2026-03-05`  
-State: `active`
+State: `closed`
 
 ## Source Inventory
 
@@ -21,11 +21,11 @@ Legend:
 
 | Bucket | Files | State | Notes |
 |---|---:|---|---|
-| `java_mainline_lane` | 281 | `in_progress` | app flow, container/detail/settings, runtime bridges |
-| `native_cpp_lane` | 209 | `pending` | xserver/runtime glue and low-level native lanes |
-| `res_manifest_lane` | 440 | `pending` | resources/layouts/menus/preferences/manifest |
-| `aux_plugins_lane` | 51 | `pending` | `input_controls/*` + `audio_plugin/*` |
-| `workflow_root_lane` | 11 | `pending` | root metadata/scripts (no `.github/workflows` in donor) |
+| `java_mainline_lane` | 281 | `closed` | launcher/runtime + bionic markers + task-manager/xserver baseline reconciled |
+| `native_cpp_lane` | 209 | `closed` | rejected for app-tree; bounded to native/runtime owner repos |
+| `res_manifest_lane` | 440 | `closed` | scanned; no mandatory app-tree transfer beyond existing UI contracts |
+| `aux_plugins_lane` | 51 | `closed` | reviewed; no no-regression transfer required for this round scope |
+| `workflow_root_lane` | 11 | `closed` | root metadata/scripts reviewed; no app-layer transfer required |
 
 ## Current strict-round note
 
@@ -37,3 +37,9 @@ Legend:
 - `2026-03-05 / pass 1`:
   - Round 8 coverage file initialized.
   - base bucket map created from donor inventory.
+- `2026-03-05 / pass 2`:
+  - `java_mainline_lane` extended with runtime-environment startup forensic markers in `XServerDisplayActivity`.
+- `2026-03-05 / pass 3`:
+  - all remaining buckets finalized with integrate/reject boundary decisions.
+- `2026-03-05 / closure`:
+  - all buckets moved to `closed`; Round 8 file-level coverage completed.

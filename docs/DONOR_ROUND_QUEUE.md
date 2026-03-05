@@ -41,7 +41,7 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 5 | `olegos2/mobox` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 6 | `ewt45/termux-x11-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
-| 8 | `coffincolors/winlator` | `active` | opened after Round 7 closure |
+| 8 | `coffincolors/winlator` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `pending` | unlocks after Round 8 = `closed` |
 
 ## Round 6 (termux-x11-fork) Historical Workset (Completed)
@@ -68,13 +68,13 @@ Round 7 control artifacts:
 - `docs/rounds/R7_WINLATORFORK_MATRIX.md`
 - `docs/rounds/R7_WINLATORFORK_FILE_COVERAGE.md`
 
-## Round 8 (coffincolors/winlator) Immediate Workset
+## Round 8 (coffincolors/winlator) Historical Workset (Completed)
 
-1. Rebuild strict file inventory for `coffincolors/winlator` and lock module buckets (`java`, `native cpp`, `res`, plugins, root metadata).
-2. Open transfer matrix by lanes (`bionic_runtime`, `launcher_discipline`, `graphics_dialogs`, `task_manager`, `xserver_java`, `native_boundary`).
-3. Mark each signal `integrate` or `reject_with_rationale`.
-4. Land only no-regression deltas in Aeolator app-tree as contracts (no blind donor copy).
-5. Prepare `active -> gate` checklist with launch/graphics/task-manager/forensic anchors.
+1. Rebuilt strict file inventory for `coffincolors/winlator` and locked module buckets (`java`, `native cpp`, `res`, plugins, root metadata).
+2. Opened transfer matrix by lanes (`bionic_runtime`, `launcher_discipline`, `graphics_dialogs`, `task_manager`, `xserver_java`, `native_boundary`).
+3. Marked each signal `integrate` or `reject_with_rationale`.
+4. Landed no-regression app-tree deltas as contracts (no blind donor copy).
+5. Completed round closure (`active -> closed`) with launch/graphics/task-manager/forensic anchors.
 
 Round 8 control artifacts:
 - `docs/rounds/R8_COFFINCOLORS_MATRIX.md`
@@ -190,3 +190,9 @@ What was added to smooth the transition:
 - `2026-03-05` pass 1:
   - Round 8 opened as `active`.
   - `R8_COFFINCOLORS_MATRIX` and `R8_COFFINCOLORS_FILE_COVERAGE` initialized.
+- `2026-03-05` pass 2:
+  - runtime environment startup forensic markers landed in `XServerDisplayActivity` (`RUNTIME_ENV_COMPONENTS_PREPARED/STARTED`).
+- `2026-03-05` pass 3:
+  - transfer rows finalized across bionic/runtime, launcher, graphics/dialog, task-manager and xserver java lanes.
+- `2026-03-05` closure:
+  - Round 8 moved to `closed`.

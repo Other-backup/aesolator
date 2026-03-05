@@ -1,7 +1,7 @@
 # Round 8 Matrix: `coffincolors/winlator`
 
 Date: `2026-03-05`  
-Round state: `active`
+Round state: `closed`
 
 ## Round Scope
 
@@ -21,12 +21,12 @@ Primary code surfaces:
 
 | Signal Cluster | Donor Anchors | Aeolator Targets | Status | Decision |
 |---|---|---|---|---|
-| cmod-bionic runtime identity/compat contracts | runtime/env and metadata lanes | runtime env + forensic metadata | `in_progress` | `integrate` |
-| launcher/runtime startup discipline | `MainActivity`, `XServerDisplayActivity`, `xenvironment/components/*` | launchdeps + xenvironment contracts | `pending` | `integrate` |
-| graphics/dialog contract deltas | `contentdialog/*`, settings/container UI hooks | Graphics center + settings contracts | `pending` | `integrate` |
-| winhandler/task-manager behavioral deltas | `winhandler/*` | task manager + process diagnostics lane | `pending` | `integrate` |
-| xserver/java extension deltas | `xserver/*` and extensions/requests | `cmod/xserver/*` | `pending` | `integrate` |
-| native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `pending` | `reject_with_rationale` |
+| cmod-bionic runtime identity/compat contracts | runtime/env and metadata lanes | runtime env + forensic metadata | `integrated` | `integrate` |
+| launcher/runtime startup discipline | `MainActivity`, `XServerDisplayActivity`, `xenvironment/components/*` | launchdeps + xenvironment contracts | `integrated` | `integrate` |
+| graphics/dialog contract deltas | `contentdialog/*`, settings/container UI hooks | Graphics center + settings contracts | `integrated` | `integrate` |
+| winhandler/task-manager behavioral deltas | `winhandler/*` | task manager + process diagnostics lane | `integrated` | `integrate` |
+| xserver/java extension deltas | `xserver/*` and extensions/requests | `cmod/xserver/*` | `integrated` | `integrate` |
+| native cpp patch-set and low-level runtime glue | `app/src/main/cpp/*` | native/runtime owner repos (outside app-tree) | `rejected` | `reject_with_rationale` |
 
 ## Closure Criteria For Round 8
 
@@ -48,3 +48,30 @@ Round 8 can be marked `closed` only when:
   - java mainline lane: `281`
   - native cpp lane: `209`
   - res/manifest lane: `440`
+
+### 2026-03-05 / Pass 2
+
+- Launcher/runtime discipline row integrated:
+  - `setupXEnvironment()` now emits deterministic startup forensic markers:
+    - `RUNTIME_ENV_COMPONENTS_PREPARED`
+    - `RUNTIME_ENV_COMPONENTS_STARTED`
+  - markers include startup/audio/wine/binding-path context for runtime correlation.
+
+### 2026-03-05 / Pass 3
+
+- cmod-bionic identity row finalized as integrated:
+  - runtime env markers (`AERO_RUNTIME_LIBC`, `AERO_RUNTIME_ANDROID_BIONIC_ONLY`, ABI/SDK markers) already active.
+  - forensic issue metadata includes bionic/runtime compatibility fields (`runtimeLibc`, `runtimeBionicOnly`, `supportedAbis`, `hostArch`).
+- graphics/dialog row finalized as integrated:
+  - donor dialog baseline is covered/superseded by existing Aeolator graphics/settings dialog contract lanes.
+- winhandler/task-manager row finalized as integrated:
+  - task-manager runtime metrics/realtime cadence/forensic lifecycle lane already present and exceeds donor baseline.
+- xserver/java row finalized as integrated:
+  - donor Java extension/request baseline (`DRI3/Present/Sync`) is already covered in current `cmod/xserver` lane.
+- native cpp row rejected for app-tree:
+  - low-level native glue is explicitly bounded to native/runtime owner repos.
+
+### 2026-03-05 / Closure
+
+- Round 8 moved to `closed`.
+- All transfer rows are finalized as `integrated` or `rejected` with rationale.

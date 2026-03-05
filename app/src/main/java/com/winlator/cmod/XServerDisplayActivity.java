@@ -1187,6 +1187,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String rootPath = imageFs.getRootDir().getPath();
         FileUtils.clear(imageFs.getTmpDir());
 
+        int bindingPathCount = 0;
 
         guestProgramLauncherComponent = new GuestProgramLauncherComponent(
                 contentsManager,
@@ -1210,6 +1211,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             for (String[] drive : container.drivesIterator()) {
                 bindingPaths.add(drive[1]);
             }
+            bindingPathCount = bindingPaths.size();
 
             guestProgramLauncherComponent.setBindingPaths(bindingPaths.toArray(new String[0]));
 
@@ -1266,6 +1268,22 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         // Add the launcher to our environment
         environment.addComponent(guestProgramLauncherComponent);
 
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "RUNTIME_ENV_COMPONENTS_PREPARED",
+                null,
+                "xserver",
+                "runtime_environment_components_prepared",
+                ForensicLogger.fields(
+                        "audio_driver", audioDriver,
+                        "startup_selection", startupSelection,
+                        "wine_version", container != null ? container.getWineVersion() : "",
+                        "binding_paths_count", bindingPathCount,
+                        "has_wine_request_handler", wineRequestHandler != null
+                )
+        );
+
         // Start all environment components (XServer, Audio, etc.)
         environment.startEnvironmentComponents();
 
@@ -1273,6 +1291,19 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         winHandler.start();
 
         if (wineRequestHandler != null) wineRequestHandler.start();
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "RUNTIME_ENV_COMPONENTS_STARTED",
+                null,
+                "xserver",
+                "runtime_environment_components_started",
+                ForensicLogger.fields(
+                        "audio_driver", audioDriver,
+                        "has_wine_request_handler", wineRequestHandler != null
+                )
+        );
 
         // Reset dxwrapper config
         dxwrapperConfig = null;
