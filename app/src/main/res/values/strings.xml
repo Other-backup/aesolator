@@ -732,6 +732,9 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="open_upscaler_settings">Open Upscaler settings</string>
     <string name="graphics_center_upscaler_hint">Upscaler options are configured per shortcut in Shortcut Settings.</string>
     <string name="contents_sources">Contents Sources</string>
+    <string name="contents_source_selector">Source lane</string>
+    <string name="contents_channel_selector">Channel</string>
+    <string name="contents_arch_selector">Architecture</string>
     <string name="contents_source_wcphub">WCPHub</string>
     <string name="contents_source_fallback">Fallback feed</string>
     <string name="contents_source_aesolator">Ae.solator feed</string>
@@ -754,6 +757,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="dgvoodoo_config_summary">Current package: %1$s</string>
     <string name="dgvoodoo_config_note">Legacy APIs (DDraw/D3D1-7/Glide) are routed through dgVoodoo when this wrapper mode is selected.</string>
     <string name="dgvoodoo_config_arch">Preferred local install arch</string>
+    <string name="dgvoodoo_config_arch_available">Installed package architectures: %1$s</string>
     <string name="dgvoodoo_arch_auto">Auto</string>
     <string name="dgvoodoo_arch_x86">x86</string>
     <string name="dgvoodoo_arch_x64">x64</string>
@@ -763,7 +767,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="dgvoodoo_vsync">Enable dgVoodoo VSync</string>
     <string name="dgvoodoo_flip_model">Enable flip model</string>
     <string name="dgvoodoo_package_state_missing">missing</string>
-    <string name="dgvoodoo_package_state_ready">ready (%1$s)</string>
+    <string name="dgvoodoo_package_state_ready">ready (%1$s) • arch: %2$s</string>
     <string name="install_drivers_message">You will now be prompted to pick a driver. These must be the same ones used in other emulators like Yuzu, Dolphin, Citra, etc.</string>
     <string name="install_drivers_warning">Be warned that because of limitations of current PC emulators, Qualcomm Drivers may not work on chipsets below 8 Gen2 without getting patched.</string>
     <string name="enable_loader_trace">Enable loader trace</string>

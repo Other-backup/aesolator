@@ -738,9 +738,35 @@ public class ContentsManager {
     private ContentProfile findEquivalentProfile(List<ContentProfile> profiles, ContentProfile remote) {
         if (profiles == null || remote == null) return null;
         for (ContentProfile profile : profiles) {
-            if (profile != null && profile.sameEntry(remote)) return profile;
+            if (profile == null) continue;
+            if (profile.sameEntry(remote)) return profile;
+            if (isUpdatableLane(profile.type)
+                    && profile.type == remote.type
+                    && profile.verName != null
+                    && remote.verName != null
+                    && profile.verName.equalsIgnoreCase(remote.verName)
+                    && profile.getChannel().equalsIgnoreCase(remote.getChannel())
+                    && resolveArchHint(profile).equals(resolveArchHint(remote))) {
+                // Updatable lanes can publish with bumped versionCode while keeping the same semantic version.
+                // Treat them as equivalent to preserve installed-state markers in Contents.
+                return profile;
+            }
         }
         return null;
+    }
+
+    private String resolveArchHint(ContentProfile profile) {
+        if (profile == null) return "generic";
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " "
+                        + (profile.desc == null ? "" : profile.desc) + " "
+                        + (profile.remoteUrl == null ? "" : profile.remoteUrl) + " "
+                        + (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
+        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
+        if (combined.contains("arm64") || combined.contains("aarch64")) return "arm64";
+        return "generic";
     }
 }
 

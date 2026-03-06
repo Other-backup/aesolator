@@ -19,6 +19,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 
+import java.util.ArrayList;
 import java.util.Locale;
 
 public class DgVoodooConfigDialog extends ContentDialog {
@@ -32,6 +33,8 @@ public class DgVoodooConfigDialog extends ContentDialog {
         Context context = anchor.getContext();
         DgVoodooManager manager = new DgVoodooManager(context);
         boolean packageInstalled = manager.isInstalled();
+        ArrayList<String> installedArchitectures = manager.getInstalledArchitectures();
+        String installedArchitectureSummary = manager.getInstalledArchitectureSummary();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
         int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
@@ -52,7 +55,11 @@ public class DgVoodooConfigDialog extends ContentDialog {
         stateView.setText(context.getString(
                 R.string.dgvoodoo_config_summary,
                 packageInstalled
-                        ? context.getString(R.string.dgvoodoo_package_state_ready, manager.getVersionHint())
+                        ? context.getString(
+                                R.string.dgvoodoo_package_state_ready,
+                                manager.getVersionHint(),
+                                installedArchitectureSummary
+                        )
                         : context.getString(R.string.dgvoodoo_package_state_missing)
         ));
         layout.addView(stateView);
@@ -67,24 +74,46 @@ public class DgVoodooConfigDialog extends ContentDialog {
         labelView.setText(R.string.dgvoodoo_config_arch);
         layout.addView(labelView);
 
+        TextView installedArchView = new TextView(context);
+        installedArchView.setText(context.getString(R.string.dgvoodoo_config_arch_available, installedArchitectureSummary));
+        installedArchView.setPadding(0, padding / 6, 0, padding / 8);
+        layout.addView(installedArchView);
+
         Spinner archSpinner = new Spinner(context);
-        String[] labels = packageInstalled
-                ? new String[]{
-                        context.getString(R.string.dgvoodoo_arch_auto),
-                        context.getString(R.string.dgvoodoo_arch_x86),
-                        context.getString(R.string.dgvoodoo_arch_x64),
-                        context.getString(R.string.dgvoodoo_arch_arm64),
-                        context.getString(R.string.dgvoodoo_arch_arm64ec)
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<String> values = new ArrayList<>();
+        if (packageInstalled) {
+            labels.add(context.getString(R.string.dgvoodoo_arch_auto));
+            values.add("auto");
+            for (String arch : installedArchitectures) {
+                if ("x86".equalsIgnoreCase(arch)) {
+                    labels.add(context.getString(R.string.dgvoodoo_arch_x86));
+                    values.add("x86");
+                } else if ("x64".equalsIgnoreCase(arch)) {
+                    labels.add(context.getString(R.string.dgvoodoo_arch_x64));
+                    values.add("x64");
+                } else if ("arm64".equalsIgnoreCase(arch) || "aarch64".equalsIgnoreCase(arch)) {
+                    labels.add(context.getString(R.string.dgvoodoo_arch_arm64));
+                    values.add("arm64");
+                } else if ("arm64ec".equalsIgnoreCase(arch) || "arm64-ec".equalsIgnoreCase(arch)) {
+                    labels.add(context.getString(R.string.dgvoodoo_arch_arm64ec));
+                    values.add("arm64ec");
                 }
-                : new String[]{AppUtils.MISSING_COMPONENT_PLACEHOLDER};
-        String[] values = packageInstalled
-                ? new String[]{"auto", "x86", "x64", "arm64", "arm64ec"}
-                : new String[]{"auto"};
+            }
+            if (values.size() == 1) {
+                labels.add(context.getString(R.string.dgvoodoo_arch_x64));
+                values.add("x64");
+            }
+        } else {
+            labels.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
+            values.add("auto");
+        }
         archSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, labels));
         archSpinner.setPopupBackgroundResource(popupBg);
         KeyValueSet config = parseConfig(anchor.getTag());
         if (packageInstalled) {
-            AppUtils.setSpinnerSelectionFromValue(archSpinner, labels[indexOf(values, normalizeArch(config.get("dgvoodooArch")))]);
+            int selectedIndex = indexOf(values.toArray(new String[0]), normalizeArch(config.get("dgvoodooArch")));
+            archSpinner.setSelection(selectedIndex, false);
         } else {
             archSpinner.setSelection(0, false);
         }
@@ -113,7 +142,9 @@ public class DgVoodooConfigDialog extends ContentDialog {
 
         setOnConfirmCallback(() -> {
             if (packageInstalled) {
-                config.put("dgvoodooArch", values[archSpinner.getSelectedItemPosition()]);
+                int selectedArchIndex = archSpinner.getSelectedItemPosition();
+                if (selectedArchIndex < 0 || selectedArchIndex >= values.size()) selectedArchIndex = 0;
+                config.put("dgvoodooArch", values.get(selectedArchIndex));
                 config.put("dgvoodooForceD3D11", forceD3D11Switch.isChecked() ? "1" : "0");
                 config.put("dgvoodooVSync", vsyncSwitch.isChecked() ? "1" : "0");
                 config.put("dgvoodooFlipModel", flipModelSwitch.isChecked() ? "1" : "0");
@@ -130,6 +161,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
                     ForensicLogger.fields(
                             "package_installed", packageInstalled ? "1" : "0",
                             "version_hint", manager.getVersionHint(),
+                            "available_arches", installedArchitectureSummary,
                             "arch", normalizeArch(config.get("dgvoodooArch")),
                             "force_d3d11", normalizeToggle(config.get("dgvoodooForceD3D11"), DEFAULT_FORCE_D3D11),
                             "vsync", normalizeToggle(config.get("dgvoodooVSync"), DEFAULT_VSYNC),

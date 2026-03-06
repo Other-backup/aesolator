@@ -31,46 +31,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="@string/contents_sources" />
+        android:text="@string/contents_source_selector" />
 
-    <HorizontalScrollView
-        android:id="@+id/HSVContentsSources"
+    <Spinner
+        android:id="@+id/SContentsSourceMode"
+        style="@style/ComboBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fadeScrollbars="false"
-        android:overScrollMode="ifContentScrolls"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:id="@+id/LLContentsSources"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <CheckBox
-                android:id="@+id/CBSourceWcpHub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/contents_source_wcphub"
-                android:textSize="13sp" />
-
-            <CheckBox
-                android:id="@+id/CBSourceFallback"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/contents_source_fallback"
-                android:textSize="13sp" />
-
-            <CheckBox
-                android:id="@+id/CBSourceAesolator"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/contents_source_aesolator"
-                android:textSize="13sp" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        android:layout_marginTop="4dp" />
 
     <TextView
         android:id="@+id/TVContentsLaneScope"
@@ -87,44 +55,29 @@
         android:layout_marginTop="8dp"
         android:text="@string/contents_filters" />
 
-    <HorizontalScrollView
-        android:id="@+id/HSVContentsFilters"
+    <LinearLayout
+        android:id="@+id/LLContentsFilters"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fadeScrollbars="false"
-        android:overScrollMode="ifContentScrolls"
-        android:scrollbars="none">
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/LLContentsFilters"
-            android:layout_width="wrap_content"
+        <Spinner
+            android:id="@+id/SContentsChannelMode"
+            style="@style/ComboBox"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1" />
 
-            <CheckBox
-                android:id="@+id/CBFilterArm64ec"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/contents_filter_arm64ec"
-                android:textSize="13sp" />
-
-            <CheckBox
-                android:id="@+id/CBFilterX64"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/contents_filter_x64"
-                android:textSize="13sp" />
-
-            <CheckBox
-                android:id="@+id/CBFilterBeta"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/contents_filter_beta"
-                android:textSize="13sp" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        <Spinner
+            android:id="@+id/SContentsArchMode"
+            style="@style/ComboBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+    </LinearLayout>
 
 
     <View style="@style/HorizontalLine" />

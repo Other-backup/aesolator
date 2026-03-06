@@ -59,6 +59,22 @@ public class DgVoodooManager {
         return isInstalled() ? "local" : "missing";
     }
 
+    public ArrayList<String> getInstalledArchitectures() {
+        ArrayList<String> architectures = new ArrayList<>();
+        File packageDir = getPackageDir();
+        if (hasRuntimeArch(packageDir, ARCH_X86)) architectures.add(ARCH_X86);
+        if (hasRuntimeArch(packageDir, ARCH_X64)) architectures.add(ARCH_X64);
+        if (hasRuntimeArch(packageDir, ARCH_ARM64)) architectures.add(ARCH_ARM64);
+        if (hasRuntimeArch(packageDir, ARCH_ARM64EC)) architectures.add(ARCH_ARM64EC);
+        return architectures;
+    }
+
+    public String getInstalledArchitectureSummary() {
+        ArrayList<String> architectures = getInstalledArchitectures();
+        if (architectures.isEmpty()) return "-";
+        return String.join(", ", architectures);
+    }
+
     public String installPackage(Uri packageUri) {
         if (packageUri == null) return "";
 
