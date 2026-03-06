@@ -568,6 +568,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         imageFs.setWinePath(wineInfo.path);
 
+        boolean enableLogs = preferences.getBoolean("enable_wine_debug", false)
+                || preferences.getBoolean("enable_box64_logs", false);
+
         ProcessHelper.removeAllDebugCallbacks();
         if (enableLogs) {
             LogView.setFilename(getExecutable());
