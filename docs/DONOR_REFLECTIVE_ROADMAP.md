@@ -29,6 +29,19 @@ Still open (UI tail queue):
 - Add consistent top-left back action for all major tabs/dialog roots.
 - Complete card-style migration for remaining legacy forms and spacing collisions.
 
+Added scope (2026-03-06, extension batch):
+1. Graphics Center feed viewport overflow and non-scrollable artifact list.
+2. Compact layout pass: remove shortcut/open-container quick links, reclaim vertical space for driver feeds.
+3. Contents policy by package lane:
+   - FEX/Box64/WoWBox64: `Release/Nightly` filter enabled.
+   - Vulkan SDK: no channel split in UI (`stable-only` lane behavior).
+4. DXVK/VKD3D architecture lane cleanup:
+   - remove `x86_64` lane selector from DXVK/VKD3D filter scope.
+   - keep `native` + `arm64ec` selectors (+ `all`).
+5. Wine/Proton filter simplification:
+   - channel filter disabled,
+   - architecture split retained.
+
 ## Execution Contract (Updated)
 
 Effective immediately: `1 round = 1 donor`, strict sequential closure.

@@ -10,7 +10,6 @@ import com.winlator.cmod.R;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -30,7 +29,6 @@ import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ForensicLogger;
@@ -164,9 +162,6 @@ public class AdrenotoolsFragment extends Fragment {
         View btInstallDriver = layout.findViewById(R.id.BTInstallDriver);
         btInstallDriver.setOnClickListener((v) -> openZipInstaller());
 
-        View btOpenContentsGraphics = layout.findViewById(R.id.BTOpenContentsGraphics);
-        btOpenContentsGraphics.setOnClickListener(v -> openContents());
-
         layout.findViewById(R.id.BTLaneTurnip).setOnClickListener(v ->
                 selectGraphicsLane(LANE_TURNIP, R.id.BTLaneTurnip));
         layout.findViewById(R.id.BTLaneOpenGL).setOnClickListener(v ->
@@ -175,7 +170,6 @@ public class AdrenotoolsFragment extends Fragment {
         layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> showX11SettingsDialog());
 
         layout.findViewById(R.id.BTOpenUpscalerSettings).setOnClickListener(v -> showUpscalerSettingsDialog());
-        layout.findViewById(R.id.BTOpenUpscalerShortcut).setOnClickListener(v -> openUpscalerShortcutSettings());
         styleGraphicsCenterButtons(layout);
         refreshGraphicsCenterStatus();
         refreshGraphicsFeed();
@@ -363,34 +357,6 @@ public class AdrenotoolsFragment extends Fragment {
             intent.setType("*/*");
             getActivity().startActivityFromFragment(this, intent, MainActivity.OPEN_FILE_REQUEST_CODE);
         });
-    }
-
-    private void openContents() {
-        sharedPreferences.edit().remove("contents_preselected_display_category").apply();
-        ForensicLogger.logEvent(
-                requireContext(),
-                "info",
-                "GRAPHICS_CENTER_OPEN_CONTENTS",
-                null,
-                "graphics_center",
-                "open_contents_from_graphics_center",
-                null
-        );
-        navigateToMainMenuItem(R.id.main_menu_contents, new ContentsFragment());
-    }
-
-    private void openUpscalerShortcutSettings() {
-        ForensicLogger.logEvent(
-                requireContext(),
-                "info",
-                "GRAPHICS_CENTER_OPEN_UPSCALER",
-                null,
-                "graphics_center",
-                "open_upscaler_settings_from_graphics_center",
-                null
-        );
-        navigateToMainMenuItem(R.id.main_menu_shortcuts, new ShortcutsFragment());
-        AppUtils.showToast(getContext(), R.string.graphics_center_upscaler_shortcut_hint);
     }
 
     private void showUpscalerSettingsDialog() {
@@ -855,36 +821,13 @@ public class AdrenotoolsFragment extends Fragment {
         styleLaneButton(root, R.id.BTLaneOpenGL, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark, isDarkMode, selectedLaneButtonId == R.id.BTLaneOpenGL);
         styleLaneButton(root, R.id.BTDri3Settings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenUpscalerSettings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
-        styleLaneButton(root, R.id.BTOpenUpscalerShortcut, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTInstallDriver, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
-        styleLaneButton(root, R.id.BTOpenContentsGraphics, R.color.colorAccent, R.color.colorAccentDark, isDarkMode, false);
     }
 
     private void applyFeedSpinnerTheme(boolean isDarkMode) {
         int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
         if (sGraphicsFeedSourceMode != null) sGraphicsFeedSourceMode.setBackgroundResource(spinnerBackground);
         if (sGraphicsFeedBranchMode != null) sGraphicsFeedBranchMode.setBackgroundResource(spinnerBackground);
-    }
-
-    private void navigateToMainMenuItem(int menuItemId, Fragment fallbackFragment) {
-        if (!isAdded() || getActivity() == null) return;
-        if (getActivity() instanceof MainActivity) {
-            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-            if (navigationView != null && navigationView.getMenu() != null) {
-                MenuItem target = navigationView.getMenu().findItem(menuItemId);
-                if (target != null) {
-                    navigationView.setCheckedItem(menuItemId);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(target);
-                    return;
-                }
-            }
-        }
-        if (fallbackFragment != null) {
-            getParentFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.FLFragmentContainer, fallbackFragment)
-                    .commit();
-        }
     }
 
     private void styleLaneButton(View root, int buttonId, int lightColorRes, int darkColorRes, boolean isDarkMode, boolean isSelected) {

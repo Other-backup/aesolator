@@ -173,6 +173,7 @@ public class ContentsFragment extends Fragment {
                     preselectedDisplayCategory = "";
                 }
                 updateLaneScopeLabel();
+                refreshTypeScopedFilterSpinners();
                 updateFilterControlsVisibility();
                 if (emptyText != null && recyclerView != null) {
                     loadContentList();
@@ -219,8 +220,7 @@ public class ContentsFragment extends Fragment {
         applyFilterSpinnerTheme();
 
         setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
-        setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
-        setSpinnerSelectionByValue(sContentsArchMode, archValues, archMode, 0);
+        refreshTypeScopedFilterSpinners();
 
         sContentsSourceMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -343,6 +343,9 @@ public class ContentsFragment extends Fragment {
             if (!locallyInstalled && !matchesSelectedSourceMode(profile)) {
                 continue;
             }
+            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && profile.isBetaLike()) {
+                continue;
+            }
             if (!locallyInstalled && supportsChannelFilter(currentContentType)) {
                 if ("stable".equalsIgnoreCase(channelMode) && profile.isBetaLike()) {
                     continue;
@@ -449,18 +452,23 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean supportsArchitectureFilters(ContentProfile.ContentType type) {
-        return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
-    }
-
-    private boolean supportsChannelFilter(ContentProfile.ContentType type) {
         return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
+    }
+
+    private boolean supportsChannelFilter(ContentProfile.ContentType type) {
+        return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
     }
 
     private void updateFilterControlsVisibility() {
@@ -482,6 +490,76 @@ public class ContentsFragment extends Fragment {
         if (sContentsSourceMode != null) sContentsSourceMode.setBackgroundResource(spinnerBackground);
         if (sContentsChannelMode != null) sContentsChannelMode.setBackgroundResource(spinnerBackground);
         if (sContentsArchMode != null) sContentsArchMode.setBackgroundResource(spinnerBackground);
+    }
+
+    private void refreshTypeScopedFilterSpinners() {
+        if (getContext() == null || sContentsChannelMode == null || sContentsArchMode == null) return;
+
+        channelValues = getChannelValuesForType(currentContentType);
+        archValues = getArchValuesForType(currentContentType);
+
+        String[] channelEntries = getChannelEntriesForType(currentContentType);
+        String[] archEntries = getArchEntriesForType(currentContentType);
+
+        sContentsChannelMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, channelEntries));
+        sContentsArchMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, archEntries));
+
+        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        sContentsChannelMode.setPopupBackgroundResource(popupBackground);
+        sContentsArchMode.setPopupBackgroundResource(popupBackground);
+        applyFilterSpinnerTheme();
+
+        if (!containsIgnoreCase(channelValues, channelMode)) channelMode = channelValues.length > 0 ? channelValues[0] : "stable";
+        if (!containsIgnoreCase(archValues, archMode)) archMode = archValues.length > 0 ? archValues[0] : "all";
+
+        setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
+        setSpinnerSelectionByValue(sContentsArchMode, archValues, archMode, 0);
+    }
+
+    private boolean containsIgnoreCase(String[] values, String value) {
+        if (values == null || values.length == 0 || value == null) return false;
+        for (String item : values) {
+            if (value.equalsIgnoreCase(item)) return true;
+        }
+        return false;
+    }
+
+    private String[] getChannelEntriesForType(ContentProfile.ContentType type) {
+        if (!supportsChannelFilter(type)) {
+            return new String[]{"Release only"};
+        }
+        return getResources().getStringArray(R.array.contents_channel_entries);
+    }
+
+    private String[] getChannelValuesForType(ContentProfile.ContentType type) {
+        if (!supportsChannelFilter(type)) {
+            return new String[]{"stable"};
+        }
+        return getResources().getStringArray(R.array.contents_channel_values);
+    }
+
+    private String[] getArchEntriesForType(ContentProfile.ContentType type) {
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
+            return getResources().getStringArray(R.array.contents_arch_entries_dxvk_vkd3d);
+        }
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return getResources().getStringArray(R.array.contents_arch_entries_wine_proton);
+        }
+        return getResources().getStringArray(R.array.contents_arch_entries);
+    }
+
+    private String[] getArchValuesForType(ContentProfile.ContentType type) {
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
+            return getResources().getStringArray(R.array.contents_arch_values_dxvk_vkd3d);
+        }
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return getResources().getStringArray(R.array.contents_arch_values_wine_proton);
+        }
+        return getResources().getStringArray(R.array.contents_arch_values);
     }
 
     private boolean isArm64EcProfile(ContentProfile profile) {
@@ -517,7 +595,23 @@ public class ContentsFragment extends Fragment {
         return combined.contains("arm64") || combined.contains("aarch64");
     }
 
+    private boolean isNativeProfile(ContentProfile profile) {
+        if (profile == null) return false;
+        if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                && profile.type != ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
+            return false;
+        }
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " " +
+                        (profile.desc == null ? "" : profile.desc) + " " +
+                        (profile.remoteUrl == null ? "" : profile.remoteUrl) + " " +
+                        (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        return combined.contains("native");
+    }
+
     private String resolveProfileArchTag(ContentProfile profile) {
+        if (isNativeProfile(profile)) return "native";
         if (isArm64EcProfile(profile)) return "arm64ec";
         if (isX64Profile(profile)) return "x86_64";
         if (isArm64Profile(profile)) return "arm64";
@@ -815,12 +909,14 @@ public class ContentsFragment extends Fragment {
     }
 
     private String resolveRemoteArchHint(JSONObject object) {
+        String normalizedType = object.optString("type", "").trim().toLowerCase(Locale.US);
         String combined = (
                 object.optString("verName", "") + " "
                         + object.optString("description", "") + " "
                         + object.optString("remoteUrl", "") + " "
                         + object.optString(ContentProfile.MARK_RELEASE_TAG, "")
         ).toLowerCase(Locale.US);
+        if (("dxvk".equals(normalizedType) || "vkd3d".equals(normalizedType)) && combined.contains("native")) return "native";
         if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
         if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
         if (combined.contains("arm64")) return "arm64";

@@ -84,6 +84,26 @@
         <item>arm64ec</item>
         <item>x86_64</item>
     </string-array>
+    <string-array name="contents_arch_entries_wine_proton">
+        <item>All architectures</item>
+        <item>ARM64EC lanes</item>
+        <item>x86_64 lanes</item>
+    </string-array>
+    <string-array name="contents_arch_values_wine_proton">
+        <item>all</item>
+        <item>arm64ec</item>
+        <item>x86_64</item>
+    </string-array>
+    <string-array name="contents_arch_entries_dxvk_vkd3d">
+        <item>All lanes</item>
+        <item>Native lanes</item>
+        <item>ARM64EC lanes</item>
+    </string-array>
+    <string-array name="contents_arch_values_dxvk_vkd3d">
+        <item>all</item>
+        <item>native</item>
+        <item>arm64ec</item>
+    </string-array>
     <string-array name="dxvk_version_entries">
         <item>1.11.1-sarek</item>
         <item>1.10.3-arm64ec-async</item>
