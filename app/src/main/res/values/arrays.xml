@@ -44,15 +44,11 @@
         <item>Ae.solator feed (Recommended)</item>
         <item>WCPHub feed</item>
         <item>Fallback feed</item>
-        <item>All sources (Merged)</item>
-        <item>Custom URL feed</item>
     </string-array>
     <string-array name="contents_source_values">
         <item>aesolator</item>
         <item>wcphub</item>
         <item>fallback</item>
-        <item>all</item>
-        <item>custom</item>
     </string-array>
     <string-array name="graphics_feed_source_entries">
         <item>Ae.solator Archive (Recommended)</item>
@@ -82,13 +78,11 @@
         <item>All architectures</item>
         <item>ARM64EC lanes</item>
         <item>x86_64 lanes</item>
-        <item>ARM64 lanes</item>
     </string-array>
     <string-array name="contents_arch_values">
         <item>all</item>
         <item>arm64ec</item>
         <item>x86_64</item>
-        <item>arm64</item>
     </string-array>
     <string-array name="dxvk_version_entries">
         <item>1.11.1-sarek</item>
@@ -393,18 +387,6 @@
         <item>Box64</item>
     </string-array>
     <string-array name="wine_entries">
-    </string-array>
-    <string-array name="forensic_adb_transport_entries">
-        <item>@string/forensic_adb_transport_auto</item>
-        <item>@string/forensic_adb_transport_nonroot</item>
-        <item>@string/forensic_adb_transport_root</item>
-        <item>@string/forensic_adb_transport_shizuku</item>
-    </string-array>
-    <string-array name="forensic_adb_transport_values">
-        <item>auto</item>
-        <item>nonroot</item>
-        <item>root</item>
-        <item>shizuku</item>
     </string-array>
     <string-array name="upscaler_preset_entries">
         <item>auto</item>

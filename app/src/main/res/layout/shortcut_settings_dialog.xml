@@ -167,7 +167,7 @@
                 android:layout_height="22dp"
                 android:layout_marginLeft="4dp"
                 android:src="@drawable/icon_help"
-                app:tint="#e0e0e0" />
+                app:tint="?attr/colorControlNormal" />
         </LinearLayout>
 
         <LinearLayout

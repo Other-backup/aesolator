@@ -24,7 +24,6 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
@@ -46,7 +45,6 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ForensicCenterFragment extends Fragment {
-    private static final String PREF_OPEN_X11_DIALOG_ONCE = "graphics_open_x11_dialog_once";
     private SharedPreferences preferences;
 
     @Nullable
@@ -77,7 +75,6 @@ public class ForensicCenterFragment extends Fragment {
         CheckBox cbNonRootCapture = view.findViewById(R.id.CBForensicNonRootCapture);
         CheckBox cbRootCapture = view.findViewById(R.id.CBForensicRootCapture);
         CheckBox cbShizukuCapture = view.findViewById(R.id.CBForensicShizukuCapture);
-        Spinner sAdbTransport = view.findViewById(R.id.SForensicAdbTransport);
         TextView badgeFreeWine = view.findViewById(R.id.TVPolicyBadgeFreeWine);
         TextView badgeDxvk = view.findViewById(R.id.TVPolicyBadgeDxvk);
         TextView badgeDgVoodoo = view.findViewById(R.id.TVPolicyBadgeDgVoodoo);
@@ -111,7 +108,6 @@ public class ForensicCenterFragment extends Fragment {
         badgeDxvk.setTextColor(badgeTextColor);
         badgeDgVoodoo.setTextColor(badgeTextColor);
         sDri3Mode.setBackgroundResource(spinnerBackground);
-        sAdbTransport.setBackgroundResource(spinnerBackground);
 
         cbWineDebug.setChecked(preferences.getBoolean("enable_wine_debug", false));
         cbBox64Logs.setChecked(preferences.getBoolean("enable_box64_logs", false));
@@ -137,34 +133,11 @@ public class ForensicCenterFragment extends Fragment {
             cbShizukuCapture.setChecked(false);
             cbShizukuCapture.setEnabled(false);
         }
-        String[] adbTransportLabels = getResources().getStringArray(R.array.forensic_adb_transport_entries);
-        String[] adbTransportValues = getResources().getStringArray(R.array.forensic_adb_transport_values);
-        String selectedAdbTransport = ForensicConfig.normalizeAdbCaptureMode(
-                preferences.getString(ForensicConfig.PREF_ADB_CAPTURE_MODE, ForensicConfig.ADB_CAPTURE_MODE_AUTO)
-        );
-        sAdbTransport.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, adbTransportLabels));
-        sAdbTransport.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        for (int i = 0; i < adbTransportValues.length; i++) {
-            if (adbTransportValues[i].equalsIgnoreCase(selectedAdbTransport)) {
-                sAdbTransport.setSelection(i);
-                break;
-            }
-        }
-        updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand);
+        updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, adbCaptureCommand);
         cbRootCapture.setOnCheckedChangeListener((buttonView, isChecked) ->
-                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
+                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, adbCaptureCommand));
         cbShizukuCapture.setOnCheckedChangeListener((buttonView, isChecked) ->
-                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
-        sAdbTransport.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view1, int position, long id) {
-                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
+                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, adbCaptureCommand));
         ForensicConfig.Snapshot openSnapshot = ForensicConfig.fromPreferences(preferences);
         ForensicLogger.logEvent(
                 requireContext(),
@@ -218,7 +191,7 @@ public class ForensicCenterFragment extends Fragment {
         });
 
         view.findViewById(R.id.BTRunRootCapture).setOnClickListener(v ->
-                runRootCaptureNow(cbRootCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
+                runRootCaptureNow(cbRootCapture, adbCaptureCommand));
         view.findViewById(R.id.BTCopyAdbCaptureCommand).setOnClickListener(v ->
                 copyAdbCaptureCommandToClipboard(adbCaptureCommand));
         adbCommand.setOnClickListener(v -> copyAdbCommandToClipboard());
@@ -247,7 +220,7 @@ public class ForensicCenterFragment extends Fragment {
                     .putBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, cbNonRootCapture.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, cbRootCapture.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_SHIZUKU_CAPTURE, cbShizukuCapture.isChecked())
-                    .putString(ForensicConfig.PREF_ADB_CAPTURE_MODE, adbTransportValues[sAdbTransport.getSelectedItemPosition()])
+                    .putString(ForensicConfig.PREF_ADB_CAPTURE_MODE, resolveCaptureMode(cbRootCapture, cbShizukuCapture))
                     .apply();
 
             ForensicConfig.Snapshot savedSnapshot = ForensicConfig.fromPreferences(preferences);
@@ -272,28 +245,6 @@ public class ForensicCenterFragment extends Fragment {
         });
 
         view.findViewById(R.id.BTViewForensicLog).setOnClickListener(v -> showForensicLogViewer());
-
-        view.findViewById(R.id.BTForensicOpenX11).setOnClickListener(v -> {
-            if (getActivity() instanceof MainActivity) {
-                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-                if (navigationView != null) {
-                    ForensicLogger.logEvent(
-                            requireContext(),
-                            "info",
-                            "FORENSIC_OPEN_X11_SETTINGS",
-                            null,
-                            "forensic_center",
-                            "open_x11_settings_from_forensic",
-                            null
-                    );
-                    preferences.edit().putBoolean(PREF_OPEN_X11_DIALOG_ONCE, true).apply();
-                    navigationView.setCheckedItem(R.id.main_menu_adrenotools_gpu_drivers);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(
-                            navigationView.getMenu().findItem(R.id.main_menu_adrenotools_gpu_drivers)
-                    );
-                }
-            }
-        });
 
         return view;
     }
@@ -369,7 +320,11 @@ public class ForensicCenterFragment extends Fragment {
 
         final String finalTail = tail;
         dialog.setOnConfirmCallback(() -> {
-            reportForensicIssue(finalTail, latestFile);
+            ContentDialog.confirm(
+                    context,
+                    R.string.diagnostics_forensic_report_privacy_warning,
+                    () -> reportForensicIssue(finalTail, latestFile)
+            );
         });
 
         View btExport = dialog.findViewById(R.id.BTForensicExportLog);
@@ -469,23 +424,11 @@ public class ForensicCenterFragment extends Fragment {
         );
     }
 
-    private void runRootCaptureNow(CheckBox cbRootCapture,
-                                   Spinner sAdbTransport,
-                                   String[] adbTransportValues,
-                                   TextView captureCommandView) {
+    private void runRootCaptureNow(CheckBox cbRootCapture, TextView captureCommandView) {
         Context context = getContext();
         if (context == null) return;
         if (!cbRootCapture.isChecked() || !ForensicConfig.isRootBinaryPresent()) {
             AppUtils.showToast(context, R.string.forensic_root_unavailable);
-            return;
-        }
-
-        int modeIndex = sAdbTransport.getSelectedItemPosition();
-        String mode = (modeIndex >= 0 && modeIndex < adbTransportValues.length)
-                ? ForensicConfig.normalizeAdbCaptureMode(adbTransportValues[modeIndex])
-                : ForensicConfig.ADB_CAPTURE_MODE_AUTO;
-        if (!ForensicConfig.ADB_CAPTURE_MODE_ROOT.equals(mode)) {
-            AppUtils.showToast(context, R.string.forensic_root_mode_required);
             return;
         }
 
@@ -552,7 +495,7 @@ public class ForensicCenterFragment extends Fragment {
                         finalSuccess ? "forensic_root_capture_ok" : "forensic_root_capture_fail",
                         ForensicLogger.fields(
                             "exit_code", finalExitCode,
-                            "capture_mode", mode,
+                            "capture_mode", ForensicConfig.ADB_CAPTURE_MODE_ROOT,
                             "capture_command", previewCommand,
                             "output", finalOutput,
                             "runtime_summary", ForensicConfig.buildRuntimeSummary(snapshot),
@@ -604,6 +547,7 @@ public class ForensicCenterFragment extends Fragment {
                 bodyBuilder.append("### Error digest\n```text\n")
                         .append(digest)
                         .append("\n```\n\n");
+                bodyBuilder.append("Full forensic logs are included in bundle files only.\n\n");
                 bodyBuilder.append(bundle.markdown);
                 String body = bodyBuilder.toString();
                 if (body.length() > 7000) {
@@ -702,18 +646,27 @@ public class ForensicCenterFragment extends Fragment {
 
     private void updateCaptureCommandPreview(CheckBox cbRootCapture,
                                              CheckBox cbShizukuCapture,
-                                             Spinner sAdbTransport,
-                                             String[] adbTransportValues,
                                              TextView tvCaptureCommand) {
-        if (tvCaptureCommand == null || adbTransportValues == null || adbTransportValues.length == 0) return;
-        int selectedIndex = sAdbTransport.getSelectedItemPosition();
-        if (selectedIndex < 0 || selectedIndex >= adbTransportValues.length) selectedIndex = 0;
-
+        if (tvCaptureCommand == null) return;
         ForensicConfig.Snapshot snapshot = ForensicConfig.fromPreferences(preferences);
         snapshot.enableRootCapture = cbRootCapture.isChecked();
         snapshot.enableShizukuCapture = cbShizukuCapture.isChecked();
-        snapshot.adbCaptureMode = adbTransportValues[selectedIndex];
+        snapshot.adbCaptureMode = resolveCaptureMode(cbRootCapture, cbShizukuCapture);
         tvCaptureCommand.setText(ForensicConfig.buildCaptureCommand(requireContext(), snapshot));
+    }
+
+    private String resolveCaptureMode(CheckBox cbRootCapture, CheckBox cbShizukuCapture) {
+        if (cbShizukuCapture != null
+                && cbShizukuCapture.isChecked()
+                && ForensicConfig.isShizukuInstalled(requireContext())) {
+            return ForensicConfig.ADB_CAPTURE_MODE_SHIZUKU;
+        }
+        if (cbRootCapture != null
+                && cbRootCapture.isChecked()
+                && ForensicConfig.isRootBinaryPresent()) {
+            return ForensicConfig.ADB_CAPTURE_MODE_ROOT;
+        }
+        return ForensicConfig.ADB_CAPTURE_MODE_AUTO;
     }
 
     private void copyAdbCaptureCommandToClipboard(TextView captureCommandView) {

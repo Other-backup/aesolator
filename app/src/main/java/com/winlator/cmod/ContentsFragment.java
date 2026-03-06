@@ -113,10 +113,26 @@ public class ContentsFragment extends Fragment {
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
         sourceMode = sharedPreferences.getString("contents_source_mode", "aesolator");
         if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "aesolator";
+        boolean migratedSourceMode = false;
+        if ("all".equalsIgnoreCase(sourceMode) || "custom".equalsIgnoreCase(sourceMode)) {
+            sourceMode = "aesolator";
+            migratedSourceMode = true;
+        }
         channelMode = sharedPreferences.getString("contents_channel_mode", "stable");
         if (channelMode == null || channelMode.trim().isEmpty()) channelMode = "stable";
         archMode = sharedPreferences.getString("contents_arch_mode", "all");
         if (archMode == null || archMode.trim().isEmpty()) archMode = "all";
+        boolean migratedArchMode = false;
+        if ("arm64".equalsIgnoreCase(archMode)) {
+            archMode = "all";
+            migratedArchMode = true;
+        }
+        if (migratedSourceMode || migratedArchMode) {
+            SharedPreferences.Editor migrationEditor = sharedPreferences.edit();
+            if (migratedSourceMode) migrationEditor.putString("contents_source_mode", sourceMode);
+            if (migratedArchMode) migrationEditor.putString("contents_arch_mode", archMode);
+            migrationEditor.apply();
+        }
         preselectedDisplayCategory = sharedPreferences.getString("contents_preselected_display_category", "");
         if (preselectedDisplayCategory == null) preselectedDisplayCategory = "";
         sharedPreferences.edit().remove("contents_preselected_display_category").apply();
@@ -353,19 +369,11 @@ public class ContentsFragment extends Fragment {
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
         if (profile == null) return false;
         String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
-        if ("all".equals(mode)) return true;
 
         String joined = (
                 (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
                         (profile.remoteUrl == null ? "" : profile.remoteUrl)
         ).toLowerCase(Locale.US);
-
-        if ("custom".equals(mode)) {
-            String customFeedUrl = sharedPreferences.getString("downloadable_contents_url", "");
-            String customHost = resolveHost(customFeedUrl);
-            if (customHost.isEmpty()) return true;
-            return joined.contains(customHost);
-        }
 
         if ("aesolator".equals(mode)) {
             return joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator");
@@ -381,17 +389,6 @@ public class ContentsFragment extends Fragment {
                     || joined.contains("fallback");
         }
         return true;
-    }
-
-    private String resolveHost(String value) {
-        if (value == null || value.trim().isEmpty()) return "";
-        try {
-            URI uri = new URI(value.trim());
-            String host = uri.getHost();
-            return host == null ? "" : host.trim().toLowerCase(Locale.US);
-        } catch (Exception ignored) {
-            return "";
-        }
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -648,19 +645,6 @@ public class ContentsFragment extends Fragment {
             urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
             return urls;
         }
-        if ("custom".equals(selectedSourceMode)) {
-            String preferredUrl = sharedPreferences.getString("downloadable_contents_url", "");
-            if (preferredUrl != null && !preferredUrl.trim().isEmpty()) {
-                urls.add(preferredUrl.trim());
-            }
-            return urls;
-        }
-        if ("all".equals(selectedSourceMode)) {
-            urls.add(ContentsManager.REMOTE_PROFILES_AE);
-            urls.add(ContentsManager.REMOTE_PROFILES);
-            urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
-            return urls;
-        }
         // Default source mode keeps one author lane selected to avoid mixed releases.
         urls.add(ContentsManager.REMOTE_PROFILES_AE);
         return urls;
@@ -668,12 +652,7 @@ public class ContentsFragment extends Fragment {
 
     private String buildSourceSignature(String selectedSourceMode) {
         String normalized = selectedSourceMode == null ? "aesolator" : selectedSourceMode.trim().toLowerCase(Locale.US);
-        String custom = "";
-        if ("custom".equals(normalized)) {
-            String preferredUrl = sharedPreferences.getString("downloadable_contents_url", "");
-            custom = preferredUrl == null ? "" : preferredUrl.trim().toLowerCase(Locale.US);
-        }
-        return normalized + "|" + custom;
+        return normalized;
     }
 
     private void addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {

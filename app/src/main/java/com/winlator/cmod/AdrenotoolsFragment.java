@@ -168,10 +168,6 @@ public class AdrenotoolsFragment extends Fragment {
 
         layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> showX11SettingsDialog());
 
-        layout.findViewById(R.id.BTForensicCenter).setOnClickListener(v -> {
-            navigateToMainMenuItem(R.id.main_menu_diagnostics, new ForensicCenterFragment());
-        });
-
         layout.findViewById(R.id.BTOpenUpscalerSettings).setOnClickListener(v -> showUpscalerSettingsDialog());
         layout.findViewById(R.id.BTOpenUpscalerShortcut).setOnClickListener(v -> openUpscalerShortcutSettings());
         styleGraphicsCenterButtons(layout);
@@ -848,7 +844,6 @@ public class AdrenotoolsFragment extends Fragment {
         styleLaneButton(root, R.id.BTLaneTurnip, R.color.contents_lane_turnip, R.color.contents_lane_turnip_dark, isDarkMode, selectedLaneButtonId == R.id.BTLaneTurnip);
         styleLaneButton(root, R.id.BTLaneOpenGL, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark, isDarkMode, selectedLaneButtonId == R.id.BTLaneOpenGL);
         styleLaneButton(root, R.id.BTDri3Settings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
-        styleLaneButton(root, R.id.BTForensicCenter, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenUpscalerSettings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenUpscalerShortcut, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTInstallDriver, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
@@ -962,7 +957,7 @@ public class AdrenotoolsFragment extends Fragment {
         if (profiles == null || profiles.isEmpty()) {
             tvGraphicsFeedEmpty.setText(R.string.graphics_center_driver_feed_empty);
             tvGraphicsFeedEmpty.setVisibility(View.VISIBLE);
-            rvGraphicsFeed.setVisibility(View.GONE);
+            rvGraphicsFeed.setVisibility(View.VISIBLE);
             rvGraphicsFeed.setAdapter(new GraphicsFeedAdapter(new ArrayList<>()));
             return;
         }
@@ -985,6 +980,10 @@ public class AdrenotoolsFragment extends Fragment {
             profiles.addAll(fetchGitHubReleaseZipProfiles("MrPurple666/purple-turnip", lane, source));
         } else {
             profiles.addAll(fetchGitHubReleaseZipProfiles("kosoymiki/wcp-graphics-lanes", lane, source));
+        }
+
+        if (profiles.isEmpty()) {
+            profiles.addAll(buildStaticFallbackProfiles(source, lane));
         }
 
         Collections.sort(profiles, (left, right) -> {
@@ -1268,6 +1267,60 @@ public class AdrenotoolsFragment extends Fragment {
         return "main";
     }
 
+    private List<ContentProfile> buildStaticFallbackProfiles(String sourceKey, String lane) {
+        ArrayList<ContentProfile> profiles = new ArrayList<>();
+        String source = sourceKey == null ? "" : sourceKey.trim().toLowerCase(Locale.US);
+        if (!LANE_TURNIP.equals(lane)) return profiles;
+        if ("stevenmxz".equals(source) || "ae_archive".equals(source)) {
+            String sourceRepo = "stevenmxz".equals(source)
+                    ? "StevenMXZ/freedreno_turnip-CI"
+                    : "Ae.solator archive";
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "Turnip Gen8 V26",
+                    "https://github.com/StevenMXZ/freedreno_turnip-CI/releases/download/v26.1.2/Turnip_Gen8_V26.zip",
+                    sourceRepo,
+                    "v26.1.2",
+                    "gen8",
+                    261200
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "Turnip v26.1.0 R4",
+                    "https://github.com/StevenMXZ/freedreno_turnip-CI/releases/download/v26.1.0-R4/Turnip_v26.1.0_R4.zip",
+                    sourceRepo,
+                    "v26.1.0-R4",
+                    "r-series",
+                    261004
+            ));
+        }
+        return profiles;
+    }
+
+    private ContentProfile buildStaticProfile(String lane,
+                                              String verName,
+                                              String remoteUrl,
+                                              String sourceRepo,
+                                              String releaseTag,
+                                              String delivery,
+                                              int verCode) {
+        ContentProfile profile = new ContentProfile();
+        profile.type = LANE_OPENGL.equals(lane)
+                ? ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                : ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER;
+        profile.verName = verName;
+        profile.verCode = verCode;
+        profile.desc = verName + " (fallback mirror)";
+        profile.remoteUrl = remoteUrl;
+        profile.sourceRepo = sourceRepo;
+        profile.releaseTag = releaseTag;
+        profile.delivery = delivery;
+        profile.channel = ContentProfile.CHANNEL_STABLE;
+        profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
+        profile.locallyInstalled = isLikelyInstalledDriver(profile.verName);
+        return profile;
+    }
+
     private int deriveGameNativeVerCode(String fileName, int fallback) {
         if (fileName == null || fileName.trim().isEmpty()) return fallback;
         String digits = fileName.replaceAll("[^0-9]", "");
@@ -1311,7 +1364,7 @@ public class AdrenotoolsFragment extends Fragment {
             String key = profile.delivery == null ? "" : profile.delivery.trim().toLowerCase(Locale.US);
             if (key.isEmpty()) key = "main";
             if (!options.containsKey(key)) {
-                options.put(key, key.replace('-', ' '));
+                options.put(key, formatReleaseLineLabel(key));
             }
         }
 
@@ -1351,6 +1404,20 @@ public class AdrenotoolsFragment extends Fragment {
             if (normalized.equals(branch)) filtered.add(profile);
         }
         return filtered;
+    }
+
+    private String formatReleaseLineLabel(String key) {
+        if (key == null || key.trim().isEmpty()) return "Mainline";
+        String normalized = key.trim().toLowerCase(Locale.US);
+        return switch (normalized) {
+            case "main", "mainline" -> "Mainline";
+            case "r-series", "rseries" -> "R-series";
+            case "gen8" -> "Gen8";
+            case "qcom-opengl" -> "QCOM OpenGL";
+            case "mesa-opengl" -> "Mesa OpenGL";
+            case "turnip-ci" -> "Turnip CI";
+            default -> normalized.replace('-', ' ');
+        };
     }
 
     private int resolveFeedAccentColor(ContentProfile profile) {

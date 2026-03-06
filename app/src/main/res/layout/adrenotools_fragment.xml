@@ -109,23 +109,27 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/RVGraphicsFeed"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="244dp"
-            android:layout_marginTop="6dp"
-            android:nestedScrollingEnabled="false"
-            android:overScrollMode="never"
-            android:scrollbars="vertical" />
+            android:layout_height="252dp"
+            android:layout_marginTop="6dp">
 
-        <TextView
-            android:id="@+id/TVGraphicsFeedEmpty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center"
-            android:text="@string/graphics_center_driver_feed_empty"
-            android:visibility="gone" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/RVGraphicsFeed"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never"
+                android:scrollbars="vertical" />
+
+            <TextView
+                android:id="@+id/TVGraphicsFeedEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="@string/graphics_center_driver_feed_empty"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/TVGraphicsActionsLabel"
@@ -154,12 +158,12 @@
                 android:layout_height="0dp" />
 
             <Button
-                android:id="@+id/BTForensicCenter"
+                android:id="@+id/BTOpenUpscalerSettings"
                 style="@style/ButtonNeutral"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/open_forensic_center" />
+                android:text="@string/open_upscaler_profiles" />
         </LinearLayout>
 
         <LinearLayout
@@ -169,30 +173,30 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/BTOpenUpscalerSettings"
-                style="@style/ButtonNeutral"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/open_upscaler_profiles" />
-
-            <Space
-                android:layout_width="10dp"
-                android:layout_height="0dp" />
-
-            <Button
                 android:id="@+id/BTOpenUpscalerShortcut"
                 style="@style/ButtonNeutral"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/open_upscaler_shortcuts" />
+
+            <Space
+                android:layout_width="10dp"
+                android:layout_height="0dp" />
+
+            <Button
+                android:id="@+id/BTOpenContentsGraphics"
+                style="@style/ButtonPositive"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/open_contents_packages" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/RecyclerView"
             android:layout_width="match_parent"
-            android:layout_height="232dp"
+            android:layout_height="236dp"
             android:layout_marginTop="8dp"
             android:nestedScrollingEnabled="false"
             android:overScrollMode="never"
@@ -208,22 +212,9 @@
             <Button
                 android:id="@+id/BTInstallDriver"
                 style="@style/ButtonNeutral"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="@string/install_drivers_local" />
-
-            <Space
-                android:layout_width="10dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTOpenContentsGraphics"
-                style="@style/ButtonPositive"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/open_contents_packages" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

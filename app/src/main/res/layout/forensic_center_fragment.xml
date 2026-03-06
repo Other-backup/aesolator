@@ -221,14 +221,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/enable_root_capture" />
-
-                <Button
-                    android:id="@+id/BTForensicOpenX11"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/open_dri3_settings" />
             </LinearLayout>
 
             <LinearLayout
@@ -276,21 +268,6 @@
                     android:text="@string/enable_shizuku_capture" />
 
                 <TextView
-                    android:id="@+id/TVForensicAdbTransportLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/forensic_adb_transport_title" />
-
-                <Spinner
-                    android:id="@+id/SForensicAdbTransport"
-                    style="@style/ComboBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/forensic_adb_transport_entries"
-                    android:spinnerMode="dialog" />
-
-                <TextView
                     android:id="@+id/TVAdbCaptureCommandLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -336,19 +313,15 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/copy_capture_command" />
-
-                    <Space
-                        android:layout_width="10dp"
-                        android:layout_height="0dp" />
-
-                    <Button
-                        android:id="@+id/BTSaveForensic"
-                        style="@style/ButtonPositive"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/save" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/BTSaveForensic"
+                    style="@style/ButtonPositive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/save" />
 
                 <Button
                     android:id="@+id/BTViewForensicLog"

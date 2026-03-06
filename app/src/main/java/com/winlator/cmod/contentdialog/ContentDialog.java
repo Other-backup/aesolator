@@ -21,6 +21,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.ThemeAssetPainter;
 
 import java.util.ArrayList;
 
@@ -72,6 +73,7 @@ public class ContentDialog extends Dialog {
         });
 
         setContentView(contentView);
+        ThemeAssetPainter.apply(context, contentView, isDarkMode);
     }
 
     public View getInflatedLayout() {

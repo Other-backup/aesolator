@@ -15,7 +15,8 @@
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:minHeight="138dp">
 
                 <LinearLayout style="@style/FieldSet">
                     <TextView
@@ -346,11 +347,12 @@
                         android:layout_height="wrap_content"
                         android:text="Enable Big Picture Mode on App Launch" />
 
-                    <FrameLayout
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
-
-                        <LinearLayout style="@style/FieldSet">
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp">
 
                             <LinearLayout
                                 android:layout_width="match_parent"
@@ -378,13 +380,7 @@
                                 android:layout_marginTop="8dp"
                                 android:hint="Enter your API Key here"
                                 android:visibility="gone" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/TVCustomApiKey"
-                            style="@style/FieldSetLabel"
-                            android:text="SteamGridDB API Key" />
-                    </FrameLayout>
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -395,8 +391,10 @@
             </FrameLayout>
 
             <FrameLayout
+                android:id="@+id/FLXServerSettings"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:visibility="gone">
 
                 <LinearLayout style="@style/FieldSet">
                     <LinearLayout
@@ -630,7 +628,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="right|bottom"
-        android:tint="#ffffff"
+        android:tint="@color/white"
         android:src="@drawable/icon_confirm"
         android:layout_margin="16dp" />
 </FrameLayout>

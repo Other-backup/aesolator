@@ -288,7 +288,7 @@
                         android:id="@+id/TVCPUTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/colorPrimary"
+                        android:textColor="?attr/colorControlNormal"
                         android:textStyle="bold" />
 
                     <LinearLayout
@@ -310,7 +310,7 @@
                         android:id="@+id/TVMemoryTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/colorPrimary"
+                        android:textColor="?attr/colorControlNormal"
                         android:textStyle="bold" />
 
                     <TextView
@@ -332,7 +332,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/task_manager_runtime_telemetry"
-                        android:textColor="@color/colorPrimary"
+                        android:textColor="?attr/colorControlNormal"
                         android:textStyle="bold" />
 
                     <TextView

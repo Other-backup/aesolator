@@ -2,13 +2,15 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/forensic_panel_background_dark"
     android:orientation="vertical"
-    android:padding="6dp">
+    android:padding="8dp">
 
     <TextView
         android:id="@+id/TVForensicLogFile"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@color/forensic_badge_text_dark"
         android:textStyle="bold" />
 
     <TextView
@@ -16,6 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
+        android:textColor="@color/forensic_log_stats_text"
         android:textSize="12sp"
         android:typeface="monospace" />
 
@@ -39,7 +42,7 @@
         android:layout_width="match_parent"
         android:layout_height="360dp"
         android:layout_marginTop="8dp"
-        android:background="@drawable/forensic_command_background"
+        android:background="@drawable/forensic_command_background_dark"
         android:padding="8dp"
         android:scrollbars="horizontal">
 
@@ -54,6 +57,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="720dp"
+                android:textColor="@color/forensic_log_body_text"
                 android:textIsSelectable="true"
                 android:textSize="12sp"
                 android:typeface="monospace" />

@@ -81,7 +81,7 @@
             android:layout_height="wrap_content"
             android:textStyle="bold"
             android:text="Gyroscope"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorControlNormal"
             android:layout_marginTop="8dp" />
 
         <View
@@ -145,7 +145,7 @@
             android:layout_height="wrap_content"
             android:textStyle="bold"
             android:text="Trigger"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorControlNormal"
             android:layout_marginTop="8dp" />
 
         <View
@@ -248,7 +248,7 @@
             android:layout_height="wrap_content"
             android:textStyle="bold"
             android:text="@string/external_controllers"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorControlNormal"
             android:layout_marginTop="8dp" />
 
         <View style="@style/HorizontalLine" />

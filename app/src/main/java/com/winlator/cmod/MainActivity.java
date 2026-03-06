@@ -2,6 +2,7 @@ package com.winlator.cmod;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
@@ -42,6 +43,7 @@ import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
@@ -113,6 +115,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         // Determine text color based on dark mode
         int textColor = isDarkMode ? Color.WHITE : Color.BLACK;
         setNavigationViewItemTextColor(navigationView, textColor);
+        navigationView.setItemIconTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent)
+        ));
 
         // Create Winlator folder if not present
         File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
@@ -150,6 +155,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 }
             }
         }
+        applyThemeAssetTintPass();
     }
 
     private void showAllFilesAccessDialog() {
@@ -328,6 +334,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         drawerLayout.closeDrawer(GravityCompat.START);
+        View contentRoot = findViewById(android.R.id.content);
+        if (contentRoot != null) {
+            contentRoot.post(this::applyThemeAssetTintPass);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        boolean latestDark = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
+        if (latestDark != isDarkMode) isDarkMode = latestDark;
+        applyThemeAssetTintPass();
+    }
+
+    private void applyThemeAssetTintPass() {
+        View contentRoot = findViewById(android.R.id.content);
+        if (contentRoot != null) {
+            ThemeAssetPainter.apply(this, contentRoot, isDarkMode);
+        }
     }
 
     private void showAboutDialog() {

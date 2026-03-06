@@ -242,8 +242,7 @@
     <string name="dxwrapper_help_content"><![CDATA[
         <i><b>WineD3D</b></i> is a translation layer for DirectX 1-11 to OpenGL.<br /><br />
         <i><b>DXVK</b></i> is a translation layer for Direct3D 9-11 to Vulkan.<br /><br />
-        <i><b>VKD3D</b></i> is a translation layer for Direct3D 12 API to Vulkan.<br /><br />
-        Legacy DirectDraw/D3D1-7/Glide is routed through dgVoodoo runtime lanes.
+        <i><b>VKD3D</b></i> is a translation layer for Direct3D 12 API to Vulkan.
     ]]></string>
     <string name="box64_env_var_help__dynarec_safeflags"><![CDATA[
         Handling of flags on CALL/RET opcodes<br /><br />
@@ -696,16 +695,15 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="diagnostics_adb_label">ADB command for live logs</string>
     <string name="diagnostics_adb_capture_label">ADB capture command for issue bundle</string>
     <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|dgvoodoo|turnip|opengl|aero_|aesolator"</string>
-    <string name="diagnostics_forensic_run_root_capture">Run Root Capture</string>
+    <string name="diagnostics_forensic_run_root_capture">Run root bundle capture</string>
     <string name="diagnostics_forensic_root_capture_running">Running root forensic capture...</string>
     <string name="diagnostics_forensic_root_capture_ok">Root capture completed: %1$s</string>
     <string name="diagnostics_forensic_root_capture_fail">Root capture failed (exit code %1$d)</string>
     <string name="forensic_root_unavailable">Root capture unavailable: enable root capture and ensure su is present.</string>
-    <string name="forensic_root_mode_required">Set capture transport to "ADB root (su)" to run direct root capture.</string>
     <string name="diagnostics_view_forensic_log">View forensic log</string>
     <string name="diagnostics_forensic_log_title">Forensic Log Viewer</string>
     <string name="diagnostics_forensic_log_file">File: %1$s</string>
-    <string name="diagnostics_forensic_log_report">Report</string>
+    <string name="diagnostics_forensic_log_report">Create GitHub report</string>
     <string name="diagnostics_forensic_log_empty">No forensic trace file found.</string>
     <string name="diagnostics_forensic_log_export">Export log snapshot</string>
     <string name="diagnostics_forensic_log_export_ok">Forensic snapshot exported: %1$s</string>
@@ -732,7 +730,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="graphics_center_driver_feed_hint">Only Turnip/OpenGL lanes are installable here. Use Contents for other runtime packages.</string>
     <string name="graphics_center_driver_feed_empty">No packages available for the selected lane.</string>
     <string name="graphics_center_driver_feed_loading">Loading package feed...</string>
-    <string name="graphics_center_branch_selector">Driver branch</string>
+    <string name="graphics_center_branch_selector">Release line</string>
     <string name="graphics_center_branch_all">All branches</string>
     <string name="graphics_center_install_action">Install</string>
     <string name="graphics_center_update_action">Update</string>
@@ -811,12 +809,8 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="enable_nonroot_capture">Enable non-root forensic capture</string>
     <string name="enable_root_capture">Enable root forensic capture (when available)</string>
     <string name="enable_shizuku_capture">Enable Shizuku forensic capture (when available)</string>
-    <string name="forensic_adb_transport_title">Preferred capture transport</string>
-    <string name="forensic_adb_transport_auto">Auto (best available)</string>
-    <string name="forensic_adb_transport_nonroot">ADB non-root (run-as)</string>
-    <string name="forensic_adb_transport_root">ADB root (su)</string>
-    <string name="forensic_adb_transport_shizuku">Shizuku bridge</string>
-    <string name="copy_capture_command">Copy Capture</string>
+    <string name="copy_capture_command">Copy command</string>
+    <string name="diagnostics_forensic_report_privacy_warning">A forensic issue draft will open on GitHub. The report body includes summary only; full logs stay in bundle files.</string>
     <string name="enable_vulkan_api_dump">Enable dumping of Vulkan api calls to file.</string>
     <string name="dll_emulator">32bit Emulator</string>
     <string name="open_with_android_browser">Open Android Browser in Wine</string>

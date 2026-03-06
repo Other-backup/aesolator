@@ -104,6 +104,7 @@ public class SettingsFragment extends Fragment {
     private static final int REQUEST_CODE_INSTALL_SOUNDFONT = 1001;
     private static final int REQUEST_CODE_IMPORT_BOX64_PRESET = 1004;
     private static final int REQUEST_CODE_IMPORT_FEXCORE_PRESET = 1005;
+    private static final String PREF_THEME_TRANSITION_PENDING = "theme_transition_pending";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -117,6 +118,11 @@ public class SettingsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         // Apply dynamic styles to all labels
         applyDynamicStylesRecursively(view);
+        if (preferences != null && preferences.getBoolean(PREF_THEME_TRANSITION_PENDING, false)) {
+            view.setAlpha(0f);
+            view.animate().alpha(1f).setDuration(220L).start();
+            preferences.edit().putBoolean(PREF_THEME_TRANSITION_PENDING, false).apply();
+        }
         ((AppCompatActivity)getActivity()).getSupportActionBar().setTitle(R.string.settings);
     }
 
@@ -276,6 +282,7 @@ public class SettingsFragment extends Fragment {
         view.findViewById(R.id.TVDri3ModeHint).setVisibility(View.GONE);
         view.findViewById(R.id.CBDri3PresentWait).setVisibility(View.GONE);
         view.findViewById(R.id.CBDri3ForceSwWsi).setVisibility(View.GONE);
+        view.findViewById(R.id.FLXServerSettings).setVisibility(View.GONE);
 
         final CheckBox cbUseXR = view.findViewById(R.id.CBUseXR);
         cbUseXR.setChecked(preferences.getBoolean("use_xr", true));
@@ -401,14 +408,18 @@ public class SettingsFragment extends Fragment {
     }
 
     private void updateTheme(boolean isDarkMode) {
-        if (isDarkMode) {
-            getActivity().setTheme(R.style.AppTheme_Dark);
-        } else {
-            getActivity().setTheme(R.style.AppTheme);
-        }
-
-        // Recreate the activity to apply the new theme
-        getActivity().recreate();
+        if (getActivity() == null) return;
+        preferences.edit().putBoolean(PREF_THEME_TRANSITION_PENDING, true).apply();
+        View decor = getActivity().getWindow().getDecorView();
+        decor.animate()
+                .alpha(0f)
+                .setDuration(180L)
+                .withEndAction(() -> {
+                    if (!isAdded() || getActivity() == null) return;
+                    getActivity().setTheme(isDarkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
+                    getActivity().recreate();
+                })
+                .start();
     }
 
 
@@ -446,9 +457,6 @@ public class SettingsFragment extends Fragment {
         TextView bigPictureModeLabel = view.findViewById(R.id.TVBigPictureMode);
         applyFieldSetLabelStyle(bigPictureModeLabel, isDarkMode);
 
-        TextView tvCustomApiKey = view.findViewById(R.id.TVCustomApiKey);
-        applyFieldSetLabelStyle(tvCustomApiKey, isDarkMode);
-
 //        TextView shortcutSettingsLabel = view.findViewById(R.id.TVShortcutSettings);
 //        applyFieldSetLabelStyle(shortcutSettingsLabel, isDarkMode);
 
@@ -481,7 +489,6 @@ public class SettingsFragment extends Fragment {
                 R.id.TVShortcutSettings,
                 R.id.TVRuntimeProfileGlobal,
                 R.id.TVBigPictureMode,
-                R.id.TVCustomApiKey,
                 R.id.TVXServer,
                 R.id.TVExperimental,
                 R.id.TVImageFs
@@ -499,7 +506,8 @@ public class SettingsFragment extends Fragment {
                 if (child instanceof LinearLayout) {
                     child.setBackgroundResource(panelBackground);
                     int padding = dpToPx(child.getContext(), 12f);
-                    child.setPadding(padding, padding, padding, padding);
+                    child.setPadding(padding, dpToPx(child.getContext(), 16f), padding, padding);
+                    child.setMinimumHeight(dpToPx(child.getContext(), 120f));
                 }
             }
         }
