@@ -30,12 +30,13 @@
     </LinearLayout>
 
     <com.google.android.material.navigation.NavigationView
-        android:layout_width="320dp"
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:id="@+id/NavigationView"
         android:fitsSystemWindows="true"
         android:scrollbars="vertical"
+        app:itemHorizontalPadding="18dp"
         app:itemIconTint="@color/colorAccent"
         app:menu="@menu/main_menu"/>
 </androidx.drawerlayout.widget.DrawerLayout>

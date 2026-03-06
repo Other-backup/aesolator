@@ -80,6 +80,7 @@ public class ForensicCenterFragment extends Fragment {
         int commandBackground = isDarkMode
                 ? R.drawable.forensic_command_background_dark
                 : R.drawable.forensic_command_background;
+        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
         int badgeTextColor = ContextCompat.getColor(
                 requireContext(),
                 isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
@@ -96,6 +97,8 @@ public class ForensicCenterFragment extends Fragment {
         badgeFreeWine.setTextColor(badgeTextColor);
         badgeDxvk.setTextColor(badgeTextColor);
         badgeDgVoodoo.setTextColor(badgeTextColor);
+        sDri3Mode.setBackgroundResource(spinnerBackground);
+        sAdbTransport.setBackgroundResource(spinnerBackground);
 
         cbWineDebug.setChecked(preferences.getBoolean("enable_wine_debug", false));
         cbBox64Logs.setChecked(preferences.getBoolean("enable_box64_logs", false));

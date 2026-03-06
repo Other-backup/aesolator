@@ -10,6 +10,7 @@ import com.winlator.cmod.R;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -128,6 +129,7 @@ public class AdrenotoolsFragment extends Fragment {
         sGraphicsFeedSourceMode.setPopupBackgroundResource(popupBackground);
         sGraphicsFeedChannelMode.setPopupBackgroundResource(popupBackground);
         sGraphicsFeedArchMode.setPopupBackgroundResource(popupBackground);
+        applyFeedSpinnerTheme(isDarkMode);
         setSpinnerSelectionByValue(sGraphicsFeedSourceMode, sourceValues, sourceMode, 0);
         setSpinnerSelectionByValue(sGraphicsFeedChannelMode, channelValues, channelMode, 0);
         setSpinnerSelectionByValue(sGraphicsFeedArchMode, archValues, archMode, 0);
@@ -167,23 +169,11 @@ public class AdrenotoolsFragment extends Fragment {
                 selectGraphicsLane(LANE_OPENGL, R.id.BTLaneOpenGL));
 
         layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> {
-            if (getActivity() instanceof MainActivity) {
-                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-                if (navigationView != null) {
-                    navigationView.setCheckedItem(R.id.main_menu_settings);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_settings));
-                }
-            }
+            navigateToMainMenuItem(R.id.main_menu_settings, new SettingsFragment());
         });
 
         layout.findViewById(R.id.BTForensicCenter).setOnClickListener(v -> {
-            if (getActivity() instanceof MainActivity) {
-                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-                if (navigationView != null) {
-                    navigationView.setCheckedItem(R.id.main_menu_diagnostics);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_diagnostics));
-                }
-            }
+            navigateToMainMenuItem(R.id.main_menu_diagnostics, new ForensicCenterFragment());
         });
 
         layout.findViewById(R.id.BTOpenUpscalerSettings).setOnClickListener(v -> openUpscalerSettings());
@@ -214,6 +204,7 @@ public class AdrenotoolsFragment extends Fragment {
         if (recyclerView != null) {
             recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
         }
+        styleGraphicsCenterButtons(rootView);
         refreshGraphicsCenterStatus();
         refreshGraphicsFeed();
     }
@@ -361,13 +352,7 @@ public class AdrenotoolsFragment extends Fragment {
                 "open_contents_from_graphics_center",
                 null
         );
-        if (getActivity() instanceof MainActivity) {
-            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-            if (navigationView != null) {
-                navigationView.setCheckedItem(R.id.main_menu_contents);
-                ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_contents));
-            }
-        }
+        navigateToMainMenuItem(R.id.main_menu_contents, new ContentsFragment());
     }
 
     private void openUpscalerSettings() {
@@ -380,14 +365,8 @@ public class AdrenotoolsFragment extends Fragment {
                 "open_upscaler_settings_from_graphics_center",
                 null
         );
-        if (getActivity() instanceof MainActivity) {
-            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-            if (navigationView != null) {
-                navigationView.setCheckedItem(R.id.main_menu_shortcuts);
-                ((MainActivity) getActivity()).onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_shortcuts));
-                AppUtils.showToast(getContext(), R.string.graphics_center_upscaler_hint);
-            }
-        }
+        navigateToMainMenuItem(R.id.main_menu_shortcuts, new ShortcutsFragment());
+        AppUtils.showToast(getContext(), R.string.graphics_center_upscaler_hint);
     }
 
     private void styleGraphicsCenterButtons(View root) {
@@ -398,6 +377,36 @@ public class AdrenotoolsFragment extends Fragment {
         styleLaneButton(root, R.id.BTDri3Settings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTForensicCenter, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenUpscalerSettings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
+        styleLaneButton(root, R.id.BTInstallDriver, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
+        styleLaneButton(root, R.id.BTOpenContentsGraphics, R.color.colorAccent, R.color.colorAccentDark, isDarkMode, false);
+    }
+
+    private void applyFeedSpinnerTheme(boolean isDarkMode) {
+        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
+        if (sGraphicsFeedSourceMode != null) sGraphicsFeedSourceMode.setBackgroundResource(spinnerBackground);
+        if (sGraphicsFeedChannelMode != null) sGraphicsFeedChannelMode.setBackgroundResource(spinnerBackground);
+        if (sGraphicsFeedArchMode != null) sGraphicsFeedArchMode.setBackgroundResource(spinnerBackground);
+    }
+
+    private void navigateToMainMenuItem(int menuItemId, Fragment fallbackFragment) {
+        if (!isAdded() || getActivity() == null) return;
+        if (getActivity() instanceof MainActivity) {
+            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
+            if (navigationView != null && navigationView.getMenu() != null) {
+                MenuItem target = navigationView.getMenu().findItem(menuItemId);
+                if (target != null) {
+                    navigationView.setCheckedItem(menuItemId);
+                    ((MainActivity) getActivity()).onNavigationItemSelected(target);
+                    return;
+                }
+            }
+        }
+        if (fallbackFragment != null) {
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.FLFragmentContainer, fallbackFragment)
+                    .commit();
+        }
     }
 
     private void styleLaneButton(View root, int buttonId, int lightColorRes, int darkColorRes, boolean isDarkMode, boolean isSelected) {

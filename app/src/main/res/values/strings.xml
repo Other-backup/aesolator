@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE resources [
     <!ENTITY TERMUX_PACKAGE_NAME "com.winlator">
-    <!ENTITY TERMUX_X11_APP_NAME "Aesolator:X11">
+    <!ENTITY TERMUX_X11_APP_NAME "Ae.solator:X11">
     ]>
 <resources>
-    <string name="app_name">Aesolator</string>
+    <string name="app_name">Ae.solator</string>
     <string name="run">Run</string>
     <string name="edit">Edit</string>
     <string name="remove">Remove</string>

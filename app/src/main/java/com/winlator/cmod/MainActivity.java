@@ -98,6 +98,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         drawerLayout = findViewById(R.id.DrawerLayout);
         NavigationView navigationView = findViewById(R.id.NavigationView);
         navigationView.setNavigationItemSelectedListener(this);
+        while (navigationView.getHeaderCount() > 0) {
+            View header = navigationView.getHeaderView(0);
+            navigationView.removeHeaderView(header);
+        }
 
         setSupportActionBar(findViewById(R.id.Toolbar));
         ActionBar actionBar = getSupportActionBar();

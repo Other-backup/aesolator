@@ -199,6 +199,7 @@ public class ContentsFragment extends Fragment {
                 getResources().getStringArray(R.array.contents_arch_entries)
         ));
         sContentsArchMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        applyFilterSpinnerTheme();
 
         setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
         setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
@@ -426,6 +427,14 @@ public class ContentsFragment extends Fragment {
         boolean showFiltersCard = showArchFilters || showChannelFilter;
         if (tvContentsFiltersLabel != null) tvContentsFiltersLabel.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
         if (llContentsFilters != null) llContentsFilters.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
+    }
+
+    private void applyFilterSpinnerTheme() {
+        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
+        if (sContentType != null) sContentType.setBackgroundResource(spinnerBackground);
+        if (sContentsSourceMode != null) sContentsSourceMode.setBackgroundResource(spinnerBackground);
+        if (sContentsChannelMode != null) sContentsChannelMode.setBackgroundResource(spinnerBackground);
+        if (sContentsArchMode != null) sContentsArchMode.setBackgroundResource(spinnerBackground);
     }
 
     private boolean isArm64EcProfile(ContentProfile profile) {
