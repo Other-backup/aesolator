@@ -20,7 +20,6 @@ import android.telecom.Call;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -43,7 +42,6 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.box64.Box64EditPresetDialog;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
@@ -222,10 +220,6 @@ public class SettingsFragment extends Fragment {
         );
         sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
-        view.findViewById(R.id.BTOpenForensicCenter).setOnClickListener(v -> {
-            navigateToMainMenuItem(R.id.main_menu_diagnostics, new ForensicCenterFragment());
-        });
-
         final Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
 
         sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
@@ -387,27 +381,6 @@ public class SettingsFragment extends Fragment {
 
 
         return view;
-    }
-
-    private void navigateToMainMenuItem(int menuItemId, Fragment fallbackFragment) {
-        if (!isAdded() || getActivity() == null) return;
-        if (getActivity() instanceof MainActivity) {
-            NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-            if (navigationView != null && navigationView.getMenu() != null) {
-                MenuItem target = navigationView.getMenu().findItem(menuItemId);
-                if (target != null) {
-                    navigationView.setCheckedItem(menuItemId);
-                    ((MainActivity) getActivity()).onNavigationItemSelected(target);
-                    return;
-                }
-            }
-        }
-        if (fallbackFragment != null) {
-            getParentFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.FLFragmentContainer, fallbackFragment)
-                    .commit();
-        }
     }
 
     private void updateTheme(boolean isDarkMode) {

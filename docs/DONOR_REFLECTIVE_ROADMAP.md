@@ -16,6 +16,19 @@ This roadmap tracks exhaustive donor analysis coverage (pre/during/post) and con
 8. `coffincolors/winlator`
 9. APK donor lane: `GameHub-Lite-5.3.3-RC2.apk`
 
+## Current Worklog (2026-03-06)
+
+Closed in tree:
+- Runtime/forensic env layering is now explicit and ordered: `graphics -> container -> shortcut -> runtime -> forensic -> override` (forensic no longer gets overwritten by runtime defaults).
+- `Global Runtime Profile` is visually and behaviorally decoupled from forensic controls in Settings.
+- DRI3 controls were removed from `Forensic Center`; DRI3 remains only in `Graphics Center` (X11 settings lane).
+- Forensic policy hint text updated to reflect telemetry-only scope (without DRI3 ownership).
+
+Still open (UI tail queue):
+- Full navigation redesign: replace drawer with main-grid navigation tab (3 cards per row).
+- Add consistent top-left back action for all major tabs/dialog roots.
+- Complete card-style migration for remaining legacy forms and spacing collisions.
+
 ## Execution Contract (Updated)
 
 Effective immediately: `1 round = 1 donor`, strict sequential closure.

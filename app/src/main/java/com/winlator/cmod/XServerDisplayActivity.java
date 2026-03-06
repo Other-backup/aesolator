@@ -2271,8 +2271,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             }
         }
 
-        applyForensicEnvVars(mergedEnv, forensicSnapshot);
-
         String requestedRuntimeProfile = resolveRuntimeProfileId(mergedEnv);
         mergedEnv.putAll(RuntimeProfileManager.getEnvVars(this, requestedRuntimeProfile));
         applyBionicRuntimeMarkers(mergedEnv);
@@ -2281,6 +2279,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             effectiveRuntimeProfile = RuntimeProfileManager.resolveEffectiveProfileId(this, requestedRuntimeProfile);
         }
         mergedEnv.put("AERO_RUNTIME_PROFILE", effectiveRuntimeProfile);
+        applyForensicEnvVars(mergedEnv, forensicSnapshot);
 
         if (!mergedEnv.has("WINEESYNC")) {
             mergedEnv.put("WINEESYNC", "1");
@@ -2290,7 +2289,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             mergedEnv.putAll(overrideEnvVars);
             overrideEnvVars.clear();
         }
-        mergedEnv.put("AERO_ENV_LAYER_ORDER", "graphics->container->shortcut->forensic->runtime->override");
+        mergedEnv.put("AERO_ENV_LAYER_ORDER", "graphics->container->shortcut->runtime->forensic->override");
         mergedEnv.put("AERO_FORENSIC_RUNTIME_SUMMARY", ForensicConfig.buildRuntimeSummary(forensicSnapshot));
         mergedEnv.put("AERO_FORENSIC_CAPTURE_SUMMARY", ForensicConfig.buildCaptureSummary(this, forensicSnapshot));
 
