@@ -10,64 +10,89 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <TextView
+        <LinearLayout
+            android:id="@+id/LLX11Dri3Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/graphics_center_x11_settings_hint"
-            android:textSize="12sp" />
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
 
-        <CheckBox
-            android:id="@+id/CBX11UseDri3"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/use_dri3_extension" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/graphics_center_x11_settings_title"
+                android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/dri3_mode_title" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/graphics_center_x11_settings_hint"
+                android:textSize="12sp" />
 
-        <Spinner
-            android:id="@+id/SX11Dri3Mode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:spinnerMode="dialog" />
+            <CheckBox
+                android:id="@+id/CBX11UseDri3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/use_dri3_extension" />
 
-        <CheckBox
-            android:id="@+id/CBX11Dri3PresentWait"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/dri3_present_wait" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/dri3_mode_title" />
 
-        <CheckBox
-            android:id="@+id/CBX11Dri3ForceSwWsi"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/dri3_force_sw_wsi" />
+            <Spinner
+                android:id="@+id/SX11Dri3Mode"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dialog" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/graphics_center_x11_input_section"
-            android:textStyle="bold" />
+            <CheckBox
+                android:id="@+id/CBX11Dri3PresentWait"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/dri3_present_wait" />
 
-        <CheckBox
-            android:id="@+id/CBX11CursorLock"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/x11_cursor_lock_label" />
+            <CheckBox
+                android:id="@+id/CBX11Dri3ForceSwWsi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/dri3_force_sw_wsi" />
+        </LinearLayout>
 
-        <CheckBox
-            android:id="@+id/CBX11XinputToggle"
+        <LinearLayout
+            android:id="@+id/LLX11InputCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/x11_xinput_toggle_label" />
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/graphics_center_x11_input_section"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/CBX11CursorLock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/x11_cursor_lock_label" />
+
+            <CheckBox
+                android:id="@+id/CBX11XinputToggle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/x11_xinput_toggle_label" />
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

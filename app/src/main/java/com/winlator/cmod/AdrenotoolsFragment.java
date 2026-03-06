@@ -755,6 +755,12 @@ public class AdrenotoolsFragment extends Fragment {
         CheckBox cbDri3ForceSwWsi = dialog.findViewById(R.id.CBX11Dri3ForceSwWsi);
         CheckBox cbCursorLock = dialog.findViewById(R.id.CBX11CursorLock);
         CheckBox cbXinputToggle = dialog.findViewById(R.id.CBX11XinputToggle);
+        View llX11Dri3Card = dialog.findViewById(R.id.LLX11Dri3Card);
+        View llX11InputCard = dialog.findViewById(R.id.LLX11InputCard);
+
+        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
+        if (llX11Dri3Card != null) llX11Dri3Card.setBackgroundResource(panelBackground);
+        if (llX11InputCard != null) llX11InputCard.setBackgroundResource(panelBackground);
 
         String[] dri3Entries = getResources().getStringArray(R.array.dri3_mode_entries);
         String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
