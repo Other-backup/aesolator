@@ -2755,11 +2755,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             activeInfo = selectedInfo;
         }
 
-        if (activeInfo != null && !activeInfo.isSystemSelection()) {
+        if (activeInfo != null && !activeInfo.isSystemSelection() && !activeInfo.isOpenGlProvider()) {
             adrenotoolsManager.setDriverByInfo(envVars, imageFs, activeInfo);
             if (!activeInfo.preferredGalliumDriver.isEmpty()) {
                 envVars.put("GALLIUM_DRIVER", activeInfo.preferredGalliumDriver);
             }
+        } else if (activeInfo != null && activeInfo.isOpenGlProvider()
+                && !activeInfo.preferredGalliumDriver.isEmpty()) {
+            // OpenGL provider is delivered as an overlay package; keep Vulkan ICD routing
+            // separate and only expose the Gallium selection for the active GL path.
+            envVars.put("GALLIUM_DRIVER", activeInfo.preferredGalliumDriver);
         }
 
         adrenotoolsManager.restoreManagedOverlay(imageFs);
