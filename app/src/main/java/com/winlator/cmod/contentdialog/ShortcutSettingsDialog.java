@@ -37,6 +37,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.fexcore.FEXCoreManager;
 import com.winlator.cmod.fexcore.FEXCorePreset;
@@ -68,7 +69,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
     private static final String FG_SOURCE_OPTI_FG = "opti_fg";
     private static final String FG_OUTPUT_AUTO = "auto";
     private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
-    private static final String FG_OUTPUT_DLSSG_TO_FSR3 = "dlssg_to_fsr3";
     private static final String FRAMEGEN_MODE_BALANCED = "balanced";
     private static final String FRAMEGEN_MODE_QUALITY = "quality";
     private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
@@ -419,46 +419,99 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final TextView tvSharpnessLevel = findViewById(R.id.TVSharpnessLevel);
         final TextView tvSharpnessDenoise = findViewById(R.id.TVSharpnessDenoise);
 
-        String legacySharpnessEffect = shortcut.getExtra("sharpnessEffect", "None");
-        String initialUpscalerBackend = shortcut.getExtra("upscalerBackend", "");
-        if (initialUpscalerBackend.isEmpty()) {
-            initialUpscalerBackend = !"none".equalsIgnoreCase(legacySharpnessEffect)
-                    ? UPSCALER_BACKEND_VKBASALT
-                    : UPSCALER_BACKEND_OFF;
-        }
-        String initialUpscalerEffect = shortcut.getExtra("upscalerEffect", "");
-        if (initialUpscalerEffect.isEmpty()) {
-            initialUpscalerEffect = normalizeLegacyUpscalerEffect(legacySharpnessEffect);
-        }
-        String initialUpscalerPreset = normalizeUpscalerPreset(shortcut.getExtra("upscalerPreset", UPSCALER_PRESET_AUTO));
-        int initialUpscalerScale = parseBoundedInt(shortcut.getExtra("upscalerScale", "100"), 100, 100, 200);
-        int initialGeneratedFrames = parseBoundedInt(shortcut.getExtra("upscalerGeneratedFrames", "1"), 1, 1, 3);
-        boolean initialFrameGenerationEnabled = parseBooleanValue(shortcut.getExtra("upscalerFrameGeneration", "0"));
-        String initialFgSource = normalizeFgSource(shortcut.getExtra("upscalerFgSource", FG_SOURCE_NATIVE));
-        String initialFgOutput = normalizeFgOutput(shortcut.getExtra("upscalerFgOutput", FG_OUTPUT_AUTO));
-        String initialFramegenMode = normalizeFramegenMode(
-                shortcut.getExtra("upscalerFramegenMode", FRAMEGEN_MODE_BALANCED)
+        UpscalerProfileStore.Profile globalUpscalerProfile = UpscalerProfileStore.getSelectedProfile(prefs);
+        String initialUpscalerBackend = UpscalerProfileStore.normalizeBackend(
+                shortcut.getExtra("upscalerBackend", globalUpscalerProfile.backend)
         );
-        boolean initialUpscalerThermalGuard = parseBooleanValue(shortcut.getExtra("upscalerThermalGuard", "1"));
-        int initialUpscalerTargetFps = parseBoundedInt(shortcut.getExtra("upscalerTargetFps", "60"), 60, 30, 144);
+        String initialUpscalerEffect = normalizeUpscalerEffect(
+                shortcut.getExtra("upscalerEffect", globalUpscalerProfile.effect)
+        );
+        String initialUpscalerPreset = normalizeUpscalerPreset(
+                shortcut.getExtra("upscalerPreset", globalUpscalerProfile.preset)
+        );
+        int initialUpscalerScale = parseBoundedInt(
+                shortcut.getExtra("upscalerScale", String.valueOf(globalUpscalerProfile.scalePercent)),
+                100,
+                100,
+                200
+        );
+        int initialGeneratedFrames = parseBoundedInt(
+                shortcut.getExtra("upscalerGeneratedFrames", String.valueOf(globalUpscalerProfile.generatedFrames)),
+                1,
+                1,
+                3
+        );
+        boolean initialFrameGenerationEnabled = parseBooleanValue(
+                shortcut.getExtra(
+                        "upscalerFrameGeneration",
+                        globalUpscalerProfile.frameGeneration ? "1" : "0"
+                )
+        );
+        if (!UPSCALER_BACKEND_MOBFGSR.equals(initialUpscalerBackend)) {
+            initialFrameGenerationEnabled = false;
+        }
+        String initialFgSource = normalizeFgSource(
+                shortcut.getExtra("upscalerFgSource", globalUpscalerProfile.fgSource)
+        );
+        String initialFgOutput = normalizeFgOutput(
+                shortcut.getExtra("upscalerFgOutput", globalUpscalerProfile.fgOutput)
+        );
+        String initialFramegenMode = normalizeFramegenMode(
+                shortcut.getExtra("upscalerFramegenMode", globalUpscalerProfile.framegenMode)
+        );
+        boolean initialUpscalerThermalGuard = parseBooleanValue(
+                shortcut.getExtra(
+                        "upscalerThermalGuard",
+                        globalUpscalerProfile.thermalGuard ? "1" : "0"
+                )
+        );
+        int initialUpscalerTargetFps = parseBoundedInt(
+                shortcut.getExtra("upscalerTargetFps", String.valueOf(globalUpscalerProfile.targetFps)),
+                60,
+                30,
+                144
+        );
         int initialInterpolationFactor = parseBoundedIntAllowZero(
-                shortcut.getExtra("upscalerInterpolationFactor", "50"),
+                shortcut.getExtra(
+                        "upscalerInterpolationFactor",
+                        String.valueOf(globalUpscalerProfile.interpolationFactor)
+                ),
                 50,
                 0,
                 100
         );
-        boolean initialUpscalerDebugOverlay = parseBooleanValue(shortcut.getExtra("upscalerDebugOverlay", "0"));
-        boolean initialUpscalerDebugTearLines = parseBooleanValue(shortcut.getExtra("upscalerDebugTearLines", "0"));
-        boolean initialUpscalerInterpolatedOnly = parseBooleanValue(shortcut.getExtra("upscalerInterpolatedOnly", "0"));
-        boolean initialVulkanValidationLayer = parseBooleanValue(shortcut.getExtra("vulkanValidationLayer", "0"));
+        boolean initialUpscalerDebugOverlay = parseBooleanValue(
+                shortcut.getExtra(
+                        "upscalerDebugOverlay",
+                        globalUpscalerProfile.debugOverlay ? "1" : "0"
+                )
+        );
+        boolean initialUpscalerDebugTearLines = parseBooleanValue(
+                shortcut.getExtra(
+                        "upscalerDebugTearLines",
+                        globalUpscalerProfile.debugTearLines ? "1" : "0"
+                )
+        );
+        boolean initialUpscalerInterpolatedOnly = parseBooleanValue(
+                shortcut.getExtra(
+                        "upscalerInterpolatedOnly",
+                        globalUpscalerProfile.interpolatedOnly ? "1" : "0"
+                )
+        );
+        boolean initialVulkanValidationLayer = parseBooleanValue(
+                shortcut.getExtra(
+                        "vulkanValidationLayer",
+                        globalUpscalerProfile.vulkanValidationLayer ? "1" : "0"
+                )
+        );
         int initialSharpnessLevel = parseBoundedIntAllowZero(
-                shortcut.getExtra("upscalerSharpness", shortcut.getExtra("sharpnessLevel", "100")),
+                shortcut.getExtra("upscalerSharpness", String.valueOf(globalUpscalerProfile.sharpness)),
                 100,
                 0,
                 100
         );
         int initialSharpnessDenoise = parseBoundedIntAllowZero(
-                shortcut.getExtra("upscalerDenoise", shortcut.getExtra("sharpnessDenoise", "100")),
+                shortcut.getExtra("upscalerDenoise", String.valueOf(globalUpscalerProfile.denoise)),
                 100,
                 0,
                 100
@@ -530,8 +583,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final Runnable updateUpscalerUiState = () -> {
             String backendId = StringUtils.parseIdentifier(sUpscalerBackend.getSelectedItem());
             boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(backendId);
-            boolean frameGenerationSupported = UPSCALER_BACKEND_VKBASALT.equals(backendId)
-                    || UPSCALER_BACKEND_MOBFGSR.equals(backendId);
+            boolean frameGenerationSupported = UPSCALER_BACKEND_MOBFGSR.equals(backendId);
             boolean mobfgsrDebugSupported = UPSCALER_BACKEND_MOBFGSR.equals(backendId);
             sUpscalerPreset.setEnabled(upscalerEnabled);
             sUpscalerEffect.setEnabled(upscalerEnabled);
@@ -727,11 +779,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 shortcut.putExtra("upscalerSharpness", sharpnessLevel);
                 shortcut.putExtra("upscalerDenoise", sharpnessDenoise);
 
-                // Keep legacy keys for backward compatibility with previously created shortcuts.
-                shortcut.putExtra("sharpnessEffect", toLegacyVkBasaltEffect(upscalerBackend, upscalerEffect));
-                shortcut.putExtra("sharpnessLevel", sharpnessLevel);
-                shortcut.putExtra("sharpnessDenoise", sharpnessDenoise);
-
                 ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
                 int controlsProfile = sControlsProfile.getSelectedItemPosition() > 0 ? profiles.get(sControlsProfile.getSelectedItemPosition() - 1).id : 0;
                 shortcut.putExtra("controlsProfile", controlsProfile > 0 ? String.valueOf(controlsProfile) : null);
@@ -878,8 +925,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 || "yes".equalsIgnoreCase(value);
     }
 
-    private String normalizeLegacyUpscalerEffect(String legacyEffect) {
-        String normalized = legacyEffect == null ? UPSCALER_EFFECT_NONE : legacyEffect.trim().toLowerCase(Locale.ENGLISH);
+    private String normalizeUpscalerEffect(String effect) {
+        String normalized = effect == null ? UPSCALER_EFFECT_NONE : effect.trim().toLowerCase(Locale.ENGLISH);
         return switch (normalized) {
             case "cas", "dls", "fsr", "nis" -> normalized;
             default -> UPSCALER_EFFECT_NONE;
@@ -917,19 +964,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
         String normalized = output == null ? FG_OUTPUT_AUTO : output.trim().toLowerCase(Locale.ENGLISH);
         return switch (normalized) {
             case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
-            case FG_OUTPUT_DLSSG_TO_FSR3, "dlssg-to-fsr3" -> FG_OUTPUT_DLSSG_TO_FSR3;
+            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_MOBFGSR;
             default -> FG_OUTPUT_AUTO;
-        };
-    }
-
-    private String toLegacyVkBasaltEffect(String backend, String effect) {
-        if (!UPSCALER_BACKEND_VKBASALT.equals(backend)) return "None";
-        String normalized = effect == null ? UPSCALER_EFFECT_NONE : effect.trim().toLowerCase(Locale.ENGLISH);
-        return switch (normalized) {
-            case "cas" -> "CAS";
-            case "dls" -> "DLS";
-            case "fsr", "nis" -> "CAS";
-            default -> "None";
         };
     }
 

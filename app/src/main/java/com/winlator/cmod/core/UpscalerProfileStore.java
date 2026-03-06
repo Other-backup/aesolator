@@ -22,13 +22,13 @@ public final class UpscalerProfileStore {
         public String id = DEFAULT_PROFILE_ID;
         public String name = DEFAULT_PROFILE_NAME;
         public String preset = "auto";
-        public String backend = "off";
-        public String effect = "none";
+        public String backend = "mobfgsr";
+        public String effect = "fsr";
         public int scalePercent = 100;
-        public boolean frameGeneration = false;
+        public boolean frameGeneration = true;
         public int generatedFrames = 1;
         public String fgSource = "native";
-        public String fgOutput = "auto";
+        public String fgOutput = "mobfgsr";
         public String framegenMode = "balanced";
         public boolean thermalGuard = true;
         public int targetFps = 60;
@@ -71,13 +71,13 @@ public final class UpscalerProfileStore {
                 obj.put("id", safe(id, DEFAULT_PROFILE_ID));
                 obj.put("name", safe(name, DEFAULT_PROFILE_NAME));
                 obj.put("preset", safe(preset, "auto"));
-                obj.put("backend", safe(backend, "off"));
-                obj.put("effect", safe(effect, "none"));
+                obj.put("backend", safe(backend, "mobfgsr"));
+                obj.put("effect", safe(effect, "fsr"));
                 obj.put("scalePercent", clamp(scalePercent, 100, 100, 200));
                 obj.put("frameGeneration", frameGeneration);
                 obj.put("generatedFrames", clamp(generatedFrames, 1, 1, 3));
                 obj.put("fgSource", safe(fgSource, "native"));
-                obj.put("fgOutput", safe(fgOutput, "auto"));
+                obj.put("fgOutput", safe(fgOutput, "mobfgsr"));
                 obj.put("framegenMode", safe(framegenMode, "balanced"));
                 obj.put("thermalGuard", thermalGuard);
                 obj.put("targetFps", clamp(targetFps, 60, 30, 144));
@@ -253,7 +253,8 @@ public final class UpscalerProfileStore {
         String normalized = parseIdentifier(value);
         if ("mobfgsr".equals(normalized)) return "mobfgsr";
         if ("dlssg_to_fsr3".equals(normalized) || "dlssgtofsr3".equals(normalized) || "dlssg-to-fsr3".equals(normalized)) {
-            return "dlssg_to_fsr3";
+            // Keep legacy values readable but converge to native framegen lane.
+            return "mobfgsr";
         }
         return "auto";
     }

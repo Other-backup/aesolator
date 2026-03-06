@@ -425,7 +425,6 @@
     <string-array name="upscaler_fg_output_entries">
         <item>auto</item>
         <item>mobfgsr</item>
-        <item>dlssg_to_fsr3</item>
     </string-array>
     <string-array name="upscaler_framegen_mode_entries">
         <item>balanced</item>

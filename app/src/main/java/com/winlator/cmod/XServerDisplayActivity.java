@@ -249,7 +249,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private static final String FG_SOURCE_OPTI_FG = "opti_fg";
     private static final String FG_OUTPUT_AUTO = "auto";
     private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
-    private static final String FG_OUTPUT_DLSSG_TO_FSR3 = "dlssg_to_fsr3";
     private static final String FRAMEGEN_MODE_BALANCED = "balanced";
     private static final String FRAMEGEN_MODE_QUALITY = "quality";
     private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
@@ -1504,24 +1503,15 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
     private void parseUpscalerFromShortcut(@NonNull Shortcut activeShortcut) {
         UpscalerProfileStore.Profile globalProfile = UpscalerProfileStore.getSelectedProfile(preferences);
-        String legacySharpnessEffect = activeShortcut.getExtra("sharpnessEffect", "None");
         String backend = activeShortcut.getExtra("upscalerBackend", "");
-        if (backend == null || backend.trim().isEmpty()) {
-            backend = !"none".equalsIgnoreCase(legacySharpnessEffect)
-                    ? UPSCALER_BACKEND_VKBASALT
-                    : globalProfile.backend;
-        }
+        if (backend == null || backend.trim().isEmpty()) backend = globalProfile.backend;
         backend = StringUtils.parseIdentifier(backend);
         if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
-            backend = UPSCALER_BACKEND_OFF;
+            backend = UpscalerProfileStore.normalizeBackend(globalProfile.backend);
         }
 
         String effect = activeShortcut.getExtra("upscalerEffect", "");
-        if (effect == null || effect.trim().isEmpty()) {
-            effect = !"none".equalsIgnoreCase(legacySharpnessEffect)
-                    ? mapLegacySharpnessEffect(legacySharpnessEffect)
-                    : globalProfile.effect;
-        }
+        if (effect == null || effect.trim().isEmpty()) effect = globalProfile.effect;
         effect = normalizeUpscalerEffect(effect);
 
         String presetRaw = activeShortcut.getExtra("upscalerPreset", "");
@@ -1542,9 +1532,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         String sharpnessRaw = activeShortcut.getExtra("upscalerSharpness", "");
         if (sharpnessRaw == null || sharpnessRaw.trim().isEmpty()) {
-            sharpnessRaw = activeShortcut.getExtra("sharpnessLevel", "");
-        }
-        if (sharpnessRaw == null || sharpnessRaw.trim().isEmpty()) {
             sharpnessRaw = String.valueOf(globalProfile.sharpness);
         }
         upscalerSharpnessPercent = parseBoundedIntAllowZero(
@@ -1555,9 +1542,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         );
 
         String denoiseRaw = activeShortcut.getExtra("upscalerDenoise", "");
-        if (denoiseRaw == null || denoiseRaw.trim().isEmpty()) {
-            denoiseRaw = activeShortcut.getExtra("sharpnessDenoise", "");
-        }
         if (denoiseRaw == null || denoiseRaw.trim().isEmpty()) {
             denoiseRaw = String.valueOf(globalProfile.denoise);
         }
@@ -1683,14 +1667,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         };
     }
 
-    private String mapLegacySharpnessEffect(String legacyEffect) {
-        String normalized = StringUtils.parseIdentifier(legacyEffect);
-        return switch (normalized) {
-            case "cas", "dls", "fsr", "nis" -> normalized;
-            default -> UPSCALER_EFFECT_NONE;
-        };
-    }
-
     private String normalizeFramegenMode(String mode) {
         String normalized = StringUtils.parseIdentifier(mode);
         return switch (normalized) {
@@ -1712,7 +1688,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String normalized = StringUtils.parseIdentifier(output);
         return switch (normalized) {
             case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
-            case FG_OUTPUT_DLSSG_TO_FSR3, "dlssg-to-fsr3" -> FG_OUTPUT_DLSSG_TO_FSR3;
+            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_MOBFGSR;
             default -> FG_OUTPUT_AUTO;
         };
     }
@@ -1736,7 +1712,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String normalizedSocClass = socClass == null || socClass.trim().isEmpty() ? "unknown" : socClass.trim();
         boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(upscalerBackend)
                 && !UPSCALER_EFFECT_NONE.equals(upscalerEffect);
-        boolean frameGenerationActive = upscalerFrameGeneration && upscalerEnabled;
+        boolean frameGenerationRequested = upscalerFrameGeneration && upscalerEnabled;
+        boolean frameGenerationBackendSupported = UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend);
+        boolean frameGenerationActive = frameGenerationRequested && frameGenerationBackendSupported;
+        if (frameGenerationRequested && !frameGenerationBackendSupported) {
+            guardReason = "framegen_requires_mobfgsr_backend";
+        }
         String resolvedFgOutput = upscalerFgOutput;
         if (FG_OUTPUT_AUTO.equals(resolvedFgOutput)) {
             resolvedFgOutput = UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend) ? FG_OUTPUT_MOBFGSR : FG_OUTPUT_AUTO;
@@ -1811,7 +1792,9 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         if (frameGenerationActive && !dxvkRoute) {
             frameGenerationActive = false;
-            guardReason = "framegen_requires_dxvk_route";
+            if ("none".equals(guardReason)) {
+                guardReason = "framegen_requires_dxvk_route";
+            }
             mobfgsrDebugBridgeActive = false;
         }
         if (!frameGenerationActive) {
@@ -1848,10 +1831,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         setOrClearEnv("AERO_FRAMEGEN_OUTPUT", resolvedFgOutput);
         setOrClearEnv("AERO_FRAMEGEN_MODE", frameGenerationActive ? upscalerFramegenMode : "");
         setOrClearEnv("AERO_FRAMEGEN_THERMAL_GUARD", frameGenerationActive && effectiveThermalGuard ? "1" : "0");
-        setOrClearEnv(
-                "AERO_DLSSG_TO_FSR3_BRIDGE",
-                frameGenerationActive && FG_OUTPUT_DLSSG_TO_FSR3.equals(resolvedFgOutput) ? "1" : "0"
-        );
+        setOrClearEnv("AERO_DLSSG_TO_FSR3_BRIDGE", "");
+        setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", "");
+        setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", "");
+        setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", "");
         setOrClearEnv(
                 "AERO_FRAMEGEN_INTERPOLATION_FACTOR",
                 frameGenerationActive ? String.valueOf(effectiveInterpolationFactor) : ""
@@ -1902,15 +1885,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", upscalerDebugOverlay ? "1" : "0");
             setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", upscalerDebugTearLines ? "1" : "0");
             setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", upscalerInterpolatedOnly ? "1" : "0");
-            if (FG_OUTPUT_DLSSG_TO_FSR3.equals(resolvedFgOutput)) {
-                setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", upscalerDebugOverlay ? "1" : "0");
-                setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", upscalerDebugTearLines ? "1" : "0");
-                setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", upscalerInterpolatedOnly ? "1" : "0");
-            } else {
-                setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", "");
-                setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", "");
-                setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", "");
-            }
             setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", String.format(Locale.US, "%.4f", depthDiffThresholdSr));
             setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", colorDiffThresholdFg));
             setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", depthDiffThresholdFg));
@@ -1934,9 +1908,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", "");
             setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", "");
             setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", "");
-            setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", "");
-            setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", "");
-            setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", "");
             setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", "");
             setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", "");
             setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", "");
