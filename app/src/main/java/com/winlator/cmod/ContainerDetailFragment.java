@@ -28,6 +28,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
@@ -141,17 +142,48 @@ public class ContainerDetailFragment extends Fragment {
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-//        Context context = textView.getContext();
+        if (textView == null) return;
+        Context context = textView.getContext();
+        textView.setBackgroundResource(isDarkMode
+                ? R.drawable.forensic_badge_background_dark
+                : R.drawable.forensic_badge_background);
+        textView.setTextColor(ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+        ));
+        textView.bringToFront();
+    }
 
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundResource(R.color.window_background_color_dark); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
+    private static void applyModernSectionCardStyle(TextView textView, boolean isDarkMode) {
+        if (textView == null) return;
+        applyFieldSetLabelStyle(textView, isDarkMode);
+        View parent = (View) textView.getParent();
+        if (!(parent instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) parent;
+        int panelBackground = isDarkMode
+                ? R.drawable.forensic_panel_background_dark
+                : R.drawable.forensic_panel_background;
+        int horizontalPadding = dpToPx(textView.getContext(), 12f);
+        int topPadding = dpToPx(textView.getContext(), 18f);
+        int bottomPadding = dpToPx(textView.getContext(), 12f);
+        int topMargin = dpToPx(textView.getContext(), 6f);
+
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (!(child instanceof LinearLayout)) continue;
+            child.setBackgroundResource(panelBackground);
+            child.setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
+            ViewGroup.LayoutParams rawParams = child.getLayoutParams();
+            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) rawParams;
+                marginParams.topMargin = topMargin;
+                child.setLayoutParams(marginParams);
+            }
         }
+    }
+
+    private static int dpToPx(Context context, float dp) {
+        return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 
 
@@ -263,32 +295,32 @@ public class ContainerDetailFragment extends Fragment {
 
         // Find TextViews by ID and apply dynamic styles
         TextView desktopLabel = view.findViewById(R.id.TVDesktop);
-        applyFieldSetLabelStyle(desktopLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(desktopLabel, isDarkMode);
 
         TextView registryKeysLabel = view.findViewById(R.id.TVDirectInput);
-        applyFieldSetLabelStyle(registryKeysLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(registryKeysLabel, isDarkMode);
 
         // Win Components TextViews
         TextView directXLabel = view.findViewById(R.id.TVDirectX);
-        applyFieldSetLabelStyle(directXLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(directXLabel, isDarkMode);
 
         TextView generalLabel = view.findViewById(R.id.TVGeneral);
-        applyFieldSetLabelStyle(generalLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(generalLabel, isDarkMode);
 
         // Advanced Tab TextViews
         TextView box64Label = view.findViewById(R.id.TVBox64);
-        applyFieldSetLabelStyle(box64Label, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(box64Label, isDarkMode);
         
         TextView fexCoreLabel = view.findViewById(R.id.TVFEXCore);
-        applyFieldSetLabelStyle(fexCoreLabel, isDarkMode);
+        applyModernSectionCardStyle(fexCoreLabel, isDarkMode);
 
         TextView systemLabel = view.findViewById(R.id.TVSystem);
-        applyFieldSetLabelStyle(systemLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(systemLabel, isDarkMode);
 
         TextView gameControllerLabel = view.findViewById(R.id.TVGameController);
-        applyFieldSetLabelStyle(gameControllerLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(gameControllerLabel, isDarkMode);
         TextView containerFramegenLabel = view.findViewById(R.id.TVContainerFramegen);
-        applyFieldSetLabelStyle(containerFramegenLabel, isDarkMode);
+        applyModernSectionCardStyle(containerFramegenLabel, isDarkMode);
 
     }
 

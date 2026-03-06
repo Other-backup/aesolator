@@ -13,6 +13,7 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
@@ -51,6 +52,7 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
 
         TextView environmentVariablesLabel = findViewById(R.id.TVEnvironmentVariables);
         applyFieldSetLabelStyle(environmentVariablesLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyModernSectionCardStyle(environmentVariablesLabel, isDarkMode);
 
         final EditText etName = findViewById(R.id.ETName);
         etName.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
@@ -156,16 +158,42 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-//        Context context = textView.getContext();
+        if (textView == null) return;
+        Context context = textView.getContext();
+        textView.setBackgroundResource(isDarkMode
+                ? R.drawable.forensic_badge_background_dark
+                : R.drawable.forensic_badge_background);
+        textView.setTextColor(ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+        ));
+        textView.bringToFront();
+    }
 
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundResource(R.color.content_dialog_background_dark); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
+    private static void applyModernSectionCardStyle(TextView textView, boolean isDarkMode) {
+        if (textView == null) return;
+        View parent = (View) textView.getParent();
+        if (!(parent instanceof LinearLayout) && !(parent instanceof android.widget.FrameLayout)) return;
+        if (!(parent instanceof android.view.ViewGroup)) return;
+        android.view.ViewGroup group = (android.view.ViewGroup) parent;
+        int panelBackground = isDarkMode
+                ? R.drawable.forensic_panel_background_dark
+                : R.drawable.forensic_panel_background;
+        int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
+        int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 18f);
+        int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
+        int topMargin = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 6f);
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (!(child instanceof LinearLayout)) continue;
+            child.setBackgroundResource(panelBackground);
+            child.setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
+            android.view.ViewGroup.LayoutParams rawParams = child.getLayoutParams();
+            if (rawParams instanceof android.view.ViewGroup.MarginLayoutParams) {
+                android.view.ViewGroup.MarginLayoutParams marginParams = (android.view.ViewGroup.MarginLayoutParams) rawParams;
+                marginParams.topMargin = topMargin;
+                child.setLayoutParams(marginParams);
+            }
         }
     }
 

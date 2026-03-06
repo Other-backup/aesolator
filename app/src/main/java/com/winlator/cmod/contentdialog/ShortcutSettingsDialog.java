@@ -20,6 +20,7 @@ import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
@@ -130,6 +131,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         boolean isDarkMode = prefs.getBoolean("dark_mode", false);
 
         applyDynamicStyles(findViewById(R.id.LLContent), isDarkMode);
+        applyFieldSetLabelStylesDynamically(llContent, isDarkMode);
 
         // Initialize the turnip version TextView
         tvGraphicsDriverVersion = findViewById(R.id.TVGraphicsDriverVersion);
@@ -828,7 +830,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 TextView textView = (TextView) child;
                 // Apply the style based on the content of the TextView
                 if (isFieldSetLabel(textView.getText().toString())) {
-                    applyFieldSetLabelStyle(textView, isDarkMode);
+                    applyModernSectionCardStyle(textView, isDarkMode);
                 }
             }
         }
@@ -839,7 +841,9 @@ public class ShortcutSettingsDialog extends ContentDialog {
         return text.equalsIgnoreCase("DirectX") ||
                 text.equalsIgnoreCase("General") ||
                 text.equalsIgnoreCase("Box64") ||
+                text.equalsIgnoreCase("FEXCore Config") ||
                 text.equalsIgnoreCase("Input Controls") ||
+                text.equalsIgnoreCase("Touchpad Help") ||
                 text.equalsIgnoreCase("Game Controller") ||
                 text.equalsIgnoreCase("System") ||
                 text.equalsIgnoreCase("vkBasalt") ||
@@ -1061,15 +1065,48 @@ public class ShortcutSettingsDialog extends ContentDialog {
     }
 
     private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundColor(Color.parseColor("#424242")); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
+        if (textView == null) return;
+        Context context = textView.getContext();
+        textView.setBackgroundResource(isDarkMode
+                ? R.drawable.forensic_badge_background_dark
+                : R.drawable.forensic_badge_background);
+        textView.setTextColor(ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+        ));
+        textView.bringToFront();
+    }
+
+    private void applyModernSectionCardStyle(TextView textView, boolean isDarkMode) {
+        if (textView == null) return;
+        applyFieldSetLabelStyle(textView, isDarkMode);
+        View parent = (View) textView.getParent();
+        if (!(parent instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) parent;
+        int panelBackground = isDarkMode
+                ? R.drawable.forensic_panel_background_dark
+                : R.drawable.forensic_panel_background;
+        int horizontalPadding = dpToPx(12f);
+        int topPadding = dpToPx(18f);
+        int bottomPadding = dpToPx(12f);
+        int topMargin = dpToPx(6f);
+
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (!(child instanceof LinearLayout)) continue;
+            child.setBackgroundResource(panelBackground);
+            child.setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
+            ViewGroup.LayoutParams rawParams = child.getLayoutParams();
+            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) rawParams;
+                marginParams.topMargin = topMargin;
+                child.setLayoutParams(marginParams);
+            }
         }
+    }
+
+    private int dpToPx(float dp) {
+        return Math.round(dp * getContext().getResources().getDisplayMetrics().density);
     }
 
     private static void applyDarkThemeToEditText(EditText editText, boolean isDarkMode) {

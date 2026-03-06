@@ -308,7 +308,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/directx" />
             </FrameLayout>
 
@@ -323,7 +322,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/general" />
             </FrameLayout>
         </LinearLayout>
@@ -393,7 +391,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/box64" />
             </FrameLayout>
             
@@ -427,7 +424,6 @@
                     
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/fexcore_config" />
                     
             </FrameLayout>
@@ -491,7 +487,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/input_controls" />
             </FrameLayout>
 
@@ -610,7 +605,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/touchpad_help" />
             </FrameLayout>
 
@@ -680,7 +674,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/game_controller" />
             </FrameLayout>
 
@@ -723,7 +716,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/system" />
             </FrameLayout>
 
@@ -977,7 +969,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/upscaler_title" />
             </FrameLayout>
 
