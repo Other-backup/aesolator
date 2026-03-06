@@ -19,6 +19,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.VKD3DVersionItem;
 import com.winlator.cmod.xenvironment.ImageFs;
@@ -103,9 +104,7 @@ public class DXVKConfigDialog extends ContentDialog {
         loadDxvkVersionSpinner(contentsManager, sDXVKVersion, isARM64EC);
         loadVkd3dVersionSpinner(contentsManager, sVKD3DVersion);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, VKD3D_FEATURE_LEVEL);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        sVKD3DFeatureLevel.setAdapter(adapter);
+        sVKD3DFeatureLevel.setAdapter(SpinnerAdapters.create(context, isDarkMode(), Arrays.asList(VKD3D_FEATURE_LEVEL)));
 
         setDXVKSpinner(sDXVKVersion, config, contentsManager, isARM64EC);
         AppUtils.setSpinnerSelectionFromIdentifier(sFramerate, config.get("framerate"));
@@ -151,8 +150,7 @@ public class DXVKConfigDialog extends ContentDialog {
                         dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
                     }
 
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
-                    sDXVKVersion.setAdapter(adapter);
+                    sDXVKVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(), dxvkVersions));
                     sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
 
                     Integer curMajor = tryGetMajor(currentDXVKVersion);
@@ -257,8 +255,7 @@ public class DXVKConfigDialog extends ContentDialog {
                 dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
             }
 
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
-            sDXVKVersion.setAdapter(adapter);
+            sDXVKVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(), dxvkVersions));
             sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
 
             Integer curMajor = tryGetMajor(currentDXVKVersion);
@@ -337,7 +334,7 @@ public class DXVKConfigDialog extends ContentDialog {
             itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(SpinnerAdapters.create(context, isDarkMode(), itemList));
         spinner.setEnabled(hasVersions);
         dxvkVersions = itemList;
     }
@@ -386,5 +383,10 @@ public class DXVKConfigDialog extends ContentDialog {
         for (Spinner spinner : spinners) {
             if (spinner != null) spinner.setPopupBackgroundResource(popupBg);
         }
+    }
+
+    private boolean isDarkMode() {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getBoolean("dark_mode", false);
     }
 }

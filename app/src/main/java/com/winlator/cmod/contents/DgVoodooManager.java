@@ -490,6 +490,25 @@ public class DgVoodooManager {
         candidates.add("Release/" + normalized);
         candidates.add("release/" + normalized);
         candidates.add("bin/" + normalized);
+        if (ARCH_X64.equals(normalized)) {
+            candidates.add("MS/x86_64");
+            candidates.add("x86_64");
+            candidates.add("Release/x86_64");
+            candidates.add("release/x86_64");
+            candidates.add("bin/x86_64");
+            candidates.add("MS/amd64");
+            candidates.add("amd64");
+            candidates.add("Release/amd64");
+            candidates.add("release/amd64");
+            candidates.add("bin/amd64");
+        }
+        if (ARCH_ARM64.equals(normalized)) {
+            candidates.add("MS/aarch64");
+            candidates.add("aarch64");
+            candidates.add("Release/aarch64");
+            candidates.add("release/aarch64");
+            candidates.add("bin/aarch64");
+        }
         if (ARCH_ARM64EC.equals(normalized)) {
             candidates.add("arm64-ec");
             candidates.add("MS/arm64-ec");

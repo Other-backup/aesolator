@@ -16,7 +16,6 @@ import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -54,6 +53,7 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
@@ -117,6 +117,15 @@ public class ContainerDetailFragment extends Fragment {
             "SDL_ALLOW_TOPMOST=0",
             "SDL_MOUSE_FOCUS_CLICKTHROUGH=1"
     };
+
+    private static boolean resolveDarkMode(@Nullable Context context) {
+        if (context == null) return isDarkMode;
+        try {
+            return PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", isDarkMode);
+        } catch (Exception ignored) {
+            return isDarkMode;
+        }
+    }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -425,7 +434,7 @@ public class ContainerDetailFragment extends Fragment {
 
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
         List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sGraphicsItemsList));
+        sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), sGraphicsItemsList));
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
 
@@ -664,7 +673,7 @@ public class ContainerDetailFragment extends Fragment {
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             List<String> mouseWarpOverrideList = Arrays.asList(context.getString(R.string.disable), context.getString(R.string.enable), context.getString(R.string.force));
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            sMouseWarpOverride.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, mouseWarpOverrideList));
+            sMouseWarpOverride.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), mouseWarpOverrideList));
             AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride, registryEditor.getStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", "disable"));
         }
     }
@@ -682,7 +691,7 @@ public class ContainerDetailFragment extends Fragment {
         }
         catch (JSONException e) {}
 
-        spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(SpinnerAdapters.create(getContext(), resolveDarkMode(getContext()), values));
         spinner.setSelection(selectedPosition);
     }
 
@@ -757,7 +766,8 @@ public class ContainerDetailFragment extends Fragment {
             for (String value : context.getResources().getStringArray(R.array.dxwrapper_entries)) {
                 items.add(value);
             }
-            sDXWrapper.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items.toArray()));
+            sDXWrapper.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), items));
+            sDXWrapper.setPopupBackgroundResource(resolveDarkMode(context) ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
@@ -913,7 +923,7 @@ public class ContainerDetailFragment extends Fragment {
         Callback<String[]> addItem = (drive) -> {
             final View itemView = inflater.inflate(R.layout.drive_list_item, parent, false);
             Spinner spinner = itemView.findViewById(R.id.Spinner);
-            spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, driveLetters));
+            spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), driveLetters));
             AppUtils.setSpinnerSelectionFromValue(spinner, drive[0]+":");
 
             // Apply dark theme to the spinner popup background
@@ -1050,7 +1060,7 @@ public class ContainerDetailFragment extends Fragment {
             wineVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
 
-        sWineVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wineVersions));
+        sWineVersion.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), wineVersions));
         sWineVersion.setEnabled(hasWineVersion);
 
         if (isEditMode() && hasWineVersion) {
@@ -1079,9 +1089,7 @@ public class ContainerDetailFragment extends Fragment {
         for (XKeycode value : values) {
             array.add(value.name());
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, array);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
+        spinner.setAdapter(SpinnerAdapters.create(spinner.getContext(), resolveDarkMode(spinner.getContext()), array));
 
         byte keycode = isEditMode() ? container.getControllerMapping(mapping) : (byte) defaultValue;
         int index = 0;
@@ -1099,7 +1107,7 @@ public class ContainerDetailFragment extends Fragment {
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
         
         // Set the adapter with the combined list
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), itemList));
     }
 
     public static void loadBox64VersionSpinner(Context context, Container container, ContentsManager manager, Spinner spinner, boolean isArm64EC) {
@@ -1126,7 +1134,7 @@ public class ContainerDetailFragment extends Fragment {
             itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), itemList));
         spinner.setEnabled(hasVersions);
 
         if (!hasVersions) return;

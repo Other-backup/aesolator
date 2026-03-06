@@ -335,8 +335,7 @@ public class ContentsFragment extends Fragment {
                     continue;
                 }
             }
-            if (!locallyInstalled
-                    && supportsArchitectureFilters(currentContentType)
+            if (supportsArchitectureFilters(currentContentType)
                     && archMode != null
                     && !"all".equalsIgnoreCase(archMode)) {
                 String profileArch = resolveProfileArchTag(profile);
@@ -354,12 +353,19 @@ public class ContentsFragment extends Fragment {
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
         if (profile == null) return false;
         String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
-        if ("all".equals(mode) || "custom".equals(mode)) return true;
+        if ("all".equals(mode)) return true;
 
         String joined = (
                 (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
                         (profile.remoteUrl == null ? "" : profile.remoteUrl)
         ).toLowerCase(Locale.US);
+
+        if ("custom".equals(mode)) {
+            String customFeedUrl = sharedPreferences.getString("downloadable_contents_url", "");
+            String customHost = resolveHost(customFeedUrl);
+            if (customHost.isEmpty()) return true;
+            return joined.contains(customHost);
+        }
 
         if ("aesolator".equals(mode)) {
             return joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator");
@@ -375,6 +381,17 @@ public class ContentsFragment extends Fragment {
                     || joined.contains("fallback");
         }
         return true;
+    }
+
+    private String resolveHost(String value) {
+        if (value == null || value.trim().isEmpty()) return "";
+        try {
+            URI uri = new URI(value.trim());
+            String host = uri.getHost();
+            return host == null ? "" : host.trim().toLowerCase(Locale.US);
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -508,6 +525,19 @@ public class ContentsFragment extends Fragment {
         if (isX64Profile(profile)) return "x86_64";
         if (isArm64Profile(profile)) return "arm64";
         return "generic";
+    }
+
+    private boolean isVulkanSdkRuntimePresent() {
+        File shareRoot = new File(requireContext().getFilesDir(), "imagefs/usr/share");
+        File vulkanDir = new File(shareRoot, "vulkan");
+        File sdkDir = new File(shareRoot, "vulkan-sdk");
+        return (vulkanDir.isDirectory() && hasChildren(vulkanDir))
+                || (sdkDir.isDirectory() && hasChildren(sdkDir));
+    }
+
+    private boolean hasChildren(File dir) {
+        String[] list = dir.list();
+        return list != null && list.length > 0;
     }
 
     private void reloadRemoteContents() {
@@ -652,7 +682,53 @@ public class ContentsFragment extends Fragment {
         if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return;
         seenSources.add(normalized);
         String json = Downloader.downloadString(normalized);
-        if (json != null && !json.trim().isEmpty()) payloads.add(json);
+        if (json != null && !json.trim().isEmpty()) {
+            payloads.add(injectFeedSourceMetadata(json, normalized));
+        }
+    }
+
+    private String injectFeedSourceMetadata(String json, String feedUrl) {
+        try {
+            JSONArray array = new JSONArray(json);
+            String sourceLabel = deriveFeedSourceLabel(feedUrl);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject object = array.optJSONObject(i);
+                if (object == null) continue;
+                if (object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim().isEmpty()) {
+                    object.put(ContentProfile.MARK_SOURCE_REPO, sourceLabel);
+                }
+                if (object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim().isEmpty()) {
+                    object.put(ContentProfile.MARK_RELEASE_TAG, deriveFeedReleaseTag(feedUrl));
+                }
+            }
+            return array.toString();
+        } catch (Exception ignored) {
+            return json;
+        }
+    }
+
+    private String deriveFeedSourceLabel(String feedUrl) {
+        try {
+            URI uri = new URI(feedUrl);
+            String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
+            String path = uri.getPath() == null ? "" : uri.getPath().trim();
+            if ("raw.githubusercontent.com".equals(host) && !path.isEmpty()) {
+                String[] parts = path.split("/");
+                if (parts.length >= 3 && !parts[1].isEmpty() && !parts[2].isEmpty()) {
+                    return parts[1] + "/" + parts[2];
+                }
+            }
+            if (!host.isEmpty()) return host;
+        } catch (Exception ignored) {
+        }
+        return "remote-feed";
+    }
+
+    private String deriveFeedReleaseTag(String feedUrl) {
+        String lower = feedUrl == null ? "" : feedUrl.toLowerCase(Locale.US);
+        if (lower.contains("nightly")) return ContentProfile.CHANNEL_NIGHTLY;
+        if (lower.contains("beta") || lower.contains("rc")) return ContentProfile.CHANNEL_BETA;
+        return ContentProfile.CHANNEL_STABLE;
     }
 
     private boolean isAllowedFeedUrl(String url) {
@@ -1001,17 +1077,22 @@ public class ContentsFragment extends Fragment {
         if (!"generic".equals(archTag)) {
             meta.append(" • ").append(archTag);
         }
-        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO && profile.isInstalledLocally()) {
-            String dgArch = new DgVoodooManager(requireContext()).getInstalledArchitectureSummary();
+        boolean runtimeInstalled = profile.isInstalledLocally();
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            DgVoodooManager dgVoodooManager = new DgVoodooManager(requireContext());
+            runtimeInstalled = runtimeInstalled || dgVoodooManager.isInstalled();
+            String dgArch = dgVoodooManager.getInstalledArchitectureSummary();
             if (dgArch != null && !dgArch.trim().isEmpty() && !"-".equals(dgArch)) {
                 meta.append(" • arch=").append(dgArch.trim().toLowerCase(Locale.US));
             }
+        } else if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            runtimeInstalled = runtimeInstalled || isVulkanSdkRuntimePresent();
         }
         String channel = profile.getChannel();
         if (channel != null && !channel.trim().isEmpty() && !ContentProfile.CHANNEL_STABLE.equalsIgnoreCase(channel)) {
             meta.append(" • ").append(channel.trim().toLowerCase(Locale.US));
         }
-        if (profile.isInstalledLocally()) meta.append(" • installed");
+        if (runtimeInstalled) meta.append(" • installed");
         return meta.toString();
     }
 

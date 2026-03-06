@@ -398,14 +398,20 @@ public class ContentsManager {
         try {
             ContentProfile profile = new ContentProfile();
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
-            String typeName = profileJSONObject.getString(ContentProfile.MARK_TYPE);
+            String typeName = profileJSONObject.optString(ContentProfile.MARK_TYPE, profileJSONObject.optString("contentType", ""));
             ContentProfile.ContentType resolvedType = ContentProfile.ContentType.getTypeByName(typeName);
             if (resolvedType == null) return null;
 
             profile.type = resolvedType;
-            profile.verName = profileJSONObject.optString(ContentProfile.MARK_VERSION_NAME, "");
-            profile.verCode = profileJSONObject.optInt(ContentProfile.MARK_VERSION_CODE, 0);
-            profile.desc = profileJSONObject.optString(ContentProfile.MARK_DESC, "");
+            profile.verName = profileJSONObject.optString(
+                    ContentProfile.MARK_VERSION_NAME,
+                    profileJSONObject.optString("verName", profileJSONObject.optString("versionName", ""))
+            );
+            profile.verCode = parseOptionalInt(
+                    profileJSONObject.opt(ContentProfile.MARK_VERSION_CODE),
+                    parseOptionalInt(profileJSONObject.opt("verCode"), 0)
+            );
+            profile.desc = profileJSONObject.optString(ContentProfile.MARK_DESC, profileJSONObject.optString("name", ""));
             profile.channel = profileJSONObject.optString(ContentProfile.MARK_CHANNEL, ContentProfile.CHANNEL_STABLE);
             profile.delivery = profileJSONObject.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_EMBEDDED);
             profile.displayCategory = profileJSONObject.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "");
@@ -417,15 +423,23 @@ public class ContentsManager {
             profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
             profile.locallyInstalled = true;
 
-            JSONArray fileJSONArray = profileJSONObject.getJSONArray(ContentProfile.MARK_FILE_LIST);
+            JSONArray fileJSONArray = profileJSONObject.optJSONArray(ContentProfile.MARK_FILE_LIST);
+            if (fileJSONArray == null) {
+                fileJSONArray = profileJSONObject.optJSONArray("fileList");
+            }
+            if (fileJSONArray == null) {
+                return null;
+            }
             List<ContentProfile.ContentFile> fileList = new ArrayList<>();
             for (int i = 0; i < fileJSONArray.length(); i++) {
                 JSONObject contentFileJSONObject = fileJSONArray.getJSONObject(i);
                 ContentProfile.ContentFile contentFile = new ContentProfile.ContentFile();
-                contentFile.source = contentFileJSONObject.getString(ContentProfile.MARK_FILE_SOURCE);
-                contentFile.target = contentFileJSONObject.getString(ContentProfile.MARK_FILE_TARGET);
+                contentFile.source = contentFileJSONObject.optString(ContentProfile.MARK_FILE_SOURCE, contentFileJSONObject.optString("src", ""));
+                contentFile.target = contentFileJSONObject.optString(ContentProfile.MARK_FILE_TARGET, contentFileJSONObject.optString("dst", ""));
+                if (contentFile.source.isEmpty() || contentFile.target.isEmpty()) continue;
                 fileList.add(contentFile);
             }
+            if (fileList.isEmpty()) return null;
             profile.fileList = fileList;
 
             if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE

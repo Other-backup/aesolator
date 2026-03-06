@@ -6,7 +6,6 @@ import android.os.Build;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -23,6 +22,7 @@ import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.GPUInformation;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.widget.MultiSelectionComboBox;
 
@@ -84,8 +84,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 String gpuName = jobj.getString("name");
                 entries.add(gpuName);
             }
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, entries);
-            spinner.setAdapter(adapter);
+            spinner.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), entries));
         }
         catch (JSONException e) {
         }
@@ -389,9 +388,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         if (!hasVersions) {
             wrapperVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
-        ArrayAdapter<String> wrapperAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wrapperVersions);
-
-        sVersion.setAdapter(wrapperAdapter);
+        sVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), wrapperVersions));
         sVersion.setEnabled(hasVersions);
         mscAvailableExtensions.setEnabled(hasVersions);
 
@@ -429,13 +426,13 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             sdkApiVersions.add("—");
             sVulkanVersion.setEnabled(false);
             selectedVulkanVersion = selectedValue != null && !selectedValue.trim().isEmpty() ? selectedValue : "1.3";
-            sVulkanVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sdkApiVersions));
+            sVulkanVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), sdkApiVersions));
             sVulkanVersion.setSelection(0);
             return;
         }
 
         sVulkanVersion.setEnabled(true);
-        sVulkanVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sdkApiVersions));
+        sVulkanVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), sdkApiVersions));
         if (!AppUtils.setSpinnerSelectionFromValue(sVulkanVersion, selectedValue)) {
             // Default to highest API exposed by installed SDK lanes.
             sVulkanVersion.setSelection(sdkApiVersions.size() - 1);
@@ -486,6 +483,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.verName : null));
         inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.desc : null));
         inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.releaseTag : null));
+        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.vulkanSdkVersion : null));
         if (inferredMax > 0) return new int[]{1, inferredMax};
         return new int[]{0, 0};
     }
@@ -537,6 +535,11 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sBCnEmulation.setPopupBackgroundResource(popupBg);
         sBCnEmulationType.setPopupBackgroundResource(popupBg);
         sBCnEmulationCache.setPopupBackgroundResource(popupBg);
+    }
+
+    private boolean isDarkMode(Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getBoolean("dark_mode", false);
     }
 
 }

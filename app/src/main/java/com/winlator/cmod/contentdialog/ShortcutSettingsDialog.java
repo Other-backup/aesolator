@@ -11,7 +11,6 @@ import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -36,6 +35,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.fexcore.FEXCoreManager;
@@ -389,7 +389,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
         List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sGraphicsItemsList));
+        sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, isDarkMode, sGraphicsItemsList));
+        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
         final Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
@@ -1126,6 +1127,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
     private void loadControlsProfileSpinner(Spinner spinner, String selectedValue) {
         final Context context = fragment.getContext();
+        final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
         final ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
         ArrayList<String> values = new ArrayList<>();
         values.add(context.getString(R.string.none));
@@ -1138,7 +1140,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
             values.add(profile.getName());
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(SpinnerAdapters.create(context, isDarkMode, values));
+        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         spinner.setSelection(selectedPosition, false);
     }
 
@@ -1153,7 +1156,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
     
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
-        
+        final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
+
         ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver);
         
         final String[] dxwrapperEntries = context.getResources().getStringArray(R.array.dxwrapper_entries);
@@ -1172,7 +1176,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
             for (String value : dxwrapperEntries) {
                     items.add(value);
             }
-            sDXWrapper.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items.toArray(new String[0])));
+            sDXWrapper.setAdapter(SpinnerAdapters.create(context, isDarkMode, items));
+            sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
         };
 

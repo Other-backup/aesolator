@@ -3,7 +3,6 @@ package com.winlator.cmod.contentdialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -18,6 +17,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.SpinnerAdapters;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -108,7 +108,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
             labels.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
             values.add("auto");
         }
-        archSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, labels));
+        archSpinner.setAdapter(SpinnerAdapters.create(context, isDarkMode, labels));
         archSpinner.setPopupBackgroundResource(popupBg);
         KeyValueSet config = parseConfig(anchor.getTag());
         if (packageInstalled) {
