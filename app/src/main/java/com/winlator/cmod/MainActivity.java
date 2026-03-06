@@ -21,6 +21,7 @@ import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.IntRange;
@@ -345,6 +346,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onResume();
         boolean latestDark = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
         if (latestDark != isDarkMode) isDarkMode = latestDark;
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null && decor.getAlpha() != 1f) decor.setAlpha(1f);
         applyThemeAssetTintPass();
     }
 
@@ -359,10 +362,30 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         ContentDialog dialog = new ContentDialog(this, R.layout.about_dialog);
         dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
 
-        if (isDarkMode) {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.content_dialog_background_dark);
-        } else {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.content_dialog_background);
+        dialog.getWindow().setBackgroundDrawableResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background
+        );
+
+        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
+        int badgeBackground = isDarkMode ? R.drawable.forensic_badge_background_dark : R.drawable.forensic_badge_background;
+        int badgeTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text);
+        int bodyTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.forensic_log_body_text : R.color.forensic_badge_text);
+
+        LinearLayout llAboutHeaderCard = dialog.findViewById(R.id.LLAboutHeaderCard);
+        LinearLayout llAboutCreditsCard = dialog.findViewById(R.id.LLAboutCreditsCard);
+        LinearLayout llAboutRuntimeCard = dialog.findViewById(R.id.LLAboutRuntimeCard);
+        TextView tvAboutCreditsLabel = dialog.findViewById(R.id.TVAboutCreditsLabel);
+        TextView tvAboutRuntimeLabel = dialog.findViewById(R.id.TVAboutRuntimeLabel);
+        if (llAboutHeaderCard != null) llAboutHeaderCard.setBackgroundResource(panelBackground);
+        if (llAboutCreditsCard != null) llAboutCreditsCard.setBackgroundResource(panelBackground);
+        if (llAboutRuntimeCard != null) llAboutRuntimeCard.setBackgroundResource(panelBackground);
+        if (tvAboutCreditsLabel != null) {
+            tvAboutCreditsLabel.setBackgroundResource(badgeBackground);
+            tvAboutCreditsLabel.setTextColor(badgeTextColor);
+        }
+        if (tvAboutRuntimeLabel != null) {
+            tvAboutRuntimeLabel.setBackgroundResource(badgeBackground);
+            tvAboutRuntimeLabel.setTextColor(badgeTextColor);
         }
 
         try {
@@ -393,12 +416,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             TextView tvCreditsAndThirdPartyApps = dialog.findViewById(R.id.TVCreditsAndThirdPartyApps);
             tvCreditsAndThirdPartyApps.setText(Html.fromHtml(creditsAndThirdPartyAppsHTML, Html.FROM_HTML_MODE_LEGACY));
             tvCreditsAndThirdPartyApps.setMovementMethod(LinkMovementMethod.getInstance());
+            tvCreditsAndThirdPartyApps.setTextColor(bodyTextColor);
 
             String glibcExpVersionForkHTML = String.join("<br />",
                     "Aesolator runtime branch and contracts are maintained in-repo.");
             TextView tvGlibcExpVersionFork = dialog.findViewById(R.id.TVGlibcExpVersionFork);
             tvGlibcExpVersionFork.setText(Html.fromHtml(glibcExpVersionForkHTML, Html.FROM_HTML_MODE_LEGACY));
             tvGlibcExpVersionFork.setMovementMethod(LinkMovementMethod.getInstance());
+            tvGlibcExpVersionFork.setTextColor(bodyTextColor);
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }

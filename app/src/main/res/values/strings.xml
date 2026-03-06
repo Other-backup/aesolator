@@ -845,6 +845,8 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="upscaler_debug_tearlines">Framegen Debug Tear Lines</string>
     <string name="upscaler_interpolated_only">Show Interpolated Frames Only</string>
     <string name="upscaler_vulkan_validation_layer">Enable Vulkan Validation Layer</string>
+    <string name="container_fg_defaults">Container Framegen Defaults</string>
+    <string name="container_fg_hint">Applies when shortcut does not override upscaler settings. Fine tuning remains in Graphics Center and per-shortcut settings.</string>
     <string name="vkbasalt">vkBasalt</string>
     <string name="vkbasalt_sharpness_effects">Sharpness Effect</string>
     <string name="vkbasalt_sharpness_level">Sharpness Level</string>

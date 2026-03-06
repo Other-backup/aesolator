@@ -14,6 +14,8 @@ import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.telecom.Call;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -105,6 +107,7 @@ public class SettingsFragment extends Fragment {
     private static final int REQUEST_CODE_IMPORT_BOX64_PRESET = 1004;
     private static final int REQUEST_CODE_IMPORT_FEXCORE_PRESET = 1005;
     private static final String PREF_THEME_TRANSITION_PENDING = "theme_transition_pending";
+    private boolean themeSwitchInProgress = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -408,18 +411,36 @@ public class SettingsFragment extends Fragment {
     }
 
     private void updateTheme(boolean isDarkMode) {
-        if (getActivity() == null) return;
+        if (themeSwitchInProgress || getActivity() == null) return;
+        Activity activity = getActivity();
+        if (activity.isFinishing() || activity.isDestroyed()) return;
+        themeSwitchInProgress = true;
+        if (cbDarkMode != null) cbDarkMode.setEnabled(false);
         preferences.edit().putBoolean(PREF_THEME_TRANSITION_PENDING, true).apply();
-        View decor = getActivity().getWindow().getDecorView();
-        decor.animate()
-                .alpha(0f)
-                .setDuration(180L)
-                .withEndAction(() -> {
-                    if (!isAdded() || getActivity() == null) return;
-                    getActivity().setTheme(isDarkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
-                    getActivity().recreate();
-                })
-                .start();
+        View decor = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
+        final boolean[] recreateDispatched = new boolean[]{false};
+        Runnable recreateAction = () -> {
+            if (recreateDispatched[0]) return;
+            recreateDispatched[0] = true;
+            if (!isAdded() || getActivity() == null) return;
+            Activity current = getActivity();
+            if (current.isFinishing() || current.isDestroyed()) return;
+            if (decor != null) decor.setAlpha(1f);
+            current.recreate();
+        };
+        if (decor != null) {
+            decor.animate().cancel();
+            decor.setAlpha(1f);
+            decor.animate()
+                    .alpha(0.92f)
+                    .setDuration(140L)
+                    .withEndAction(recreateAction)
+                    .start();
+            // Fallback if animation callback is skipped by activity lifecycle changes.
+            new Handler(Looper.getMainLooper()).postDelayed(recreateAction, 220L);
+        } else {
+            recreateAction.run();
+        }
     }
 
 
@@ -505,9 +526,14 @@ public class SettingsFragment extends Fragment {
                 if (child == label) continue;
                 if (child instanceof LinearLayout) {
                     child.setBackgroundResource(panelBackground);
-                    int padding = dpToPx(child.getContext(), 12f);
-                    child.setPadding(padding, dpToPx(child.getContext(), 16f), padding, padding);
+                    int horizontalPadding = dpToPx(child.getContext(), 12f);
+                    child.setPadding(horizontalPadding, dpToPx(child.getContext(), 30f), horizontalPadding, dpToPx(child.getContext(), 14f));
                     child.setMinimumHeight(dpToPx(child.getContext(), 120f));
+                    ViewGroup.LayoutParams rawParams = child.getLayoutParams();
+                    if (rawParams instanceof ViewGroup.MarginLayoutParams marginParams) {
+                        marginParams.topMargin = Math.max(marginParams.topMargin, dpToPx(child.getContext(), 12f));
+                        child.setLayoutParams(marginParams);
+                    }
                 }
             }
         }
@@ -523,6 +549,7 @@ public class SettingsFragment extends Fragment {
                 context,
                 isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
         ));
+        textView.bringToFront();
     }
 
     private int dpToPx(Context context, float dp) {

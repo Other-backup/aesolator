@@ -55,6 +55,7 @@ import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineThemeManager;
@@ -214,6 +215,10 @@ public class ContainerDetailFragment extends Fragment {
 
         Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
         sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        Spinner sContainerFgPreset = view.findViewById(R.id.SContainerFgPreset);
+        sContainerFgPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        Spinner sContainerFgMode = view.findViewById(R.id.SContainerFgMode);
+        sContainerFgMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -282,6 +287,8 @@ public class ContainerDetailFragment extends Fragment {
 
         TextView gameControllerLabel = view.findViewById(R.id.TVGameController);
         applyFieldSetLabelStyle(gameControllerLabel, isDarkMode);  // Apply the dark or light mode styles
+        TextView containerFramegenLabel = view.findViewById(R.id.TVContainerFramegen);
+        applyFieldSetLabelStyle(containerFramegenLabel, isDarkMode);
 
     }
 
@@ -365,6 +372,35 @@ public class ContainerDetailFragment extends Fragment {
 
         final CheckBox cbFullscreenStretched = view.findViewById(R.id.CBFullscreenStretched);
         cbFullscreenStretched.setChecked(isEditMode() && container.isFullscreenStretched());
+        final CheckBox cbContainerFgEnable = view.findViewById(R.id.CBContainerFgEnable);
+        final Spinner sContainerFgPreset = view.findViewById(R.id.SContainerFgPreset);
+        final Spinner sContainerFgMode = view.findViewById(R.id.SContainerFgMode);
+        final CheckBox cbContainerFgThermalGuard = view.findViewById(R.id.CBContainerFgThermalGuard);
+        UpscalerProfileStore.Profile globalUpscalerProfile = UpscalerProfileStore.getSelectedProfile(preferences);
+        String containerFgPreset = UpscalerProfileStore.normalizePreset(isEditMode()
+                ? container.getExtra("upscalerPreset", globalUpscalerProfile.preset)
+                : globalUpscalerProfile.preset);
+        String containerFgMode = UpscalerProfileStore.normalizeFramegenMode(isEditMode()
+                ? container.getExtra("upscalerFramegenMode", globalUpscalerProfile.framegenMode)
+                : globalUpscalerProfile.framegenMode);
+        boolean containerFgEnable = "1".equals(isEditMode()
+                ? container.getExtra("upscalerFrameGeneration", globalUpscalerProfile.frameGeneration ? "1" : "0")
+                : (globalUpscalerProfile.frameGeneration ? "1" : "0"));
+        boolean containerFgThermalGuard = "1".equals(isEditMode()
+                ? container.getExtra("upscalerThermalGuard", globalUpscalerProfile.thermalGuard ? "1" : "0")
+                : (globalUpscalerProfile.thermalGuard ? "1" : "0"));
+        AppUtils.setSpinnerSelectionFromIdentifier(sContainerFgPreset, containerFgPreset);
+        AppUtils.setSpinnerSelectionFromIdentifier(sContainerFgMode, containerFgMode);
+        cbContainerFgEnable.setChecked(containerFgEnable);
+        cbContainerFgThermalGuard.setChecked(containerFgThermalGuard);
+        Runnable updateContainerFgState = () -> {
+            boolean enabled = cbContainerFgEnable.isChecked();
+            sContainerFgPreset.setEnabled(enabled);
+            sContainerFgMode.setEnabled(enabled);
+            cbContainerFgThermalGuard.setEnabled(enabled);
+        };
+        cbContainerFgEnable.setOnCheckedChangeListener((buttonView, isChecked) -> updateContainerFgState.run());
+        updateContainerFgState.run();
 
         // Existing declarations of UI components and variables
         final Runnable showInputWarning = () -> ContentDialog.alert(context, R.string.enable_xinput_and_dinput_same_time, null);
@@ -501,6 +537,14 @@ public class ContainerDetailFragment extends Fragment {
                 if (AppUtils.isMissingComponentValue(selectedWineVersion)) {
                     selectedWineVersion = isEditMode() ? container.getWineVersion() : WineInfo.MAIN_WINE_VERSION.identifier();
                 }
+                String containerUpscalerPreset = UpscalerProfileStore.normalizePreset(
+                        StringUtils.parseIdentifier(sContainerFgPreset.getSelectedItem())
+                );
+                String containerUpscalerFramegenMode = UpscalerProfileStore.normalizeFramegenMode(
+                        StringUtils.parseIdentifier(sContainerFgMode.getSelectedItem())
+                );
+                String containerUpscalerFramegen = cbContainerFgEnable.isChecked() ? "1" : "0";
+                String containerUpscalerThermalGuard = cbContainerFgThermalGuard.isChecked() ? "1" : "0";
 
                 String box64Version = sBox64Version.getSelectedItem() != null ? sBox64Version.getSelectedItem().toString() : "";
                 if (AppUtils.isMissingComponentValue(box64Version)) {
@@ -571,6 +615,11 @@ public class ContainerDetailFragment extends Fragment {
                     container.setLC_ALL(lc_all);
                     container.setPrimaryController(primaryController);
                     container.setControllerMapping(controllerMapping);
+                    container.putExtra("upscalerPreset", containerUpscalerPreset);
+                    container.putExtra("upscalerFramegenMode", containerUpscalerFramegenMode);
+                    container.putExtra("upscalerFrameGeneration", containerUpscalerFramegen);
+                    container.putExtra("upscalerThermalGuard", containerUpscalerThermalGuard);
+                    container.putExtra("upscalerBackend", cbContainerFgEnable.isChecked() ? "mobfgsr" : null);
                     container.saveData();
                     saveWineRegistryKeys(view);
                     getActivity().onBackPressed();
@@ -604,6 +653,13 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("lc_all", lc_all);
                     data.put("primaryController", primaryController);
                     data.put("controllerMapping", controllerMapping);
+                    JSONObject extraData = new JSONObject();
+                    extraData.put("upscalerPreset", containerUpscalerPreset);
+                    extraData.put("upscalerFramegenMode", containerUpscalerFramegenMode);
+                    extraData.put("upscalerFrameGeneration", containerUpscalerFramegen);
+                    extraData.put("upscalerThermalGuard", containerUpscalerThermalGuard);
+                    extraData.put("upscalerBackend", cbContainerFgEnable.isChecked() ? "mobfgsr" : JSONObject.NULL);
+                    data.put("extraData", extraData);
 
                     preloaderDialog.show(R.string.creating_container);
 

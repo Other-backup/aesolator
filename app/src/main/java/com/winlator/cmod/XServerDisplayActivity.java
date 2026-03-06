@@ -1501,28 +1501,34 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         return Math.max(min, Math.min(max, parsed));
     }
 
+    private String resolveUpscalerValue(@NonNull Shortcut activeShortcut, @NonNull String key, @NonNull String fallback) {
+        String shortcutValue = activeShortcut.getExtra(key, "");
+        if (shortcutValue != null && !shortcutValue.trim().isEmpty()) return shortcutValue;
+        if (container != null) {
+            String containerValue = container.getExtra(key, "");
+            if (containerValue != null && !containerValue.trim().isEmpty()) return containerValue;
+        }
+        return fallback;
+    }
+
     private void parseUpscalerFromShortcut(@NonNull Shortcut activeShortcut) {
         UpscalerProfileStore.Profile globalProfile = UpscalerProfileStore.getSelectedProfile(preferences);
-        String backend = activeShortcut.getExtra("upscalerBackend", "");
-        if (backend == null || backend.trim().isEmpty()) backend = globalProfile.backend;
+        String backend = resolveUpscalerValue(activeShortcut, "upscalerBackend", globalProfile.backend);
         backend = StringUtils.parseIdentifier(backend);
         if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
             backend = UpscalerProfileStore.normalizeBackend(globalProfile.backend);
         }
 
-        String effect = activeShortcut.getExtra("upscalerEffect", "");
-        if (effect == null || effect.trim().isEmpty()) effect = globalProfile.effect;
+        String effect = resolveUpscalerValue(activeShortcut, "upscalerEffect", globalProfile.effect);
         effect = normalizeUpscalerEffect(effect);
 
-        String presetRaw = activeShortcut.getExtra("upscalerPreset", "");
-        if (presetRaw == null || presetRaw.trim().isEmpty()) presetRaw = globalProfile.preset;
+        String presetRaw = resolveUpscalerValue(activeShortcut, "upscalerPreset", globalProfile.preset);
         if (presetRaw == null || presetRaw.trim().isEmpty()) presetRaw = UPSCALER_PRESET_AUTO;
         upscalerPreset = normalizeUpscalerPreset(presetRaw);
         upscalerBackend = backend;
         upscalerEffect = effect;
 
-        String scaleRaw = activeShortcut.getExtra("upscalerScale", "");
-        if (scaleRaw == null || scaleRaw.trim().isEmpty()) scaleRaw = String.valueOf(globalProfile.scalePercent);
+        String scaleRaw = resolveUpscalerValue(activeShortcut, "upscalerScale", String.valueOf(globalProfile.scalePercent));
         upscalerScalePercent = parseBoundedInt(
                 scaleRaw,
                 100,
@@ -1530,10 +1536,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 200
         );
 
-        String sharpnessRaw = activeShortcut.getExtra("upscalerSharpness", "");
-        if (sharpnessRaw == null || sharpnessRaw.trim().isEmpty()) {
-            sharpnessRaw = String.valueOf(globalProfile.sharpness);
-        }
+        String sharpnessRaw = resolveUpscalerValue(activeShortcut, "upscalerSharpness", String.valueOf(globalProfile.sharpness));
         upscalerSharpnessPercent = parseBoundedIntAllowZero(
                 sharpnessRaw,
                 100,
@@ -1541,10 +1544,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 100
         );
 
-        String denoiseRaw = activeShortcut.getExtra("upscalerDenoise", "");
-        if (denoiseRaw == null || denoiseRaw.trim().isEmpty()) {
-            denoiseRaw = String.valueOf(globalProfile.denoise);
-        }
+        String denoiseRaw = resolveUpscalerValue(activeShortcut, "upscalerDenoise", String.valueOf(globalProfile.denoise));
         upscalerDenoisePercent = parseBoundedIntAllowZero(
                 denoiseRaw,
                 100,
@@ -1552,16 +1552,18 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 100
         );
 
-        String framegenRaw = activeShortcut.getExtra("upscalerFrameGeneration", "");
-        if (framegenRaw == null || framegenRaw.trim().isEmpty()) {
-            framegenRaw = globalProfile.frameGeneration ? "1" : "0";
-        }
+        String framegenRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerFrameGeneration",
+                globalProfile.frameGeneration ? "1" : "0"
+        );
         upscalerFrameGeneration = parseBoolean(framegenRaw);
 
-        String generatedFramesRaw = activeShortcut.getExtra("upscalerGeneratedFrames", "");
-        if (generatedFramesRaw == null || generatedFramesRaw.trim().isEmpty()) {
-            generatedFramesRaw = String.valueOf(globalProfile.generatedFrames);
-        }
+        String generatedFramesRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerGeneratedFrames",
+                String.valueOf(globalProfile.generatedFrames)
+        );
         upscalerGeneratedFrames = parseBoundedInt(
                 generatedFramesRaw,
                 1,
@@ -1569,26 +1571,23 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 3
         );
 
-        String fgSourceRaw = activeShortcut.getExtra("upscalerFgSource", "");
-        if (fgSourceRaw == null || fgSourceRaw.trim().isEmpty()) fgSourceRaw = globalProfile.fgSource;
+        String fgSourceRaw = resolveUpscalerValue(activeShortcut, "upscalerFgSource", globalProfile.fgSource);
         upscalerFgSource = normalizeFgSource(fgSourceRaw);
 
-        String fgOutputRaw = activeShortcut.getExtra("upscalerFgOutput", "");
-        if (fgOutputRaw == null || fgOutputRaw.trim().isEmpty()) fgOutputRaw = globalProfile.fgOutput;
+        String fgOutputRaw = resolveUpscalerValue(activeShortcut, "upscalerFgOutput", globalProfile.fgOutput);
         upscalerFgOutput = normalizeFgOutput(fgOutputRaw);
 
-        String framegenModeRaw = activeShortcut.getExtra("upscalerFramegenMode", "");
-        if (framegenModeRaw == null || framegenModeRaw.trim().isEmpty()) framegenModeRaw = globalProfile.framegenMode;
+        String framegenModeRaw = resolveUpscalerValue(activeShortcut, "upscalerFramegenMode", globalProfile.framegenMode);
         upscalerFramegenMode = normalizeFramegenMode(framegenModeRaw);
 
-        String thermalGuardRaw = activeShortcut.getExtra("upscalerThermalGuard", "");
-        if (thermalGuardRaw == null || thermalGuardRaw.trim().isEmpty()) {
-            thermalGuardRaw = globalProfile.thermalGuard ? "1" : "0";
-        }
+        String thermalGuardRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerThermalGuard",
+                globalProfile.thermalGuard ? "1" : "0"
+        );
         upscalerThermalGuard = parseBoolean(thermalGuardRaw);
 
-        String targetFpsRaw = activeShortcut.getExtra("upscalerTargetFps", "");
-        if (targetFpsRaw == null || targetFpsRaw.trim().isEmpty()) targetFpsRaw = String.valueOf(globalProfile.targetFps);
+        String targetFpsRaw = resolveUpscalerValue(activeShortcut, "upscalerTargetFps", String.valueOf(globalProfile.targetFps));
         upscalerTargetFps = parseBoundedIntAllowZero(
                 targetFpsRaw,
                 60,
@@ -1596,10 +1595,11 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 144
         );
 
-        String interpolationRaw = activeShortcut.getExtra("upscalerInterpolationFactor", "");
-        if (interpolationRaw == null || interpolationRaw.trim().isEmpty()) {
-            interpolationRaw = String.valueOf(globalProfile.interpolationFactor);
-        }
+        String interpolationRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerInterpolationFactor",
+                String.valueOf(globalProfile.interpolationFactor)
+        );
         upscalerInterpolationFactor = parseBoundedIntAllowZero(
                 interpolationRaw,
                 50,
@@ -1607,28 +1607,32 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 100
         );
 
-        String debugOverlayRaw = activeShortcut.getExtra("upscalerDebugOverlay", "");
-        if (debugOverlayRaw == null || debugOverlayRaw.trim().isEmpty()) {
-            debugOverlayRaw = globalProfile.debugOverlay ? "1" : "0";
-        }
+        String debugOverlayRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerDebugOverlay",
+                globalProfile.debugOverlay ? "1" : "0"
+        );
         upscalerDebugOverlay = parseBoolean(debugOverlayRaw);
 
-        String debugTearRaw = activeShortcut.getExtra("upscalerDebugTearLines", "");
-        if (debugTearRaw == null || debugTearRaw.trim().isEmpty()) {
-            debugTearRaw = globalProfile.debugTearLines ? "1" : "0";
-        }
+        String debugTearRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerDebugTearLines",
+                globalProfile.debugTearLines ? "1" : "0"
+        );
         upscalerDebugTearLines = parseBoolean(debugTearRaw);
 
-        String interpolatedOnlyRaw = activeShortcut.getExtra("upscalerInterpolatedOnly", "");
-        if (interpolatedOnlyRaw == null || interpolatedOnlyRaw.trim().isEmpty()) {
-            interpolatedOnlyRaw = globalProfile.interpolatedOnly ? "1" : "0";
-        }
+        String interpolatedOnlyRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerInterpolatedOnly",
+                globalProfile.interpolatedOnly ? "1" : "0"
+        );
         upscalerInterpolatedOnly = parseBoolean(interpolatedOnlyRaw);
 
-        String vkValidationRaw = activeShortcut.getExtra("vulkanValidationLayer", "");
-        if (vkValidationRaw == null || vkValidationRaw.trim().isEmpty()) {
-            vkValidationRaw = globalProfile.vulkanValidationLayer ? "1" : "0";
-        }
+        String vkValidationRaw = resolveUpscalerValue(
+                activeShortcut,
+                "vulkanValidationLayer",
+                globalProfile.vulkanValidationLayer ? "1" : "0"
+        );
         upscalerVulkanValidationLayer = parseBoolean(vkValidationRaw);
         vkbasaltConfig = buildVkBasaltConfig(upscalerEffect, upscalerSharpnessPercent, upscalerDenoisePercent);
     }

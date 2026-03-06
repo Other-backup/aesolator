@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
     <LinearLayout
-        android:layout_width="320dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="14dp">
 
         <LinearLayout
+            android:id="@+id/LLAboutHeaderCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/forensic_panel_background"
+            android:gravity="center_vertical"
+            android:minHeight="128dp"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:padding="14dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -24,54 +29,100 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:text="Ae.solator"
                     android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorControlNormal"
-                    android:text="Aesolator" />
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/TVWebpage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:textColor="?attr/colorAccent" />
+                    android:layout_marginTop="4dp"
+                    android:textColor="?attr/colorAccent"
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/TVAppVersion"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:textColor="#9e9e9e" />
+                    android:layout_marginTop="4dp"
+                    android:textColor="#9e9e9e"
+                    android:textSize="14sp" />
             </LinearLayout>
 
             <ImageView
-                android:layout_width="70dp"
-                android:layout_height="70dp"
+                android:id="@+id/IVAboutLauncherIcon"
+                android:layout_width="74dp"
+                android:layout_height="74dp"
                 android:src="@mipmap/ic_launcher" />
         </LinearLayout>
 
-        <View style="@style/HorizontalLine" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <FrameLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="@string/credits_and_third_party_apps" />
+            android:layout_marginTop="12dp">
 
-        <TextView
-            android:id="@+id/TVCreditsAndThirdPartyApps"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            <LinearLayout
+                android:id="@+id/LLAboutCreditsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/forensic_panel_background"
+                android:orientation="vertical"
+                android:paddingBottom="14dp"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:paddingTop="30dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/TVCreditsAndThirdPartyApps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/TVAboutCreditsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:background="@drawable/forensic_badge_background"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:text="@string/credits_and_third_party_apps"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="@string/glibc_exp_edition" />
+            android:layout_marginTop="12dp">
 
-        <TextView
-            android:id="@+id/TVGlibcExpVersionFork"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            <LinearLayout
+                android:id="@+id/LLAboutRuntimeCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/forensic_panel_background"
+                android:orientation="vertical"
+                android:paddingBottom="14dp"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:paddingTop="30dp">
+
+                <TextView
+                    android:id="@+id/TVGlibcExpVersionFork"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/TVAboutRuntimeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:background="@drawable/forensic_badge_background"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:text="@string/glibc_exp_edition"
+                android:textStyle="bold" />
+        </FrameLayout>
     </LinearLayout>
-</LinearLayout>
+</ScrollView>

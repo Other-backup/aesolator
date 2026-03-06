@@ -84,6 +84,10 @@ public class AdrenotoolsFragment extends Fragment {
     private final ArrayList<String> branchValues = new ArrayList<>();
     private boolean suppressBranchCallback = false;
     private final HashSet<String> installingEntries = new HashSet<>();
+    private DriversAdapter driversAdapter;
+    private GraphicsFeedAdapter graphicsFeedAdapter;
+    private int graphicsFeedRefreshToken = 0;
+    private String branchSelectorSignature = "";
     
     @Override 
     public void onCreate(Bundle savedInstanceState) {
@@ -149,11 +153,13 @@ public class AdrenotoolsFragment extends Fragment {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
         recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
-        recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
+        driversAdapter = new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers());
+        recyclerView.setAdapter(driversAdapter);
 
         rvGraphicsFeed.setLayoutManager(new LinearLayoutManager(rvGraphicsFeed.getContext()));
         rvGraphicsFeed.addItemDecoration(new DividerItemDecoration(rvGraphicsFeed.getContext(), DividerItemDecoration.VERTICAL));
-        rvGraphicsFeed.setAdapter(new GraphicsFeedAdapter(new ArrayList<>()));
+        graphicsFeedAdapter = new GraphicsFeedAdapter(new ArrayList<>());
+        rvGraphicsFeed.setAdapter(graphicsFeedAdapter);
 
         View btInstallDriver = layout.findViewById(R.id.BTInstallDriver);
         btInstallDriver.setOnClickListener((v) -> openZipInstaller());
@@ -191,9 +197,7 @@ public class AdrenotoolsFragment extends Fragment {
         if (branchMode == null || branchMode.trim().isEmpty()) branchMode = "all";
         setSpinnerSelectionByValue(sGraphicsFeedSourceMode, sourceValues, sourceMode, 0);
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
-        if (recyclerView != null) {
-            recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
-        }
+        if (driversAdapter != null) driversAdapter.replaceItems(adrenotoolsManager.enumarateInstalledDrivers());
         styleGraphicsCenterButtons(rootView);
         refreshGraphicsCenterStatus();
         refreshGraphicsFeed();
@@ -206,7 +210,7 @@ public class AdrenotoolsFragment extends Fragment {
             Uri uri = data.getData();
             String driver = adrenotoolsManager.installDriver(uri);
             if (!driver.isEmpty()) {
-                ((DriversAdapter)recyclerView.getAdapter()).addItem(driver);
+                if (driversAdapter != null) driversAdapter.addItem(driver);
                 refreshGraphicsCenterStatus();
             }
         }
@@ -300,6 +304,12 @@ public class AdrenotoolsFragment extends Fragment {
         public void addItem(String item) {
             driversList.add(item);
             notifyItemInserted(getItemCount() - 1);
+        }
+
+        public void replaceItems(ArrayList<String> updatedDriversList) {
+            driversList.clear();
+            if (updatedDriversList != null) driversList.addAll(updatedDriversList);
+            notifyDataSetChanged();
         }
         
         public void removeAtIndex(int index) {
@@ -937,15 +947,19 @@ public class AdrenotoolsFragment extends Fragment {
 
     private void refreshGraphicsFeed() {
         if (!isAdded() || rvGraphicsFeed == null || tvGraphicsFeedEmpty == null) return;
-        tvGraphicsFeedEmpty.setText(R.string.graphics_center_driver_feed_loading);
-        tvGraphicsFeedEmpty.setVisibility(View.VISIBLE);
-        rvGraphicsFeed.setVisibility(View.GONE);
+        final int requestToken = ++graphicsFeedRefreshToken;
+        if (graphicsFeedAdapter == null || graphicsFeedAdapter.getItemCount() == 0) {
+            tvGraphicsFeedEmpty.setText(R.string.graphics_center_driver_feed_loading);
+            tvGraphicsFeedEmpty.setVisibility(View.VISIBLE);
+        }
+        rvGraphicsFeed.setVisibility(View.VISIBLE);
 
         new Thread(() -> {
             if (!isAdded()) return;
             List<ContentProfile> sourceProfiles = collectSourceProfiles(selectedLane, sourceMode);
             if (!isAdded() || getActivity() == null) return;
             requireActivity().runOnUiThread(() -> {
+                if (requestToken != graphicsFeedRefreshToken) return;
                 updateBranchSelector(sourceProfiles);
                 showGraphicsFeed(applyBranchFilter(sourceProfiles, branchMode));
             });
@@ -958,12 +972,12 @@ public class AdrenotoolsFragment extends Fragment {
             tvGraphicsFeedEmpty.setText(R.string.graphics_center_driver_feed_empty);
             tvGraphicsFeedEmpty.setVisibility(View.VISIBLE);
             rvGraphicsFeed.setVisibility(View.VISIBLE);
-            rvGraphicsFeed.setAdapter(new GraphicsFeedAdapter(new ArrayList<>()));
+            if (graphicsFeedAdapter != null) graphicsFeedAdapter.setProfiles(new ArrayList<>());
             return;
         }
         tvGraphicsFeedEmpty.setVisibility(View.GONE);
         rvGraphicsFeed.setVisibility(View.VISIBLE);
-        rvGraphicsFeed.setAdapter(new GraphicsFeedAdapter(profiles));
+        if (graphicsFeedAdapter != null) graphicsFeedAdapter.setProfiles(profiles);
     }
 
     private List<ContentProfile> collectSourceProfiles(String lane, String selectedSourceMode) {
@@ -1357,14 +1371,22 @@ public class AdrenotoolsFragment extends Fragment {
 
     private void updateBranchSelector(List<ContentProfile> profiles) {
         if (!isAdded() || sGraphicsFeedBranchMode == null) return;
-        LinkedHashMap<String, String> options = new LinkedHashMap<>();
-        options.put("all", getString(R.string.graphics_center_branch_all));
+        LinkedHashSet<String> uniqueBranches = new LinkedHashSet<>();
         for (ContentProfile profile : profiles) {
             if (profile == null) continue;
             String key = profile.delivery == null ? "" : profile.delivery.trim().toLowerCase(Locale.US);
             if (key.isEmpty()) key = "main";
-            if (!options.containsKey(key)) {
-                options.put(key, formatReleaseLineLabel(key));
+            uniqueBranches.add(key);
+        }
+
+        LinkedHashMap<String, String> options = new LinkedHashMap<>();
+        if (uniqueBranches.size() <= 1) {
+            String onlyBranch = uniqueBranches.isEmpty() ? "main" : uniqueBranches.iterator().next();
+            options.put(onlyBranch, formatReleaseLineLabel(onlyBranch));
+        } else {
+            options.put("all", getString(R.string.graphics_center_branch_all));
+            for (String key : uniqueBranches) {
+                if (!options.containsKey(key)) options.put(key, formatReleaseLineLabel(key));
             }
         }
 
@@ -1376,18 +1398,24 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         if (!branchValues.contains(branchMode)) {
-            branchMode = "all";
+            branchMode = branchValues.get(0);
             sharedPreferences.edit().putString(PREF_GRAPHICS_BRANCH_MODE, branchMode).apply();
         }
 
+        String nextSignature = String.join("|", branchValues);
+        boolean needsAdapterReset = !nextSignature.equals(branchSelectorSignature);
+        branchSelectorSignature = nextSignature;
         suppressBranchCallback = true;
-        sGraphicsFeedBranchMode.setAdapter(SpinnerAdapters.create(
-                requireContext(),
-                sharedPreferences.getBoolean("dark_mode", false),
-                branchEntries
-        ));
+        if (needsAdapterReset) {
+            sGraphicsFeedBranchMode.setAdapter(SpinnerAdapters.create(
+                    requireContext(),
+                    sharedPreferences.getBoolean("dark_mode", false),
+                    branchEntries
+            ));
+        }
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
-        sGraphicsFeedBranchMode.setEnabled(branchValues.size() > 1);
+        boolean hasSyntheticAllOption = !branchValues.isEmpty() && "all".equals(branchValues.get(0));
+        sGraphicsFeedBranchMode.setEnabled(hasSyntheticAllOption ? branchValues.size() > 2 : branchValues.size() > 1);
         suppressBranchCallback = false;
     }
 
@@ -1416,8 +1444,21 @@ public class AdrenotoolsFragment extends Fragment {
             case "qcom-opengl" -> "QCOM OpenGL";
             case "mesa-opengl" -> "Mesa OpenGL";
             case "turnip-ci" -> "Turnip CI";
-            default -> normalized.replace('-', ' ');
+            default -> toTitleCase(normalized.replace('-', ' '));
         };
+    }
+
+    private String toTitleCase(String value) {
+        if (value == null || value.trim().isEmpty()) return "";
+        String[] parts = value.trim().split("\\s+");
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (out.length() > 0) out.append(' ');
+            out.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) out.append(part.substring(1));
+        }
+        return out.toString();
     }
 
     private int resolveFeedAccentColor(ContentProfile profile) {
@@ -1580,9 +1621,7 @@ public class AdrenotoolsFragment extends Fragment {
                     ContentDialog.alert(getContext(), R.string.graphics_center_install_failed, null);
                 } else {
                     ContentDialog.alert(getContext(), R.string.content_installed_success, null);
-                    if (recyclerView != null) {
-                        recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
-                    }
+                    if (driversAdapter != null) driversAdapter.replaceItems(adrenotoolsManager.enumarateInstalledDrivers());
                     ForensicLogger.logEvent(
                             getContext(),
                             "info",
@@ -1609,7 +1648,9 @@ public class AdrenotoolsFragment extends Fragment {
         private final List<ContentProfile> profiles;
 
         private GraphicsFeedAdapter(List<ContentProfile> profiles) {
-            this.profiles = profiles == null ? new ArrayList<>() : profiles;
+            this.profiles = new ArrayList<>();
+            if (profiles != null) this.profiles.addAll(profiles);
+            setHasStableIds(true);
         }
 
         private class ViewHolder extends RecyclerView.ViewHolder {
@@ -1689,6 +1730,25 @@ public class AdrenotoolsFragment extends Fragment {
         @Override
         public int getItemCount() {
             return profiles.size();
+        }
+
+        @Override
+        public long getItemId(int position) {
+            if (position < 0 || position >= profiles.size()) return RecyclerView.NO_ID;
+            ContentProfile profile = profiles.get(position);
+            if (profile == null) return RecyclerView.NO_ID;
+            String idSeed = (profile.remoteUrl == null ? "" : profile.remoteUrl)
+                    + "|"
+                    + (profile.verName == null ? "" : profile.verName)
+                    + "|"
+                    + profile.verCode;
+            return idSeed.hashCode();
+        }
+
+        private void setProfiles(List<ContentProfile> updatedProfiles) {
+            profiles.clear();
+            if (updatedProfiles != null) profiles.addAll(updatedProfiles);
+            notifyDataSetChanged();
         }
     }
 }

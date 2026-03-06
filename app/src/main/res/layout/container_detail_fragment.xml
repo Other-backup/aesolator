@@ -275,6 +275,62 @@
                 android:text="@string/fullscreen_stretched"
                 android:layout_marginTop="8dp" />
 
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout style="@style/FieldSet">
+
+                    <CheckBox
+                        android:id="@+id/CBContainerFgEnable"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/upscaler_enable_frame_generation" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/upscaler_preset" />
+
+                    <Spinner
+                        android:id="@+id/SContainerFgPreset"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:entries="@array/upscaler_preset_entries" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/upscaler_framegen_mode" />
+
+                    <Spinner
+                        android:id="@+id/SContainerFgMode"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:entries="@array/upscaler_framegen_mode_entries" />
+
+                    <CheckBox
+                        android:id="@+id/CBContainerFgThermalGuard"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/upscaler_thermal_guard" />
+
+                    <TextView
+                        android:id="@+id/TVContainerFgHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/container_fg_hint"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVContainerFramegen"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/container_fg_defaults" />
+            </FrameLayout>
+
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/TabLayout"
                 android:layout_width="match_parent"
