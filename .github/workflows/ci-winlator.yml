@@ -1,13 +1,55 @@
-name: Legacy Aesolator APK lane (disabled)
+name: Trigger Aesolator APK lane (WCP Archive)
 
 on:
+  push:
+    branches: ["main"]
   workflow_dispatch:
+    inputs:
+      aesolator_ref:
+        description: "Aesolator ref (branch/tag) for remote lane"
+        required: false
+        default: "main"
+      aesolator_commit:
+        description: "Exact Aesolator commit SHA (optional)"
+        required: false
+        default: ""
+      runtime_release_tag:
+        description: "Runtime release tag consumed by app defaults"
+        required: false
+        default: "freewine11-arm64ec-latest"
+
+concurrency:
+  group: aesolator-dispatch-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  lane_relocated:
+  dispatch_wcp_archive_lane:
     runs-on: ubuntu-24.04
     steps:
-      - name: Lane moved to WCP Archive
+      - name: Dispatch Aesolator APK build in WCP Archive
+        env:
+          GH_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}
+          AESOLATOR_REF: ${{ github.event.inputs.aesolator_ref || github.ref_name || 'main' }}
+          AESOLATOR_COMMIT: ${{ github.event.inputs.aesolator_commit || github.sha }}
+          RUNTIME_RELEASE_TAG: ${{ github.event.inputs.runtime_release_tag || 'freewine11-arm64ec-latest' }}
         run: |
-          echo "Aesolator APK lane moved to kosoymiki/wcp-runtime-lanes"
-          echo "Use workflow: .github/workflows/ci-aesolator-apk.yml"
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::AEO_RELEASE_TOKEN is required to dispatch workflow in kosoymiki/wcp-runtime-lanes"
+            exit 1
+          fi
+
+          gh api \
+            -X POST \
+            repos/kosoymiki/wcp-runtime-lanes/actions/workflows/ci-aesolator-apk.yml/dispatches \
+            -f ref=main \
+            -f "inputs[aesolator_ref]=${AESOLATOR_REF}" \
+            -f "inputs[aesolator_commit]=${AESOLATOR_COMMIT}" \
+            -f "inputs[runtime_release_tag]=${RUNTIME_RELEASE_TAG}"
+
+          echo "Dispatched kosoymiki/wcp-runtime-lanes/.github/workflows/ci-aesolator-apk.yml"
+          echo "aesolator_ref=${AESOLATOR_REF}"
+          echo "aesolator_commit=${AESOLATOR_COMMIT}"
