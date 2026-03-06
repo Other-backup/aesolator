@@ -371,7 +371,7 @@ public class DXVKConfigDialog extends ContentDialog {
             itemList.add(new VKD3DVersionItem(AppUtils.MISSING_COMPONENT_PLACEHOLDER));
         }
 
-        ArrayAdapter<VKD3DVersionItem> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList);
+        ArrayAdapter<VKD3DVersionItem> adapter = SpinnerAdapters.createGeneric(context, isDarkMode(), itemList);
         spinner.setAdapter(adapter);
         spinner.setEnabled(hasRuntimeVersions);
     }

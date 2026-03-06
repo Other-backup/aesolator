@@ -191,69 +191,28 @@ public class ContainerDetailFragment extends Fragment {
 
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
-
-
-        // Update Spinners
-        Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-        sScreenSize.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
-        sWineVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
-        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
-        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sEmulator64 = view.findViewById(R.id.SEmulator64);
-        sEmulator64.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sEmulator = view.findViewById(R.id.SEmulator);
-        sEmulator.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        // Update Wine Configuration Tab Spinner styles
-        // Desktop
-        Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
-        sDesktopTheme.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sDesktopBackgroundType = view.findViewById(R.id.SDesktopBackgroundType);
-        sDesktopBackgroundType.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-        sMouseWarpOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        // Win Components
-        // Handled in createWinComponentsTab
-
-        // Update Advanced Tab Spinner styles
-        Spinner SDInputType = view.findViewById(R.id.SDInputType);
-        SDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
-        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
-        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-
-        Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
-        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-        Spinner sContainerFgPreset = view.findViewById(R.id.SContainerFgPreset);
-        sContainerFgPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
-        Spinner sContainerFgMode = view.findViewById(R.id.SContainerFgMode);
-        sContainerFgMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        Spinner[] spinners = new Spinner[] {
+                view.findViewById(R.id.SScreenSize),
+                view.findViewById(R.id.SWineVersion),
+                view.findViewById(R.id.SGraphicsDriver),
+                view.findViewById(R.id.SDXWrapper),
+                view.findViewById(R.id.SAudioDriver),
+                view.findViewById(R.id.SEmulator64),
+                view.findViewById(R.id.SEmulator),
+                view.findViewById(R.id.SMIDISoundFont),
+                view.findViewById(R.id.SDesktopTheme),
+                view.findViewById(R.id.SDesktopBackgroundType),
+                view.findViewById(R.id.SMouseWarpOverride),
+                view.findViewById(R.id.SDInputType),
+                view.findViewById(R.id.SBox64Preset),
+                view.findViewById(R.id.SBox64Version),
+                view.findViewById(R.id.SFEXCoreVersion),
+                view.findViewById(R.id.SFEXCorePreset),
+                view.findViewById(R.id.SStartupSelection),
+                view.findViewById(R.id.SContainerFgPreset),
+                view.findViewById(R.id.SContainerFgMode)
+        };
+        for (Spinner spinner : spinners) SpinnerAdapters.applySurface(spinner, isDarkMode);
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -1281,5 +1240,4 @@ public class ContainerDetailFragment extends Fragment {
     }
 
 }
-
 

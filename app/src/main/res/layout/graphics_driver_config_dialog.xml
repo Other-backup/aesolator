@@ -37,7 +37,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/vulkan_version_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -51,7 +51,7 @@
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -65,7 +65,7 @@
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -79,7 +79,7 @@
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
                 </LinearLayout>
 
                 <TextView
@@ -109,7 +109,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/device_memory_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -124,7 +124,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/present_mode_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -139,7 +139,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/resource_type_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -154,7 +154,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/bcn_emulation_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -169,7 +169,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/bcn_emulation_type_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -184,7 +184,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/bcn_emulation_cache_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
                 </LinearLayout>
 
                 <TextView

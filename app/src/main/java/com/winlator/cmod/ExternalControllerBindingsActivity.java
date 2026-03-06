@@ -31,6 +31,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.Binding;
@@ -262,7 +263,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                         break;
                 }
 
-                holder.binding.setAdapter(new ArrayAdapter<>($this, android.R.layout.simple_spinner_dropdown_item, bindingEntries));
+                holder.binding.setAdapter(SpinnerAdapters.createGeneric($this, bindingEntries));
                 AppUtils.setSpinnerSelectionFromValue(holder.binding, item.getBinding().toString());
             };
 

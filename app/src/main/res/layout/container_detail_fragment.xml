@@ -60,7 +60,7 @@
                                 android:entries="@array/screen_size_entries"
                                 android:focusable="true"
                                 android:focusableInTouchMode="true"
-                                android:spinnerMode="dialog" />
+                                android:spinnerMode="dropdown" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -655,7 +655,7 @@
                             style="@style/ComboBox"
                             android:id="@+id/SBox64Version"
                             android:layout_width="match_parent"
-                            android:spinnerMode="dialog" />
+                            android:spinnerMode="dropdown" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -666,7 +666,7 @@
                             style="@style/ComboBox"
                             android:id="@+id/SBox64Preset"
                             android:layout_width="match_parent"
-                            android:spinnerMode="dialog" />
+                            android:spinnerMode="dropdown" />
 
                     </LinearLayout>
 
@@ -705,7 +705,7 @@
                             style="@style/ComboBox"
                             android:id="@+id/SFEXCorePreset"
                             android:layout_width="match_parent"
-                            android:spinnerMode="dialog" />
+                            android:spinnerMode="dropdown" />
                     </LinearLayout>
 
                     <TextView
@@ -969,6 +969,6 @@
         android:layout_height="wrap_content"
         android:layout_gravity="end|bottom"
         android:tint="@color/white"
-        android:src="@drawable/icon_confirm"
+        android:src="@drawable/ae_icon_confirm"
         android:layout_margin="16dp" />
 </FrameLayout>

@@ -28,7 +28,7 @@
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
                     android:entries="@array/vkd3d_version_entries"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -40,7 +40,7 @@
                     android:id="@+id/SVKD3DFeatureLevel"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -53,7 +53,7 @@
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
                     android:entries="@array/dxvk_version_entries"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -66,7 +66,7 @@
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
                     android:entries="@array/dxvk_framerate_entries"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
             </LinearLayout>
 
             <TextView

@@ -36,8 +36,7 @@
             <TextView
                 style="@style/FieldSetLabel"
                 android:tag="theme_badge"
-                android:text="@string/graphics_center_actions"
-                android:textStyle="bold" />
+                android:text="@string/graphics_center_actions" />
         </FrameLayout>
 
         <FrameLayout
@@ -60,9 +59,13 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:drawableStart="@drawable/icon_cpu"
+                        android:drawableStart="@drawable/ae_icon_turnip_lane"
                         android:drawablePadding="6dp"
+                        android:gravity="center"
                         android:minWidth="0dp"
+                        android:minHeight="50dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
                         android:text="@string/graphics_center_lane_turnip" />
 
                     <Space
@@ -75,9 +78,13 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:drawableStart="@drawable/icon_screen_effect"
+                        android:drawableStart="@drawable/ae_icon_opengl_lane"
                         android:drawablePadding="6dp"
+                        android:gravity="center"
                         android:minWidth="0dp"
+                        android:minHeight="50dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
                         android:text="@string/graphics_center_lane_opengl" />
                 </LinearLayout>
             </LinearLayout>
@@ -86,8 +93,7 @@
                 android:id="@+id/TVGraphicsLaneLabel"
                 style="@style/FieldSetLabel"
                 android:tag="theme_badge"
-                android:text="@string/graphics_center_lanes"
-                android:textStyle="bold" />
+                android:text="@string/graphics_center_lanes" />
         </FrameLayout>
 
         <FrameLayout
@@ -136,7 +142,7 @@
 
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="392dp"
+                    android:layout_height="468dp"
                     android:layout_marginTop="10dp">
 
                     <androidx.recyclerview.widget.RecyclerView
@@ -161,8 +167,7 @@
                 android:id="@+id/TVGraphicsDownloadsLabel"
                 style="@style/FieldSetLabel"
                 android:tag="theme_badge"
-                android:text="@string/graphics_center_driver_feed_title"
-                android:textStyle="bold" />
+                android:text="@string/graphics_center_driver_feed_title" />
         </FrameLayout>
 
         <FrameLayout
@@ -185,6 +190,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:gravity="center"
+                        android:minHeight="48dp"
                         android:text="@string/open_dri3_settings" />
 
                     <Space
@@ -197,13 +204,15 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:gravity="center"
+                        android:minHeight="48dp"
                         android:text="@string/open_upscaler_profiles" />
                 </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/RecyclerView"
                     android:layout_width="match_parent"
-                    android:layout_height="132dp"
+                    android:layout_height="104dp"
                     android:layout_marginTop="10dp"
                     android:nestedScrollingEnabled="true"
                     android:overScrollMode="ifContentScrolls"
@@ -222,8 +231,7 @@
                 android:id="@+id/TVGraphicsActionsLabel"
                 style="@style/FieldSetLabel"
                 android:tag="theme_badge"
-                android:text="@string/graphics_center_actions"
-                android:textStyle="bold" />
+                android:text="@string/graphics_center_actions" />
         </FrameLayout>
     </LinearLayout>
 </ScrollView>

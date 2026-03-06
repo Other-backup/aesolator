@@ -39,7 +39,7 @@
                 android:id="@+id/SBindingType"
                 android:layout_width="140dp"
                 android:entries="@array/binding_type_entries"
-                android:spinnerMode="dialog"
+                android:spinnerMode="dropdown"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:clickable="true" />
@@ -53,7 +53,7 @@
                 android:id="@+id/SBinding"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:spinnerMode="dialog"
+                android:spinnerMode="dropdown"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:clickable="true" />
@@ -63,5 +63,5 @@
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTRemove"
-        android:src="@drawable/icon_remove" />
+        android:src="@drawable/ae_icon_remove" />
 </LinearLayout>

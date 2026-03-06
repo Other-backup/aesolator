@@ -84,7 +84,7 @@
         android:layout_width="34dp"
         android:layout_height="34dp"
         android:layout_marginStart="6dp"
-        android:src="@drawable/icon_popup_menu_download" />
+        android:src="@drawable/ae_icon_download" />
     <ProgressBar
         android:id="@+id/Progress"
         style="?android:attr/progressBarStyleSmall"

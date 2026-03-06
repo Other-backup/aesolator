@@ -22,6 +22,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ArrayUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 
 import org.json.JSONArray;
@@ -147,7 +148,7 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
                     spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
                     spinner.setVisibility(View.VISIBLE);
                     spinner.setEnabled(!readonly);
-                    spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
+                    spinner.setAdapter(SpinnerAdapters.create(context, isDarkMode, values));
                     AppUtils.setSpinnerSelectionFromValue(spinner, value);
                 }
 

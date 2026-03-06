@@ -48,7 +48,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:spinnerMode="dialog" />
+                            android:spinnerMode="dropdown" />
 
                     </LinearLayout>
 
@@ -63,26 +63,26 @@
                             style="@style/ListMenuButton"
                             android:id="@+id/BTAddBox64Preset"
                             android:tooltipText="@string/add"
-                            android:src="@drawable/icon_add" />
+                            android:src="@drawable/ae_icon_add" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTEditBox64Preset"
                             android:tooltipText="@string/edit"
-                            android:src="@drawable/icon_edit" />
+                            android:src="@drawable/ae_icon_edit" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:tooltipText="@string/duplicate"
                             android:id="@+id/BTDuplicateBox64Preset"
-                            android:src="@drawable/icon_duplicate" />
+                            android:src="@drawable/ae_icon_duplicate" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:tooltipText="@string/remove"
                             android:id="@+id/BTRemoveBox64Preset"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_remove" />
+                            android:src="@drawable/ae_icon_remove" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
@@ -96,7 +96,7 @@
                             android:tooltipText="@string/import_action"
                             android:id="@+id/BTImportBox64Preset"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_popup_menu_download" />
+                            android:src="@drawable/ae_icon_download" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -134,7 +134,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:spinnerMode="dialog" />
+                            android:spinnerMode="dropdown" />
 
                     </LinearLayout>
 
@@ -149,26 +149,26 @@
                             style="@style/ListMenuButton"
                             android:id="@+id/BTAddFEXCorePreset"
                             android:tooltipText="@string/add"
-                            android:src="@drawable/icon_add" />
+                            android:src="@drawable/ae_icon_add" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTEditFEXCorePreset"
                             android:tooltipText="@string/edit"
-                            android:src="@drawable/icon_edit" />
+                            android:src="@drawable/ae_icon_edit" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:tooltipText="@string/duplicate"
                             android:id="@+id/BTDuplicateFEXCorePreset"
-                            android:src="@drawable/icon_duplicate" />
+                            android:src="@drawable/ae_icon_duplicate" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:tooltipText="@string/remove"
                             android:id="@+id/BTRemoveFEXCorePreset"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_remove" />
+                            android:src="@drawable/ae_icon_remove" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
@@ -182,7 +182,7 @@
                             android:tooltipText="@string/import_action"
                             android:id="@+id/BTImportFEXCorePreset"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_popup_menu_download" />
+                            android:src="@drawable/ae_icon_download" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -225,13 +225,13 @@
                         <ImageButton
                             android:id="@+id/BTInstallSF"
                             style="@style/ListMenuButton"
-                            android:src="@drawable/icon_add" />
+                            android:src="@drawable/ae_icon_add" />
 
                         <ImageButton
                             android:id="@+id/BTRemoveSF"
                             style="@style/ListMenuButton"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_remove" />
+                            android:src="@drawable/ae_icon_remove" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -352,7 +352,7 @@
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -484,7 +484,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:entries="@array/dri3_mode_entries"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:id="@+id/TVDri3ModeHint"
@@ -684,6 +684,6 @@
         android:layout_height="wrap_content"
         android:layout_gravity="end|bottom"
         android:tint="@color/white"
-        android:src="@drawable/icon_confirm"
+        android:src="@drawable/ae_icon_confirm"
         android:layout_margin="16dp" />
 </FrameLayout>

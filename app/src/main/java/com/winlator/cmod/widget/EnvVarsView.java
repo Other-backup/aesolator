@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.Arrays;
@@ -200,7 +201,7 @@ public class EnvVarsView extends FrameLayout {
             case "SELECT":
                 String[] items = Arrays.copyOfRange(knownEnvVar, 2, knownEnvVar.length);
                 final Spinner spinner = itemView.findViewById(R.id.Spinner);
-                spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items));
+                spinner.setAdapter(SpinnerAdapters.createGeneric(context, items));
                 AppUtils.setSpinnerSelectionFromValue(spinner, value);
                 spinner.setVisibility(VISIBLE);
                 applyDarkTheme(spinner); // Apply dark theme
@@ -266,7 +267,6 @@ public class EnvVarsView extends FrameLayout {
     }
 
 }
-
 
 
 

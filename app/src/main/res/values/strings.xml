@@ -23,6 +23,7 @@
     <string name="shortcuts">Shortcuts</string>
     <string name="containers">Containers</string>
     <string name="input_controls">Input Controls</string>
+    <string name="input_controls_no_external_controllers">No external controllers are linked to this profile yet.</string>
     <string name="no_items_to_display">No items to display</string>
     <string name="new_container">New Container</string>
     <string name="edit_container">Edit Container</string>
@@ -801,6 +802,7 @@
     <string name="graphics_center_driver_feed_hint">Pick a source and release line, then install only Turnip or OpenGL packages from this screen.</string>
     <string name="graphics_center_driver_feed_empty">No driver packages were found for the current source and release line.</string>
     <string name="graphics_center_driver_feed_loading">Loading driver releases...</string>
+    <string name="graphics_feed_source_ae_archive">Ae.solator Archive (Recommended)</string>
     <string name="graphics_center_branch_selector">Release line</string>
     <string name="graphics_center_branch_all">All branches</string>
     <string name="graphics_center_install_action">Install</string>

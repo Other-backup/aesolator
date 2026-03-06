@@ -12,6 +12,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.SpinnerAdapters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,7 +43,7 @@ public abstract class FEXCoreManager {
         boolean hasVersions = !itemList.isEmpty();
         if (!hasVersions) itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(SpinnerAdapters.create(context, itemList));
         spinner.setEnabled(hasVersions);
         if (hasVersions) {
             AppUtils.setSpinnerSelectionFromValue(spinner, fexcoreVersion);

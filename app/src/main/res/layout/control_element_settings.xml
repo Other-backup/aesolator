@@ -36,7 +36,7 @@
                     android:id="@+id/SType"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <LinearLayout
                     android:id="@+id/LLShape"
@@ -54,7 +54,7 @@
                         android:id="@+id/SShape"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -115,7 +115,7 @@
                         android:id="@+id/SRange"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -180,7 +180,7 @@
                         android:id="@+id/SBindingUp"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -192,7 +192,7 @@
                         android:id="@+id/SBindingRight"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -204,7 +204,7 @@
                         android:id="@+id/SBindingDown"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -216,7 +216,7 @@
                         android:id="@+id/SBindingLeft"
                         style="@style/ComboBox"
                         android:layout_width="match_parent"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
                 </LinearLayout>
             </LinearLayout>
 

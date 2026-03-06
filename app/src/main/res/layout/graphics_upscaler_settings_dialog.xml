@@ -46,7 +46,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -141,7 +141,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_preset_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -155,7 +155,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_backend_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -169,7 +169,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_effect_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -183,7 +183,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_scale_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <CheckBox
                 android:id="@+id/CBEnableVulkanValidationLayer"
@@ -277,7 +277,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_generated_frames_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -291,7 +291,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_fg_source_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -305,7 +305,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_fg_output_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -319,7 +319,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:entries="@array/upscaler_framegen_mode_entries"
-                android:spinnerMode="dialog" />
+                android:spinnerMode="dropdown" />
 
             <CheckBox
                 android:id="@+id/CBUpscalerThermalGuard"

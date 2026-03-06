@@ -47,6 +47,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.HttpUtils;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
@@ -145,7 +146,8 @@ public class InputControlsFragment extends Fragment {
 
         final Spinner sProfile = view.findViewById(R.id.SProfile);
 
-        sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        SpinnerAdapters.applySurface(sProfile, isDarkMode);
+        SpinnerAdapters.applySurface(sbGyroTriggerButton, isDarkMode);
 
         loadProfileSpinner(sProfile);
 
@@ -389,7 +391,7 @@ public class InputControlsFragment extends Fragment {
             values.add(profile.getName());
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(SpinnerAdapters.create(getContext(), isDarkMode, values));
         spinner.setSelection(selectedPosition, false);
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override

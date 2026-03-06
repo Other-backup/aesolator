@@ -13,9 +13,11 @@ import androidx.annotation.Nullable;
 import com.winlator.cmod.R;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 public class CPUListView extends LinearLayout {
+    private static final int CPUS_PER_ROW = 4;
     private List<String> checkedCPUList;
     private final byte numProcessors;
 
@@ -30,6 +32,7 @@ public class CPUListView extends LinearLayout {
     public CPUListView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setOrientation(HORIZONTAL);
+        checkedCPUList = new ArrayList<>();
         numProcessors = (byte)Runtime.getRuntime().availableProcessors();
         refreshContent();
     }
@@ -37,25 +40,38 @@ public class CPUListView extends LinearLayout {
     private void refreshContent() {
         removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(getContext());
+        setOrientation(VERTICAL);
 
+        LinearLayout currentRow = null;
         for (int i = 0; i < numProcessors; i++) {
-            View itemView = inflater.inflate(R.layout.cpu_list_item, this, false);
-            String tag = "CPU"+i;
+            if (i % CPUS_PER_ROW == 0) {
+                currentRow = new LinearLayout(getContext());
+                currentRow.setOrientation(HORIZONTAL);
+                currentRow.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                addView(currentRow);
+            }
+
+            View itemView = inflater.inflate(R.layout.cpu_list_item, currentRow, false);
+            String tag = "CPU" + i;
             CheckBox checkBox = itemView.findViewById(R.id.CheckBox);
             checkBox.setTag(tag);
             checkBox.setChecked(checkedCPUList == null || checkedCPUList.contains(String.valueOf(i)));
-
-            ((TextView)itemView.findViewById(R.id.TextView)).setText(tag);
-            addView(itemView);
+            ((TextView) itemView.findViewById(R.id.TextView)).setText(tag);
+            if (currentRow != null) currentRow.addView(itemView);
         }
     }
 
     public void setCheckedCPUList(String checkedCPUList) {
-        this.checkedCPUList = Arrays.asList(checkedCPUList.split(","));
+        if (checkedCPUList == null || checkedCPUList.trim().isEmpty()) {
+            this.checkedCPUList = new ArrayList<>();
+        } else {
+            this.checkedCPUList = new ArrayList<>(Arrays.asList(checkedCPUList.split(",")));
+        }
         refreshContent();
     }
 
     public void setCheckedCPUList(int from, int to) {
+        if (checkedCPUList == null) checkedCPUList = new ArrayList<>();
         checkedCPUList.clear();
         for (int i = from; i < to; i++) checkedCPUList.add(String.valueOf(i));
         refreshContent();

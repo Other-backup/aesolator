@@ -37,27 +37,27 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:spinnerMode="dialog" />
+                        android:spinnerMode="dropdown" />
 
                     <ImageButton
                         android:id="@+id/BTAddProfile"
                         style="@style/ListMenuButton"
                         android:contentDescription="@string/add"
-                        android:src="@drawable/icon_add"
+                        android:src="@drawable/ae_icon_add"
                         android:tooltipText="@string/add" />
 
                     <ImageButton
                         android:id="@+id/BTEditProfile"
                         style="@style/ListMenuButton"
                         android:contentDescription="@string/edit"
-                        android:src="@drawable/icon_edit"
+                        android:src="@drawable/ae_icon_edit"
                         android:tooltipText="@string/edit" />
 
                     <ImageButton
                         android:id="@+id/BTDuplicateProfile"
                         style="@style/ListMenuButton"
                         android:contentDescription="@string/duplicate"
-                        android:src="@drawable/icon_duplicate"
+                        android:src="@drawable/ae_icon_duplicate"
                         android:tooltipText="@string/duplicate" />
 
                     <ImageButton
@@ -65,7 +65,7 @@
                         style="@style/ListMenuButton"
                         android:contentDescription="@string/remove"
                         android:layout_marginEnd="0dp"
-                        android:src="@drawable/icon_remove"
+                        android:src="@drawable/ae_icon_remove"
                         android:tooltipText="@string/remove" />
                 </LinearLayout>
 
@@ -286,6 +286,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/TVEmptyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:text="@string/input_controls_no_external_controllers"
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <TextView

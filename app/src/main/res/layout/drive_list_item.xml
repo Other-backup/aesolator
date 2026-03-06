@@ -31,5 +31,5 @@
         style="@style/ListMenuButton"
         android:id="@+id/BTRemove"
         android:layout_marginStart="6dp"
-        android:src="@drawable/icon_remove" />
+        android:src="@drawable/ae_icon_remove" />
 </LinearLayout>

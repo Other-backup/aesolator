@@ -18,6 +18,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.effects.ColorEffect;
 import com.winlator.cmod.renderer.effects.CRTEffect;
@@ -224,7 +225,7 @@ public class ScreenEffectDialog extends ContentDialog {
             }
             position++;
         }
-        sProfile.setAdapter(new ArrayAdapter<>(activity, android.R.layout.simple_spinner_dropdown_item, items));
+        sProfile.setAdapter(SpinnerAdapters.create(activity, items));
         sProfile.setSelection(selectedPosition);
     }
 

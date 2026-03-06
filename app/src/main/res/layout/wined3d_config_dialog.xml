@@ -27,7 +27,7 @@
                     android:id="@+id/SCSMT"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -39,7 +39,7 @@
                     android:id="@+id/SGPUName"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -52,7 +52,7 @@
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
                     android:entries="@array/video_memory_size_entries"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -64,7 +64,7 @@
                     android:id="@+id/SStrictShaderMath"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -76,7 +76,7 @@
                     android:id="@+id/SOffscreenRenderingMode"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -88,7 +88,7 @@
                     android:id="@+id/SRenderer"
                     style="@style/ComboBox"
                     android:layout_width="match_parent"
-                    android:spinnerMode="dialog" />
+                    android:spinnerMode="dropdown" />
             </LinearLayout>
 
             <TextView

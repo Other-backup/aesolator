@@ -46,7 +46,7 @@
         <ImageButton
             style="@style/ListMenuButton"
             android:id="@+id/BTRemove"
-            android:src="@drawable/icon_remove"
+            android:src="@drawable/ae_icon_remove"
             android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

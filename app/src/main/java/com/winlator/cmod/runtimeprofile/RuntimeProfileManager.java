@@ -8,6 +8,7 @@ import android.widget.SpinnerAdapter;
 
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.SpinnerAdapters;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -184,7 +185,7 @@ public final class RuntimeProfileManager {
                 break;
             }
         }
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, profiles));
+        spinner.setAdapter(SpinnerAdapters.createGeneric(context, profiles));
         spinner.setSelection(selectedPosition);
     }
 

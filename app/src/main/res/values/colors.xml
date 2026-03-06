@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Light Theme Colors -->
-    <color name="window_background_color">#fafafa</color>
+    <color name="window_background_color">#F1F7F3</color>
     <color name="colorPrimary">#1F5A43</color>
     <color name="colorPrimaryDark">#143A2B</color>
     <color name="colorAccent">#2CCB7F</color>
@@ -58,13 +58,13 @@
     <color name="forensic_command_bg_dark">#102019</color>
     <color name="forensic_log_stats_text">#D7EFE2</color>
     <color name="forensic_log_body_text">#CDE7DA</color>
-    <color name="surface_dialog_bg">#F4FCF8</color>
+    <color name="surface_dialog_bg">#EEF8F2</color>
     <color name="surface_dialog_bg_dark">#11221B</color>
     <color name="surface_dialog_border">#A4DDBE</color>
     <color name="surface_dialog_border_dark">#2E9F6C</color>
-    <color name="surface_card_bg">#F6FCF8</color>
+    <color name="surface_card_bg">#F2FAF5</color>
     <color name="surface_card_bg_dark">#14231D</color>
-    <color name="surface_card_border">#B5DFC9</color>
+    <color name="surface_card_border">#A9DABE</color>
     <color name="surface_card_border_dark">#316E55</color>
     <color name="surface_badge_bg">#DDF5E8</color>
     <color name="surface_badge_bg_dark">#203B31</color>
@@ -76,9 +76,9 @@
     <color name="surface_command_bg_dark">#0F1E18</color>
     <color name="surface_command_border">#C7E8D5</color>
     <color name="surface_command_border_dark">#376C55</color>
-    <color name="surface_input_bg">#FCFFFD</color>
+    <color name="surface_input_bg">#F8FCFA</color>
     <color name="surface_input_bg_dark">#173026</color>
-    <color name="surface_input_border">#B9E6CF</color>
+    <color name="surface_input_border">#AEDFC4</color>
     <color name="surface_input_border_dark">#2E8E64</color>
     <color name="surface_input_focus">#2CCB7F</color>
     <color name="surface_input_focus_dark">#39D98A</color>
