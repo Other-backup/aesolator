@@ -90,6 +90,14 @@ public final class SpinnerAdapters {
         return createGeneric(context, isDarkMode(context), values);
     }
 
+    public static <T> ArrayAdapter<T> createGeneric(Context context, boolean isDarkMode, T[] values) {
+        return createGeneric(context, isDarkMode, values == null ? new ArrayList<>() : Arrays.asList(values));
+    }
+
+    public static <T> ArrayAdapter<T> createGeneric(Context context, T[] values) {
+        return createGeneric(context, isDarkMode(context), values);
+    }
+
     public static boolean isDarkMode(Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
     }
