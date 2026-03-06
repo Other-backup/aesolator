@@ -73,7 +73,7 @@
                 android:id="@+id/BTElementSettings"
                 style="@style/ListMenuButton"
                 android:layout_marginStart="4dp"
-                android:src="@drawable/icon_settings" />
+                android:src="@drawable/ae_icon_settings" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

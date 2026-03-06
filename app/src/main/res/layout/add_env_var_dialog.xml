@@ -39,7 +39,7 @@
                     android:id="@+id/BTMenu"
                     style="@style/ListMenuButton"
                     android:layout_marginStart="8dp"
-                    android:src="@drawable/icon_menu" />
+                    android:src="@drawable/ae_icon_menu" />
             </LinearLayout>
 
             <TextView

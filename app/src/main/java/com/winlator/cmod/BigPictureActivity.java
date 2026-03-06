@@ -834,7 +834,7 @@ public class BigPictureActivity extends AppCompatActivity {
             }
 
             // Update UI
-            coverArtView.setImageResource(R.drawable.icon_action_bar_import); // Default placeholder image
+            coverArtView.setImageResource(R.drawable.ae_icon_image_picker);
             coverArtView.setBackgroundColor(Color.parseColor("#99000000")); // Semi-transparent background
 
             Log.d("BigPictureActivity", "Custom cover art removed and data saved.");

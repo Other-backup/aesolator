@@ -1110,7 +1110,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionRelativeMouse,
                 R.string.toggle_relative_mouse_movement,
                 isRelativeMouseMovement ? R.string.runtime_drawer_relative_mouse_summary_on : R.string.runtime_drawer_relative_mouse_summary_off,
-                R.drawable.icon_magnifier,
+                R.drawable.ae_icon_magnifier,
                 true
         );
         updateRuntimeDrawerAction(
@@ -1120,7 +1120,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionFullscreen,
                 R.string.toggle_fullscreen,
                 fullscreenActive ? R.string.runtime_drawer_fullscreen_summary_on : R.string.runtime_drawer_fullscreen_summary_off,
-                R.drawable.icon_fullscreen,
+                R.drawable.ae_icon_fullscreen,
                 true
         );
         updateRuntimeDrawerAction(
@@ -1130,7 +1130,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionPauseResume,
                 isPaused ? R.string.resume_container : R.string.pause_container,
                 isPaused ? R.string.runtime_drawer_resume_summary : R.string.runtime_drawer_pause_summary,
-                isPaused ? R.drawable.icon_play : R.drawable.icon_pause,
+                isPaused ? R.drawable.ae_icon_play : R.drawable.ae_icon_pause,
                 true
         );
         updateRuntimeDrawerAction(
@@ -1140,7 +1140,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionMagnifier,
                 R.string.magnifier,
                 magnifierEnabled ? R.string.runtime_drawer_magnifier_summary : R.string.runtime_drawer_magnifier_unavailable,
-                R.drawable.icon_magnifier,
+                R.drawable.ae_icon_magnifier,
                 magnifierEnabled
         );
         updateRuntimeDrawerAction(
@@ -1150,7 +1150,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionLogs,
                 R.string.logs,
                 logsEnabled ? R.string.runtime_drawer_logs_summary : R.string.runtime_drawer_logs_disabled,
-                R.drawable.icon_debug,
+                R.drawable.ae_icon_diagnostics,
                 logsEnabled
         );
 
@@ -2133,7 +2133,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void showInputControlsDialog() {
         final ContentDialog dialog = new ContentDialog(this, R.layout.input_controls_dialog);
         dialog.setTitle(R.string.input_controls);
-        dialog.setIcon(R.drawable.icon_input_controls);
+        dialog.setIcon(R.drawable.ae_icon_gamepad);
 
         final Spinner sProfile = dialog.findViewById(R.id.SProfile);
 

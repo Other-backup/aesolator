@@ -18,7 +18,7 @@
         android:layout_height="32dp"
         android:layout_marginEnd="10dp"
         android:scaleType="fitCenter"
-        android:src="@drawable/icon_open" />
+        android:src="@drawable/ae_icon_open" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -76,7 +76,7 @@
         android:layout_width="34dp"
         android:layout_height="34dp"
         android:layout_marginStart="6dp"
-        android:src="@drawable/icon_list_item_menu" />
+        android:src="@drawable/ae_icon_menu" />
 
     <ImageButton
         android:id="@+id/BTDownload"

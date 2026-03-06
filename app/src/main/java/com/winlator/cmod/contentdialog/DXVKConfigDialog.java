@@ -83,7 +83,7 @@ public class DXVKConfigDialog extends ContentDialog {
     public DXVKConfigDialog(View anchor, boolean isARM64EC) {
         super(anchor.getContext(), R.layout.dxvk_config_dialog);
         context = anchor.getContext();
-        setIcon(R.drawable.icon_settings);
+        setIcon(R.drawable.ae_icon_settings);
         // Marker for folded-contract checks: DXVK + VKD3D.
         setTitle(context.getString(R.string.dxvk_vkd3d_configuration));
 
@@ -381,7 +381,10 @@ public class DXVKConfigDialog extends ContentDialog {
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
         int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         for (Spinner spinner : spinners) {
-            if (spinner != null) spinner.setPopupBackgroundResource(popupBg);
+            if (spinner != null) {
+                SpinnerAdapters.applySurface(spinner, isDarkMode);
+                spinner.setPopupBackgroundResource(popupBg);
+            }
         }
     }
 

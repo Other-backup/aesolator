@@ -1,7 +1,7 @@
 package com.winlator.cmod.widget;
 
 import android.content.Context;
-import android.graphics.Color;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.util.AttributeSet;
@@ -136,21 +136,46 @@ public class EnvVarsView extends FrameLayout {
 
     // Method to apply dark theme styles
     private void applyDarkTheme(View view) {
+        int primaryTextColor = ContextCompat.getColor(
+                getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        int hintTextColor = ContextCompat.getColor(
+                getContext(),
+                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        );
         if (isDarkMode) {
             if (view instanceof TextView) {
-                ((TextView) view).setTextColor(Color.WHITE);
+                ((TextView) view).setTextColor(primaryTextColor);
             } else if (view instanceof EditText) {
-                view.setBackgroundResource(R.drawable.edit_text_dark); // Assuming you have a dark background resource
-                ((EditText) view).setTextColor(Color.WHITE);
-                ((EditText) view).setHintTextColor(Color.GRAY);
+                view.setBackgroundResource(R.drawable.edit_text_dark);
+                ((EditText) view).setTextColor(primaryTextColor);
+                ((EditText) view).setHintTextColor(hintTextColor);
             } else if (view instanceof Spinner) {
-                ((Spinner) view).setPopupBackgroundResource(R.drawable.surface_dialog_background_dark);
+                Spinner spinner = (Spinner) view;
+                SpinnerAdapters.applySurface(spinner, true);
+                spinner.setPopupBackgroundResource(R.drawable.surface_dialog_background_dark);
             } else if (view instanceof ToggleButton) {
-                // Apply custom styles if needed for ToggleButton
-                // For example, you could change the background or text colors
+                ToggleButton toggle = (ToggleButton) view;
+                toggle.setTextColor(primaryTextColor);
+                toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.surface_toggle_off_dark)));
             }
         } else {
-            // Apply light theme if needed
+            if (view instanceof TextView) {
+                ((TextView) view).setTextColor(primaryTextColor);
+            } else if (view instanceof EditText) {
+                view.setBackgroundResource(R.drawable.edit_text);
+                ((EditText) view).setTextColor(primaryTextColor);
+                ((EditText) view).setHintTextColor(hintTextColor);
+            } else if (view instanceof Spinner) {
+                Spinner spinner = (Spinner) view;
+                SpinnerAdapters.applySurface(spinner, false);
+                spinner.setPopupBackgroundResource(R.drawable.surface_dialog_background);
+            } else if (view instanceof ToggleButton) {
+                ToggleButton toggle = (ToggleButton) view;
+                toggle.setTextColor(primaryTextColor);
+                toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.surface_toggle_off)));
+            }
         }
     }
 
@@ -267,7 +292,6 @@ public class EnvVarsView extends FrameLayout {
     }
 
 }
-
 
 
 

@@ -4,7 +4,6 @@ package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.util.Log;
 import android.view.Menu;
@@ -105,7 +104,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         this.fragment = fragment;
         this.shortcut = shortcut;
         setTitle(shortcut.name);
-        setIcon(R.drawable.icon_settings);
+        setIcon(R.drawable.ae_icon_settings);
 
         ContainerManager containerManager = shortcut.container.getManager();
 
@@ -992,6 +991,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
     }
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
+        SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
 
         // Update edit text
         EditText etName = view.findViewById(R.id.ETName);
@@ -1098,15 +1098,17 @@ public class ShortcutSettingsDialog extends ContentDialog {
     }
 
     private static void applyDarkThemeToEditText(EditText editText, boolean isDarkMode) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE);
-            editText.setHintTextColor(Color.GRAY);
-            editText.setBackgroundResource(R.drawable.edit_text_dark);
-        } else {
-            editText.setTextColor(Color.BLACK);
-            editText.setHintTextColor(Color.GRAY);
-            editText.setBackgroundResource(R.drawable.edit_text);
-        }
+        int textColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        int hintColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        );
+        editText.setTextColor(textColor);
+        editText.setHintTextColor(hintColor);
+        editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
     }
 
     private void updateExtra(String extraName, String containerValue, String newValue) {

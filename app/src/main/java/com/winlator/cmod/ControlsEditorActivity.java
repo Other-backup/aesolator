@@ -354,7 +354,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             ImageView imageView = new ImageView(this);
             imageView.setLayoutParams(params);
             imageView.setPadding(padding, padding, padding, padding);
-            imageView.setBackgroundResource(R.drawable.icon_background);
+            imageView.setBackgroundResource(R.drawable.ae_icon_tile_background);
             imageView.setTag(id);
             imageView.setSelected(id == selectedId);
             imageView.setOnClickListener((v) -> {

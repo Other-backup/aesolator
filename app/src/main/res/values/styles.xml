@@ -140,9 +140,9 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">42dp</item>
         <item name="android:textSize">16sp</item>
-        <item name="android:gravity">left|center_vertical</item>
-        <item name="android:paddingLeft">12dp</item>
-        <item name="android:paddingRight">12dp</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:paddingTop">0dp</item>
         <item name="android:paddingBottom">0dp</item>
         <item name="android:maxLines">1</item>
@@ -307,7 +307,7 @@
         <item name="android:paddingStart">12dp</item>
         <item name="android:paddingEnd">12dp</item>
         <item name="android:paddingBottom">12dp</item>
-        <item name="android:paddingTop">30dp</item>
+        <item name="android:paddingTop">42dp</item>
         <item name="android:layout_marginTop">6dp</item>
     </style>
 
@@ -320,14 +320,14 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/surface_badge_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">10dp</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:paddingBottom">4dp</item>
-        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:paddingStart">7dp</item>
+        <item name="android:paddingEnd">7dp</item>
+        <item name="android:paddingTop">1dp</item>
+        <item name="android:paddingBottom">1dp</item>
+        <item name="android:layout_marginStart">10dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">9sp</item>
         <item name="android:textColor">@color/surface_badge_text</item>
     </style>
 
@@ -355,8 +355,8 @@
     <style name="HelpButton">
         <item name="android:layout_width">22dp</item>
         <item name="android:layout_height">22dp</item>
-        <item name="android:layout_marginLeft">4dp</item>
-        <item name="android:src">@drawable/icon_help</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:src">@drawable/ae_icon_help</item>
         <item name="tint">@color/help_button_tint_light</item>
     </style>
 

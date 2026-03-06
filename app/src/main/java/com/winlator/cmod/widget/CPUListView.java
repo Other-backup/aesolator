@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CPUListView extends LinearLayout {
-    private static final int CPUS_PER_ROW = 4;
     private List<String> checkedCPUList;
     private final byte numProcessors;
 
@@ -41,10 +40,11 @@ public class CPUListView extends LinearLayout {
         removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(getContext());
         setOrientation(VERTICAL);
+        int cpusPerRow = resolveCpusPerRow();
 
         LinearLayout currentRow = null;
         for (int i = 0; i < numProcessors; i++) {
-            if (i % CPUS_PER_ROW == 0) {
+            if (i % cpusPerRow == 0) {
                 currentRow = new LinearLayout(getContext());
                 currentRow.setOrientation(HORIZONTAL);
                 currentRow.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -59,6 +59,13 @@ public class CPUListView extends LinearLayout {
             ((TextView) itemView.findViewById(R.id.TextView)).setText(tag);
             if (currentRow != null) currentRow.addView(itemView);
         }
+    }
+
+    private int resolveCpusPerRow() {
+        float widthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+        if (widthDp < 700f) return 2;
+        if (widthDp < 960f) return 3;
+        return 4;
     }
 
     public void setCheckedCPUList(String checkedCPUList) {

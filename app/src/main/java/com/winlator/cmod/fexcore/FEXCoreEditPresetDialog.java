@@ -2,7 +2,6 @@ package com.winlator.cmod.fexcore;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -45,7 +44,7 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
         preset = presetId != null ? FEXCorePresetManager.getPreset(context, presetId) : null;
         readonly = preset != null && !preset.isCustom();
         setTitle(StringUtils.getString(context, "fexcore_preset"));
-        setIcon(R.drawable.icon_env_var);
+        setIcon(R.drawable.ae_icon_env_var);
 
         // Load the user's preferred theme
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -145,6 +144,7 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
                     if (readonly) editText.setAlpha(0.5f);
                 }
                 else {
+                    SpinnerAdapters.applySurface(spinner, isDarkMode);
                     spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
                     spinner.setVisibility(View.VISIBLE);
                     spinner.setEnabled(!readonly);
@@ -199,14 +199,16 @@ public class FEXCoreEditPresetDialog extends ContentDialog {
     }
 
     private void applyDarkThemeToEditText(EditText editText) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
+        int textColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        int hintColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        );
+        editText.setTextColor(textColor);
+        editText.setHintTextColor(hintColor);
+        editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
     }
 }

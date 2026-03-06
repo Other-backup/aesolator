@@ -15,7 +15,7 @@ public class AddEnvVarDialog extends ContentDialog {
         final EditText etValue = findViewById(R.id.ETValue);
 
         setTitle(context.getString(R.string.new_environment_variable));
-        setIcon(R.drawable.icon_env_var);
+        setIcon(R.drawable.ae_icon_env_var);
 
         findViewById(R.id.BTMenu).setOnClickListener((v) -> {
             PopupMenu popupMenu = new PopupMenu(context, v);

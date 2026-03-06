@@ -32,11 +32,11 @@
         android:id="@+id/BTRun"
         style="@style/ListMenuButton"
         android:layout_marginStart="6dp"
-        android:src="@drawable/icon_run" />
+        android:src="@drawable/ae_icon_play" />
 
     <ImageButton
         android:id="@+id/BTMenu"
         style="@style/ListMenuButton"
         android:layout_marginStart="6dp"
-        android:src="@drawable/icon_list_item_menu" />
+        android:src="@drawable/ae_icon_menu" />
 </LinearLayout>

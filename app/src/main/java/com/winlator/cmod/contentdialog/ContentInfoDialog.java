@@ -18,7 +18,7 @@ import java.util.List;
 public class ContentInfoDialog extends ContentDialog {
     public ContentInfoDialog(Context context, ContentProfile profile) {
         super(context, R.layout.content_info_dialog);
-        setIcon(R.drawable.icon_about);
+        setIcon(R.drawable.ae_icon_about);
         setTitle(R.string.content_info);
 
         TextView tvType = findViewById(R.id.TVType);

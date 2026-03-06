@@ -20,7 +20,7 @@ public class StorageInfoDialog extends ContentDialog {
         super(activity, R.layout.container_storage_info_dialog);
 
         setTitle(R.string.storage_info);
-        setIcon(R.drawable.icon_info);
+        setIcon(R.drawable.ae_icon_info);
 
         AtomicLong driveCSize = new AtomicLong();
         driveCSize.set(0);

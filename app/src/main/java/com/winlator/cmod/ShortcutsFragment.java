@@ -374,7 +374,7 @@ public class ShortcutsFragment extends Fragment {
             // Create the properties dialog
             ContentDialog dialog = new ContentDialog(getContext(), R.layout.shortcut_properties_dialog);
             dialog.setTitle(R.string.shortcut_properties_title);
-            dialog.setIcon(R.drawable.icon_info);
+            dialog.setIcon(R.drawable.ae_icon_info);
 
             TextView playCountTextView = dialog.findViewById(R.id.play_count);
             TextView playtimeTextView = dialog.findViewById(R.id.playtime);

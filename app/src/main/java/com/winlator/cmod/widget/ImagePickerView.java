@@ -40,7 +40,7 @@ public class ImagePickerView extends View implements View.OnClickListener {
     public ImagePickerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
-        icon = BitmapFactory.decodeResource(context.getResources(), R.drawable.icon_image_picker);
+        icon = BitmapFactory.decodeResource(context.getResources(), R.drawable.ae_icon_image_picker);
 
         setBackgroundResource(R.drawable.combo_box);
         setClickable(true);

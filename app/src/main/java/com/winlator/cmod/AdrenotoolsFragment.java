@@ -3,7 +3,6 @@ package com.winlator.cmod;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import com.winlator.cmod.R;
@@ -71,6 +70,7 @@ public class AdrenotoolsFragment extends Fragment {
     private View rootView;
     private TextView tvGraphicsCenterStatus;
     private TextView tvGraphicsFeedEmpty;
+    private TextView tvGraphicsFeedBranchLabel;
     private Spinner sGraphicsFeedSourceMode;
     private Spinner sGraphicsFeedBranchMode;
     private int selectedLaneButtonId = R.id.BTLaneTurnip;
@@ -111,6 +111,7 @@ public class AdrenotoolsFragment extends Fragment {
         tvGraphicsCenterStatus = layout.findViewById(R.id.TVGraphicsCenterStatus);
         rvGraphicsFeed = layout.findViewById(R.id.RVGraphicsFeed);
         tvGraphicsFeedEmpty = layout.findViewById(R.id.TVGraphicsFeedEmpty);
+        tvGraphicsFeedBranchLabel = layout.findViewById(R.id.TVGraphicsFeedBranchLabel);
         sGraphicsFeedSourceMode = layout.findViewById(R.id.SGraphicsFeedSourceMode);
         sGraphicsFeedBranchMode = layout.findViewById(R.id.SGraphicsFeedBranchMode);
 
@@ -154,12 +155,18 @@ public class AdrenotoolsFragment extends Fragment {
         sGraphicsFeedSourceMode.setOnItemSelectedListener(feedFilterListener);
         sGraphicsFeedBranchMode.setOnItemSelectedListener(feedFilterListener);
 
-        recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
+        LinearLayoutManager installedLayoutManager = new LinearLayoutManager(recyclerView.getContext());
+        installedLayoutManager.setAutoMeasureEnabled(true);
+        recyclerView.setLayoutManager(installedLayoutManager);
+        recyclerView.setNestedScrollingEnabled(false);
         recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
         driversAdapter = new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers());
         recyclerView.setAdapter(driversAdapter);
 
-        rvGraphicsFeed.setLayoutManager(new LinearLayoutManager(rvGraphicsFeed.getContext()));
+        LinearLayoutManager feedLayoutManager = new LinearLayoutManager(rvGraphicsFeed.getContext());
+        feedLayoutManager.setAutoMeasureEnabled(true);
+        rvGraphicsFeed.setLayoutManager(feedLayoutManager);
+        rvGraphicsFeed.setNestedScrollingEnabled(false);
         rvGraphicsFeed.addItemDecoration(new DividerItemDecoration(rvGraphicsFeed.getContext(), DividerItemDecoration.VERTICAL));
         graphicsFeedAdapter = new GraphicsFeedAdapter(new ArrayList<>());
         rvGraphicsFeed.setAdapter(graphicsFeedAdapter);
@@ -838,9 +845,8 @@ public class AdrenotoolsFragment extends Fragment {
     }
 
     private void applyFeedSpinnerTheme(boolean isDarkMode) {
-        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
-        if (sGraphicsFeedSourceMode != null) sGraphicsFeedSourceMode.setBackgroundResource(spinnerBackground);
-        if (sGraphicsFeedBranchMode != null) sGraphicsFeedBranchMode.setBackgroundResource(spinnerBackground);
+        SpinnerAdapters.applySurface(sGraphicsFeedSourceMode, isDarkMode);
+        SpinnerAdapters.applySurface(sGraphicsFeedBranchMode, isDarkMode);
     }
 
     private void styleLaneButton(View root, int buttonId, int lightColorRes, int darkColorRes, boolean isDarkMode, boolean isSelected) {
@@ -855,11 +861,16 @@ public class AdrenotoolsFragment extends Fragment {
         if (isSelected) {
             bg.setColor(withAlpha(accent, isDarkMode ? 172 : 222));
             bg.setStroke(dpToPx(1f), withAlpha(accent, 245));
-            button.setTextColor(Color.WHITE);
+            button.setTextColor(ContextCompat.getColor(
+                    requireContext(),
+                    isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_table_head_text
+            ));
         } else {
             bg.setColor(withAlpha(accent, isDarkMode ? 62 : 26));
             bg.setStroke(dpToPx(1f), withAlpha(accent, isDarkMode ? 238 : 180));
-            button.setTextColor(isDarkMode ? Color.WHITE : accent);
+            button.setTextColor(isDarkMode
+                    ? ContextCompat.getColor(requireContext(), R.color.surface_badge_text_dark)
+                    : accent);
         }
 
         button.setBackground(bg);
@@ -1259,8 +1270,7 @@ public class AdrenotoolsFragment extends Fragment {
     private List<ContentProfile> buildStaticFallbackProfiles(String sourceKey, String lane) {
         ArrayList<ContentProfile> profiles = new ArrayList<>();
         String source = sourceKey == null ? "" : sourceKey.trim().toLowerCase(Locale.US);
-        if (!LANE_TURNIP.equals(lane)) return profiles;
-        if ("stevenmxz".equals(source) || "ae_archive".equals(source)) {
+        if (LANE_TURNIP.equals(lane) && ("stevenmxz".equals(source) || "ae_archive".equals(source))) {
             String sourceRepo = "stevenmxz".equals(source)
                     ? "StevenMXZ/freedreno_turnip-CI"
                     : "Ae.solator archive";
@@ -1281,6 +1291,96 @@ public class AdrenotoolsFragment extends Fragment {
                     "v26.1.0-R4",
                     "r-series",
                     261004
+            ));
+        }
+        if (LANE_TURNIP.equals(lane) && "whitebelyash".equals(source)) {
+            String sourceRepo = "whitebelyash/freedreno_turnip-CI";
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "mesa-turnip-main-V26.1.0-git_3",
+                    "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git_3/mesa-turnip-main-V26.1.0-git_3.zip",
+                    sourceRepo,
+                    "mesa_v26.1.0-git_3",
+                    "mainline",
+                    261003
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "mesa-turnip-main-flushall-V26.1.0-git-hotfix",
+                    "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git-hotfix/mesa-turnip-main-flushall-V26.1.0-git-hotfix.zip",
+                    sourceRepo,
+                    "mesa_v26.1.0-git-hotfix",
+                    "flushall",
+                    261002
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "mesa-turnip-main-noflushall-V26.1.0-git-hotfix",
+                    "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git-hotfix/mesa-turnip-main-noflushall-V26.1.0-git-hotfix.zip",
+                    sourceRepo,
+                    "mesa_v26.1.0-git-hotfix",
+                    "noflushall",
+                    261001
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "a8xx-gen8-V23",
+                    "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/tu_v23/a8xx-gen8-V23.zip",
+                    sourceRepo,
+                    "tu_v23",
+                    "a8xx-gen8",
+                    260923
+            ));
+        }
+        if (LANE_TURNIP.equals(lane) && "mrpurple".equals(source)) {
+            String sourceRepo = "MrPurple666/purple-turnip";
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "turnip_mrpurple_T24-toasted",
+                    "https://github.com/MrPurple666/purple-turnip/releases/download/vturnip_mrpurple_T24-toasted.adpkg/turnip_mrpurple_T24-toasted.adpkg.zip",
+                    sourceRepo,
+                    "vturnip_mrpurple_T24-toasted.adpkg",
+                    "toasted",
+                    240024
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "turnip_mrpurple_T21-AYANEO",
+                    "https://github.com/MrPurple666/purple-turnip/releases/download/vturnip_mrpurple_T21-AYANEO.adpkg/turnip_mrpurple_T21-AYANEO.adpkg.zip",
+                    sourceRepo,
+                    "vturnip_mrpurple_T21-AYANEO.adpkg",
+                    "ayaneo",
+                    240021
+            ));
+        }
+        if (LANE_OPENGL.equals(lane) && "gamenative".equals(source)) {
+            String sourceRepo = "gamenative.app/drivers";
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "qcom-849",
+                    "https://downloads.gamenative.app/drivers/qcom-849.zip",
+                    sourceRepo,
+                    "qcom-849",
+                    "qcom-opengl",
+                    849000
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "8Elite2-842.6",
+                    "https://downloads.gamenative.app/drivers/8Elite2-842.6.zip",
+                    sourceRepo,
+                    "8Elite2-842.6",
+                    "8elite2-opengl",
+                    842006
+            ));
+            profiles.add(buildStaticProfile(
+                    lane,
+                    "Adreno_819",
+                    "https://downloads.gamenative.app/drivers/Adreno_819.zip",
+                    sourceRepo,
+                    "Adreno_819",
+                    "adreno-opengl",
+                    819000
             ));
         }
         return profiles;
@@ -1486,7 +1586,23 @@ public class AdrenotoolsFragment extends Fragment {
             layoutParams.width = uniqueBranches.size() <= 1 ? ViewGroup.LayoutParams.WRAP_CONTENT : ViewGroup.LayoutParams.MATCH_PARENT;
             sGraphicsFeedBranchMode.setLayoutParams(layoutParams);
         }
+        updateBranchLabel(uniqueBranches.size());
         suppressBranchCallback = false;
+    }
+
+    private void updateBranchLabel(int uniqueBranchCount) {
+        if (tvGraphicsFeedBranchLabel == null) return;
+        int labelRes;
+        if ("gamenative".equals(sourceMode)) {
+            labelRes = uniqueBranchCount <= 1
+                    ? R.string.graphics_center_driver_line_single
+                    : R.string.graphics_center_driver_line_selector;
+        } else {
+            labelRes = uniqueBranchCount <= 1
+                    ? R.string.graphics_center_release_line_single
+                    : R.string.graphics_center_branch_selector;
+        }
+        tvGraphicsFeedBranchLabel.setText(labelRes);
     }
 
     private List<ContentProfile> applyBranchFilter(List<ContentProfile> profiles, String selectedBranch) {
@@ -1509,6 +1625,7 @@ public class AdrenotoolsFragment extends Fragment {
         String normalized = key.trim().toLowerCase(Locale.US);
         return switch (normalized) {
             case "main", "mainline" -> "Mainline";
+            case "experimental" -> "Experimental";
             case "r-series", "rseries" -> "R-series";
             case "gen8" -> "Gen8";
             case "autotuner" -> "Autotuner";
@@ -1527,6 +1644,7 @@ public class AdrenotoolsFragment extends Fragment {
             case "noflushall" -> "No Flushall";
             case "toasted" -> "Toasted";
             case "ayaneo" -> "AYANEO";
+            case "purple" -> "Purple";
             case "turnip-ci" -> "Turnip CI";
             default -> toTitleCase(normalized.replace('-', ' '));
         };

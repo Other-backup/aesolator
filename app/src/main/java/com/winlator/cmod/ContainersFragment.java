@@ -5,7 +5,6 @@ import static com.winlator.cmod.core.AppUtils.showToast;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -28,6 +27,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -101,8 +101,12 @@ public class ContainersFragment extends Fragment {
         MenuItem bigPictureItem = menu.findItem(R.id.action_big_picture_mode);
         Drawable icon = bigPictureItem.getIcon();
         if (icon != null) {
+            boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(requireContext()).getBoolean("dark_mode", false);
             icon.mutate(); // Ensure we don't modify other instances of this drawable
-            icon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
+            icon.setColorFilter(ContextCompat.getColor(
+                    requireContext(),
+                    isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+            ), PorterDuff.Mode.SRC_IN);
         }
     }
 
@@ -178,7 +182,7 @@ public class ContainersFragment extends Fragment {
                     holder.itemView.getContext(),
                     isDarkMode ? R.color.colorAccentDark : R.color.colorAccent
             );
-            holder.imageView.setImageResource(R.drawable.icon_container);
+            holder.imageView.setImageResource(R.drawable.ae_icon_package);
             holder.imageView.setColorFilter(accent);
             holder.title.setText(item.getName());
             holder.title.setTextColor(accent);

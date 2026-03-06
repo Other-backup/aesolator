@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Looper;
 import android.text.Html;
@@ -28,6 +29,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.tabs.TabLayout;
 import com.winlator.cmod.R;
@@ -166,8 +168,14 @@ public abstract class AppUtils {
 
     public static PopupWindow showPopupWindow(View anchor, View contentView, int width, int height) {
         Context context = anchor.getContext();
+        boolean isDarkMode = SpinnerAdapters.isDarkMode(context);
         PopupWindow popupWindow = new PopupWindow(context);
         popupWindow.setElevation(5.0f);
+        Drawable popupBackground = ContextCompat.getDrawable(
+                context,
+                isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
+        );
+        popupWindow.setBackgroundDrawable(popupBackground);
 
         if (width == 0 && height == 0) {
             int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
@@ -205,12 +213,18 @@ public abstract class AppUtils {
     }
 
     public static void showHelpBox(Context context, View anchor, String text) {
+        boolean isDarkMode = SpinnerAdapters.isDarkMode(context);
         int padding = (int)UnitUtils.dpToPx(8);
         TextView textView = new TextView(context);
         textView.setLayoutParams(new ViewGroup.LayoutParams((int)UnitUtils.dpToPx(284), ViewGroup.LayoutParams.WRAP_CONTENT));
         textView.setPadding(padding, padding, padding, padding);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         textView.setText(Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY));
+        textView.setBackgroundResource(isDarkMode ? R.drawable.surface_command_background_dark : R.drawable.surface_command_background);
+        textView.setTextColor(ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        ));
         int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         textView.measure(widthMeasureSpec, heightMeasureSpec);

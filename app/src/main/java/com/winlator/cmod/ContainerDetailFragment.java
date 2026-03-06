@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -191,28 +190,7 @@ public class ContainerDetailFragment extends Fragment {
 
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
-        Spinner[] spinners = new Spinner[] {
-                view.findViewById(R.id.SScreenSize),
-                view.findViewById(R.id.SWineVersion),
-                view.findViewById(R.id.SGraphicsDriver),
-                view.findViewById(R.id.SDXWrapper),
-                view.findViewById(R.id.SAudioDriver),
-                view.findViewById(R.id.SEmulator64),
-                view.findViewById(R.id.SEmulator),
-                view.findViewById(R.id.SMIDISoundFont),
-                view.findViewById(R.id.SDesktopTheme),
-                view.findViewById(R.id.SDesktopBackgroundType),
-                view.findViewById(R.id.SMouseWarpOverride),
-                view.findViewById(R.id.SDInputType),
-                view.findViewById(R.id.SBox64Preset),
-                view.findViewById(R.id.SBox64Version),
-                view.findViewById(R.id.SFEXCoreVersion),
-                view.findViewById(R.id.SFEXCorePreset),
-                view.findViewById(R.id.SStartupSelection),
-                view.findViewById(R.id.SContainerFgPreset),
-                view.findViewById(R.id.SContainerFgMode)
-        };
-        for (Spinner spinner : spinners) SpinnerAdapters.applySurface(spinner, isDarkMode);
+        SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -1033,15 +1011,17 @@ public class ContainerDetailFragment extends Fragment {
 
     // Helper method to apply dark theme to EditText
     private static void applyDarkThemeToEditText(EditText editText) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
+        int textColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        int hintColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        );
+        editText.setTextColor(textColor);
+        editText.setHintTextColor(hintColor);
+        editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
     }
 
     // Helper method to apply dark theme to buttons or other clickable views
@@ -1240,4 +1220,3 @@ public class ContainerDetailFragment extends Fragment {
     }
 
 }
-

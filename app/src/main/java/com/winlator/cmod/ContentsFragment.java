@@ -485,11 +485,10 @@ public class ContentsFragment extends Fragment {
     }
 
     private void applyFilterSpinnerTheme() {
-        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
-        if (sContentType != null) sContentType.setBackgroundResource(spinnerBackground);
-        if (sContentsSourceMode != null) sContentsSourceMode.setBackgroundResource(spinnerBackground);
-        if (sContentsChannelMode != null) sContentsChannelMode.setBackgroundResource(spinnerBackground);
-        if (sContentsArchMode != null) sContentsArchMode.setBackgroundResource(spinnerBackground);
+        SpinnerAdapters.applySurface(sContentType, isDarkMode);
+        SpinnerAdapters.applySurface(sContentsSourceMode, isDarkMode);
+        SpinnerAdapters.applySurface(sContentsChannelMode, isDarkMode);
+        SpinnerAdapters.applySurface(sContentsArchMode, isDarkMode);
     }
 
     private void refreshTypeScopedFilterSpinners() {
@@ -1356,14 +1355,14 @@ public class ContentsFragment extends Fragment {
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             final ContentProfile profile = data.get(position);
             int iconId = switch (profile.type) {
-                case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> R.drawable.icon_wine;
+                case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> R.drawable.ae_icon_package;
                 case CONTENT_TYPE_DXVK,
                      CONTENT_TYPE_VKD3D,
                      CONTENT_TYPE_VULKAN_SDK,
                      CONTENT_TYPE_TURNIP_DRIVER,
                      CONTENT_TYPE_OPENGL_DRIVER,
-                     CONTENT_TYPE_DGVOODOO -> R.drawable.icon_open;
-                default -> R.drawable.icon_settings;
+                     CONTENT_TYPE_DGVOODOO -> R.drawable.ae_icon_open;
+                default -> R.drawable.ae_icon_settings;
             };
             holder.ivIcon.setImageResource(iconId);
             int accentColor = resolveProfileAccentColor(profile);

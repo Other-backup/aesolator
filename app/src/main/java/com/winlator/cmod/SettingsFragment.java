@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -51,6 +50,7 @@ import com.winlator.cmod.core.ArrayUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
 import com.winlator.cmod.fexcore.FEXCorePreset;
@@ -420,7 +420,7 @@ public class SettingsFragment extends Fragment {
 
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
-
+        SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
         sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
@@ -430,6 +430,8 @@ public class SettingsFragment extends Fragment {
         sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         Spinner sDri3Mode = view.findViewById(R.id.SDri3Mode);
         sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
+        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
     }
 
     private void applyDynamicStylesRecursively(View view) {

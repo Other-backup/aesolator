@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
         ContentDialog dialog = new ContentDialog(this);
         dialog.setTitle(R.string.all_files_access_required);
         dialog.setMessage(R.string.all_files_access_required_message);
-        dialog.setIcon(R.drawable.icon_settings);
+        dialog.setIcon(R.drawable.ae_icon_settings);
         ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.open_settings);
         dialog.setOnConfirmCallback(() -> {
             ForensicLogger.logEvent(
@@ -301,7 +301,7 @@ public class MainActivity extends AppCompatActivity {
         boolean showBack = editInputControls || !isHomeDashboardVisible();
         actionBar.setDisplayHomeAsUpEnabled(showBack);
         if (showBack) {
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+            actionBar.setHomeAsUpIndicator(R.drawable.ae_icon_back);
         }
     }
 
@@ -315,7 +315,7 @@ public class MainActivity extends AppCompatActivity {
     private void showAboutDialog() {
         ContentDialog dialog = new ContentDialog(this, R.layout.about_dialog);
         dialog.setTitle(R.string.about);
-        dialog.setIcon(R.drawable.icon_about);
+        dialog.setIcon(R.drawable.ae_icon_about);
         dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
 
         dialog.getWindow().setBackgroundDrawableResource(

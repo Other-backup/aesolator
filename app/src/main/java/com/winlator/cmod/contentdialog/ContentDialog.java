@@ -3,11 +3,11 @@ package com.winlator.cmod.contentdialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.CheckedTextView;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -16,6 +16,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
@@ -213,24 +214,40 @@ public class ContentDialog extends Dialog {
     }
 
     private static void applyDarkThemeToEditText(EditText editText, boolean isDarkMode) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
+        int textColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        int hintColor = ContextCompat.getColor(
+                editText.getContext(),
+                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        );
+        editText.setTextColor(textColor);
+        editText.setHintTextColor(hintColor);
+        editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
     }
 
     public static void showMultipleChoiceList(Context context, int titleResId, final String[] items, Callback<ArrayList<Integer>> callback) {
         ContentDialog dialog = new ContentDialog(context);
+        final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
+        final int textColor = ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
 
         final ListView listView = dialog.findViewById(R.id.ListView);
         listView.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
+        listView.setBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-        listView.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_multiple_choice, items));
+        listView.setAdapter(new ArrayAdapter<String>(context, R.layout.dialog_choice_item_multiple, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull android.view.ViewGroup parent) {
+                CheckedTextView checkedTextView = (CheckedTextView) super.getView(position, convertView, parent);
+                checkedTextView.setTextColor(textColor);
+                return checkedTextView;
+            }
+        });
         listView.setVisibility(View.VISIBLE);
 
         dialog.setTitle(titleResId);
@@ -248,12 +265,26 @@ public class ContentDialog extends Dialog {
 
     public static void showSingleChoiceList(Context context, int titleResId, final String[] items, Callback<Integer> callback) {
         ContentDialog dialog = new ContentDialog(context);
+        final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
+        final int textColor = ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
         dialog.getContentView().findViewById(R.id.BTConfirm).setVisibility(View.GONE);
 
         final ListView listView = dialog.findViewById(R.id.ListView);
         listView.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
+        listView.setBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         listView.setChoiceMode(ListView.CHOICE_MODE_NONE);
-        listView.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_single_choice, items));
+        listView.setAdapter(new ArrayAdapter<String>(context, R.layout.dialog_choice_item_single, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull android.view.ViewGroup parent) {
+                CheckedTextView checkedTextView = (CheckedTextView) super.getView(position, convertView, parent);
+                checkedTextView.setTextColor(textColor);
+                return checkedTextView;
+            }
+        });
         listView.setVisibility(View.VISIBLE);
         listView.setOnItemClickListener((parent, view, position, id) -> {
             callback.call(position);

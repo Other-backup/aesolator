@@ -11,20 +11,20 @@
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTMove"
-        android:src="@drawable/icon_move"
+        android:src="@drawable/ae_icon_move"
         android:layout_marginBottom="4dp" />
 
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTHide"
-        android:src="@drawable/icon_hide" />
+        android:src="@drawable/ae_icon_hide" />
 
     <View style="@style/HorizontalLine" />
 
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTZoomPlus"
-        android:src="@drawable/icon_zoom_plus"
+        android:src="@drawable/ae_icon_zoom_plus"
         android:layout_marginBottom="4dp" />
 
     <TextView
@@ -36,5 +36,5 @@
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTZoomMinus"
-        android:src="@drawable/icon_zoom_minus" />
+        android:src="@drawable/ae_icon_zoom_minus" />
 </LinearLayout>

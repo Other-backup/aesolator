@@ -36,13 +36,13 @@
             android:id="@+id/BTQuickEnd"
             style="@style/ListMenuButton"
             android:contentDescription="@string/end_process"
-            android:src="@drawable/icon_popup_menu_remove" />
+            android:src="@drawable/ae_icon_remove" />
 
         <ImageButton
             android:id="@+id/BTMenu"
             style="@style/ListMenuButton"
             android:contentDescription="@string/options"
-            android:src="@drawable/icon_list_item_menu" />
+            android:src="@drawable/ae_icon_menu" />
     </LinearLayout>
 
     <LinearLayout

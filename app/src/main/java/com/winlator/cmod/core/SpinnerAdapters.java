@@ -10,9 +10,11 @@ import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.widget.MultiSelectionComboBox;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,7 +29,8 @@ public final class SpinnerAdapters {
     }
 
     public static ArrayAdapter<String> create(Context context, boolean isDarkMode, List<String> values) {
-        final int textColor = isDarkMode ? Color.WHITE : Color.BLACK;
+        final int textColor = resolvePrimaryTextColor(context, isDarkMode);
+        final int dropdownBackground = isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent;
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
             @NonNull
             @Override
@@ -42,6 +45,7 @@ public final class SpinnerAdapters {
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
                 styleText(view, textColor);
+                view.setBackgroundResource(dropdownBackground);
                 return view;
             }
         };
@@ -58,7 +62,8 @@ public final class SpinnerAdapters {
     }
 
     public static <T> ArrayAdapter<T> createGeneric(Context context, boolean isDarkMode, List<T> values) {
-        final int textColor = isDarkMode ? Color.WHITE : Color.BLACK;
+        final int textColor = resolvePrimaryTextColor(context, isDarkMode);
+        final int dropdownBackground = isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent;
         ArrayAdapter<T> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
             @NonNull
             @Override
@@ -73,6 +78,7 @@ public final class SpinnerAdapters {
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
                 styleText(view, textColor);
+                view.setBackgroundResource(dropdownBackground);
                 return view;
             }
         };
@@ -94,9 +100,28 @@ public final class SpinnerAdapters {
         spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
     }
 
+    public static void applySurface(MultiSelectionComboBox comboBox, boolean isDarkMode) {
+        if (comboBox == null) return;
+        comboBox.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
+        comboBox.setTextColor(resolvePrimaryTextColor(comboBox.getContext(), isDarkMode));
+    }
+
     public static void applySurface(Spinner spinner) {
         if (spinner == null) return;
         applySurface(spinner, isDarkMode(spinner.getContext()));
+    }
+
+    public static void applySurfaceRecursively(View view, boolean isDarkMode) {
+        if (view == null) return;
+        if (view instanceof Spinner spinner) {
+            applySurface(spinner, isDarkMode);
+        } else if (view instanceof MultiSelectionComboBox comboBox) {
+            applySurface(comboBox, isDarkMode);
+        }
+        if (!(view instanceof ViewGroup group)) return;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            applySurfaceRecursively(group.getChildAt(i), isDarkMode);
+        }
     }
 
     private static void styleText(View view, int textColor) {
@@ -105,5 +130,13 @@ public final class SpinnerAdapters {
         textView.setTextColor(textColor);
         textView.setSingleLine(false);
         textView.setEllipsize(TextUtils.TruncateAt.END);
+    }
+
+    private static int resolvePrimaryTextColor(Context context, boolean isDarkMode) {
+        if (context == null) return isDarkMode ? Color.WHITE : Color.BLACK;
+        return ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
     }
 }

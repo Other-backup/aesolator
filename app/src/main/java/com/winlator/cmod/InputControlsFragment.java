@@ -84,6 +84,10 @@ public class InputControlsFragment extends Fragment {
 
     private boolean isDarkMode;
 
+    public InputControlsFragment() {
+        this(0);
+    }
+
     public InputControlsFragment(int selectedProfileId) {
         this.selectedProfileId = selectedProfileId;
     }
@@ -145,9 +149,11 @@ public class InputControlsFragment extends Fragment {
         currentProfile = selectedProfileId > 0 ? manager.getProfile(selectedProfileId) : null;
 
         final Spinner sProfile = view.findViewById(R.id.SProfile);
-
-        SpinnerAdapters.applySurface(sProfile, isDarkMode);
-        SpinnerAdapters.applySurface(sbGyroTriggerButton, isDarkMode);
+        sbGyroTriggerButton = view.findViewById(R.id.SBGyroTriggerButton);
+        int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
+        SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
+        sProfile.setPopupBackgroundResource(popupBackground);
+        sbGyroTriggerButton.setPopupBackgroundResource(popupBackground);
 
         loadProfileSpinner(sProfile);
 
@@ -180,8 +186,6 @@ public class InputControlsFragment extends Fragment {
 
         cbGyroEnabled = view.findViewById(R.id.CBGyroEnabled);
         cbGyroEnabled.setChecked(preferences.getBoolean("gyro_enabled", false));
-
-        sbGyroTriggerButton = view.findViewById(R.id.SBGyroTriggerButton);
         rgGyroMode = view.findViewById(R.id.RGyroMode);
 
         int selectedMode = preferences.getInt("gyro_mode", 0);
@@ -202,6 +206,12 @@ public class InputControlsFragment extends Fragment {
         }
 
         keycodeArray.recycle();
+
+        sbGyroTriggerButton.setAdapter(SpinnerAdapters.create(
+                requireContext(),
+                isDarkMode,
+                getResources().getStringArray(R.array.button_options)
+        ));
 
         int selectedButton = preferences.getInt("gyro_trigger_button", KeyEvent.KEYCODE_BUTTON_L1);
         Log.d("InputControlsFragment", "Selected button keycode: " + selectedButton);
@@ -471,7 +481,7 @@ public class InputControlsFragment extends Fragment {
     private void showGyroConfigDialog() {
         ContentDialog dialog = new ContentDialog(requireContext(), R.layout.gyro_config_dialog);
         dialog.setTitle(R.string.gyro_configuration);
-        dialog.setIcon(R.drawable.icon_settings);
+        dialog.setIcon(R.drawable.ae_icon_settings);
         ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.save);
         View dialogView = dialog.getInflatedLayout();
 
@@ -668,7 +678,7 @@ public class InputControlsFragment extends Fragment {
     private void showAnalogStickConfigDialog() {
         ContentDialog dialog = new ContentDialog(requireContext(), R.layout.analog_stick_config_dialog);
         dialog.setTitle(R.string.configure_analog_sticks);
-        dialog.setIcon(R.drawable.icon_settings);
+        dialog.setIcon(R.drawable.ae_icon_settings);
         ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.save);
         View dialogView = dialog.getInflatedLayout();
 

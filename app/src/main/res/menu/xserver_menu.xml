@@ -3,26 +3,26 @@
     <group android:checkableBehavior="none">
         <item
             android:id="@+id/main_menu_keyboard"
-            android:icon="@drawable/icon_keyboard"
+            android:icon="@drawable/ae_icon_keyboard"
             android:title="@string/keyboard" />
         <item
             android:id="@+id/main_menu_input_controls"
-            android:icon="@drawable/icon_input_controls"
+            android:icon="@drawable/ae_icon_gamepad"
             android:title="@string/input_controls" />
         <item
             android:id="@+id/main_menu_relative_mouse_movement"
             android:title="@string/toggle_relative_mouse_movement" />
         <item
             android:id="@+id/main_menu_screen_effects"
-            android:icon="@drawable/icon_screen_effect"
+            android:icon="@drawable/ae_icon_screen_effect"
             android:title="@string/screen_effect" />
         <item
             android:id="@+id/main_menu_toggle_fullscreen"
-            android:icon="@drawable/icon_fullscreen"
+            android:icon="@drawable/ae_icon_fullscreen"
             android:title="@string/toggle_fullscreen" />
         <item
             android:id="@+id/main_menu_pause"
-            android:icon="@drawable/icon_pause"
+            android:icon="@drawable/ae_icon_pause"
             android:title="@string/pause_container" />
         <item
             android:id="@+id/main_menu_pip_mode"
@@ -30,19 +30,19 @@
             android:title="@string/pip_mode" />
         <item
             android:id="@+id/main_menu_task_manager"
-            android:icon="@drawable/icon_task_manager"
+            android:icon="@drawable/ae_icon_task_manager"
             android:title="@string/task_manager" />
         <item
             android:id="@+id/main_menu_magnifier"
-            android:icon="@drawable/icon_magnifier"
+            android:icon="@drawable/ae_icon_magnifier"
             android:title="@string/magnifier" />
         <item
             android:id="@+id/main_menu_logs"
-            android:icon="@drawable/icon_debug"
+            android:icon="@drawable/ae_icon_diagnostics"
             android:title="@string/logs" />
         <item
             android:id="@+id/main_menu_exit"
-            android:icon="@drawable/icon_exit"
+            android:icon="@drawable/ae_icon_remove"
             android:title="@string/exit" />
     </group>
 </menu>

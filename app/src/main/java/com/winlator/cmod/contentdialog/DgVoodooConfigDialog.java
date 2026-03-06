@@ -42,7 +42,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
         int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
 
-        setIcon(R.drawable.icon_settings);
+        setIcon(R.drawable.ae_icon_settings);
         setTitle(R.string.dgvoodoo_configuration);
 
         FrameLayout frameLayout = findViewById(R.id.FrameLayout);
@@ -117,6 +117,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
             values.add("auto");
         }
         archSpinner.setAdapter(SpinnerAdapters.create(context, isDarkMode, labels));
+        SpinnerAdapters.applySurface(archSpinner, isDarkMode);
         archSpinner.setPopupBackgroundResource(popupBg);
         KeyValueSet config = parseConfig(anchor.getTag());
         if (packageInstalled) {

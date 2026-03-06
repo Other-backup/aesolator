@@ -25,7 +25,7 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
 
     public DebugDialog(@NonNull Context context) {
         super(context, R.layout.debug_dialog);
-        setIcon(R.drawable.icon_debug);
+        setIcon(R.drawable.ae_icon_diagnostics);
         setTitle(context.getString(R.string.logs));
         logView = findViewById(R.id.LogView);
 
@@ -40,7 +40,7 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
         toolbarView.findViewById(R.id.BTClear).setOnClickListener((v) -> logView.clear());
         toolbarView.findViewById(R.id.BTPause).setOnClickListener((v) -> {
             setPaused(!paused);
-            ((ImageButton)v).setImageResource(getPaused() ? R.drawable.icon_play : R.drawable.icon_pause);
+            ((ImageButton)v).setImageResource(getPaused() ? R.drawable.ae_icon_play : R.drawable.ae_icon_pause);
         });
         llBottomBarPanel.addView(toolbarView);
         try {

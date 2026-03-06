@@ -3,35 +3,35 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/main_menu_shortcuts"
-            android:icon="@drawable/icon_shortcut"
+            android:icon="@drawable/ae_icon_duplicate"
             android:title="@string/shortcuts" />
         <item
             android:id="@+id/main_menu_containers"
-            android:icon="@drawable/icon_container"
+            android:icon="@drawable/ae_icon_package"
             android:title="@string/containers" />
         <item
             android:id="@+id/main_menu_input_controls"
-            android:icon="@drawable/icon_input_controls"
+            android:icon="@drawable/ae_icon_gamepad"
             android:title="@string/input_controls" />
         <item
             android:id="@+id/main_menu_contents"
-            android:icon="@drawable/icon_open"
+            android:icon="@drawable/ae_icon_open"
             android:title="@string/contents" />
         <item
             android:id="@+id/main_menu_adrenotools_gpu_drivers"
-            android:icon="@drawable/icon_open"
+            android:icon="@drawable/ae_icon_turnip_lane"
             android:title="@string/adrenotools_gpu_drivers" />
         <item
             android:id="@+id/main_menu_diagnostics"
-            android:icon="@drawable/icon_debug"
+            android:icon="@drawable/ae_icon_diagnostics"
             android:title="@string/diagnostics" />
         <item
             android:id="@+id/main_menu_settings"
-            android:icon="@drawable/icon_settings"
+            android:icon="@drawable/ae_icon_settings"
             android:title="@string/settings" />
         <item
             android:id="@+id/main_menu_about"
-            android:icon="@drawable/icon_about"
+            android:icon="@drawable/ae_icon_about"
             android:title="@string/about" />
     </group>
 </menu>

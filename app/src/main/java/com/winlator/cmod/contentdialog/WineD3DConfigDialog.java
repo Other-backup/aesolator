@@ -33,7 +33,7 @@ public class WineD3DConfigDialog extends ContentDialog {
     public WineD3DConfigDialog(View anchor) {
         super(anchor.getContext(), R.layout.wined3d_config_dialog);
         context = anchor.getContext();
-        setIcon(R.drawable.icon_settings);
+        setIcon(R.drawable.ae_icon_settings);
         setTitle(R.string.wined3d_configuration_title);
 
         final Spinner sCSMT = findViewById(R.id.SCSMT);
@@ -49,6 +49,12 @@ public class WineD3DConfigDialog extends ContentDialog {
         sOffscreenRenderingMode.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(offscreenRenderingModeValues)));
         sRenderer.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(rendererValues)));
         int popupBg = darkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
+        SpinnerAdapters.applySurface(sCSMT, darkMode);
+        SpinnerAdapters.applySurface(sGPUName, darkMode);
+        SpinnerAdapters.applySurface(sVideoMemorySize, darkMode);
+        SpinnerAdapters.applySurface(sStrictShaderMath, darkMode);
+        SpinnerAdapters.applySurface(sOffscreenRenderingMode, darkMode);
+        SpinnerAdapters.applySurface(sRenderer, darkMode);
         sCSMT.setPopupBackgroundResource(popupBg);
         sGPUName.setPopupBackgroundResource(popupBg);
         sVideoMemorySize.setPopupBackgroundResource(popupBg);

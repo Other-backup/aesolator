@@ -89,7 +89,7 @@
                             android:id="@+id/BTExportBox64Preset"
                             android:tooltipText="@string/export"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_export" />
+                            android:src="@drawable/ae_icon_export" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
@@ -175,7 +175,7 @@
                             android:id="@+id/BTExportFEXCorePreset"
                             android:tooltipText="@string/export"
                             android:layout_marginEnd="0dp"
-                            android:src="@drawable/icon_export" />
+                            android:src="@drawable/ae_icon_export" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
@@ -406,7 +406,7 @@
                                     android:id="@+id/BTHelpApiKey"
                                     style="@style/HelpButton"
                                     android:contentDescription="@string/help_steamgrid"
-                                    android:src="@drawable/icon_help" />
+                                    android:src="@drawable/ae_icon_help" />
                             </LinearLayout>
 
                             <EditText

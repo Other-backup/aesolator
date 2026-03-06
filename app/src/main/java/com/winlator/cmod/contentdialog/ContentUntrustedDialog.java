@@ -14,7 +14,7 @@ import java.util.List;
 public class ContentUntrustedDialog extends ContentDialog {
     public ContentUntrustedDialog(Context context, List<ContentProfile.ContentFile> contentFiles) {
         super(context, R.layout.content_untrusted_dialog);
-        setIcon(R.drawable.icon_info);
+        setIcon(R.drawable.ae_icon_info);
         setTitle(R.string.warning);
 
         RecyclerView recyclerView = findViewById(R.id.recyclerView);

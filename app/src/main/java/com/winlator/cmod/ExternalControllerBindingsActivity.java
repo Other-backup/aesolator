@@ -72,7 +72,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
 
         ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+        actionBar.setHomeAsUpIndicator(R.drawable.ae_icon_back);
 
         emptyTextView = findViewById(R.id.TVEmptyText);
         recyclerView = findViewById(R.id.RecyclerView);

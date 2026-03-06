@@ -152,7 +152,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     private void initializeDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
-        setIcon(R.drawable.icon_settings);
+        setIcon(R.drawable.ae_icon_settings);
         setTitle(anchor.getContext().getString(R.string.graphics_driver_configuration));
 
         String graphicsDriverConfig = anchor.getTag().toString();
@@ -526,6 +526,16 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
         int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
+        SpinnerAdapters.applySurface(sVersion, isDarkMode);
+        SpinnerAdapters.applySurface(sVulkanVersion, isDarkMode);
+        SpinnerAdapters.applySurface(sPresentMode, isDarkMode);
+        SpinnerAdapters.applySurface(sGPUName, isDarkMode);
+        SpinnerAdapters.applySurface(sMaxDeviceMemory, isDarkMode);
+        SpinnerAdapters.applySurface(sResourceType, isDarkMode);
+        SpinnerAdapters.applySurface(sBCnEmulation, isDarkMode);
+        SpinnerAdapters.applySurface(sBCnEmulationType, isDarkMode);
+        SpinnerAdapters.applySurface(sBCnEmulationCache, isDarkMode);
+        SpinnerAdapters.applySurface(mscAvailableExtensions, isDarkMode);
         sVersion.setPopupBackgroundResource(popupBg);
         sVulkanVersion.setPopupBackgroundResource(popupBg);
         sPresentMode.setPopupBackgroundResource(popupBg);
@@ -543,4 +553,3 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
 }
-

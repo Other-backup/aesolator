@@ -78,7 +78,7 @@
                             android:id="@+id/BTCloseRuntimeDrawer"
                             style="@style/ListMenuButton"
                             android:contentDescription="@string/close"
-                            android:src="@drawable/icon_action_bar_back" />
+                            android:src="@drawable/ae_icon_back" />
                     </LinearLayout>
 
                     <TextView
@@ -129,7 +129,7 @@
                         android:id="@+id/IVRuntimeActionKeyboard"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_keyboard" />
+                        android:src="@drawable/ae_icon_keyboard" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -174,7 +174,7 @@
                         android:id="@+id/IVRuntimeActionInputControls"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_input_controls" />
+                        android:src="@drawable/ae_icon_gamepad" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -219,7 +219,7 @@
                         android:id="@+id/IVRuntimeActionRelativeMouse"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_magnifier" />
+                        android:src="@drawable/ae_icon_magnifier" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -263,7 +263,7 @@
                         android:id="@+id/IVRuntimeActionScreenEffects"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_screen_effect" />
+                        android:src="@drawable/ae_icon_screen_effect" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -308,7 +308,7 @@
                         android:id="@+id/IVRuntimeActionFullscreen"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_fullscreen" />
+                        android:src="@drawable/ae_icon_fullscreen" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -352,7 +352,7 @@
                         android:id="@+id/IVRuntimeActionPauseResume"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_pause" />
+                        android:src="@drawable/ae_icon_pause" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -440,7 +440,7 @@
                         android:id="@+id/IVRuntimeActionTaskManager"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_task_manager" />
+                        android:src="@drawable/ae_icon_task_manager" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -485,7 +485,7 @@
                         android:id="@+id/IVRuntimeActionMagnifier"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_magnifier" />
+                        android:src="@drawable/ae_icon_magnifier" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -529,7 +529,7 @@
                         android:id="@+id/IVRuntimeActionLogs"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_debug" />
+                        android:src="@drawable/ae_icon_diagnostics" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -573,7 +573,7 @@
                         android:id="@+id/IVRuntimeActionExit"
                         android:layout_width="22dp"
                         android:layout_height="22dp"
-                        android:src="@drawable/icon_exit" />
+                        android:src="@drawable/ae_icon_remove" />
 
                     <LinearLayout
                         android:layout_width="0dp"

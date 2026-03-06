@@ -114,7 +114,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         this.arm64ecRuntime = detectArm64ecRuntime(activity);
         setCancelable(false);
         setTitle(R.string.task_manager);
-        setIcon(R.drawable.icon_task_manager);
+        setIcon(R.drawable.ae_icon_task_manager);
 
         Button cancelButton = findViewById(R.id.BTCancel);
         cancelButton.setText(R.string.new_task);
@@ -203,7 +203,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
     private void showProcessorAffinityDialog(final ProcessInfo processInfo) {
         ContentDialog dialog = new ContentDialog(activity, R.layout.cpu_list_dialog);
         dialog.setTitle(processInfo.name);
-        dialog.setIcon(R.drawable.icon_cpu);
+        dialog.setIcon(R.drawable.ae_icon_cpu);
         final CPUListView cpuListView = dialog.findViewById(R.id.CPUListView);
         cpuListView.setCheckedCPUList(processInfo.getCPUList());
         dialog.setOnConfirmCallback(() -> {

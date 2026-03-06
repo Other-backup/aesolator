@@ -12,7 +12,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.ListPopupWindow;
+import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 
+import com.winlator.cmod.R;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.Collections;
@@ -63,7 +67,7 @@ public class MultiSelectionComboBox extends AppCompatTextView {
     }
 
     public void setSelectedItem(String item) {
-        if (selectedItemSet.contains(item)) selectedItemSet.add(item);
+        if (!selectedItemSet.contains(item)) selectedItemSet.add(item);
         if (!text.isEmpty())
             setText(selectedItemSet.size() + " " + text);
         else
@@ -93,12 +97,19 @@ public class MultiSelectionComboBox extends AppCompatTextView {
     @Override
     public boolean performClick() {
         if (items == null || items.length == 0) return true;
-        final ArrayAdapter<String> adapter = new ArrayAdapter<String>(getContext(), android.R.layout.simple_list_item_multiple_choice, items) {
+        final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("dark_mode", false);
+        final int textColor = ContextCompat.getColor(
+                getContext(),
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        );
+        final ArrayAdapter<String> adapter = new ArrayAdapter<String>(getContext(), R.layout.dialog_choice_item_multiple, items) {
             @NonNull
             @Override
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
                 CheckedTextView checkedTextView = (CheckedTextView)super.getView(position, convertView, parent);
                 checkedTextView.setChecked(selectedItemSet.contains(items[position]));
+                checkedTextView.setTextColor(textColor);
+                checkedTextView.setBackgroundResource(isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent);
                 if (!text.isEmpty())
                     setText(selectedItemSet.size() + " " + text);
                 else
@@ -111,6 +122,12 @@ public class MultiSelectionComboBox extends AppCompatTextView {
         popupWindow.setAdapter(adapter);
         popupWindow.setAnchorView(this);
         popupWindow.setWidth((int)UnitUtils.dpToPx(260));
+        popupWindow.setModal(true);
+        popupWindow.setBackgroundDrawable(ContextCompat.getDrawable(
+                getContext(),
+                isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
+        ));
+        SpinnerAdapters.applySurface(this, isDarkMode);
 
         popupWindow.setOnItemClickListener((parent, view, position, id) -> {
             String item = items[position];

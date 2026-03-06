@@ -1,6 +1,7 @@
 package com.winlator.cmod;
 
 import android.content.SharedPreferences;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -42,14 +43,14 @@ public class MainMenuGridFragment extends Fragment {
     }
 
     private static final List<MenuCardEntry> MENU_ENTRIES = Arrays.asList(
-            new MenuCardEntry(R.id.main_menu_containers, R.string.containers, R.string.main_menu_hint_containers, R.drawable.icon_container, R.color.colorAccent, R.color.colorAccentDark),
-            new MenuCardEntry(R.id.main_menu_shortcuts, R.string.shortcuts, R.string.main_menu_hint_shortcuts, R.drawable.icon_shortcut, R.color.colorPrimary, R.color.colorAccentDark),
-            new MenuCardEntry(R.id.main_menu_contents, R.string.contents, R.string.main_menu_hint_contents, R.drawable.icon_open, R.color.contents_lane_vulkansdk, R.color.contents_lane_vulkansdk_dark),
-            new MenuCardEntry(R.id.main_menu_adrenotools_gpu_drivers, R.string.adrenotools_gpu_drivers, R.string.main_menu_hint_graphics, R.drawable.icon_open, R.color.contents_lane_turnip, R.color.contents_lane_turnip_dark),
-            new MenuCardEntry(R.id.main_menu_diagnostics, R.string.diagnostics, R.string.main_menu_hint_forensic, R.drawable.icon_debug, R.color.contents_lane_dgvoodoo, R.color.contents_lane_dgvoodoo_dark),
-            new MenuCardEntry(R.id.main_menu_settings, R.string.settings, R.string.main_menu_hint_settings, R.drawable.icon_settings, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark),
-            new MenuCardEntry(R.id.main_menu_input_controls, R.string.input_controls, R.string.main_menu_hint_input, R.drawable.icon_input_controls, R.color.contents_lane_dxvk, R.color.contents_lane_dxvk_dark),
-            new MenuCardEntry(R.id.main_menu_about, R.string.about, R.string.main_menu_hint_about, R.drawable.icon_about, R.color.contents_lane_proton, R.color.contents_lane_proton_dark)
+            new MenuCardEntry(R.id.main_menu_containers, R.string.containers, R.string.main_menu_hint_containers, R.drawable.ae_icon_package, R.color.colorAccent, R.color.colorAccentDark),
+            new MenuCardEntry(R.id.main_menu_shortcuts, R.string.shortcuts, R.string.main_menu_hint_shortcuts, R.drawable.ae_icon_duplicate, R.color.colorPrimary, R.color.colorAccentDark),
+            new MenuCardEntry(R.id.main_menu_contents, R.string.contents, R.string.main_menu_hint_contents, R.drawable.ae_icon_download, R.color.contents_lane_vulkansdk, R.color.contents_lane_vulkansdk_dark),
+            new MenuCardEntry(R.id.main_menu_adrenotools_gpu_drivers, R.string.adrenotools_gpu_drivers, R.string.main_menu_hint_graphics, R.drawable.ae_icon_turnip_lane, R.color.contents_lane_turnip, R.color.contents_lane_turnip_dark),
+            new MenuCardEntry(R.id.main_menu_diagnostics, R.string.diagnostics, R.string.main_menu_hint_forensic, R.drawable.ae_icon_diagnostics, R.color.contents_lane_dgvoodoo, R.color.contents_lane_dgvoodoo_dark),
+            new MenuCardEntry(R.id.main_menu_settings, R.string.settings, R.string.main_menu_hint_settings, R.drawable.ae_icon_settings, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark),
+            new MenuCardEntry(R.id.main_menu_input_controls, R.string.input_controls, R.string.main_menu_hint_input, R.drawable.ae_icon_gamepad, R.color.contents_lane_dxvk, R.color.contents_lane_dxvk_dark),
+            new MenuCardEntry(R.id.main_menu_about, R.string.about, R.string.main_menu_hint_about, R.drawable.ae_icon_about, R.color.contents_lane_proton, R.color.contents_lane_proton_dark)
     );
 
     private boolean isDarkMode;
@@ -75,7 +76,13 @@ public class MainMenuGridFragment extends Fragment {
         heroSubtitle.setTextColor(bodyColor);
         sectionLabel.setTextColor(titleColor);
 
-        recyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 3));
+        int spanCount = resolveSpanCount();
+        recyclerView.setLayoutManager(new GridLayoutManager(requireContext(), spanCount));
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setItemAnimator(null);
+        if (recyclerView.getItemDecorationCount() == 0) {
+            recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, dpToPx(4f)));
+        }
         recyclerView.setAdapter(new MainMenuCardAdapter(MENU_ENTRIES));
         return view;
     }
@@ -157,7 +164,33 @@ public class MainMenuGridFragment extends Fragment {
         return (color & 0x00ffffff) | (clampedAlpha << 24);
     }
 
+    private int resolveSpanCount() {
+        float widthDp = requireContext().getResources().getDisplayMetrics().widthPixels
+                / requireContext().getResources().getDisplayMetrics().density;
+        return widthDp >= 960f ? 4 : 2;
+    }
+
     private int dpToPx(float dp) {
         return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
+    }
+
+    private static final class GridSpacingItemDecoration extends RecyclerView.ItemDecoration {
+        private final int spanCount;
+        private final int spacing;
+
+        private GridSpacingItemDecoration(int spanCount, int spacing) {
+            this.spanCount = Math.max(1, spanCount);
+            this.spacing = Math.max(0, spacing);
+        }
+
+        @Override
+        public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
+            int position = parent.getChildAdapterPosition(view);
+            if (position == RecyclerView.NO_POSITION) return;
+            int column = position % spanCount;
+            outRect.left = spacing - column * spacing / spanCount;
+            outRect.right = (column + 1) * spacing / spanCount;
+            outRect.top = position < spanCount ? 0 : spacing;
+        }
     }
 }
