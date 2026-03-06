@@ -722,6 +722,8 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="graphics_center_driver_feed_hint">Only Turnip/OpenGL lanes are installable here. Use Contents for other runtime packages.</string>
     <string name="graphics_center_driver_feed_empty">No packages available for the selected lane.</string>
     <string name="graphics_center_driver_feed_loading">Loading package feed...</string>
+    <string name="graphics_center_branch_selector">Driver branch</string>
+    <string name="graphics_center_branch_all">All branches</string>
     <string name="graphics_center_install_action">Install</string>
     <string name="graphics_center_update_action">Update</string>
     <string name="graphics_center_installed_action">Installed</string>
@@ -753,7 +755,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="dri3_force_sw_wsi">Force software WSI fallback</string>
     <string name="dri3_section_title">DRI3 Advanced</string>
     <string name="dxvk_vkd3d_configuration">DXVK + VKD3D configuration</string>
-    <string name="dxvk_legacy_route_note">Legacy DDraw/D3D1-7 route is handled by dgVoodoo wrapper mode.</string>
     <string name="dgvoodoo_configuration">dgVoodoo configuration</string>
     <string name="dgvoodoo_config_summary">Current package: %1$s</string>
     <string name="dgvoodoo_config_note">Legacy APIs (DDraw/D3D1-7/Glide) are routed through dgVoodoo when this wrapper mode is selected.</string>

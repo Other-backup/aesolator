@@ -54,6 +54,20 @@
         <item>all</item>
         <item>custom</item>
     </string-array>
+    <string-array name="graphics_feed_source_entries">
+        <item>Ae.solator Archive (Recommended)</item>
+        <item>StevenMXZ Turnip CI</item>
+        <item>GameNative Drivers</item>
+        <item>whitebelyash Turnip CI</item>
+        <item>MrPurple Turnip</item>
+    </string-array>
+    <string-array name="graphics_feed_source_values">
+        <item>ae_archive</item>
+        <item>stevenmxz</item>
+        <item>gamenative</item>
+        <item>whitebelyash</item>
+        <item>mrpurple</item>
+    </string-array>
     <string-array name="contents_channel_entries">
         <item>Release only</item>
         <item>Nightly/Beta only</item>

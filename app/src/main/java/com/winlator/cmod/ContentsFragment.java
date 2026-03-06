@@ -39,6 +39,7 @@ import com.winlator.cmod.contentdialog.ContentInfoDialog;
 import com.winlator.cmod.contentdialog.ContentUntrustedDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
@@ -322,7 +323,8 @@ public class ContentsFragment extends Fragment {
             if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON && !isProtonLike(profile)) {
                 continue;
             }
-            if (supportsChannelFilter(currentContentType)) {
+            boolean locallyInstalled = profile != null && profile.locallyInstalled;
+            if (!locallyInstalled && supportsChannelFilter(currentContentType)) {
                 if ("stable".equalsIgnoreCase(channelMode) && profile.isBetaLike()) {
                     continue;
                 }
@@ -330,7 +332,10 @@ public class ContentsFragment extends Fragment {
                     continue;
                 }
             }
-            if (supportsArchitectureFilters(currentContentType) && archMode != null && !"all".equalsIgnoreCase(archMode)) {
+            if (!locallyInstalled
+                    && supportsArchitectureFilters(currentContentType)
+                    && archMode != null
+                    && !"all".equalsIgnoreCase(archMode)) {
                 String profileArch = resolveProfileArchTag(profile);
                 if (!archMode.equalsIgnoreCase(profileArch)) continue;
             }
@@ -403,7 +408,6 @@ public class ContentsFragment extends Fragment {
     private boolean supportsArchitectureFilters(ContentProfile.ContentType type) {
         return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
     }
 
@@ -967,6 +971,12 @@ public class ContentsFragment extends Fragment {
         String archTag = resolveProfileArchTag(profile);
         if (!"generic".equals(archTag)) {
             meta.append(" • ").append(archTag);
+        }
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO && profile.isInstalledLocally()) {
+            String dgArch = new DgVoodooManager(requireContext()).getInstalledArchitectureSummary();
+            if (dgArch != null && !dgArch.trim().isEmpty() && !"-".equals(dgArch)) {
+                meta.append(" • arch=").append(dgArch.trim().toLowerCase(Locale.US));
+            }
         }
         String channel = profile.getChannel();
         if (channel != null && !channel.trim().isEmpty() && !ContentProfile.CHANNEL_STABLE.equalsIgnoreCase(channel)) {
