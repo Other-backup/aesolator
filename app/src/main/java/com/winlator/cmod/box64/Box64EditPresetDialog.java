@@ -129,7 +129,7 @@ public class Box64EditPresetDialog extends ContentDialog {
                     if (readonly) toggleButton.setAlpha(0.5f);
                 }
                 else {
-                    spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+                    spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
                     spinner.setVisibility(View.VISIBLE);
                     spinner.setEnabled(!readonly);
                     spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
@@ -146,11 +146,11 @@ public class Box64EditPresetDialog extends ContentDialog {
         if (textView == null) return;
         Context context = textView.getContext();
         textView.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_badge_background_dark
-                : R.drawable.forensic_badge_background);
+                ? R.drawable.surface_badge_background_dark
+                : R.drawable.surface_badge_background);
         textView.setTextColor(ContextCompat.getColor(
                 context,
-                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         ));
         textView.bringToFront();
     }
@@ -162,8 +162,8 @@ public class Box64EditPresetDialog extends ContentDialog {
         if (!(parent instanceof android.view.ViewGroup)) return;
         android.view.ViewGroup group = (android.view.ViewGroup) parent;
         int panelBackground = isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background;
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background;
         int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
         int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 18f);
         int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);

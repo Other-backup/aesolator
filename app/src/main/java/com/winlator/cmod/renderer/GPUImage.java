@@ -28,7 +28,7 @@ public class GPUImage extends Texture {
             System.err.println("Error: Failed to create hardware buffer");
         }
     }
-    
+
     public GPUImage(int socketFd) {
         hardwareBufferPtr = hardwareBufferFromSocket(socketFd);
         if (hardwareBufferPtr != 0) {
@@ -103,7 +103,7 @@ public class GPUImage extends Texture {
     }
 
     private native long hardwareBufferFromSocket(int fd);
-    
+
     private native long createHardwareBuffer(short width, short height);
 
     private native void destroyHardwareBuffer(long hardwareBufferPtr);

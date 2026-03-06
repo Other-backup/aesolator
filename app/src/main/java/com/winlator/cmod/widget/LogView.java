@@ -70,7 +70,7 @@ public class LogView extends View {
         int height = getHeight();
 
         if (width == 0 || height == 0) return;
-        
+
         synchronized (lock) {
             paint.setStyle(Paint.Style.FILL);
 
@@ -88,8 +88,8 @@ public class LogView extends View {
             float textHeight = paint.getFontSpacing();
 
             float rowY = -scrollPosition.y;
-            
-            
+
+
             for (int i = 0, count = lines.size(); i < count; i++) {
                 if ((rowY + rowHeight) < 0 || rowY >= height) {
                     rowY += rowHeight;
@@ -104,7 +104,7 @@ public class LogView extends View {
                 canvas.drawText(lines.get(i), -scrollPosition.x, centerY, paint);
                 rowY += rowHeight;
             }
-             
+
             drawScrollThumbs(canvas);
         }
     }
@@ -208,7 +208,7 @@ public class LogView extends View {
         String logFile = fileName.replaceAll("\\s", "_").toLowerCase() + "_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".txt";
         return new File(logsDir, logFile);
     }
-    
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getAction()) {

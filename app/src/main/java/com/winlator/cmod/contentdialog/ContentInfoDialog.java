@@ -7,7 +7,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,8 +33,6 @@ public class ContentInfoDialog extends ContentDialog {
         tvDescription.setText(profile.desc);
         recyclerView.setAdapter(new ContentInfoFileAdapter(profile.fileList));
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-        recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
-
     }
 
     public static class ContentInfoFileAdapter extends RecyclerView.Adapter<ContentInfoFileAdapter.ViewHolder> {
@@ -64,8 +61,8 @@ public class ContentInfoDialog extends ContentDialog {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            holder.tvSource.setText(data.get(position).source + " ->");
-            holder.tvtarget.setText('\t' + data.get(position).target);
+            holder.tvSource.setText(data.get(position).source);
+            holder.tvtarget.setText(data.get(position).target);
         }
 
         @Override

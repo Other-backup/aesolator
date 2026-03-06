@@ -3,30 +3,50 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="6dp">
 
     <TextView
-        android:id="@+id/play_count"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Number of times played: "
-        android:textSize="16sp"
-        android:paddingBottom="8dp" />
-
-    <TextView
-        android:id="@+id/playtime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Playtime: "
-        android:textSize="16sp"
-        android:paddingBottom="8dp" />
-
-    <Button
-        android:id="@+id/reset_properties"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Reset Properties"
-        android:textSize="16sp"
-        android:paddingBottom="8dp" />
+        android:layout_marginBottom="8dp"
+        android:text="@string/shortcut_properties_hint"
+        android:textSize="13sp" />
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            style="@style/FieldSet"
+            android:tag="theme_card">
+
+            <TextView
+                android:id="@+id/play_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/playtime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/reset_properties"
+                style="@style/ButtonNeutral"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/shortcut_properties_reset" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/shortcut_properties_title"
+            android:textStyle="bold" />
+    </FrameLayout>
 </LinearLayout>

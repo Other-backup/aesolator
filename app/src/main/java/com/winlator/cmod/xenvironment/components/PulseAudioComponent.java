@@ -45,7 +45,7 @@ public class PulseAudioComponent extends EnvironmentComponent {
             }
         }
     }
-    
+
     private void copyFromLibraryDir(File dst) {
         String[] libs = new String[] {
             "libltdl.so", "libpulseaudio.so", "libpulse.so", "libpulsecommon-13.0.so", "libpulsecore-13.0.so", "libsndfile.so"
@@ -60,7 +60,7 @@ public class PulseAudioComponent extends EnvironmentComponent {
                 if (is != null) {
                     Files.copy(is, dstDir, StandardCopyOption.REPLACE_EXISTING);
                     FileUtils.chmod(dstDir.toFile(), 0771);
-                }    
+                }
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
@@ -91,7 +91,7 @@ public class PulseAudioComponent extends EnvironmentComponent {
         envVars.add("LD_LIBRARY_PATH="+systemLibPath+":"+modulesDir+":"+workingDir.getAbsolutePath());
         envVars.add("HOME="+workingDir);
         envVars.add("TMPDIR="+environment.getTmpDir());
-        
+
         copyFromLibraryDir(workingDir);
 
         String command = workingDir.getAbsolutePath() + "/libpulseaudio.so";

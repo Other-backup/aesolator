@@ -150,11 +150,11 @@ public class ScreenEffectDialog extends ContentDialog {
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
         if (textView == null) return;
         textView.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_badge_background_dark
-                : R.drawable.forensic_badge_background);
+                ? R.drawable.surface_badge_background_dark
+                : R.drawable.surface_badge_background);
         textView.setTextColor(ContextCompat.getColor(
                 textView.getContext(),
-                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         ));
         textView.bringToFront();
     }
@@ -165,8 +165,8 @@ public class ScreenEffectDialog extends ContentDialog {
         if (!(parent instanceof android.view.ViewGroup)) return;
         android.view.ViewGroup group = (android.view.ViewGroup) parent;
         int panelBackground = isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background;
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background;
         int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
         int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 18f);
         int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);

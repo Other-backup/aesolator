@@ -1,12 +1,12 @@
 package com.winlator.cmod;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.drawable.GradientDrawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -47,6 +47,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.HttpUtils;
+import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -144,7 +145,7 @@ public class InputControlsFragment extends Fragment {
 
         final Spinner sProfile = view.findViewById(R.id.SProfile);
 
-        sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         loadProfileSpinner(sProfile);
 
@@ -427,6 +428,7 @@ public class InputControlsFragment extends Fragment {
                 ImageView imageView = itemView.findViewById(R.id.ImageView);
                 int tintColor = controller.isConnected() ? ContextCompat.getColor(context, R.color.colorAccent) : 0xffe57373;
                 ImageViewCompat.setImageTintList(imageView, ColorStateList.valueOf(tintColor));
+                itemView.setBackground(buildInlineCardBackground(tintColor));
 
                 if (controllerBindingCount > 0) {
                     ImageButton removeButton = itemView.findViewById(R.id.BTRemove);
@@ -455,11 +457,21 @@ public class InputControlsFragment extends Fragment {
         else view.findViewById(R.id.TVEmptyText).setVisibility(View.VISIBLE);
     }
 
+    private GradientDrawable buildInlineCardBackground(int accent) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(UnitUtils.dpToPx(14));
+        background.setColor((accent & 0x00ffffff) | ((isDarkMode ? 50 : 20) << 24));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), (accent & 0x00ffffff) | ((isDarkMode ? 220 : 130) << 24));
+        return background;
+    }
+
     private void showGyroConfigDialog() {
-        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.gyro_config_dialog, null);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setView(dialogView);
-        builder.setTitle("Gyroscope Configuration");
+        ContentDialog dialog = new ContentDialog(requireContext(), R.layout.gyro_config_dialog);
+        dialog.setTitle(R.string.gyro_configuration);
+        dialog.setIcon(R.drawable.icon_settings);
+        ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.save);
+        View dialogView = dialog.getInflatedLayout();
 
         // Initialize InputControlsView and configure it for displaying the stick
         InputControlsView inputControlsView = new InputControlsView(getContext(), true);
@@ -508,16 +520,16 @@ public class InputControlsFragment extends Fragment {
         cbInvertGyroY.setChecked(preferences.getBoolean("invert_gyro_y", false));
 
         // Update text views for SeekBars
-        tvGyroXSensitivity.setText("X Sensitivity: " + sbGyroXSensitivity.getProgress() + "%");
-        tvGyroYSensitivity.setText("Y Sensitivity: " + sbGyroYSensitivity.getProgress() + "%");
-        tvGyroSmoothing.setText("Smoothing: " + sbGyroSmoothing.getProgress() + "%");
-        tvGyroDeadzone.setText("Deadzone: " + sbGyroDeadzone.getProgress() + "%");
+        tvGyroXSensitivity.setText(getString(R.string.gyro_x_sensitivity_value, sbGyroXSensitivity.getProgress()));
+        tvGyroYSensitivity.setText(getString(R.string.gyro_y_sensitivity_value, sbGyroYSensitivity.getProgress()));
+        tvGyroSmoothing.setText(getString(R.string.gyro_smoothing_value, sbGyroSmoothing.getProgress()));
+        tvGyroDeadzone.setText(getString(R.string.gyro_deadzone_value, sbGyroDeadzone.getProgress()));
 
         // Listeners for SeekBars
         sbGyroXSensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvGyroXSensitivity.setText("X Sensitivity: " + progress + "%");
+                tvGyroXSensitivity.setText(getString(R.string.gyro_x_sensitivity_value, progress));
             }
 
             @Override
@@ -530,7 +542,7 @@ public class InputControlsFragment extends Fragment {
         sbGyroYSensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvGyroYSensitivity.setText("Y Sensitivity: " + progress + "%");
+                tvGyroYSensitivity.setText(getString(R.string.gyro_y_sensitivity_value, progress));
             }
 
             @Override
@@ -543,7 +555,7 @@ public class InputControlsFragment extends Fragment {
         sbGyroSmoothing.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvGyroSmoothing.setText("Smoothing: " + progress + "%");
+                tvGyroSmoothing.setText(getString(R.string.gyro_smoothing_value, progress));
             }
 
             @Override
@@ -556,7 +568,7 @@ public class InputControlsFragment extends Fragment {
         sbGyroDeadzone.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvGyroDeadzone.setText("Deadzone: " + progress + "%");
+                tvGyroDeadzone.setText(getString(R.string.gyro_deadzone_value, progress));
             }
 
             @Override
@@ -573,18 +585,17 @@ public class InputControlsFragment extends Fragment {
 // Define variables for smoothing and deadzone
         final float[] smoothGyroX = {0};
         final float[] smoothGyroY = {0};
-        float smoothingFactor = preferences.getFloat("gyro_smoothing", 0.9f);  // User-defined smoothing factor
-        float gyroDeadzone = preferences.getFloat("gyro_deadzone", 0.05f);      // User-defined deadzone
-        boolean invertGyroX = preferences.getBoolean("invert_gyro_x", false);   // User-defined inversion for X axis
-        boolean invertGyroY = preferences.getBoolean("invert_gyro_y", false);   // User-defined inversion for Y axis
-        float gyroSensitivityX = preferences.getFloat("gyro_x_sensitivity", 1.0f); // User-defined sensitivity for X axis
-        float gyroSensitivityY = preferences.getFloat("gyro_y_sensitivity", 1.0f); // User-defined sensitivity for Y axis
-
         SensorEventListener gyroListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 float rawGyroX = event.values[0];  // Gyroscope X axis value
                 float rawGyroY = event.values[1];  // Gyroscope Y axis value
+                float smoothingFactor = sbGyroSmoothing.getProgress() / 100.0f;
+                float gyroDeadzone = sbGyroDeadzone.getProgress() / 100.0f;
+                boolean invertGyroX = cbInvertGyroX.isChecked();
+                boolean invertGyroY = cbInvertGyroY.isChecked();
+                float gyroSensitivityX = sbGyroXSensitivity.getProgress() / 100.0f;
+                float gyroSensitivityY = sbGyroYSensitivity.getProgress() / 100.0f;
 
                 // Apply deadzone
                 if (Math.abs(rawGyroX) < gyroDeadzone) rawGyroX = 0;
@@ -634,10 +645,12 @@ public class InputControlsFragment extends Fragment {
             public void onAccuracyChanged(Sensor sensor, int accuracy) {}
         };
 
-        sensorManager.registerListener(gyroListener, gyroscopeSensor, SensorManager.SENSOR_DELAY_GAME);
+        if (gyroscopeSensor != null) {
+            sensorManager.registerListener(gyroListener, gyroscopeSensor, SensorManager.SENSOR_DELAY_GAME);
+        }
 
-        // Set up the dialog buttons
-        builder.setPositiveButton("OK", (dialog, which) -> {
+        dialog.setOnDismissListener(d -> sensorManager.unregisterListener(gyroListener));
+        dialog.setOnConfirmCallback(() -> {
             SharedPreferences.Editor editor = preferences.edit();
             editor.putFloat("gyro_x_sensitivity", sbGyroXSensitivity.getProgress() / 100.0f);
             editor.putFloat("gyro_y_sensitivity", sbGyroYSensitivity.getProgress() / 100.0f);
@@ -647,22 +660,15 @@ public class InputControlsFragment extends Fragment {
             editor.putBoolean("invert_gyro_y", cbInvertGyroY.isChecked());
             editor.apply();
         });
-
-        builder.setNegativeButton("Cancel", null);
-
-        // Show the dialog
-        builder.create().show();
+        dialog.show();
     }
 
     private void showAnalogStickConfigDialog() {
-        // Inflate the dialog layout
-        LayoutInflater inflater = LayoutInflater.from(getContext());
-        View dialogView = inflater.inflate(R.layout.analog_stick_config_dialog, null);
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setView(dialogView);
-        builder.setTitle("Configure Analog Sticks");
-        builder.setCancelable(false);
+        ContentDialog dialog = new ContentDialog(requireContext(), R.layout.analog_stick_config_dialog);
+        dialog.setTitle(R.string.configure_analog_sticks);
+        dialog.setIcon(R.drawable.icon_settings);
+        ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.save);
+        View dialogView = dialog.getInflatedLayout();
 
         // Initialize UI elements
         SeekBar sbLeftDeadzone = dialogView.findViewById(R.id.SBLeftDeadzone);
@@ -699,16 +705,16 @@ public class InputControlsFragment extends Fragment {
 
         // Set initial values
         sbLeftDeadzone.setProgress((int) currentDeadzoneLeft);
-        tvLeftDeadzone.setText("Deadzone: " + sbLeftDeadzone.getProgress() + "%");
+        tvLeftDeadzone.setText(getString(R.string.deadzone, sbLeftDeadzone.getProgress()));
 
         sbLeftSensitivity.setProgress((int) currentSensitivityLeft);
-        tvLeftSensitivity.setText("Sensitivity: " + sbLeftSensitivity.getProgress() + "%");
+        tvLeftSensitivity.setText(getString(R.string.sensitivity, sbLeftSensitivity.getProgress()));
 
         sbRightDeadzone.setProgress((int) currentDeadzoneRight);
-        tvRightDeadzone.setText("Deadzone: " + sbRightDeadzone.getProgress() + "%");
+        tvRightDeadzone.setText(getString(R.string.deadzone, sbRightDeadzone.getProgress()));
 
         sbRightSensitivity.setProgress((int) currentSensitivityRight);
-        tvRightSensitivity.setText("Sensitivity: " + sbRightSensitivity.getProgress() + "%");
+        tvRightSensitivity.setText(getString(R.string.sensitivity, sbRightSensitivity.getProgress()));
 
         cbInvertLeftX.setChecked(invertLeftX);
         cbInvertLeftY.setChecked(invertLeftY);
@@ -721,7 +727,7 @@ public class InputControlsFragment extends Fragment {
         sbLeftDeadzone.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvLeftDeadzone.setText("Deadzone: " + progress + "%");
+                tvLeftDeadzone.setText(getString(R.string.deadzone, progress));
             }
 
             @Override
@@ -734,7 +740,7 @@ public class InputControlsFragment extends Fragment {
         sbLeftSensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvLeftSensitivity.setText("Sensitivity: " + progress + "%");
+                tvLeftSensitivity.setText(getString(R.string.sensitivity, progress));
             }
 
             @Override
@@ -747,7 +753,7 @@ public class InputControlsFragment extends Fragment {
         sbRightDeadzone.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvRightDeadzone.setText("Deadzone: " + progress + "%");
+                tvRightDeadzone.setText(getString(R.string.deadzone, progress));
             }
 
             @Override
@@ -760,7 +766,7 @@ public class InputControlsFragment extends Fragment {
         sbRightSensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvRightSensitivity.setText("Sensitivity: " + progress + "%");
+                tvRightSensitivity.setText(getString(R.string.sensitivity, progress));
             }
 
             @Override
@@ -770,8 +776,7 @@ public class InputControlsFragment extends Fragment {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // Set up the dialog buttons
-        builder.setPositiveButton("Save", (dialog, which) -> {
+        dialog.setOnConfirmCallback(() -> {
             // Retrieve and save the updated settings
             float newDeadzoneLeft = sbLeftDeadzone.getProgress() / 100.0f;
             float newDeadzoneRight = sbRightDeadzone.getProgress() / 100.0f;
@@ -803,11 +808,6 @@ public class InputControlsFragment extends Fragment {
 
             // For this example, we'll assume ExternalController instances listen to preference changes
         });
-
-        builder.setNegativeButton("Cancel", null);
-
-        // Create and show the dialog
-        AlertDialog dialog = builder.create();
         dialog.show();
     }
 }

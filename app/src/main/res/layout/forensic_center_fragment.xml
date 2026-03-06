@@ -21,7 +21,8 @@
                 android:layout_marginBottom="10dp"
                 android:background="@drawable/forensic_panel_background"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="12dp"
+                android:tag="theme_card">
 
                 <TextView
                     android:id="@+id/TVPolicyTitle"
@@ -50,6 +51,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:background="@drawable/forensic_badge_background"
+                    android:tag="theme_badge"
                     android:text="@string/diagnostics_policy_badge_freewine"
                     android:textColor="@color/forensic_badge_text"
                     android:textStyle="bold" />
@@ -60,6 +62,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="@drawable/forensic_badge_background"
+                    android:tag="theme_badge"
                     android:text="@string/diagnostics_policy_badge_dxvk_vkd3d"
                     android:textColor="@color/forensic_badge_text"
                     android:textStyle="bold" />
@@ -70,6 +73,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="@drawable/forensic_badge_background"
+                    android:tag="theme_badge"
                     android:text="@string/diagnostics_policy_badge_dgvoodoo"
                     android:textColor="@color/forensic_badge_text"
                     android:textStyle="bold" />
@@ -82,7 +86,8 @@
                 android:layout_marginBottom="10dp"
                 android:background="@drawable/forensic_panel_background"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="12dp"
+                android:tag="theme_card">
 
                 <TextView
                     android:id="@+id/TVTogglesTitle"
@@ -196,7 +201,8 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/forensic_panel_background"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="12dp"
+                android:tag="theme_card">
 
                 <TextView
                     android:id="@+id/TVAdbSectionTitle"
@@ -218,9 +224,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="@drawable/forensic_command_background"
-                    android:paddingLeft="10dp"
+                    android:paddingStart="10dp"
                     android:paddingTop="8dp"
-                    android:paddingRight="10dp"
+                    android:paddingEnd="10dp"
                     android:paddingBottom="8dp"
                     android:text="@string/diagnostics_adb_command"
                     android:textIsSelectable="true"
@@ -247,9 +253,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/forensic_command_background"
-                    android:paddingLeft="10dp"
+                    android:paddingStart="10dp"
                     android:paddingTop="8dp"
-                    android:paddingRight="10dp"
+                    android:paddingEnd="10dp"
                     android:paddingBottom="8dp"
                     android:textIsSelectable="true"
                     android:textStyle="bold"

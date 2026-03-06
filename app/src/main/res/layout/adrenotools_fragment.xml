@@ -10,184 +10,220 @@
         android:orientation="vertical"
         android:padding="14dp">
 
-        <TextView
-            android:id="@+id/TVGraphicsCenterHint"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/graphics_center_hint" />
+            android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/TVGraphicsCenterStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/graphics_center_status_empty"
-            android:textStyle="bold" />
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
 
-        <TextView
-            android:id="@+id/TVGraphicsLaneLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/graphics_center_lanes"
-            android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/TVGraphicsCenterHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/graphics_center_hint" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/TVGraphicsCenterStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/graphics_center_status_empty"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
-            <Button
-                android:id="@+id/BTLaneTurnip"
-                style="@style/ButtonNeutral"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:drawableStart="@drawable/icon_cpu"
-                android:drawablePadding="6dp"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_turnip" />
-
-            <Space
-                android:layout_width="10dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTLaneOpenGL"
-                style="@style/ButtonNeutral"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:drawableStart="@drawable/icon_screen_effect"
-                android:drawablePadding="6dp"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_opengl" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/TVGraphicsDownloadsLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/graphics_center_driver_feed_title"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/TVGraphicsDownloadsHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/graphics_center_driver_feed_hint"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/TVGraphicsFeedSourceLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/contents_source_selector" />
-
-        <Spinner
-            android:id="@+id/SGraphicsFeedSourceMode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
-
-        <TextView
-            android:id="@+id/TVGraphicsFeedBranchLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/graphics_center_branch_selector" />
-
-        <Spinner
-            android:id="@+id/SGraphicsFeedBranchMode"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_center_actions"
+                android:textStyle="bold" />
+        </FrameLayout>
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="356dp"
-            android:layout_marginTop="6dp">
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/RVGraphicsFeed"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:nestedScrollingEnabled="true"
-                android:overScrollMode="ifContentScrolls"
-                android:scrollbars="vertical" />
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTLaneTurnip"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/icon_cpu"
+                        android:drawablePadding="6dp"
+                        android:minWidth="0dp"
+                        android:text="@string/graphics_center_lane_turnip" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/BTLaneOpenGL"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/icon_screen_effect"
+                        android:drawablePadding="6dp"
+                        android:minWidth="0dp"
+                        android:text="@string/graphics_center_lane_opengl" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/TVGraphicsFeedEmpty"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="@string/graphics_center_driver_feed_empty"
-                android:visibility="gone" />
+                android:id="@+id/TVGraphicsLaneLabel"
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_center_lanes"
+                android:textStyle="bold" />
         </FrameLayout>
 
-        <TextView
-            android:id="@+id/TVGraphicsActionsLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/graphics_center_actions"
-            android:textStyle="bold" />
-
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
-            <Button
-                android:id="@+id/BTDri3Settings"
-                style="@style/ButtonNeutral"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/open_dri3_settings" />
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
 
-            <Space
-                android:layout_width="10dp"
-                android:layout_height="0dp" />
+                <TextView
+                    android:id="@+id/TVGraphicsDownloadsHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/graphics_center_driver_feed_hint"
+                    android:textSize="12sp" />
 
-            <Button
-                android:id="@+id/BTOpenUpscalerSettings"
-                style="@style/ButtonNeutral"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/open_upscaler_profiles" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/TVGraphicsFeedSourceLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/contents_source_selector" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/RecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="132dp"
-            android:layout_marginTop="6dp"
-            android:nestedScrollingEnabled="true"
-            android:overScrollMode="ifContentScrolls"
-            android:scrollbars="vertical" />
+                <Spinner
+                    android:id="@+id/SGraphicsFeedSourceMode"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" />
 
-        <View style="@style/HorizontalLine" />
+                <TextView
+                    android:id="@+id/TVGraphicsFeedBranchLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/graphics_center_branch_selector" />
 
-        <LinearLayout
+                <Spinner
+                    android:id="@+id/SGraphicsFeedBranchMode"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="392dp"
+                    android:layout_marginTop="10dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/RVGraphicsFeed"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:nestedScrollingEnabled="true"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="vertical" />
+
+                    <TextView
+                        android:id="@+id/TVGraphicsFeedEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="@string/graphics_center_driver_feed_empty"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/TVGraphicsDownloadsLabel"
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_center_driver_feed_title"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
-            <Button
-                android:id="@+id/BTInstallDriver"
-                style="@style/ButtonNeutral"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/install_drivers_local" />
-        </LinearLayout>
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTDri3Settings"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/open_dri3_settings" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/BTOpenUpscalerSettings"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/open_upscaler_profiles" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/RecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="132dp"
+                    android:layout_marginTop="10dp"
+                    android:nestedScrollingEnabled="true"
+                    android:overScrollMode="ifContentScrolls"
+                    android:scrollbars="vertical" />
+
+                <Button
+                    android:id="@+id/BTInstallDriver"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/install_drivers_local" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/TVGraphicsActionsLabel"
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_center_actions"
+                android:textStyle="bold" />
+        </FrameLayout>
     </LinearLayout>
 </ScrollView>

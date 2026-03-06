@@ -145,7 +145,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private String[] queryAvailableExtensions(String driver, Context context) {
         return GPUInformation.enumerateExtensions(driver, context);
     }
-  
+
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
         super(anchor.getContext(), R.layout.graphics_driver_config_dialog);
         initializeDialog(anchor, graphicsDriver, graphicsDriverVersionView);
@@ -331,7 +331,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         // Ensure ContentsManager syncContents is called
         ContentsManager contentsManager = new ContentsManager(anchor.getContext());
         contentsManager.syncContents();
-        
+
         // Populate the spinner with available versions from ContentsManager and pre-select the initial version
         populateGraphicsDriverVersions(anchor.getContext(), contentsManager, vulkanVersion, initialVersion, blExtensions, gpuName, maxDeviceMemory, presentMode, resourceType, bcnEmulation, bcnEmulationType, bcnEmulationCache, graphicsDriver);
 
@@ -378,7 +378,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             if (GPUInformation.isDriverSupported(version, context))
                 wrapperVersions.add(version);
         }
-        
+
         // Add installed versions from AdrenotoolsManager
         AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(context);
         wrapperVersions.addAll(adrenotoolsManager.enumarateInstalledDrivers());
@@ -525,7 +525,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private void applyPopupTheme(Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
-        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         sVersion.setPopupBackgroundResource(popupBg);
         sVulkanVersion.setPopupBackgroundResource(popupBg);
         sPresentMode.setPopupBackgroundResource(popupBg);

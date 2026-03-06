@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    android:background="@drawable/forensic_panel_background"
+    android:background="@drawable/surface_card_background"
     android:orientation="vertical"
     android:padding="10dp"
     android:tag="theme_card">
@@ -26,10 +26,10 @@
             android:id="@+id/TVLinuxPid"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/forensic_badge_background"
-            android:paddingLeft="8dp"
+            android:background="@drawable/surface_badge_background"
+            android:paddingStart="8dp"
             android:paddingTop="4dp"
-            android:paddingRight="8dp"
+            android:paddingEnd="8dp"
             android:paddingBottom="4dp"
             android:tag="theme_badge" />
 

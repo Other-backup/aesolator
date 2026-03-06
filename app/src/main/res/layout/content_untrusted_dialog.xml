@@ -1,27 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="200dp">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
 
     <LinearLayout
-        android:layout_width="300dp"
+        android:layout_width="320dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:padding="6dp">
 
-        <TextView
-            android:id="@+id/TVType"
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/warning_content_has_untrusted_files"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/content_untrusted_hint"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/warning"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/warning_content_has_untrusted_files"
-            android:textSize="16sp" />
+            android:layout_marginTop="6dp">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:nestedScrollingEnabled="false" />
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/file_list"
+                android:textStyle="bold" />
+        </FrameLayout>
     </LinearLayout>
 </ScrollView>

@@ -1,7 +1,6 @@
 package com.winlator.cmod;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
@@ -128,33 +127,35 @@ public class MainActivity extends AppCompatActivity {
                 )
         );
 
-        new AlertDialog.Builder(this)
-                .setTitle("All Files Access Required")
-                .setMessage("In order to grant access to additional storage devices such as USB storage device, the All Files Access permission must be granted. Press Okay to grant All Files Access in your Android Settings.")
-                .setPositiveButton("Okay", (dialog, which) -> {
-                    ForensicLogger.logEvent(
-                            this,
-                            "info",
-                            "STORAGE_ALL_FILES_ACCESS_OPEN_SETTINGS",
-                            null,
-                            "main",
-                            "all_files_access_open_settings",
-                            ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
-                    );
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> ForensicLogger.logEvent(
-                        this,
-                        "warn",
-                        "STORAGE_ALL_FILES_ACCESS_DECLINED",
-                        null,
-                        "main",
-                        "all_files_access_prompt_declined",
-                        ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
-                ))
-                .show();
+        ContentDialog dialog = new ContentDialog(this);
+        dialog.setTitle(R.string.all_files_access_required);
+        dialog.setMessage(R.string.all_files_access_required_message);
+        dialog.setIcon(R.drawable.icon_settings);
+        ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string.open_settings);
+        dialog.setOnConfirmCallback(() -> {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "STORAGE_ALL_FILES_ACCESS_OPEN_SETTINGS",
+                    null,
+                    "main",
+                    "all_files_access_open_settings",
+                    ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
+            );
+            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        });
+        dialog.setOnCancelCallback(() -> ForensicLogger.logEvent(
+                this,
+                "warn",
+                "STORAGE_ALL_FILES_ACCESS_DECLINED",
+                null,
+                "main",
+                "all_files_access_prompt_declined",
+                ForensicLogger.fields("sdk_int", Build.VERSION.SDK_INT)
+        ));
+        dialog.show();
     }
 
     @Override
@@ -313,25 +314,29 @@ public class MainActivity extends AppCompatActivity {
 
     private void showAboutDialog() {
         ContentDialog dialog = new ContentDialog(this, R.layout.about_dialog);
+        dialog.setTitle(R.string.about);
+        dialog.setIcon(R.drawable.icon_about);
         dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
 
         dialog.getWindow().setBackgroundDrawableResource(
-                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background
+                isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
         );
 
-        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
-        int badgeBackground = isDarkMode ? R.drawable.forensic_badge_background_dark : R.drawable.forensic_badge_background;
-        int badgeTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text);
-        int bodyTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.forensic_log_body_text : R.color.forensic_badge_text);
+        int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
+        int badgeBackground = isDarkMode ? R.drawable.surface_badge_background_dark : R.drawable.surface_badge_background;
+        int badgeTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+        int bodyTextColor = ContextCompat.getColor(this, isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
 
         LinearLayout llAboutHeaderCard = dialog.findViewById(R.id.LLAboutHeaderCard);
         LinearLayout llAboutCreditsCard = dialog.findViewById(R.id.LLAboutCreditsCard);
         LinearLayout llAboutRuntimeCard = dialog.findViewById(R.id.LLAboutRuntimeCard);
+        TextView tvAboutAppSummary = dialog.findViewById(R.id.TVAboutAppSummary);
         TextView tvAboutCreditsLabel = dialog.findViewById(R.id.TVAboutCreditsLabel);
         TextView tvAboutRuntimeLabel = dialog.findViewById(R.id.TVAboutRuntimeLabel);
         if (llAboutHeaderCard != null) llAboutHeaderCard.setBackgroundResource(panelBackground);
         if (llAboutCreditsCard != null) llAboutCreditsCard.setBackgroundResource(panelBackground);
         if (llAboutRuntimeCard != null) llAboutRuntimeCard.setBackgroundResource(panelBackground);
+        if (tvAboutAppSummary != null) tvAboutAppSummary.setTextColor(bodyTextColor);
         if (tvAboutCreditsLabel != null) {
             tvAboutCreditsLabel.setBackgroundResource(badgeBackground);
             tvAboutCreditsLabel.setTextColor(badgeTextColor);
@@ -345,14 +350,14 @@ public class MainActivity extends AppCompatActivity {
             PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
 
             TextView tvWebpage = dialog.findViewById(R.id.TVWebpage);
-            tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/aesolator\">github.com/kosoymiki/aesolator</a>", Html.FROM_HTML_MODE_LEGACY));
+            tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/aesolator\">" + getString(R.string.about_project_url) + "</a>", Html.FROM_HTML_MODE_LEGACY));
             tvWebpage.setMovementMethod(LinkMovementMethod.getInstance());
 
-            ((TextView) dialog.findViewById(R.id.TVAppVersion)).setText(getString(R.string.version) + " " + pInfo.versionName);
+            ((TextView) dialog.findViewById(R.id.TVAppVersion)).setText(getString(R.string.about_version_format, pInfo.versionName));
 
             String creditsAndThirdPartyAppsHTML = String.join("<br />",
-                    "Aesolator by Ae team",
-                    "Runtime model: FreeWine + lane-based graphics stack",
+                    "<b>Ae.solator</b> by Ae team",
+                    "<b>Stack:</b> FreeWine 11 + lane-based graphics stack + package lanes",
                     "---",
                     "Termux Package (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
                     "Wine (<a href=\"https://www.winehq.org\">winehq.org</a>)",
@@ -372,7 +377,8 @@ public class MainActivity extends AppCompatActivity {
             tvCreditsAndThirdPartyApps.setTextColor(bodyTextColor);
 
             String glibcExpVersionForkHTML = String.join("<br />",
-                    "Aesolator runtime branch and contracts are maintained in-repo.");
+                    getString(R.string.about_runtime_summary),
+                    getString(R.string.about_runtime_detail));
             TextView tvGlibcExpVersionFork = dialog.findViewById(R.id.TVGlibcExpVersionFork);
             tvGlibcExpVersionFork.setText(Html.fromHtml(glibcExpVersionForkHTML, Html.FROM_HTML_MODE_LEGACY));
             tvGlibcExpVersionFork.setMovementMethod(LinkMovementMethod.getInstance());

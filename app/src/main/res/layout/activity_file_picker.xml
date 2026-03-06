@@ -4,39 +4,53 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp">
 
-    <!-- Title or Instruction for the File Picker -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/surface_badge_background"
+        android:paddingStart="10dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="4dp"
+        android:tag="theme_badge"
+        android:text="@string/select_directory"
+        android:textStyle="bold" />
+
     <TextView
         android:id="@+id/TVPickerTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/select_directory"
-        android:textSize="18sp"
-        android:paddingBottom="8dp"/>
+        android:layout_marginTop="8dp"
+        android:text="@string/file_picker_hint"
+        android:textSize="13sp" />
 
-    <!-- Button to move up a directory -->
     <Button
         android:id="@+id/upButton"
+        style="@style/ButtonNeutral"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/up_directory"
-        android:enabled="true"/> <!-- Enabled by default -->
+        android:layout_marginTop="12dp"
+        android:enabled="true"
+        android:text="@string/up_directory" />
 
-    <!-- RecyclerView to display files and directories -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="12dp"
         android:layout_weight="1"
-        android:scrollbars="vertical"/>
+        android:clipToPadding="false"
+        android:paddingBottom="12dp"
+        android:scrollbars="vertical" />
 
-    <!-- Button to confirm the directory selection -->
     <Button
         android:id="@+id/confirmButton"
+        style="@style/ButtonPositive"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/confirm_selection"
-        android:enabled="false" /> <!-- Initially disabled until a directory is selected -->
+        android:enabled="false"
+        android:text="@string/confirm_selection" />
 
 </LinearLayout>

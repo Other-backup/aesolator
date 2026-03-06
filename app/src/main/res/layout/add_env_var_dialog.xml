@@ -1,40 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/name" />
+    android:fillViewport="true">
 
     <LinearLayout
-        android:layout_width="300dp"
+        android:layout_width="320dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="6dp">
 
-        <EditText
-            style="@style/EditText"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:id="@+id/ETName" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/new_environment_variable_hint"
+            android:textSize="13sp" />
 
-        <ImageButton
-            style="@style/ListMenuButton"
-            android:id="@+id/BTMenu"
-            android:src="@drawable/icon_menu" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/ETName"
+                    style="@style/EditText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/environment_variable_name_hint" />
+
+                <ImageButton
+                    android:id="@+id/BTMenu"
+                    style="@style/ListMenuButton"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/icon_menu" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/name"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <EditText
+                    android:id="@+id/ETValue"
+                    style="@style/EditText"
+                    android:hint="@string/environment_variable_value_hint" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/value"
+                android:textStyle="bold" />
+        </FrameLayout>
     </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/value"
-        android:layout_marginTop="8dp" />
-
-    <EditText
-        style="@style/EditText"
-        android:layout_width="300dp"
-        android:id="@+id/ETValue" />
-</LinearLayout>
+</ScrollView>

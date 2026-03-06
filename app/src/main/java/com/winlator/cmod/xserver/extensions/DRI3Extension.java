@@ -132,12 +132,12 @@ public class DRI3Extension implements Extension {
         inputStream.skip(3);
         long modifiers = inputStream.readLong();
         Log.d("Dri3", "Read modifiers " + modifiers);
-        
+
         Window window = client.xServer.windowManager.getWindow(windowId);
         if (window == null) throw new BadWindow(windowId);
         Pixmap pixmap = client.xServer.pixmapManager.getPixmap(pixmapId);
         if (pixmap != null) throw new BadIdChoice(pixmapId);
-        
+
         int fd = inputStream.getAncillaryFd();
         long size = (long)stride * height;
 
@@ -146,11 +146,11 @@ public class DRI3Extension implements Extension {
             pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
         }
         else if (modifiers == 1274) {
-            Log.d("Dri3", "Creating pixmap from dmabuf filedescriptor"); 
+            Log.d("Dri3", "Creating pixmap from dmabuf filedescriptor");
             pixmapFromFd(client, pixmapId, width, height, stride, offset, depth, fd, size);
-        }    
+        }
     }
-    
+
     private void pixmapFromHardwareBuffer(XClient client, int pixmapId, short width, short height, byte depth, int fd) throws IOException, XRequestError {
         try {
             GPUImage gpuImage = new GPUImage(fd);
@@ -160,14 +160,14 @@ public class DRI3Extension implements Extension {
         }
         finally {
             XConnectorEpoll.closeFd(fd);
-        }   
+        }
     }
 
     private void pixmapFromFd(XClient client, int pixmapId, short width, short height, int stride, int offset, byte depth, int fd, long size)  throws IOException, XRequestError {
         try {
             ByteBuffer buffer = SysVSharedMemory.mapSHMSegment(fd, size, offset, true);
             if (buffer == null) throw new BadAlloc();
-            
+
             short totalWidth = (short)(stride / 4);
             Drawable drawable = client.xServer.drawableManager.createDrawable(pixmapId, totalWidth, height, depth);
             drawable.setData(buffer);

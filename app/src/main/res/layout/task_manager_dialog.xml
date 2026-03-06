@@ -14,7 +14,7 @@
         <LinearLayout
             android:layout_width="560dp"
             android:layout_height="match_parent"
-            android:background="@drawable/bordered_panel"
+            android:background="@drawable/surface_card_background"
             android:tag="theme_card"
             android:orientation="vertical"
             android:padding="12dp">
@@ -285,7 +285,7 @@
                     android:id="@+id/LLTaskManagerCpuCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bordered_panel"
+                    android:background="@drawable/surface_card_background"
                     android:orientation="vertical"
                     android:padding="12dp"
                     android:tag="theme_card">
@@ -309,7 +309,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bordered_panel"
+                    android:background="@drawable/surface_card_background"
                     android:orientation="vertical"
                     android:padding="12dp"
                     android:tag="theme_card">
@@ -332,7 +332,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bordered_panel"
+                    android:background="@drawable/surface_card_background"
                     android:orientation="vertical"
                     android:padding="12dp"
                     android:tag="theme_card">

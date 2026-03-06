@@ -23,13 +23,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
-import android.view.PointerIcon;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.Spinner;
@@ -44,11 +40,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.preference.PreferenceManager;
-
-import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
@@ -78,7 +70,9 @@ import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
@@ -147,14 +141,17 @@ import java.util.regex.Pattern;
 
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
-public class XServerDisplayActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class XServerDisplayActivity extends AppCompatActivity {
     public static String NOTIFICATION_CHANNEL_ID = "Aesolator";
     public static int NOTIFICATION_ID = -1;
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
     private XEnvironment environment;
-    private DrawerLayout drawerLayout;
+    private View xserverRootView;
+    private View runtimeDrawerScrim;
+    private View runtimeDrawerView;
+    private boolean runtimeDrawerVisible = false;
     private ContainerManager containerManager;
     protected Container container;
     private XServer xServer;
@@ -187,7 +184,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private boolean cursorLock; // Flag to track if pointer capture was requested
     private final float[] xform = XForm.getInstance();
     private ContentsManager contentsManager;
-    private boolean navigationFocused = false;
     private MidiHandler midiHandler;
     private String midiSoundFont = "";
     private String lc_all = "";
@@ -325,19 +321,20 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     };
 
     private float pickHighestRefreshRate() {
-    	android.view.Display display = getWindowManager().getDefaultDisplay();
-    	android.view.Display.Mode[] modes = display.getSupportedModes();
-    	
-    	float maxRefresh = 0f;
-    	
-    	for (android.view.Display.Mode mode : modes) {
-			if (mode.getRefreshRate() > maxRefresh)
-    	    	maxRefresh = mode.getRefreshRate();
-    	}
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode[] modes = display.getSupportedModes();
 
-    	Log.d("XServerDisplayActivity", "Picking refresh rate " + maxRefresh);
+        float maxRefresh = 0f;
 
-    	return maxRefresh;
+        for (android.view.Display.Mode mode : modes) {
+            if (mode.getRefreshRate() > maxRefresh) {
+                maxRefresh = mode.getRefreshRate();
+            }
+        }
+
+        Log.d("XServerDisplayActivity", "Picking refresh rate " + maxRefresh);
+
+        return maxRefresh;
     }
 
     private boolean requiresSignedLaunchIntent(Intent intent) {
@@ -358,7 +355,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
         params.preferredRefreshRate = pickHighestRefreshRate();
         getWindow().setAttributes(params);
-        
+
         setContentView(R.layout.xserver_display_activity);
 
         preloaderDialog = new PreloaderDialog(this);
@@ -419,7 +416,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                             "adb_diagnostics_cmd", "adb logcat -d | grep XSERVER_LAUNCH_"
                     )
             );
-            showToast(this, "Blocked untrusted launch request");
+            showToast(this, R.string.blocked_untrusted_launch_request);
             finish();
             return;
         }
@@ -488,31 +485,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         contentsManager = new ContentsManager(this);
         contentsManager.syncContents();
 
-        drawerLayout = findViewById(R.id.DrawerLayout);
-        drawerLayout.setOnApplyWindowInsetsListener((view, windowInsets) -> windowInsets.replaceSystemWindowInsets(0, 0, 0, 0));
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-
-        NavigationView navigationView = findViewById(R.id.NavigationView);
-
-        if (isDarkMode) {
-            navigationView.setItemTextColor(ContextCompat.getColorStateList(this, R.color.white));
-            navigationView.setBackgroundResource(R.color.content_dialog_background_dark);
-        }
-
-        boolean enableLogs = preferences.getBoolean("enable_wine_debug", false) || preferences.getBoolean("enable_box64_logs", false);
-        Menu menu = navigationView.getMenu();
-        menu.findItem(R.id.main_menu_logs).setVisible(enableLogs);
-        if (XrActivity.isEnabled(this)) menu.findItem(R.id.main_menu_magnifier).setVisible(false);
-        navigationView.setNavigationItemSelectedListener(this);
-        navigationView.setPointerIcon(PointerIcon.getSystemIcon(this, PointerIcon.TYPE_ARROW));
-        navigationView.setOnFocusChangeListener((v, hasFocus) -> navigationFocused = hasFocus);
-        drawerLayout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
-            @Override
-            public void onDrawerOpened(View drawerView) {
-                super.onDrawerOpened(drawerView);
-                navigationView.requestFocus();
-            }
-        });
+        xserverRootView = findViewById(R.id.XServerRoot);
 
         imageFs = ImageFs.find(this);
 
@@ -627,9 +600,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             lc_all = shortcut.getExtra("lc_all", container.getLC_ALL());
             String inputType = shortcut.getExtra("inputType");
             if (!inputType.isEmpty()) winHandler.setInputType(Byte.parseByte(inputType));
-            String xinputDisabledString = shortcut.getExtra("disableXinput", "false");
-            xinputDisabledFromShortcut = parseBoolean(xinputDisabledString);
-            // Pass the value to WinHandler
+            xinputDisabledFromShortcut = shortcut.getExtraBoolean("disableXinput", false);
             winHandler.setXInputDisabled(xinputDisabledFromShortcut);
             parseUpscalerFromShortcut(shortcut);
             Log.d("XServerDisplayActivity", "XInput Disabled from Shortcut: " + xinputDisabledFromShortcut);
@@ -637,6 +608,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
+        setupRuntimeDrawer();
 
         if (!wineInfo.isWin64()) {
             onExtractFileListener = (file, size) -> {
@@ -663,10 +635,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                     preloaderDialog.closeOnUiThread();
                     winStarted[0] = true;
                 }
-                    
+
                 if (frameRatingWindowId == window.id) frameRating.update();
             }
-           
+
             @Override
             public void onMapWindow(Window window) {
                 // Log the class name of the mapped window
@@ -677,7 +649,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             @Override
             public void onModifyWindowProperty(Window window, Property property) {
                 changeFrameRatingVisibility(window, property);
-            }    
+            }
 
             @Override
             public void onUnmapWindow(Window window) {
@@ -728,8 +700,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_ab_gear_0011)
-                .setContentTitle("Aesolator")
-                .setContentText("Aesolator is running, do not kill or swipe this notification")
+                .setContentTitle(getString(R.string.notification_runtime_title))
+                .setContentText(getString(R.string.notification_runtime_text))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false);
@@ -1010,55 +982,228 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     @Override
     public void onBackPressed() {
         if (environment != null) {
-            if (!drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                drawerLayout.openDrawer(GravityCompat.START);
-            }
-            else drawerLayout.closeDrawers();
+            toggleRuntimeDrawer();
+            return;
         }
+        super.onBackPressed();
+    }
+
+    private void setupRuntimeDrawer() {
+        runtimeDrawerScrim = findViewById(R.id.VRuntimeDrawerScrim);
+        runtimeDrawerView = findViewById(R.id.SVRuntimeDrawer);
+        if (runtimeDrawerScrim == null || runtimeDrawerView == null) return;
+
+        runtimeDrawerScrim.setOnClickListener(v -> hideRuntimeDrawer());
+        runtimeDrawerView.setOnClickListener(v -> {});
+        View closeButton = findViewById(R.id.BTCloseRuntimeDrawer);
+        if (closeButton != null) closeButton.setOnClickListener(v -> hideRuntimeDrawer());
+
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionKeyboard, R.id.main_menu_keyboard);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionInputControls, R.id.main_menu_input_controls);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionRelativeMouse, R.id.main_menu_relative_mouse_movement);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionScreenEffects, R.id.main_menu_screen_effects);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionFullscreen, R.id.main_menu_toggle_fullscreen);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionPauseResume, R.id.main_menu_pause);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionPip, R.id.main_menu_pip_mode);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionTaskManager, R.id.main_menu_task_manager);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionMagnifier, R.id.main_menu_magnifier);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionLogs, R.id.main_menu_logs);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionExit, R.id.main_menu_exit);
+
+        runtimeDrawerView.post(() -> runtimeDrawerView.setTranslationX(getRuntimeDrawerHiddenOffset()));
+        refreshRuntimeDrawerState();
+        applyRuntimeThemeAssetPass();
+    }
+
+    private void bindRuntimeDrawerAction(int rowId, int actionId) {
+        View row = findViewById(rowId);
+        if (row == null) return;
+        row.setOnClickListener(v -> {
+            hideRuntimeDrawer();
+            handleRuntimeAction(actionId);
+        });
+    }
+
+    private void toggleRuntimeDrawer() {
+        if (runtimeDrawerVisible) hideRuntimeDrawer();
+        else showRuntimeDrawer();
+    }
+
+    private void showRuntimeDrawer() {
+        if (environment == null || runtimeDrawerView == null || runtimeDrawerScrim == null) return;
+        refreshRuntimeDrawerState();
+        runtimeDrawerVisible = true;
+        runtimeDrawerScrim.setVisibility(View.VISIBLE);
+        runtimeDrawerView.setVisibility(View.VISIBLE);
+        runtimeDrawerScrim.animate().cancel();
+        runtimeDrawerView.animate().cancel();
+        runtimeDrawerScrim.setAlpha(0f);
+        runtimeDrawerView.setTranslationX(getRuntimeDrawerHiddenOffset());
+        runtimeDrawerScrim.animate().alpha(1f).setDuration(160L).start();
+        runtimeDrawerView.animate().translationX(0f).setDuration(220L).start();
+    }
+
+    private void hideRuntimeDrawer() {
+        if (!runtimeDrawerVisible || runtimeDrawerView == null || runtimeDrawerScrim == null) return;
+        runtimeDrawerVisible = false;
+        final float hiddenOffset = getRuntimeDrawerHiddenOffset();
+        runtimeDrawerScrim.animate().cancel();
+        runtimeDrawerView.animate().cancel();
+        runtimeDrawerScrim.animate().alpha(0f).setDuration(140L).withEndAction(() -> {
+            if (!runtimeDrawerVisible && runtimeDrawerScrim != null) runtimeDrawerScrim.setVisibility(View.GONE);
+        }).start();
+        runtimeDrawerView.animate().translationX(hiddenOffset).setDuration(200L).withEndAction(() -> {
+            if (!runtimeDrawerVisible && runtimeDrawerView != null) runtimeDrawerView.setVisibility(View.GONE);
+        }).start();
+    }
+
+    private float getRuntimeDrawerHiddenOffset() {
+        int width = runtimeDrawerView != null ? runtimeDrawerView.getWidth() : 0;
+        if (width <= 0) width = Math.round(getResources().getDisplayMetrics().density * 360f);
+        return -width - Math.round(getResources().getDisplayMetrics().density * 24f);
+    }
+
+    private void applyRuntimeThemeAssetPass() {
+        if (xserverRootView != null) ThemeAssetPainter.apply(this, xserverRootView, isDarkMode);
+    }
+
+    private void refreshRuntimeDrawerState() {
+        TextView tvContainer = findViewById(R.id.TVRuntimeDrawerContainerName);
+        TextView tvShortcut = findViewById(R.id.TVRuntimeDrawerShortcutName);
+        TextView tvRoute = findViewById(R.id.TVRuntimeDrawerRoute);
+        TextView tvHint = findViewById(R.id.TVRuntimeDrawerHint);
+
+        if (tvContainer != null) {
+            String containerName = container != null ? container.getName() : getString(R.string.not_set);
+            tvContainer.setText(getString(R.string.xserver_runtime_drawer_container, containerName));
+        }
+
+        if (tvShortcut != null) {
+            if (shortcut != null && shortcut.name != null && !shortcut.name.trim().isEmpty()) {
+                tvShortcut.setText(getString(R.string.xserver_runtime_drawer_shortcut, shortcut.name));
+            } else {
+                tvShortcut.setText(R.string.xserver_runtime_drawer_shortcut_none);
+            }
+        }
+
+        if (tvRoute != null) {
+            String routeGraphics = graphicsDriver == null || graphicsDriver.isEmpty() ? "-" : graphicsDriver;
+            String routeWrapper = dxwrapper == null || dxwrapper.isEmpty() ? "-" : dxwrapper;
+            String routeAudio = audioDriver == null || audioDriver.isEmpty() ? "-" : audioDriver;
+            tvRoute.setText(getString(R.string.xserver_runtime_drawer_route, routeGraphics, routeWrapper, routeAudio));
+        }
+
+        if (tvHint != null) tvHint.setText(R.string.xserver_runtime_drawer_hint);
+
+        boolean fullscreenActive = xServerView != null && xServerView.getRenderer() != null && xServerView.getRenderer().isFullscreen();
+        boolean logsEnabled = debugDialog != null
+                && (preferences.getBoolean("enable_wine_debug", false) || preferences.getBoolean("enable_box64_logs", false));
+        boolean magnifierEnabled = !XrActivity.isEnabled(this);
+
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionRelativeMouse,
+                R.id.TVRuntimeActionRelativeMouseTitle,
+                R.id.TVRuntimeActionRelativeMouseSummary,
+                R.id.IVRuntimeActionRelativeMouse,
+                R.string.toggle_relative_mouse_movement,
+                isRelativeMouseMovement ? R.string.runtime_drawer_relative_mouse_summary_on : R.string.runtime_drawer_relative_mouse_summary_off,
+                R.drawable.icon_magnifier,
+                true
+        );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionFullscreen,
+                R.id.TVRuntimeActionFullscreenTitle,
+                R.id.TVRuntimeActionFullscreenSummary,
+                R.id.IVRuntimeActionFullscreen,
+                R.string.toggle_fullscreen,
+                fullscreenActive ? R.string.runtime_drawer_fullscreen_summary_on : R.string.runtime_drawer_fullscreen_summary_off,
+                R.drawable.icon_fullscreen,
+                true
+        );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionPauseResume,
+                R.id.TVRuntimeActionPauseResumeTitle,
+                R.id.TVRuntimeActionPauseResumeSummary,
+                R.id.IVRuntimeActionPauseResume,
+                isPaused ? R.string.resume_container : R.string.pause_container,
+                isPaused ? R.string.runtime_drawer_resume_summary : R.string.runtime_drawer_pause_summary,
+                isPaused ? R.drawable.icon_play : R.drawable.icon_pause,
+                true
+        );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionMagnifier,
+                R.id.TVRuntimeActionMagnifierTitle,
+                R.id.TVRuntimeActionMagnifierSummary,
+                R.id.IVRuntimeActionMagnifier,
+                R.string.magnifier,
+                magnifierEnabled ? R.string.runtime_drawer_magnifier_summary : R.string.runtime_drawer_magnifier_unavailable,
+                R.drawable.icon_magnifier,
+                magnifierEnabled
+        );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionLogs,
+                R.id.TVRuntimeActionLogsTitle,
+                R.id.TVRuntimeActionLogsSummary,
+                R.id.IVRuntimeActionLogs,
+                R.string.logs,
+                logsEnabled ? R.string.runtime_drawer_logs_summary : R.string.runtime_drawer_logs_disabled,
+                R.drawable.icon_debug,
+                logsEnabled
+        );
+
+        applyRuntimeThemeAssetPass();
+    }
+
+    private void updateRuntimeDrawerAction(int rowId, int titleId, int summaryId, int iconId,
+                                           int titleResId, int summaryResId, int iconResId, boolean enabled) {
+        View row = findViewById(rowId);
+        TextView title = findViewById(titleId);
+        TextView summary = findViewById(summaryId);
+        View icon = findViewById(iconId);
+        if (row == null || title == null || summary == null || icon == null) return;
+
+        title.setText(titleResId);
+        summary.setText(summaryResId);
+        if (icon instanceof android.widget.ImageView) {
+            ((android.widget.ImageView) icon).setImageResource(iconResId);
+        }
+        row.setEnabled(enabled);
+        row.setClickable(enabled);
+        row.setAlpha(enabled ? 1.0f : 0.56f);
     }
 
     @SuppressLint("SourceLockedOrientationActivity")
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+    private void handleRuntimeAction(int actionId) {
         final GLRenderer renderer = xServerView.getRenderer();
-        switch (item.getItemId()) {
+        switch (actionId) {
             case R.id.main_menu_keyboard:
                 AppUtils.showKeyboard(this);
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_input_controls:
                 showInputControlsDialog();
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_relative_mouse_movement:
                 isRelativeMouseMovement = !isRelativeMouseMovement;
-                drawerLayout.closeDrawers();
                 xServer.setRelativeMouseMovement(isRelativeMouseMovement);
                 break;
             case R.id.main_menu_toggle_fullscreen:
                 renderer.toggleFullscreen();
-                drawerLayout.closeDrawers();
                 touchpadView.toggleFullscreen();
                 break;
             case R.id.main_menu_pause:
                 if (isPaused) {
                     ProcessHelper.resumeAllWineProcesses();
-                    item.setIcon(R.drawable.icon_pause);
                 }
                 else {
                     ProcessHelper.pauseAllWineProcesses();
-                    item.setIcon(R.drawable.icon_play);
                 }
                 isPaused = !isPaused;
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_pip_mode:
                 enterPictureInPictureMode();
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_task_manager:
                 new TaskManagerDialog(this).show();
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_magnifier:
                 if (magnifierView == null) {
@@ -1075,7 +1220,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                     });
                     container.addView(magnifierView);
                 }
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_screen_effects:
                 Log.d("ScreenEffectDialog", "Initializing ScreenEffectDialog");
@@ -1102,18 +1246,15 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 });
                 Log.d("ScreenEffectDialog", "Showing ScreenEffectDialog");
                 screenEffectDialog.show();
-                drawerLayout.closeDrawers();
                 break;
             case R.id.main_menu_logs:
-                debugDialog.show();
-                drawerLayout.closeDrawers();
+                if (debugDialog != null) debugDialog.show();
                 break;
             case R.id.main_menu_exit:
-                drawerLayout.closeDrawers();
                 exit();
                 break;
         }
-        return true;
+        refreshRuntimeDrawerState();
     }
 
     @Override
@@ -1203,7 +1344,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             container.putExtra("startupSelection", startupSelection);
             containerDataChanged = true;
         }
-        
+
         extractInputDLLs();
 
         if (containerDataChanged) container.saveData();
@@ -1337,7 +1478,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         // Reset dxwrapper config
         dxwrapperConfig = null;
-        
+
     }
 
     private void createWrapperScript(String path, String content) {
@@ -1362,9 +1503,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         globalCursorSpeed = preferences.getFloat("cursor_speed", 1.0f);
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
         touchpadView.setSensitivity(globalCursorSpeed);
-        touchpadView.setFourFingersTapCallback(() -> {
-            if (!drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.openDrawer(GravityCompat.START);
-        });
+        touchpadView.setFourFingersTapCallback(this::toggleRuntimeDrawer);
         rootView.addView(touchpadView);
 
         inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
@@ -1389,17 +1528,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             rootView.addView(frameRating);
         }
 
-        // Get the fullscreen stretched extra from the shortcut if available
-        String shortcutFullscreenStretched = shortcut != null ? shortcut.getExtra("fullscreenStretched") : null;
-
-        // Proceed based on container and shortcut settings
         boolean shouldStretch = false;
-
-        if (shortcut != null && shortcutFullscreenStretched != null) {
-            // Shortcut exists and has a valid setting
-            shouldStretch = shortcutFullscreenStretched.equals("1");
+        if (shortcut != null && !shortcut.getExtra("fullscreenStretched").isEmpty()) {
+            shouldStretch = shortcut.getExtraBoolean("fullscreenStretched", false);
         } else if (container != null && container.isFullscreenStretched()) {
-            // No shortcut or shortcut doesn't override, use the container's setting
             shouldStretch = true;
         }
 
@@ -1416,14 +1548,13 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 if (profile != null) showInputControls(profile);
             }
 
-            String simTouchScreen = shortcut.getExtra("simTouchScreen");
-            touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
+            touchpadView.setSimTouchScreen(shortcut.getExtraBoolean("simTouchScreen", false));
             applyShortcutTouchpadGestureProfile();
         } else {
             touchpadView.resetGestureRuntimeTuning();
         }
 
-        AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
+        AppUtils.observeSoftKeyboardVisibility(xserverRootView != null ? xserverRootView : rootView, renderer::setScreenOffsetYRelativeToCursor);
     }
 
     private void applyShortcutTouchpadGestureProfile() {
@@ -1996,33 +2127,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         return shortcutName;
     }
 
-    private void setTextColorForDialog(ViewGroup viewGroup, int color) {
-        for (int i = 0; i < viewGroup.getChildCount(); i++) {
-            View child = viewGroup.getChildAt(i);
-            if (child instanceof ViewGroup) {
-                // If the child is a ViewGroup, recursively apply the color
-                setTextColorForDialog((ViewGroup) child, color);
-            } else if (child instanceof TextView) {
-                // If the child is a TextView, set its text color
-                ((TextView) child).setTextColor(color);
-            }
-        }
-    }
-
     private void showInputControlsDialog() {
         final ContentDialog dialog = new ContentDialog(this, R.layout.input_controls_dialog);
         dialog.setTitle(R.string.input_controls);
         dialog.setIcon(R.drawable.icon_input_controls);
 
         final Spinner sProfile = dialog.findViewById(R.id.SProfile);
-
-        dialog.getWindow().setBackgroundDrawableResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-
-        // Set text color for all TextViews in the dialog to white or black based on dark mode
-        int textColor = ContextCompat.getColor(this, isDarkMode ? R.color.white : R.color.black);
-        ViewGroup dialogViewGroup = (ViewGroup) dialog.getWindow().getDecorView().findViewById(android.R.id.content);
-        setTextColorForDialog(dialogViewGroup, textColor);
 
         Runnable loadProfileSpinner = () -> {
             ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
@@ -2036,7 +2146,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 profileItems.add(profile.getName());
             }
 
-            sProfile.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, profileItems));
+            sProfile.setAdapter(SpinnerAdapters.create(this, isDarkMode, profileItems));
             sProfile.setSelection(selectedPosition);
         };
         loadProfileSpinner.run();
@@ -2899,7 +3009,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String maxDeviceMemory = graphicsDriverConfig.get("maxDeviceMemory");
         if (maxDeviceMemory != null && Integer.parseInt(maxDeviceMemory) > 0)
             envVars.put("WRAPPER_VMEM_MAX_SIZE", maxDeviceMemory);
-        
+
         String presentMode = graphicsDriverConfig.get("presentMode");
         if (presentMode.contains("immediate")) {
             envVars.put("WRAPPER_MAX_IMAGE_COUNT", "1");
@@ -3184,7 +3294,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             return 0;
         }
     }
-    
+
     private void extractWinComponentFiles() {
         Log.d("XServerDisplayActivity", "Extracting WinComponents");
         File rootDir = imageFs.getRootDir();
@@ -3400,7 +3510,4 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     }
 
 }
-
-
-
 

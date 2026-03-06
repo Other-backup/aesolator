@@ -1,7 +1,6 @@
 package com.winlator.cmod.contentdialog;
 
 import android.app.Activity;
-import android.util.Log;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -45,8 +44,10 @@ public class StorageInfoDialog extends ContentDialog {
             tvCacheSize.setText(StringUtils.formatBytes(cacheSize.get()));
             tvTotalSize.setText(StringUtils.formatBytes(totalSize.get()));
 
-            int progress = Math.toIntExact((totalSize.get() / internalStorageSize) * 100);
-            tvUsedSpace.setText(progress+"%");
+            int progress = internalStorageSize > 0
+                    ? Math.min(100, Math.round((totalSize.get() * 100f) / (float) internalStorageSize))
+                    : 0;
+            tvUsedSpace.setText(progress + "%");
             circularProgressIndicator.setProgress(progress, true);
         };
 
@@ -77,6 +78,8 @@ public class StorageInfoDialog extends ContentDialog {
             cacheSize.addAndGet(size);
             onAddSize.call(size);
         });
+
+        updateUI.run();
 
         ((TextView)findViewById(R.id.BTCancel)).setText(R.string.clear_cache);
         setOnCancelCallback(() -> {

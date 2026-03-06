@@ -26,7 +26,7 @@ public final class ThemeAssetPainter {
     public static void apply(Context context, View root, boolean isDarkMode) {
         if (context == null || root == null) return;
         int buttonTint = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
-        int iconTint = ContextCompat.getColor(context, isDarkMode ? R.color.forensic_badge_text_dark : R.color.colorPrimaryDark);
+        int iconTint = ContextCompat.getColor(context, isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
         int buttonDrawableTint = ContextCompat.getColor(context, R.color.white);
         traverse(root, buttonTint, iconTint, buttonDrawableTint, isDarkMode);
     }
@@ -100,18 +100,18 @@ public final class ThemeAssetPainter {
     private static void applyTaggedSurface(View view, boolean isDarkMode) {
         if (hasTagFlag(view, "theme_card")) {
             view.setBackgroundResource(isDarkMode
-                    ? R.drawable.forensic_panel_background_dark
-                    : R.drawable.forensic_panel_background);
+                    ? R.drawable.surface_card_background_dark
+                    : R.drawable.surface_card_background);
         }
 
         if (hasTagFlag(view, "theme_badge")) {
             view.setBackgroundResource(isDarkMode
-                    ? R.drawable.forensic_badge_background_dark
-                    : R.drawable.forensic_badge_background);
+                    ? R.drawable.surface_badge_background_dark
+                    : R.drawable.surface_badge_background);
             if (view instanceof TextView) {
                 ((TextView) view).setTextColor(ContextCompat.getColor(
                         view.getContext(),
-                        isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                        isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
                 ));
             }
         }

@@ -67,9 +67,9 @@ public class MainMenuGridFragment extends Fragment {
         TextView sectionLabel = view.findViewById(R.id.TVMainMenuSectionLabel);
         RecyclerView recyclerView = view.findViewById(R.id.RVMainMenuCards);
 
-        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
-        int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text);
-        int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.forensic_log_body_text : R.color.forensic_badge_text);
+        int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
+        int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+        int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
         heroCard.setBackgroundResource(panelBackground);
         heroTitle.setTextColor(titleColor);
         heroSubtitle.setTextColor(bodyColor);
@@ -122,8 +122,8 @@ public class MainMenuGridFragment extends Fragment {
                     requireContext(),
                     isDarkMode ? entry.darkColorRes : entry.lightColorRes
             );
-            int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text);
-            int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.forensic_log_body_text : R.color.forensic_badge_text);
+            int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+            int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
 
             GradientDrawable background = new GradientDrawable();
             background.setShape(GradientDrawable.RECTANGLE);

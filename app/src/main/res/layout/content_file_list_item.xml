@@ -2,23 +2,22 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:layout_marginTop="6dp"
+    android:background="@drawable/surface_card_background"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:tag="theme_card">
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/TVFileSource"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:orientation="vertical">
+        android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/TVFileSource"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <TextView
-            android:id="@+id/TVFileTarget"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
+    <TextView
+        android:id="@+id/TVFileTarget"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="13sp" />
 </LinearLayout>

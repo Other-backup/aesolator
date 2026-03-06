@@ -409,6 +409,64 @@ Phase 2 (Round 2 closure queue, all closed):
 17. Map remaining APK trans-layer contracts into runtime profile and forensic env surfaces.
 18. Run lane-by-lane no-regression matrix and move each promoted lane out of queue.
 
+## Current UI Closure Pass (Ae.solator Mainline)
+
+Closed in-tree during the current card-migration round:
+- Removed remaining active legacy `AlertDialog` surfaces from main app flows and Big Picture flows; active dialog routing is now `ContentDialog`-based.
+- Removed the last active runtime `DrawerLayout` / `NavigationView` shell from `XServerDisplayActivity`; the running-container control surface is now a native card-based side drawer triggered from runtime back/gesture paths.
+- Migrated secondary dialogs to card/badge layout surfaces:
+  - environment variable editor
+  - container selector
+  - storage info
+  - content info / untrusted content review
+  - CPU affinity picker
+  - debug log viewer shell
+  - download / preloader overlays
+  - input controls session dialog
+  - shortcut activity dialog
+  - Wine install options
+  - analog stick / gyroscope tuning dialogs
+- Reworked helper surfaces to match the same visual contract:
+  - content file rows
+  - CPU list rows
+  - image picker card
+  - About header/body cards
+  - runtime side drawer for live containers
+  - terminal activity shell
+  - input-controls fragment sections
+- Re-skinned task manager container/process telemetry surfaces off legacy `bordered_panel` shells into the same card treatment used by forensic and graphics center.
+- Removed dead legacy `GamepadConfiguratorDialog` + `dialog_gamepad_configurator.xml` to avoid keeping an unused parallel UI surface in-tree.
+- Normalized dialog copy/hints and removed remaining hardcoded dialog texts from active layout surfaces.
+- Fixed dialog-adjacent logic bugs found during migration:
+  - storage usage progress no longer uses truncated integer division
+  - gyro preview now unregisters its sensor listener on dismiss and reflects live slider values
+  - input controls session dialog no longer depends on recursive manual text recolor
+  - running-container menu actions no longer depend on legacy drawer state and remain callable through the new in-layout runtime drawer
+  - task-manager host telemetry strings moved to resources instead of hardcoded labels
+- Final polish pass closed remaining active legacy UI seams:
+  - controls editor toolbar is now a card-based runtime editor surface with consistent action buttons and helper copy
+  - control-element popup settings were rebuilt into sectioned card groups for general settings, bindings and appearance
+  - container, shortcut, controller-binding, external-controller, drive and env-var rows now render as card-style list surfaces instead of flat legacy rows
+  - file-picker and extra-keys editor content were rewritten into clearer, friendlier task-specific forms
+  - Big Picture landscape settings and details now use resource-backed labels instead of hardcoded strings
+  - runtime notification text, frame-rating copy and several fallback placeholders moved to string resources
+  - generic card and badge assets were redrawn into a unified surface-driven visual system used across dialogs, cards, selectors and helper surfaces
+  - remaining generic UI copy in About, Graphics Center, X11, task manager, file-picker, control editor and upscaler screens was rewritten for clearer first-use guidance
+  - fallback “not installed / not set” surfaces now use an honest dash marker instead of misleading placeholder text
+  - generic screens were detached from temporary forensic visual aliases; forensic assets are now left only in the forensic center and forensic log viewer
+  - the dead legacy comment tail in `styles.xml` and stale commented UI code paths were removed to keep the tree logically clean
+  - final static UI sweep removed the remaining menu hardcodes, right/left-only layout anchors and hardcoded layout colors from active app surfaces
+  - static verification is now clean for active app UI: no hardcoded layout/menu strings, no raw layout hex backgrounds, no `left/right` layout anchors outside legacy preference templates, no active `DrawerLayout` / `NavigationView` / `AlertDialog` paths
+  - the only remaining UI validation step is a live device-pass for the running container shell and overlays when an ADB device is attached
+  - safe code-cleanup pass removed orphan helper/resources with no in-tree references: `PatchElf`, `ContainerDiscovery`, `main_menu_header`, `wine_install_options_dialog`, `installed_wine_list_item`, `checkbox_spinner`
+  - `main_menu.xml` and `xserver_menu.xml` were intentionally retained as ID-contract resources because active code still depends on their generated `R.id.main_menu_*` constants
+  - `ContentsManager.applyContent()` no longer carries an empty wine-only branch, `ProcessHelper` no longer mirrors every debug line into stdout by default, and a small Big Picture comment/noise tail was removed without touching runtime behavior
+  - a clean upstream baseline was parked in `/home/mikhail/wcp-sources/winlator-bionic-upstream` and used to confirm/fix the original `MidiHandler`, `WinHandler` and `GuestProgramLauncherComponent` problem points rather than patching blindly against the dirty fork tree
+  - `MidiHandler` now has a real `MIDI_LONG` path, safe reset/close handling, larger datagram intake, defensive short-packet guards and explicit synth-init failure logging
+  - `WinHandler.bringToFront()` no longer relies on a fragile CJK-overflow workaround; the process name is now UTF-8 packed into the fixed packet budget safely
+  - fullscreen/XInput/sim-touch shortcut overrides are now parsed consistently through `Shortcut.getExtraBoolean()` across settings, launch-time env construction and runtime container shell
+  - toolbar title color on main shell surfaces was aligned with the shared surface palette instead of raw platform white constants
+
 ## No-Regression Contract
 
 A lane cannot be marked complete until all checks pass:

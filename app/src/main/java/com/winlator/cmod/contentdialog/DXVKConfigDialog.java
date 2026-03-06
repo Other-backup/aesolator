@@ -58,7 +58,7 @@ public class DXVKConfigDialog extends ContentDialog {
             return null;
         }
     }
-    
+
     public static final String[] VKD3D_FEATURE_LEVEL = {"12_0", "12_1", "12_2", "11_1", "11_0", "10_1", "10_0", "9_3", "9_2", "9_1"};
 
     private static int compareVersion(String varA, String varB) {
@@ -379,7 +379,7 @@ public class DXVKConfigDialog extends ContentDialog {
     private void applyPopupTheme(Spinner... spinners) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
-        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         for (Spinner spinner : spinners) {
             if (spinner != null) spinner.setPopupBackgroundResource(popupBg);
         }

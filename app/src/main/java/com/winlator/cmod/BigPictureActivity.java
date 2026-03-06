@@ -2,7 +2,6 @@ package com.winlator.cmod;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -54,6 +53,7 @@ import com.winlator.cmod.bigpicture.steamgrid.SteamGridSearchResponse;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LaunchSecurity;
 
@@ -139,18 +139,6 @@ public class BigPictureActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         getSupportActionBar().hide();  // Hide the action bar for full-screen mode
         setContentView(R.layout.big_picture_activity);
-
-//        // Set the background to ImageView for the tiled animation background
-//        ImageView parallaxBackgroundView = findViewById(R.id.parallaxBackgroundView);
-//        parallaxBackgroundView.setBackgroundResource(R.drawable.animated_background); // Use animation as background
-//
-//        // Get the AnimationDrawable and start it directly
-//        animatedBackground = (AnimationDrawable) parallaxBackgroundView.getBackground();
-//        animatedBackground.setOneShot(false); // Loop the animation
-//        parallaxBackgroundView.post(() -> animatedBackground.start());
-
-
-
         TiledBackgroundView backgroundView = findViewById(R.id.parallaxBackgroundView);
 
         Button selectWallpaperButton = findViewById(R.id.selectWallpaperButton);
@@ -443,7 +431,7 @@ public class BigPictureActivity extends AppCompatActivity {
             playDefaultMp3FromAssets();
 
             // Provide feedback to the user
-            Toast.makeText(this, "MP3 reset to default", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.mp3_reset_default, Toast.LENGTH_SHORT).show();
         });
 
 
@@ -501,33 +489,24 @@ public class BigPictureActivity extends AppCompatActivity {
 
                 if (videoId != null) {
                     loadYouTubeVideo(videoId);
-                    youtubeUrlInput.setText(savedUrl);  // Populate the input field with the saved URL
+                    youtubeUrlInput.setText(savedUrl);
                 } else {
-                    // If no saved URL or invalid, use the default video
                     loadYouTubeVideo(defaultVideoId);
-                    youtubeUrlInput.setText("");  // Clear the input field if invalid or default video is used
+                    youtubeUrlInput.setText("");
                 }
             }
         }
-
-
-
-
-        // Set the listener for the "Load Video" button
         loadVideoButton.setOnClickListener(v -> {
             String userUrl = youtubeUrlInput.getText().toString();
             if (userUrl != null && !userUrl.isEmpty()) {
                 String videoId = extractYouTubeId(userUrl);
                 if (videoId != null) {
-                    loadYouTubeVideo(videoId);  // Load the user-specified video
-
-                    // Save the YouTube URL to SharedPreferences
+                    loadYouTubeVideo(videoId);
                     SharedPreferences.Editor editor = preferences.edit();
                     editor.putString("saved_youtube_url", userUrl);
                     editor.apply();
                 } else {
-                    // Show an error message if the URL is invalid
-                    youtubeUrlInput.setError("Invalid YouTube URL");
+                    youtubeUrlInput.setError(getString(R.string.invalid_youtube_url));
                 }
             } else {
                 // Load the default video if no URL is entered
@@ -676,9 +655,9 @@ public class BigPictureActivity extends AppCompatActivity {
 
     private void updateBgMusicButtonText(Button button, boolean isEnabled) {
         if (isEnabled) {
-            button.setText("Disable BG Music");
+            button.setText(R.string.disable_bg_music);
         } else {
-            button.setText("Enable BG Music");
+            button.setText(R.string.enable_bg_music);
         }
     }
 
@@ -825,21 +804,17 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
     private void showCoverArtOptionsDialog() {
-        // Create an AlertDialog to show the options
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Cover Art Options")
-                .setItems(new CharSequence[]{"Remove Custom Cover Art", "Upload New Cover Art"}, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // Remove Custom Cover Art
-                            removeCustomCoverArt();
-                            break;
-                        case 1: // Upload New Cover Art
-                            promptForCustomCoverArtUpload();
-                            break;
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        String[] options = {
+                getString(R.string.remove_custom_cover_art),
+                getString(R.string.upload_new_cover_art)
+        };
+        ContentDialog.showSingleChoiceList(this, R.string.cover_art_options_title, options, which -> {
+            if (which == 0) {
+                removeCustomCoverArt();
+            } else if (which == 1) {
+                promptForCustomCoverArtUpload();
+            }
+        });
     }
 
     private void removeCustomCoverArt() {
@@ -965,13 +940,13 @@ public class BigPictureActivity extends AppCompatActivity {
         SharedPreferences playtimePrefs = getSharedPreferences("playtime_stats", Context.MODE_PRIVATE);
         long totalPlaytime = playtimePrefs.getLong(shortcut.name + "_playtime", 0);
         int playCount = playtimePrefs.getInt(shortcut.name + "_play_count", 0);
-        playCountView.setText("Times Played: " + playCount);
-        playtimeView.setText("Playtime: " + formatPlaytime(totalPlaytime));
+        playCountView.setText(getString(R.string.times_played, playCount));
+        playtimeView.setText(getString(R.string.playtime_total, formatPlaytime(totalPlaytime)));
 
         // Get the associated container for this shortcut (unchanged)
         Container container = manager.getContainerForShortcut(shortcut);
         String graphicsDriver = shortcut.getExtra("graphicsDriver");
-        
+
         setTextOrPlaceholder(graphicsDriverView, graphicsDriver, container.getGraphicsDriver());
         setTextOrPlaceholder(graphicsDriverVersionView, shortcut.getExtra("graphicsDroverConfig"), container.getGraphicsDriverConfig());
         setTextOrPlaceholder(dxWrapperView, shortcut.getExtra("dxwrapper"), container.getDXWrapper());
@@ -1030,7 +1005,7 @@ public class BigPictureActivity extends AppCompatActivity {
         } else if (!containerValue.isEmpty()) {
             textView.setText(containerValue); // Fallback to the container's value
         } else {
-            textView.setText("Not Set"); // Fallback if neither are available
+            textView.setText(R.string.not_set); // Fallback if neither are available
         }
     }
 
@@ -1041,7 +1016,7 @@ public class BigPictureActivity extends AppCompatActivity {
         } else if (!containerValue.isEmpty()) {
             textView.setText(label + containerValue); // Fallback to the container's value
         } else {
-            textView.setText(label + "Not Set"); // Fallback if neither are available
+            textView.setText(label + getString(R.string.not_set)); // Fallback if neither are available
         }
     }
 
@@ -1098,7 +1073,7 @@ public class BigPictureActivity extends AppCompatActivity {
             }
 
             uploadText = new TextView(this); // Initialize the uploadText variable
-            uploadText.setText("No suitable cover art found for " + shortcut.name + ". Click the image to upload custom cover art or rename the Shortcut to something SteamGrid can recognize.");
+            uploadText.setText(getString(R.string.big_picture_cover_art_missing, shortcut.name));
             uploadText.setTextColor(Color.WHITE);
             uploadText.setTextSize(18);
             uploadText.setPadding(20, 20, 20, 20);
@@ -1219,22 +1194,22 @@ public class BigPictureActivity extends AppCompatActivity {
                     editor.apply();
 
                     // Show dialog for display preference (center, stretch, tile)
-                    String[] displayOptions = {"Center", "Stretch", "Tile"};
-                    new AlertDialog.Builder(this)
-                            .setTitle("Select Display Mode")
-                            .setItems(displayOptions, (dialog, which) -> {
-                                // Save display mode
-                                editor.putString(WALLPAPER_DISPLAY_PREF_KEY, displayOptions[which].toLowerCase());
-                                editor.apply();
+                    String[] displayOptions = {
+                            getString(R.string.display_mode_center),
+                            getString(R.string.display_mode_stretch),
+                            getString(R.string.display_mode_tile)
+                    };
+                    String[] displayOptionValues = {"center", "stretch", "tile"};
+                    ContentDialog.showSingleChoiceList(this, R.string.select_display_mode, displayOptions, which -> {
+                        editor.putString(WALLPAPER_DISPLAY_PREF_KEY, displayOptionValues[which]);
+                        editor.apply();
 
-                                // Apply wallpaper based on the chosen mode
-                                try {
-                                    applyWallpaper(Uri.fromFile(wallpaperFile), displayOptions[which].toLowerCase());
-                                } catch (FileNotFoundException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            })
-                            .show();
+                        try {
+                            applyWallpaper(Uri.fromFile(wallpaperFile), displayOptionValues[which]);
+                        } catch (FileNotFoundException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -1625,14 +1600,14 @@ public class BigPictureActivity extends AppCompatActivity {
         // 1. DocumentFile from the tree URI
         DocumentFile docFolder = DocumentFile.fromTreeUri(this, folderUri);
         if (docFolder == null || !docFolder.isDirectory()) {
-            Toast.makeText(this, "Invalid folder selected!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.invalid_folder_selected, Toast.LENGTH_SHORT).show();
             return;
         }
 
         // 2. Iterate children
         DocumentFile[] docFiles = docFolder.listFiles();
         if (docFiles == null || docFiles.length == 0) {
-            Toast.makeText(this, "No files in folder!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.no_files_in_folder, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -1651,7 +1626,7 @@ public class BigPictureActivity extends AppCompatActivity {
         }
 
         if (bitmaps.isEmpty()) {
-            Toast.makeText(this, "No PNG files found in this folder!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.no_png_files_found, Toast.LENGTH_SHORT).show();
             return;
         }
 

@@ -14,10 +14,11 @@
             android:id="@+id/LLMainMenuHeroCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/forensic_panel_background"
+            android:background="@drawable/surface_card_background"
             android:minHeight="132dp"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:tag="theme_card">
 
             <TextView
                 android:id="@+id/TVMainMenuHeroTitle"
@@ -38,11 +39,13 @@
 
         <TextView
             android:id="@+id/TVMainMenuSectionLabel"
+            style="@style/FieldSetLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="@string/main_menu_home_section"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:tag="theme_badge" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/RVMainMenuCards"

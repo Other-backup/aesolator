@@ -12,6 +12,14 @@
         android:orientation="vertical"
         android:padding="8dp">
 
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -76,10 +84,10 @@
                     android:textStyle="bold"
                     android:textSize="18dp"
                     android:layout_gravity="bottom"
-                    android:layout_marginLeft="2dp"
-                    android:layout_marginRight="2dp"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
                     android:layout_marginBottom="4dp"
-                    android:text="x" />
+                    android:text="@string/screen_size_separator" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -138,16 +146,16 @@
                 android:id="@+id/TVWrapperVersionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Current Version:"
+                android:text="@string/installed_version"
                 android:textStyle="bold"
-                android:paddingRight="8dp" />
+                android:paddingEnd="8dp" />
 
             <TextView
                 android:id="@+id/TVGraphicsDriverVersion"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="default_version"
-                android:textColor="@android:color/holo_blue_dark" />
+                android:text=""
+                android:textColor="?attr/colorAccent" />
         </LinearLayout>
 
         <LinearLayout
@@ -165,7 +173,7 @@
                 android:id="@+id/BTHelpDXWrapper"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:layout_marginLeft="4dp"
+                android:layout_marginStart="4dp"
                 android:src="@drawable/icon_help"
                 app:tint="?attr/colorControlNormal" />
         </LinearLayout>
@@ -213,7 +221,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="64bit Emulator" />
+                android:text="@string/emulator_64bit" />
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
@@ -265,6 +273,14 @@
                 android:src="@drawable/icon_menu" />
         </LinearLayout>
 
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/general" />
+        </FrameLayout>
+
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/TabLayout"
             android:layout_width="match_parent"
@@ -304,10 +320,12 @@
 
                 <LinearLayout
                     style="@style/FieldSet"
-                    android:id="@+id/LLWinComponentsDirectX" />
+                    android:id="@+id/LLWinComponentsDirectX"
+                    android:tag="theme_card" />
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/directx" />
             </FrameLayout>
 
@@ -318,10 +336,12 @@
 
                 <LinearLayout
                     style="@style/FieldSet"
-                    android:id="@+id/LLWinComponentsGeneral" />
+                    android:id="@+id/LLWinComponentsGeneral"
+                    android:tag="theme_card" />
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/general" />
             </FrameLayout>
         </LinearLayout>
@@ -337,8 +357,8 @@
                 android:id="@+id/EnvVarsView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingLeft="16dp"
-                android:paddingRight="16dp"/>
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"/>
 
             <View style="@style/HorizontalLine" />
 
@@ -364,7 +384,9 @@
                 android:id="@+id/box64Frame"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -391,16 +413,19 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/box64" />
             </FrameLayout>
-            
+
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:id="@+id/fexcoreFrame"
                 android:layout_marginTop="8dp">
-                
-                <LinearLayout style="@style/FieldSet">
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -421,11 +446,12 @@
                         android:id="@+id/SFEXCorePreset"
                         android:layout_width="match_parent" />
                 </LinearLayout>
-                    
+
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/fexcore_config" />
-                    
+
             </FrameLayout>
 
             <FrameLayout
@@ -433,7 +459,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -449,6 +477,7 @@
                 <TextView
                     android:id="@+id/TVSystem"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/system" />
             </FrameLayout>
 
@@ -457,7 +486,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -487,6 +518,7 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/input_controls" />
             </FrameLayout>
 
@@ -495,7 +527,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -527,7 +561,7 @@
                             android:id="@+id/TVTapTimeoutMs"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="200 ms" />
+                            android:text="" />
                     </LinearLayout>
                     <SeekBar
                         android:id="@+id/SBTapTimeoutMs"
@@ -549,7 +583,7 @@
                             android:id="@+id/TVTapTravelPx"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="10 px" />
+                            android:text="" />
                     </LinearLayout>
                     <SeekBar
                         android:id="@+id/SBTapTravelPx"
@@ -571,7 +605,7 @@
                             android:id="@+id/TVScrollStepPx"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="100 px" />
+                            android:text="" />
                     </LinearLayout>
                     <SeekBar
                         android:id="@+id/SBScrollStepPx"
@@ -593,7 +627,7 @@
                             android:id="@+id/TVScrollZonePx"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="350 px" />
+                            android:text="" />
                     </LinearLayout>
                     <SeekBar
                         android:id="@+id/SBScrollZonePx"
@@ -605,6 +639,7 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/touchpad_help" />
             </FrameLayout>
 
@@ -613,7 +648,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
 
                     <LinearLayout
                         android:id="@+id/LLDinputMapperType"
@@ -674,6 +711,7 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/game_controller" />
             </FrameLayout>
 
@@ -682,7 +720,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -716,6 +756,7 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/system" />
             </FrameLayout>
 
@@ -724,7 +765,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" >
 
-                <LinearLayout style="@style/FieldSet" >
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card" >
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -969,6 +1012,7 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/upscaler_title" />
             </FrameLayout>
 

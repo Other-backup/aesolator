@@ -40,7 +40,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
         String installedArchitectureSummary = manager.getInstalledArchitectureSummary();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = preferences.getBoolean("dark_mode", false);
-        int popupBg = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
 
         setIcon(R.drawable.icon_settings);
         setTitle(R.string.dgvoodoo_configuration);

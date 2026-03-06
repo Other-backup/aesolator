@@ -202,21 +202,21 @@ public class ContentsFragment extends Fragment {
                 isDarkMode,
                 getResources().getStringArray(R.array.contents_source_entries)
         ));
-        sContentsSourceMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sContentsSourceMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         sContentsChannelMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
                 isDarkMode,
                 getResources().getStringArray(R.array.contents_channel_entries)
         ));
-        sContentsChannelMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sContentsChannelMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         sContentsArchMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
                 isDarkMode,
                 getResources().getStringArray(R.array.contents_arch_entries)
         ));
-        sContentsArchMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sContentsArchMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         applyFilterSpinnerTheme();
 
         setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
@@ -288,7 +288,7 @@ public class ContentsFragment extends Fragment {
             typeList.add(getTypeLabel(type));
         }
         spinner.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, typeList));
-        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
     }
 
     private void setSpinnerSelectionByValue(Spinner spinner, String[] values, String value, int fallbackIndex) {
@@ -504,7 +504,7 @@ public class ContentsFragment extends Fragment {
         sContentsChannelMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, channelEntries));
         sContentsArchMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, archEntries));
 
-        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         sContentsChannelMode.setPopupBackgroundResource(popupBackground);
         sContentsArchMode.setPopupBackgroundResource(popupBackground);
         applyFilterSpinnerTheme();

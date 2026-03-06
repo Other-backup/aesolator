@@ -17,7 +17,7 @@
         android:scaleType="fitCenter"
         android:src="@drawable/number_picker_decrement"
         app:tint="@color/white" />
-    
+
     <EditText
         style="@style/EditText"
         android:id="@+id/EditText"
@@ -26,8 +26,8 @@
         android:layout_weight="1"
         android:gravity="center"
         android:focusable="false"
-        android:layout_marginLeft="4dp"
-        android:layout_marginRight="4dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
         android:focusableInTouchMode="false"
         android:inputType="number" />
 

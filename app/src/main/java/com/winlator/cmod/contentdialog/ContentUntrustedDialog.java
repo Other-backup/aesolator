@@ -3,7 +3,6 @@ package com.winlator.cmod.contentdialog;
 import android.content.Context;
 import android.widget.TextView;
 
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,7 +20,6 @@ public class ContentUntrustedDialog extends ContentDialog {
         RecyclerView recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setAdapter(new ContentInfoDialog.ContentInfoFileAdapter(contentFiles));
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-        recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
         ((TextView) (findViewById(R.id.BTConfirm))).setText(R.string._continue);
     }
 }

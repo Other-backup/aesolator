@@ -12,7 +12,7 @@
         android:background="?attr/colorPrimary"
         app:title="@string/app_name"
         app:titleTextAppearance="@style/TextAppearance.AppCompat.Medium"
-        app:titleTextColor="#ffffff" />
+        app:titleTextColor="@color/surface_table_head_text" />
 
     <FrameLayout
         android:id="@+id/FLFragmentContainer"

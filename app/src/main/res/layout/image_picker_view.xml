@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center">
+    android:gravity="center"
+    android:orientation="vertical">
 
     <FrameLayout
-        android:layout_width="140dp"
-        android:layout_height="140dp"
-        android:background="@drawable/bordered_panel">
+        android:layout_width="148dp"
+        android:layout_height="148dp"
+        android:background="@drawable/surface_card_background"
+        android:padding="6dp"
+        android:tag="theme_card">
 
         <ImageView
             android:id="@+id/ImageView"
-            android:layout_width="130dp"
-            android:layout_height="130dp"
-            android:scaleType="centerCrop"
-            android:layout_gravity="center" />
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop" />
 
         <ImageView
             android:id="@+id/BTRemove"
             android:layout_width="34dp"
             android:layout_height="34dp"
-            android:src="@drawable/remove_button"
+            android:layout_gravity="end"
             android:layout_margin="5dp"
-            android:layout_gravity="right"
+            android:src="@drawable/remove_button"
+            android:tag="no_theme_tint"
             android:visibility="gone" />
     </FrameLayout>
 
-    <View style="@style/HorizontalLine" />
-
     <Button
-        style="@style/ButtonNeutral"
         android:id="@+id/BTBrowse"
-        android:layout_width="130dp"
+        style="@style/ButtonNeutral"
+        android:layout_width="148dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
         android:text="@string/browse" />
 </LinearLayout>

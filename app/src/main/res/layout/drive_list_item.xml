@@ -3,13 +3,16 @@
     android:orientation="horizontal"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical">
+    android:gravity="center_vertical"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    android:padding="10dp">
 
     <Spinner
         style="@style/ComboBox"
         android:id="@+id/Spinner"
         android:layout_width="100dp"
-        android:layout_marginRight="4dp" />
+        android:layout_marginEnd="8dp" />
 
     <EditText
         style="@style/EditText"
@@ -21,10 +24,12 @@
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTSearch"
+        android:layout_marginStart="8dp"
         android:src="@drawable/icon_open" />
 
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTRemove"
+        android:layout_marginStart="6dp"
         android:src="@drawable/icon_remove" />
 </LinearLayout>

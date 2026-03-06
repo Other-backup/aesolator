@@ -12,17 +12,20 @@
         android:id="@+id/Toolbar"
         android:background="?attr/colorPrimary"
         app:layout_scrollFlags="enterAlways|scroll"
-        app:titleTextColor="#ffffff"
+        app:titleTextColor="@color/surface_table_head_text"
         app:titleTextAppearance="@style/TextAppearance.AppCompat.Medium" />
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:padding="12dp">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/RecyclerView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="12dp"
             android:scrollbars="vertical"
             app:layoutManager="LinearLayoutManager" />
 
@@ -32,7 +35,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="@string/press_any_button_on_your_controller"
-            android:textSize="24sp"
+            android:textSize="18sp"
             android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

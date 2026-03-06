@@ -1,18 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="6dp">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="8dp">
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/debug_log_hint"
+        android:textSize="13sp" />
 
-        <com.winlator.cmod.widget.LogView
-            android:id="@+id/LogView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:minHeight="180dp" />
-    </LinearLayout>
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            style="@style/FieldSet"
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:tag="theme_card"
+            android:minHeight="220dp">
+
+            <com.winlator.cmod.widget.LogView
+                android:id="@+id/LogView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:minHeight="180dp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/logs"
+            android:textStyle="bold" />
+    </FrameLayout>
 </LinearLayout>

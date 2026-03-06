@@ -1,11 +1,11 @@
     package com.winlator.cmod.container;
 
-    import android.graphics.Bitmap;
-    import android.graphics.BitmapFactory;
-    import android.util.Log;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Log;
 
-    import com.winlator.cmod.core.FileUtils;
-    import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -138,15 +138,21 @@ import java.nio.file.Files;
             try {
                 return extraData.has(name) ? extraData.getString(name) : fallback;
             }
-            catch (JSONException e) {
-                return fallback;
-            }
+        catch (JSONException e) {
+            return fallback;
         }
+    }
 
-        public void putExtra(String name, String value) {
-            try {
-                if (value != null) {
-                    extraData.put(name, value);
+    public boolean getExtraBoolean(String name, boolean fallback) {
+        String value = getExtra(name);
+        if (value == null || value.isEmpty()) return fallback;
+        return value.equals("1") || value.equals("t") || value.equalsIgnoreCase("true");
+    }
+
+    public void putExtra(String name, String value) {
+        try {
+            if (value != null) {
+                extraData.put(name, value);
                 }
                 else extraData.remove(name);
             }
@@ -289,7 +295,7 @@ import java.nio.file.Files;
         public int getContainerId() {
             return container.id;
         }
-         
+
         public String getExecutable() {
             String exe = "";
             try {
@@ -304,7 +310,7 @@ import java.nio.file.Files;
             catch (IOException e) {
                 throw new RuntimeException(e);
             }
-        
+
             return exe;
         }
 

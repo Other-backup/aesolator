@@ -28,7 +28,7 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
         setIcon(R.drawable.icon_debug);
         setTitle(context.getString(R.string.logs));
         logView = findViewById(R.id.LogView);
-        
+
         logView.getLayoutParams().width = (int)UnitUtils.dpToPx(UnitUtils.pxToDp(AppUtils.getScreenWidth()) * 0.7f);
 
         findViewById(R.id.BTCancel).setVisibility(View.GONE);
@@ -62,11 +62,11 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
             throw new RuntimeException(e);
         }
     }
-    
+
     public static void setPaused(boolean cond) {
         paused = cond;
     }
-    
+
     public static boolean getPaused() {
         return paused;
     }

@@ -1,7 +1,6 @@
 package com.winlator.cmod;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -218,11 +217,11 @@ public class SettingsFragment extends Fragment {
                 sRuntimeProfileGlobal,
                 preferences.getString("runtime_profile_global", RuntimeProfile.AUTO)
         );
-        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         final Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
 
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         final View btInstallSF = view.findViewById(R.id.BTInstallSF);
         final View btRemoveSF = view.findViewById(R.id.BTRemoveSF);
@@ -423,14 +422,14 @@ public class SettingsFragment extends Fragment {
     private void applyDynamicStyles(View view, boolean isDarkMode) {
 
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         Spinner sRuntimeProfileGlobal = view.findViewById(R.id.SRuntimeProfileGlobal);
-        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sRuntimeProfileGlobal.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         Spinner sDri3Mode = view.findViewById(R.id.SDri3Mode);
-        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
     }
 
     private void applyDynamicStylesRecursively(View view) {
@@ -479,8 +478,8 @@ public class SettingsFragment extends Fragment {
     private void applyModernSectionCards(View root, boolean isDarkMode) {
         if (root == null) return;
         int panelBackground = isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background;
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background;
         int[] labelIds = new int[]{
                 R.id.TVBox64,
                 R.id.TVFEXCore,
@@ -522,11 +521,11 @@ public class SettingsFragment extends Fragment {
         if (textView == null) return;
         Context context = textView.getContext();
         textView.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_badge_background_dark
-                : R.drawable.forensic_badge_background);
+                ? R.drawable.surface_badge_background_dark
+                : R.drawable.surface_badge_background);
         textView.setTextColor(ContextCompat.getColor(
                 context,
-                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         ));
         textView.bringToFront();
     }
@@ -618,7 +617,7 @@ public class SettingsFragment extends Fragment {
         Callback<String> onExportPreset = (String prefix) -> {
             final String presetId = Box64PresetManager.getSpinnerSelectedId(spinners.get(prefix));
             if (!presetId.startsWith(Box64Preset.CUSTOM)) {
-                AppUtils.showToast(context, "Cannot export this preset");
+                AppUtils.showToast(context, R.string.preset_export_custom_only);
                 return;
             }
             getActivity().runOnUiThread(() ->  {
@@ -680,7 +679,7 @@ public class SettingsFragment extends Fragment {
         Callback<String> onExportPreset = (String prefix) -> {
             final String presetId = FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset);
             if (!presetId.startsWith(FEXCorePreset.CUSTOM)) {
-                AppUtils.showToast(context, "Cannot export this preset");
+                AppUtils.showToast(context, R.string.preset_export_custom_only);
                 return;
             }
             getActivity().runOnUiThread(() ->  {
@@ -796,7 +795,7 @@ public class SettingsFragment extends Fragment {
                                     Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                             );
                         } catch (SecurityException e) {
-                            AppUtils.showToast(getContext(), "Unable to take persistable permissions: " + e.getMessage());
+                            AppUtils.showToast(getContext(), getString(R.string.persistable_permission_error, e.getMessage()));
                         }
 
                         // Convert the URI to an absolute path and display it
@@ -819,7 +818,7 @@ public class SettingsFragment extends Fragment {
                                     Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                             );
                         } catch (SecurityException e) {
-                            AppUtils.showToast(getContext(), "Unable to take persistable permissions: " + e.getMessage());
+                            AppUtils.showToast(getContext(), getString(R.string.persistable_permission_error, e.getMessage()));
                         }
 
                         // Convert the URI to an absolute path and display it

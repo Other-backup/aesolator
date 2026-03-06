@@ -9,20 +9,20 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginRight="4dp">
+        android:layout_marginEnd="4dp">
 
         <TextView
             android:id="@+id/TextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="start"
-            android:paddingRight="22dp"
+            android:paddingEnd="22dp"
             android:maxLines="1" />
 
         <ImageView
             android:id="@+id/BTHelp"
             style="@style/HelpButton"
-            android:layout_gravity="right" />
+            android:layout_gravity="end" />
     </FrameLayout>
 
     <LinearLayout

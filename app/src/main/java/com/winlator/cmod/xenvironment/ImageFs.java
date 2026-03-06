@@ -99,11 +99,11 @@ public class ImageFs {
     }
 
     public File getBinDir() { return new File(rootDir, "/usr/bin"); }
-    
+
     public File getShareDir() {
         return new File(rootDir, "/usr/share");
     }
-    
+
     public File getEtcDir() {
         return new File(rootDir, "/usr/etc");
     }

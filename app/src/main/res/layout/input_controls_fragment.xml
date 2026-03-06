@@ -2,269 +2,296 @@
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
     <LinearLayout
-        android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingBottom="96dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/profile" />
-
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_height="wrap_content">
 
-            <Spinner
-                style="@style/ComboBox"
-                android:id="@+id/SProfile"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:spinnerMode="dialog"/>
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
 
-            <ImageButton
-                style="@style/ListMenuButton"
-                android:id="@+id/BTAddProfile"
-                android:src="@drawable/icon_add" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile" />
 
-            <ImageButton
-                style="@style/ListMenuButton"
-                android:id="@+id/BTEditProfile"
-                android:src="@drawable/icon_edit" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <ImageButton
-                style="@style/ListMenuButton"
-                android:id="@+id/BTDuplicateProfile"
-                android:src="@drawable/icon_duplicate" />
+                    <Spinner
+                        android:id="@+id/SProfile"
+                        style="@style/ComboBox"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:spinnerMode="dialog" />
 
-            <ImageButton
-                style="@style/ListMenuButton"
-                android:id="@+id/BTRemoveProfile"
-                android:layout_marginRight="0dp"
-                android:src="@drawable/icon_remove" />
-        </LinearLayout>
+                    <ImageButton
+                        android:id="@+id/BTAddProfile"
+                        style="@style/ListMenuButton"
+                        android:contentDescription="@string/add"
+                        android:src="@drawable/icon_add"
+                        android:tooltipText="@string/add" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+                    <ImageButton
+                        android:id="@+id/BTEditProfile"
+                        style="@style/ListMenuButton"
+                        android:contentDescription="@string/edit"
+                        android:src="@drawable/icon_edit"
+                        android:tooltipText="@string/edit" />
+
+                    <ImageButton
+                        android:id="@+id/BTDuplicateProfile"
+                        style="@style/ListMenuButton"
+                        android:contentDescription="@string/duplicate"
+                        android:src="@drawable/icon_duplicate"
+                        android:tooltipText="@string/duplicate" />
+
+                    <ImageButton
+                        android:id="@+id/BTRemoveProfile"
+                        style="@style/ListMenuButton"
+                        android:contentDescription="@string/remove"
+                        android:layout_marginEnd="0dp"
+                        android:src="@drawable/icon_remove"
+                        android:tooltipText="@string/remove" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/overlay_opacity" />
+
+                    <TextView
+                        android:id="@+id/TVUiOpacity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/SBOverlayOpacity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:min="10" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTImportProfile"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/import_profile" />
+
+                    <Button
+                        android:id="@+id/BTExportProfile"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/export_profile" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/BTControlsEditor"
+                    style="@style/ButtonPositive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/controls_editor" />
+            </LinearLayout>
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/overlay_opacity"/>
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/profile" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <CheckBox
+                    android:id="@+id/CBGyroEnabled"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_right_stick_gyro" />
+
+                <TextView
+                    android:id="@+id/TVGyroTriggerLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/gyro_activator_button" />
+
+                <Spinner
+                    android:id="@+id/SBGyroTriggerButton"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:entries="@array/button_options" />
+
+                <RadioGroup
+                    android:id="@+id/RGyroMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/RBHoldMode"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="12dp"
+                        android:layout_weight="1"
+                        android:text="@string/hold_mode" />
+
+                    <RadioButton
+                        android:id="@+id/RBToggleMode"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/toggle_mode" />
+                </RadioGroup>
+
+                <Button
+                    android:id="@+id/BTConfigureGyro"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/calibrate_gyroscope" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/TVUiOpacity"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/gyro_section_title" />
+        </FrameLayout>
 
-        <SeekBar
-            android:id="@+id/SBOverlayOpacity"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:min="10"
-            android:max="100" />
+            android:layout_marginTop="12dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="Gyroscope"
-            android:textColor="?attr/colorControlNormal"
-            android:layout_marginTop="8dp" />
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
 
-        <View
-            style="@style/HorizontalLine"
-            android:layout_marginTop="16dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-        <CheckBox
-            android:id="@+id/CBGyroEnabled"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enable Right-Stick Gyroscope (Experimental)"
-            android:layout_marginBottom="16dp" /> <!-- Added margin for better spacing -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/trigger_type" />
 
-        <!-- Gyro Activator Button Label -->
-        <TextView
-            android:id="@+id/TVGyroTriggerLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Gyro Activator Button:"
-            android:layout_marginBottom="8dp"/> <!-- Add some bottom margin for better spacing -->
+                    <ImageView
+                        android:id="@+id/BTHelpTriggerMode"
+                        style="@style/HelpButton"
+                        android:layout_gravity="center" />
+                </LinearLayout>
 
-        <!-- Spinner for selecting the gyro trigger button -->
-        <Spinner
-            android:id="@+id/SBGyroTriggerButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:entries="@array/button_options"
-            android:layout_marginBottom="16dp" /> <!-- Add bottom margin to separate it from other elements -->
+                <RadioGroup
+                    android:id="@+id/RGTriggerType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
 
-        <!-- RadioGroup for selecting gyro mode (toggle/hold) -->
-        <RadioGroup
-            android:id="@+id/RGyroMode"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+                    <RadioButton
+                        android:id="@+id/RBTriggerIsButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/as_button" />
 
-            <RadioButton
-                android:id="@+id/RBHoldMode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hold Mode"
-                android:layout_marginEnd="16dp" /> <!-- Add end margin for spacing -->
+                    <RadioButton
+                        android:id="@+id/RBTriggerIsAxis"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/as_axis" />
 
-            <RadioButton
-                android:id="@+id/RBToggleMode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Toggle Mode" />
-        </RadioGroup>
+                    <RadioButton
+                        android:id="@+id/RBTriggerIsMixed"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/mixed"
+                        android:visibility="gone" />
+                </RadioGroup>
 
-        <!-- Configure Gyroscope Button -->
-        <Button
-            style="@style/ButtonNeutral"
-            android:id="@+id/BTConfigureGyro"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Calibrate Gyroscope" /> <!-- Add top margin for spacing -->
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="Trigger"
-            android:textColor="?attr/colorControlNormal"
-            android:layout_marginTop="8dp" />
-
-        <View
-            style="@style/HorizontalLine"
-            android:layout_marginTop="16dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+                <Button
+                    android:id="@+id/BTConfigureAnalogSticks"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/configure_analog_sticks_title" />
+            </LinearLayout>
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/trigger_type"
-                android:layout_gravity="center"/>
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/trigger_section_title" />
+        </FrameLayout>
 
-            <ImageView
-                android:id="@+id/BTHelpTriggerMode"
-                android:layout_gravity="center"
-                style="@style/HelpButton" />
-        </LinearLayout>
-
-
-        <RadioGroup
-            android:id="@+id/RGTriggerType"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <RadioButton
-                android:id="@+id/RBTriggerIsButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/as_button"/>
+            android:layout_marginTop="12dp">
 
-            <RadioButton
-                android:id="@+id/RBTriggerIsAxis"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/as_axis"/>
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
 
-            <RadioButton
-                android:id="@+id/RBTriggerIsMixed"
-                android:visibility="gone"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/mixed"/>
-        </RadioGroup>
+                <LinearLayout
+                    android:id="@+id/LLExternalControllers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
 
-        <Button
-            style="@style/ButtonNeutral"
-            android:id="@+id/BTConfigureAnalogSticks"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Configure Analog Sticks"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp" />
-
-        <View
-            style="@style/HorizontalLine"
-            android:layout_marginTop="16dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                style="@style/ButtonNeutral"
-                android:id="@+id/BTImportProfile"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/import_profile" />
-
-            <Button
-                style="@style/ButtonNeutral"
-                android:id="@+id/BTExportProfile"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/export_profile" />
-        </LinearLayout>
-
-        <View style="@style/HorizontalLine" />
-
-        <Button
-            style="@style/ButtonPositive"
-            android:id="@+id/BTControlsEditor"
-            android:layout_width="240dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:text="@string/controls_editor" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="@string/external_controllers"
-            android:textColor="?attr/colorControlNormal"
-            android:layout_marginTop="8dp" />
-
-        <View style="@style/HorizontalLine" />
-
-        <LinearLayout
-            android:id="@+id/LLExternalControllers"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-
-        <TextView
-            android:id="@+id/TVEmptyText"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="@string/no_items_to_display"
-            android:visibility="gone" />
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/external_controllers" />
+        </FrameLayout>
     </LinearLayout>
 </ScrollView>

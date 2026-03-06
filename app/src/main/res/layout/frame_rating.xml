@@ -8,23 +8,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="2dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginLeft="10dp"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="10dp"
         android:gravity="center_vertical"
-        android:background="#33000000">
+        android:background="@drawable/overlay_metric_background">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:text="FPS:"
-            android:textColor="#0277bd"
+            android:textSize="12sp"
+            android:text="@string/fps_label"
+            android:textColor="@color/overlay_metric_fps"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:layout_marginRight="5dp" />
+            android:layout_marginEnd="5dp" />
 
         <TextView
             android:id="@+id/TVFPS"
@@ -32,9 +35,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:text="0"
-            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:text="@string/default_metric_zero"
+            android:textColor="@color/overlay_metric_value"
             android:includeFontPadding="false"
             android:maxLines="1" />
     </LinearLayout>
@@ -42,23 +45,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="2dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginLeft="10dp"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="10dp"
         android:gravity="center_vertical"
-        android:background="#33000000">
+        android:background="@drawable/overlay_metric_background">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:text="Renderer:"
-            android:textColor="#fc0303"
+            android:textSize="12sp"
+            android:text="@string/renderer_label"
+            android:textColor="@color/overlay_metric_renderer"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:layout_marginRight="5dp" />
+            android:layout_marginEnd="5dp" />
 
         <TextView
             android:id="@+id/TVRenderer"
@@ -66,8 +72,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:textColor="@color/overlay_metric_value"
             android:includeFontPadding="false"
             android:maxLines="1" />
     </LinearLayout>
@@ -75,23 +81,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="2dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginLeft="10dp"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="10dp"
         android:gravity="center_vertical"
-        android:background="#33000000">
+        android:background="@drawable/overlay_metric_background">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:text="GPU:"
-            android:textColor="#5c23a6"
+            android:textSize="12sp"
+            android:text="@string/gpu_label"
+            android:textColor="@color/overlay_metric_gpu"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:layout_marginRight="5dp" />
+            android:layout_marginEnd="5dp" />
 
         <TextView
             android:id="@+id/TVGPU"
@@ -99,8 +108,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:textColor="@color/overlay_metric_value"
             android:includeFontPadding="false"
             android:maxLines="1" />
     </LinearLayout>
@@ -108,23 +117,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="2dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginLeft="10dp"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="10dp"
         android:gravity="center_vertical"
-        android:background="#33000000">
+        android:background="@drawable/overlay_metric_background">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:text="RAM:"
-            android:textColor="#23a6a4"
+            android:textSize="12sp"
+            android:text="@string/ram_label"
+            android:textColor="@color/overlay_metric_ram"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:layout_marginRight="5dp" />
+            android:layout_marginEnd="5dp" />
 
         <TextView
             android:id="@+id/TVRAM"
@@ -132,8 +144,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textStyle="bold"
-            android:textSize="12dp"
-            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:textColor="@color/overlay_metric_value"
             android:includeFontPadding="false"
             android:maxLines="1" />
     </LinearLayout>

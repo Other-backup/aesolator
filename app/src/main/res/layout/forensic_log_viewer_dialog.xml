@@ -4,7 +4,8 @@
     android:layout_height="wrap_content"
     android:background="@drawable/forensic_panel_background_dark"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:padding="10dp"
+    android:tag="theme_card">
 
     <TextView
         android:id="@+id/TVForensicLogFile"
@@ -22,26 +23,35 @@
         android:textSize="12sp"
         android:typeface="monospace" />
 
-    <Button
-        android:id="@+id/BTForensicCopyLog"
-        style="@style/ButtonNeutral"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/copy" />
+        android:layout_marginTop="10dp"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/BTForensicExportLog"
-        style="@style/ButtonNeutral"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/diagnostics_forensic_log_export" />
+        <Button
+            android:id="@+id/BTForensicCopyLog"
+            style="@style/ButtonNeutral"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/diagnostics_forensic_log_copy" />
+
+        <Button
+            android:id="@+id/BTForensicExportLog"
+            style="@style/ButtonNeutral"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="@string/diagnostics_forensic_log_export" />
+    </LinearLayout>
 
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="360dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:background="@drawable/forensic_command_background_dark"
         android:padding="8dp"
         android:scrollbars="horizontal">

@@ -1,9 +1,12 @@
 package com.winlator.cmod;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -22,12 +25,14 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
-import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -41,11 +46,13 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     private ExternalController controller;
     private RecyclerView recyclerView;
     private ControllerBindingsAdapter adapter;
+    private boolean isDarkMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.external_controller_bindings_activity);
+        isDarkMode = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
 
         Intent intent = getIntent();
         int profileId = intent.getIntExtra("profile_id", 0);
@@ -69,9 +76,9 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         emptyTextView = findViewById(R.id.TVEmptyText);
         recyclerView = findViewById(R.id.RecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
         recyclerView.setAdapter(adapter = new ControllerBindingsAdapter());
         updateEmptyTextView();
+        ThemeAssetPainter.apply(this, findViewById(android.R.id.content), isDarkMode);
     }
 
 //    private void updateControllerBinding(int keyCode, Binding binding) {
@@ -217,7 +224,13 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             final ExternalControllerBinding item = controller.getControllerBindingAt(position);
+            int accent = ContextCompat.getColor(
+                    ExternalControllerBindingsActivity.this,
+                    isDarkMode ? R.color.colorAccentDark : R.color.colorAccent
+            );
             holder.title.setText(item.toString());
+            holder.title.setTextColor(accent);
+            holder.itemView.setBackground(buildRowBackground(accent));
             loadBindingSpinner(holder, item);
             holder.removeButton.setOnClickListener((view) -> {
                 controller.removeControllerBinding(item);
@@ -311,7 +324,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     private void animateItemView(int position) {
         final ControllerBindingsAdapter.ViewHolder holder = (ControllerBindingsAdapter.ViewHolder)recyclerView.findViewHolderForAdapterPosition(position);
         if (holder != null) {
-            final int color = ContextCompat.getColor(this, R.color.colorAccent);
+            final int color = ContextCompat.getColor(this, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
             final ValueAnimator animator = ValueAnimator.ofFloat(0.4f, 0.0f);
             animator.setDuration(200);
             animator.setInterpolator(new AccelerateDecelerateInterpolator());
@@ -319,7 +332,27 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 float alpha = (float)animation.getAnimatedValue();
                 holder.itemView.setBackgroundColor(Color.argb((int)(alpha * 255), Color.red(color), Color.green(color), Color.blue(color)));
             });
+            animator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    holder.itemView.setBackground(buildRowBackground(color));
+                }
+            });
             animator.start();
         }
+    }
+
+    private GradientDrawable buildRowBackground(int accent) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(UnitUtils.dpToPx(14));
+        background.setColor(withAlpha(accent, isDarkMode ? 50 : 20));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 130));
+        return background;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        int clamped = Math.max(0, Math.min(255, alpha));
+        return (color & 0x00ffffff) | (clamped << 24);
     }
 }

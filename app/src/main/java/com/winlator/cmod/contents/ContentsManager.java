@@ -587,20 +587,20 @@ public class ContentsManager {
     }
 
     public boolean applyContent(ContentProfile profile) {
-        if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE) {
-            for (ContentProfile.ContentFile contentFile : profile.fileList) {
-                File targetFile = new File(getPathFromTemplate(contentFile.target));
-                File sourceFile = new File(getInstallDir(context, profile), contentFile.source);
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE) {
+            return true;
+        }
 
-                targetFile.delete();
-                FileUtils.copy(sourceFile, targetFile);
+        for (ContentProfile.ContentFile contentFile : profile.fileList) {
+            File targetFile = new File(getPathFromTemplate(contentFile.target));
+            File sourceFile = new File(getInstallDir(context, profile), contentFile.source);
 
-                if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
-                    FileUtils.chmod(targetFile, 0771);
-                }
+            targetFile.delete();
+            FileUtils.copy(sourceFile, targetFile);
+
+            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
+                FileUtils.chmod(targetFile, 0771);
             }
-        } else {
-            // TODO: do nothing?
         }
         return true;
     }
@@ -783,4 +783,3 @@ public class ContentsManager {
         return "generic";
     }
 }
-

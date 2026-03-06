@@ -24,10 +24,12 @@
                 <TextView
                     android:id="@+id/TVBox64"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/box64" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
@@ -54,51 +56,47 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="start"
-                        android:paddingTop="4dp">
+                        android:gravity="center_horizontal"
+                        android:paddingTop="6dp">
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTAddBox64Preset"
-                            android:tooltipText="Add"
+                            android:tooltipText="@string/add"
                             android:src="@drawable/icon_add" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTEditBox64Preset"
-                            android:tooltipText="Edit"
+                            android:tooltipText="@string/edit"
                             android:src="@drawable/icon_edit" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Duplicate"
+                            android:tooltipText="@string/duplicate"
                             android:id="@+id/BTDuplicateBox64Preset"
                             android:src="@drawable/icon_duplicate" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Remove"
+                            android:tooltipText="@string/remove"
                             android:id="@+id/BTRemoveBox64Preset"
-                            android:layout_marginRight="0dp"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_remove" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTExportBox64Preset"
-                            android:tooltipText="Export"
-                            android:layout_marginRight="0dp"
+                            android:tooltipText="@string/export"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_export" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Import"
+                            android:tooltipText="@string/import"
                             android:id="@+id/BTImportBox64Preset"
-                            android:layout_marginRight="0dp"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_popup_menu_download" />
-
-                        <Space
-                            android:layout_width="75dp"
-                            android:layout_height="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -112,10 +110,12 @@
                 <TextView
                     android:id="@+id/TVFEXCore"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/fexcore_config" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
@@ -142,51 +142,47 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="start"
-                        android:paddingTop="4dp">
+                        android:gravity="center_horizontal"
+                        android:paddingTop="6dp">
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTAddFEXCorePreset"
-                            android:tooltipText="Add"
+                            android:tooltipText="@string/add"
                             android:src="@drawable/icon_add" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTEditFEXCorePreset"
-                            android:tooltipText="Edit"
+                            android:tooltipText="@string/edit"
                             android:src="@drawable/icon_edit" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Duplicate"
+                            android:tooltipText="@string/duplicate"
                             android:id="@+id/BTDuplicateFEXCorePreset"
                             android:src="@drawable/icon_duplicate" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Remove"
+                            android:tooltipText="@string/remove"
                             android:id="@+id/BTRemoveFEXCorePreset"
-                            android:layout_marginRight="0dp"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_remove" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTExportFEXCorePreset"
-                            android:tooltipText="Export"
-                            android:layout_marginRight="0dp"
+                            android:tooltipText="@string/export"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_export" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="Import"
+                            android:tooltipText="@string/import"
                             android:id="@+id/BTImportFEXCorePreset"
-                            android:layout_marginRight="0dp"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_popup_menu_download" />
-
-                        <Space
-                            android:layout_width="75dp"
-                            android:layout_height="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -200,10 +196,12 @@
                 <TextView
                     android:id="@+id/TVSound"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/sound" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
 
                     <TextView
@@ -232,7 +230,7 @@
                         <ImageButton
                             android:id="@+id/BTRemoveSF"
                             style="@style/ListMenuButton"
-                            android:layout_marginRight="0dp"
+                            android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_remove" />
                     </LinearLayout>
                 </LinearLayout>
@@ -248,16 +246,18 @@
                 <TextView
                     android:id="@+id/TVTheme"
                     style="@style/FieldSetLabel"
-                    android:text="Theme" />
+                    android:tag="theme_badge"
+                    android:text="@string/theme" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <CheckBox
                         android:id="@+id/CBDarkMode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Enable Dark Mode" />
+                        android:text="@string/enable_dark_mode" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -271,15 +271,17 @@
                 <TextView
                     android:id="@+id/TVShortcutSettings"
                     style="@style/FieldSetLabel"
-                    android:text="Path Settings" />
+                    android:tag="theme_badge"
+                    android:text="@string/path_settings" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ae.solator Path" />
+                        android:text="@string/ae_solator_path" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -296,13 +298,13 @@
                             android:id="@+id/BTChooseWinlatorPath"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Choose Path" />
+                            android:text="@string/choose_path" />
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Shortcut Export Path" />
+                        android:text="@string/shortcut_export_path" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -319,7 +321,7 @@
                             android:id="@+id/BTChooseShortcutExportPath"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Choose Path" />
+                            android:text="@string/choose_path" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -333,10 +335,12 @@
                 <TextView
                     android:id="@+id/TVRuntimeProfileGlobal"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/runtime_profile_global" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
@@ -364,10 +368,12 @@
                 <TextView
                     android:id="@+id/TVBigPictureMode"
                     style="@style/FieldSetLabel"
-                    android:text="Big Picture Mode" />
+                    android:tag="theme_badge"
+                    android:text="@string/big_picture_mode" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
 
                     <!-- SteamGridDB API Key Section -->
@@ -375,7 +381,7 @@
                         android:id="@+id/CBEnableBigPictureMode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Enable Big Picture Mode on App Launch" />
+                        android:text="@string/enable_big_picture_mode_launch" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -394,7 +400,7 @@
                                     android:id="@+id/CBEnableCustomApiKey"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Set SteamGrid API Key? (Cover Art)" />
+                                    android:text="@string/steamgrid_api_key_cover_art" />
 
                                 <ImageView
                                     android:id="@+id/BTHelpApiKey"
@@ -408,7 +414,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
-                                android:hint="Enter your API Key here"
+                                android:hint="@string/steamgrid_api_key_hint"
                                 android:visibility="gone" />
                     </LinearLayout>
 
@@ -426,10 +432,12 @@
                 <TextView
                     android:id="@+id/TVXServer"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/xserver" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -511,7 +519,7 @@
                         android:id="@+id/CBCursorLock"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="True Mouse Control (Deactivate with Volume Down)"
+                        android:text="@string/true_mouse_control"
                         android:layout_marginTop="8dp" />
 
                     <!-- New Xinput Toggle Checkbox -->
@@ -519,7 +527,7 @@
                         android:id="@+id/CBXinputToggle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Disable Xinput (Used for Exclusive M/KB support)"
+                        android:text="@string/disable_xinput_exclusive"
                         android:layout_marginTop="8dp" />
 
                 </LinearLayout>
@@ -535,10 +543,12 @@
                 <TextView
                     android:id="@+id/TVLogs"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/logs" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <CheckBox
                         android:id="@+id/CBEnableWineDebug"
@@ -578,10 +588,12 @@
                 <TextView
                     android:id="@+id/TVExperimental"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/experimental" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -609,14 +621,14 @@
                             android:id="@+id/CBOpenWithAndroidBrowser"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="left|center"
+                            android:layout_gravity="start|center_vertical"
                             android:text="@string/open_with_android_browser" />
 
                         <CheckBox
                             android:id="@+id/CBShareAndroidClipboard"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="left|center"
+                            android:layout_gravity="start|center_vertical"
                             android:text="@string/share_android_clipboard" />
 
                         <View style="@style/FieldSeparator" />
@@ -624,12 +636,12 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Downloadable Contents URL" />
+                            android:text="@string/downloadable_contents_url" />
 
                         <EditText
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="left|center"
+                            android:layout_gravity="start|center_vertical"
                             android:id="@+id/ETDownloadableContentsURL"/>
 
                     </LinearLayout>
@@ -645,10 +657,12 @@
                 <TextView
                     android:id="@+id/TVImageFs"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/imagefs" />
 
                 <LinearLayout
                     style="@style/FieldSet"
+                    android:tag="theme_card"
                     android:layout_marginTop="6dp">
 
                     <Button
@@ -668,7 +682,7 @@
         android:id="@+id/BTConfirm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="right|bottom"
+        android:layout_gravity="end|bottom"
         android:tint="@color/white"
         android:src="@drawable/icon_confirm"
         android:layout_margin="16dp" />

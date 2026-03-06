@@ -571,7 +571,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         short[] clockSpeeds = CPUStatus.getCurrentClockSpeeds();
         TextView tvCPUTitle = findViewById(R.id.TVCPUTitle);
         if (clockSpeeds.length == 0) {
-            tvCPUTitle.setText("CPU (--%)");
+            tvCPUTitle.setText(R.string.task_manager_cpu_title_empty);
             return;
         }
         int totalClockSpeed = 0;
@@ -589,7 +589,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
 
         int avgClockSpeed = totalClockSpeed / clockSpeeds.length;
         byte cpuUsagePercent = (byte)(((float)avgClockSpeed / Math.max(1, maxClockSpeed)) * 100.0f);
-        tvCPUTitle.setText("CPU ("+cpuUsagePercent+"%)");
+        tvCPUTitle.setText(activity.getString(R.string.task_manager_cpu_title_value, cpuUsagePercent));
     }
 
     private void updateMemoryInfoView() {
@@ -666,7 +666,7 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                 activity.getResources().getStringArray(R.array.task_manager_windows_sort_entries)
         ));
         sWindowsSort.setAdapter(SpinnerAdapters.create(activity, darkMode, sortEntries));
-        sWindowsSort.setPopupBackgroundResource(darkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sWindowsSort.setPopupBackgroundResource(darkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         String[] sortValues = activity.getResources().getStringArray(R.array.task_manager_windows_sort_values);
         int selectedSort = 0;
         for (int i = 0; i < sortValues.length; i++) {
@@ -920,22 +920,22 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
         TextView tvCountersInfo = findViewById(R.id.TVProcessCountersInfo);
 
         if (sample == null) {
-            tvLoadInfo.setText("CPU -- | Load -- -- --");
-            tvNetInfo.setText("Net RX -- | TX --");
-            tvPressureInfo.setText("PSI cpu --/-- io --/-- mem --/--");
-            tvCountersInfo.setText("Windows 0/0 | Linux 0/0");
+            tvLoadInfo.setText(R.string.task_manager_host_load_empty);
+            tvNetInfo.setText(R.string.task_manager_host_net_empty);
+            tvPressureInfo.setText(R.string.task_manager_host_pressure_empty);
+            tvCountersInfo.setText(R.string.task_manager_host_counters_empty);
             return;
         }
 
-        tvLoadInfo.setText(String.format(Locale.ENGLISH, "CPU %.1f%% | Load %.2f %.2f %.2f",
+        tvLoadInfo.setText(activity.getString(R.string.task_manager_host_load_value,
                 sample.cpuPercent, sample.loadAverage1m, sample.loadAverage5m, sample.loadAverage15m));
-        tvNetInfo.setText(String.format(Locale.ENGLISH, "Net RX %s/s | TX %s/s",
+        tvNetInfo.setText(activity.getString(R.string.task_manager_host_net_value,
                 formatRate(sample.rxBytesPerSecond), formatRate(sample.txBytesPerSecond)));
-        tvPressureInfo.setText(String.format(Locale.ENGLISH, "PSI cpu %s/%s io %s/%s mem %s/%s",
+        tvPressureInfo.setText(activity.getString(R.string.task_manager_host_pressure_value,
                 formatPsi(sample.cpuPressureSome10), formatPsi(sample.cpuPressureFull10),
                 formatPsi(sample.ioPressureSome10), formatPsi(sample.ioPressureFull10),
                 formatPsi(sample.memoryPressureSome10), formatPsi(sample.memoryPressureFull10)));
-        tvCountersInfo.setText(String.format(Locale.ENGLISH, "Windows %d/%d | Linux %d/%d",
+        tvCountersInfo.setText(activity.getString(R.string.task_manager_host_counters_value,
                 lastWindowsVisible, lastWindowsTotal, lastLinuxVisible, lastLinuxTotal));
     }
 

@@ -107,16 +107,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         setTitle(shortcut.name);
         setIcon(R.drawable.icon_settings);
 
-        // Initialize the ContentsManager
         ContainerManager containerManager = shortcut.container.getManager();
-
-//        if (containerManager != null) {
-//            this.contentsManager = new ContentsManager(containerManager.getContext());
-//            this.contentsManager.syncTurnipContents();
-//        } else {
-//            Toast.makeText(fragment.getContext(), "Failed to initialize container manager. Please try again.", Toast.LENGTH_SHORT).show();
-//            return;
-//        }
 
         createContentView();
     }
@@ -149,18 +140,18 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
 
         final Spinner sGraphicsDriver = findViewById(R.id.SGraphicsDriver);
-        
+
         final Spinner sDXWrapper = findViewById(R.id.SDXWrapper);
 
         final Spinner sBox64Version = findViewById(R.id.SBox64Version);
-        
+
         ContentsManager contentsManager = new ContentsManager(context);
-        
+
         contentsManager.syncContents();
 
         final View vGraphicsDriverConfig = findViewById(R.id.BTGraphicsDriverConfig);
         vGraphicsDriverConfig.setTag(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
-        
+
         final View vDXWrapperConfig = findViewById(R.id.BTDXWrapperConfig);
         vDXWrapperConfig.setTag(shortcut.getExtra("dxwrapperConfig", shortcut.container.getDXWrapperConfig()));
 
@@ -241,7 +232,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         });
 
         final CheckBox cbFullscreenStretched =  findViewById(R.id.CBFullscreenStretched);
-        boolean fullscreenStretched = shortcut.getExtra("fullscreenStretched", "0").equals("1");
+        boolean fullscreenStretched = shortcut.getExtraBoolean("fullscreenStretched", false);
         cbFullscreenStretched.setChecked(fullscreenStretched);
 
         final Runnable showInputWarning = () -> ContentDialog.alert(context, R.string.enable_xinput_and_dinput_same_time, null);
@@ -283,13 +274,10 @@ public class ShortcutSettingsDialog extends ContentDialog {
         loadControlsProfileSpinner(sControlsProfile, shortcut.getExtra("controlsProfile", "0"));
 
         final CheckBox cbDisabledXInput = findViewById(R.id.CBDisabledXInput);
-        // Set the initial value based on the shortcut extras
-        boolean isXInputDisabled = shortcut.getExtra("disableXinput", "0").equals("1");
-        cbDisabledXInput.setChecked(isXInputDisabled);
+        cbDisabledXInput.setChecked(shortcut.getExtraBoolean("disableXinput", false));
 
         final CheckBox cbSimTouchScreen = findViewById(R.id.CBTouchscreenMode);
-        String isTouchScreenMode = shortcut.getExtra("simTouchScreen");
-        cbSimTouchScreen.setChecked(isTouchScreenMode.equals("1") ? true : false);
+        cbSimTouchScreen.setChecked(shortcut.getExtraBoolean("simTouchScreen", false));
         final Spinner sTouchpadGestureProfile = findViewById(R.id.STouchpadGestureProfile);
         final CheckBox cbTouchpadStrictGestureFsm = findViewById(R.id.CBTouchpadStrictGestureFsm);
         final SeekBar sbTapTimeoutMs = findViewById(R.id.SBTapTimeoutMs);
@@ -392,7 +380,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
         List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
         sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, isDarkMode, sGraphicsItemsList));
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
         final Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
@@ -1031,30 +1019,30 @@ public class ShortcutSettingsDialog extends ContentDialog {
         Spinner sUpscalerFgSource = view.findViewById(R.id.SUpscalerFgSource);
         Spinner sUpscalerFgOutput = view.findViewById(R.id.SUpscalerFgOutput);
         Spinner sUpscalerFramegenMode = view.findViewById(R.id.SUpscalerFramegenMode);
-        
+
 
         // Set dark or light mode background for spinners
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sEmulatorSpinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sControlsProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sTouchpadGestureProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerBackend.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerEffect.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerScale.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sGeneratedFrames.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerFgSource.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerFgOutput.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sUpscalerFramegenMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sEmulatorSpinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sControlsProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sTouchpadGestureProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerBackend.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerEffect.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerScale.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sGeneratedFrames.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerFgSource.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerFgOutput.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        sUpscalerFramegenMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
 //        EditText etLC_ALL = view.findViewById(R.id.ETlcall);
         EditText etExecArgs = view.findViewById(R.id.ETExecArgs);
@@ -1068,11 +1056,11 @@ public class ShortcutSettingsDialog extends ContentDialog {
         if (textView == null) return;
         Context context = textView.getContext();
         textView.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_badge_background_dark
-                : R.drawable.forensic_badge_background);
+                ? R.drawable.surface_badge_background_dark
+                : R.drawable.surface_badge_background);
         textView.setTextColor(ContextCompat.getColor(
                 context,
-                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         ));
         textView.bringToFront();
     }
@@ -1084,8 +1072,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
         if (!(parent instanceof ViewGroup)) return;
         ViewGroup group = (ViewGroup) parent;
         int panelBackground = isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background;
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background;
         int horizontalPadding = dpToPx(12f);
         int topPadding = dpToPx(18f);
         int bottomPadding = dpToPx(12f);
@@ -1214,7 +1202,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
         }
 
         spinner.setAdapter(SpinnerAdapters.create(context, isDarkMode, values));
-        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         spinner.setSelection(selectedPosition, false);
     }
 
@@ -1226,15 +1214,15 @@ public class ShortcutSettingsDialog extends ContentDialog {
     public static void loadBox64VersionSpinner(Context context, ContentsManager manager, Spinner spinner, boolean isArm64EC) {
         ContainerDetailFragment.loadBox64VersionSpinner(context, null, manager, spinner, isArm64EC);
     }
-    
+
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
         final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
 
         ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver);
-        
+
         final String[] dxwrapperEntries = context.getResources().getStringArray(R.array.dxwrapper_entries);
-        
+
         Runnable update = () -> {
             String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
             String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
@@ -1250,7 +1238,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
                     items.add(value);
             }
             sDXWrapper.setAdapter(SpinnerAdapters.create(context, isDarkMode, items));
-            sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
         };
 

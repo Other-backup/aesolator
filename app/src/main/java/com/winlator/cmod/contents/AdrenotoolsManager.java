@@ -30,17 +30,17 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class AdrenotoolsManager {
-    
+
     private File adrenotoolsContentDir;
     private Context mContext;
-    
+
     public AdrenotoolsManager(Context context) {
         this.mContext = context;
         this.adrenotoolsContentDir = new File(mContext.getFilesDir(), "contents/adrenotools");
         if (!adrenotoolsContentDir.exists())
             adrenotoolsContentDir.mkdirs();
     }
-        
+
     public String getLibraryName(String adrenoToolsDriverId) {
         String libraryName = "";
         File driverPath = new File(adrenotoolsContentDir, adrenoToolsDriverId);
@@ -53,7 +53,7 @@ public class AdrenotoolsManager {
         }
         return libraryName;
     }
-    
+
     public String getDriverName(String adrenoToolsDriverId) {
         String driverName = "";
         File driverPath = new File(adrenotoolsContentDir, adrenoToolsDriverId);
@@ -94,7 +94,7 @@ public class AdrenotoolsManager {
                 config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                 container.setGraphicsDriverConfig(GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 container.saveData();
-            }     
+            }
         }
         for (Shortcut shortcut : containerManager.loadShortcuts()) {
             HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
@@ -107,7 +107,7 @@ public class AdrenotoolsManager {
             }
         }
     }
-    
+
     public void removeDriver(String adrenoToolsDriverId) {
         Log.d("AdrenotoolsManager", "Removing driver " + adrenoToolsDriverId);
         File driverPath = new File(adrenotoolsContentDir, adrenoToolsDriverId);
@@ -117,7 +117,7 @@ public class AdrenotoolsManager {
 
     public ArrayList<String> enumarateInstalledDrivers() {
         ArrayList<String> driversList = new ArrayList<>();
-        
+
         for (File f : adrenotoolsContentDir.listFiles()) {
             boolean fromResources = isFromResources(f.getName());
             if (!fromResources && new File(f, "meta.json").exists())
@@ -125,13 +125,13 @@ public class AdrenotoolsManager {
         }
         return driversList;
     }
-    
+
     public boolean isFromResources(String adrenotoolsDriverId) {
         String driver = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
         AssetManager am = mContext.getResources().getAssets();
         InputStream is = null;
         boolean isFromResources = true;
-        
+
         try {
             is = am.open(driver);
             is.close();
@@ -139,10 +139,10 @@ public class AdrenotoolsManager {
         catch (IOException e) {
             isFromResources = false;
         }
-        
+
         return isFromResources;
     }
-        
+
     public boolean extractDriverFromResources(String adrenotoolsDriverId) {
         String src = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
         boolean hasExtracted;
@@ -160,7 +160,7 @@ public class AdrenotoolsManager {
 
         return hasExtracted;
     }
-    
+
     public String installDriver(Uri driverUri) {
         File tmpDir = new File(adrenotoolsContentDir, "tmp");
         if (tmpDir.exists()) FileUtils.delete(tmpDir);
@@ -261,7 +261,7 @@ public class AdrenotoolsManager {
             return "";
         }
     }
-    
+
     public void setDriverById(EnvVars envVars, ImageFs imagefs, String adrenotoolsDriverId) {
         boolean isFromResources = isFromResources(adrenotoolsDriverId);
 

@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -57,6 +58,7 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
@@ -146,11 +148,11 @@ public class ContainerDetailFragment extends Fragment {
         if (textView == null) return;
         Context context = textView.getContext();
         textView.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_badge_background_dark
-                : R.drawable.forensic_badge_background);
+                ? R.drawable.surface_badge_background_dark
+                : R.drawable.surface_badge_background);
         textView.setTextColor(ContextCompat.getColor(
                 context,
-                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         ));
         textView.bringToFront();
     }
@@ -162,8 +164,8 @@ public class ContainerDetailFragment extends Fragment {
         if (!(parent instanceof ViewGroup)) return;
         ViewGroup group = (ViewGroup) parent;
         int panelBackground = isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background;
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background;
         int horizontalPadding = dpToPx(textView.getContext(), 12f);
         int topPadding = dpToPx(textView.getContext(), 18f);
         int bottomPadding = dpToPx(textView.getContext(), 12f);
@@ -193,65 +195,65 @@ public class ContainerDetailFragment extends Fragment {
 
         // Update Spinners
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-        sScreenSize.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sScreenSize.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
-        sWineVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sWineVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
-        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
-        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sEmulator64 = view.findViewById(R.id.SEmulator64);
-        sEmulator64.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sEmulator64.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sEmulator = view.findViewById(R.id.SEmulator);
-        sEmulator.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sEmulator.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         // Update Wine Configuration Tab Spinner styles
         // Desktop
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
-        sDesktopTheme.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDesktopTheme.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sDesktopBackgroundType = view.findViewById(R.id.SDesktopBackgroundType);
-        sDesktopBackgroundType.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDesktopBackgroundType.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-        sMouseWarpOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMouseWarpOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         // Win Components
         // Handled in createWinComponentsTab
 
         // Update Advanced Tab Spinner styles
         Spinner SDInputType = view.findViewById(R.id.SDInputType);
-        SDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        SDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
-        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
-        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
-        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         Spinner sContainerFgPreset = view.findViewById(R.id.SContainerFgPreset);
-        sContainerFgPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sContainerFgPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         Spinner sContainerFgMode = view.findViewById(R.id.SContainerFgMode);
-        sContainerFgMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sContainerFgMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -282,7 +284,7 @@ public class ContainerDetailFragment extends Fragment {
                         openDirectoryCallback.call(path);
                     }
                 } else {
-                    Toast.makeText(getContext(), "Invalid directory selected", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), R.string.invalid_directory_selected, Toast.LENGTH_SHORT).show();
                 }
             }
             openDirectoryCallback = null;
@@ -311,7 +313,7 @@ public class ContainerDetailFragment extends Fragment {
         // Advanced Tab TextViews
         TextView box64Label = view.findViewById(R.id.TVBox64);
         applyModernSectionCardStyle(box64Label, isDarkMode);
-        
+
         TextView fexCoreLabel = view.findViewById(R.id.TVFEXCore);
         applyModernSectionCardStyle(fexCoreLabel, isDarkMode);
 
@@ -376,7 +378,7 @@ public class ContainerDetailFragment extends Fragment {
         loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize() : Container.DEFAULT_SCREEN_SIZE);
 
         final Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
-        
+
         final Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
 
         final View vDXWrapperConfig = view.findViewById(R.id.BTDXWrapperConfig);
@@ -857,7 +859,7 @@ public class ContainerDetailFragment extends Fragment {
                 items.add(value);
             }
             sDXWrapper.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), items));
-            sDXWrapper.setPopupBackgroundResource(resolveDarkMode(context) ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            sDXWrapper.setPopupBackgroundResource(resolveDarkMode(context) ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
@@ -942,7 +944,7 @@ public class ContainerDetailFragment extends Fragment {
             spinner.setTag(wincomponent[0]);
 
             // Set the background color of the spinners dynamically based on the current theme
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark: R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark: R.drawable.surface_dialog_background);
 
             parent.addView(itemView);
 
@@ -965,7 +967,7 @@ public class ContainerDetailFragment extends Fragment {
             spinner.setTag(wincomponent[0]);
 
             // Set the background color of the spinners dynamically based on the current theme
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
             parent.addView(itemView);
         }
@@ -1012,12 +1014,14 @@ public class ContainerDetailFragment extends Fragment {
 
         Callback<String[]> addItem = (drive) -> {
             final View itemView = inflater.inflate(R.layout.drive_list_item, parent, false);
+            int accent = ContextCompat.getColor(context, resolveDarkMode(context) ? R.color.colorAccentDark : R.color.colorAccent);
+            itemView.setBackground(buildInlineCardBackground(accent, resolveDarkMode(context)));
             Spinner spinner = itemView.findViewById(R.id.Spinner);
             spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), driveLetters));
             AppUtils.setSpinnerSelectionFromValue(spinner, drive[0]+":");
 
             // Apply dark theme to the spinner popup background
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
             final EditText editText = itemView.findViewById(R.id.EditText);
             editText.setText(drive[1]);
@@ -1057,6 +1061,15 @@ public class ContainerDetailFragment extends Fragment {
         });
 
         if (drives.isEmpty()) emptyTextView.setVisibility(View.VISIBLE);
+    }
+
+    private GradientDrawable buildInlineCardBackground(int accent, boolean darkMode) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(UnitUtils.dpToPx(14));
+        background.setColor((accent & 0x00ffffff) | ((darkMode ? 50 : 20) << 24));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), (accent & 0x00ffffff) | ((darkMode ? 220 : 130) << 24));
+        return background;
     }
 
     // Helper method to apply dark theme to EditText
@@ -1195,7 +1208,7 @@ public class ContainerDetailFragment extends Fragment {
     public static void updateGraphicsDriverSpinner(Context context, Spinner spinner) {
         String[] originalItems = context.getResources().getStringArray(R.array.graphics_driver_entries);
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
-        
+
         // Set the adapter with the combined list
         spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), itemList));
     }

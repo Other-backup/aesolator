@@ -11,9 +11,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingLeft="12dp"
+        android:paddingStart="12dp"
         android:paddingTop="10dp"
-        android:paddingRight="12dp"
+        android:paddingEnd="12dp"
         android:paddingBottom="2dp"
         android:visibility="gone">
 
@@ -28,7 +28,7 @@
                 style="@style/ListMenuButton"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginRight="8dp"
+                android:layout_marginEnd="8dp"
                 android:src="@drawable/icon_action_bar_back"
                 android:visibility="gone" />
 
@@ -37,7 +37,7 @@
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 app:tint="?attr/colorControlNormal"
-                android:layout_marginRight="8dp"
+                android:layout_marginEnd="8dp"
                 android:visibility="gone" />
 
             <TextView
@@ -92,45 +92,58 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="right">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/TVBottomBarText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:gravity="center_vertical"
                 android:textColor="?attr/colorControlNormal"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/LLBottomBarPanel"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
                 android:orientation="horizontal"
                 android:visibility="gone" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end|center_vertical"
                 android:orientation="horizontal">
 
                 <Button
                     android:id="@id/BTReset"
-                    android:visibility="gone"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxWidth="180dp"
                     android:text="@string/reset"
-                    style="@style/ButtonNeutral" />
+                    android:visibility="gone" />
 
                 <Button
                     style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/cancel"
                     android:id="@+id/BTCancel" />
 
                 <Button
                     style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/ok"
                     android:id="@+id/BTConfirm" />

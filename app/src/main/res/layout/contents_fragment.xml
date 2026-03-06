@@ -1,119 +1,167 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/content_type" />
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-    <LinearLayout
+        <LinearLayout
+            style="@style/FieldSet"
+            android:tag="theme_card">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/content_type" />
+
+            <Spinner
+                android:id="@+id/SContentType"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/install_content"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_marginTop="8dp">
 
-        <Spinner
-            android:id="@+id/SContentType"
-            style="@style/ComboBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+        <LinearLayout
+            style="@style/FieldSet"
+            android:tag="theme_card">
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/TVContentsSourcesLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/contents_source_selector" />
 
-    <TextView
-        android:id="@+id/TVContentsSourcesLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/contents_source_selector" />
+            <Spinner
+                android:id="@+id/SContentsSourceMode"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" />
 
-    <Spinner
-        android:id="@+id/SContentsSourceMode"
-        style="@style/ComboBox"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp" />
+            <TextView
+                android:id="@+id/TVContentsLaneScope"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/TVContentsLaneScope"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textStyle="bold"
-        android:visibility="gone" />
+            <TextView
+                android:id="@+id/TVContentsFiltersLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/contents_filters" />
 
-    <TextView
-        android:id="@+id/TVContentsFiltersLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/contents_filters" />
+            <LinearLayout
+                android:id="@+id/LLContentsFilters"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-    <LinearLayout
-        android:id="@+id/LLContentsFilters"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+                <Spinner
+                    android:id="@+id/SContentsChannelMode"
+                    style="@style/ComboBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1" />
 
-        <Spinner
-            android:id="@+id/SContentsChannelMode"
-            style="@style/ComboBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1" />
+                <Spinner
+                    android:id="@+id/SContentsArchMode"
+                    style="@style/ComboBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
 
-        <Spinner
-            android:id="@+id/SContentsArchMode"
-            style="@style/ComboBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-    </LinearLayout>
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/contents_filters"
+            android:textStyle="bold" />
+    </FrameLayout>
 
-
-    <View style="@style/HorizontalLine" />
-
-    <androidx.recyclerview.widget.RecyclerView xmlns:app="http://schemas.android.com/apk/res-auto"
-        android:id="@+id/RecyclerView"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:scrollbars="vertical"
-        app:layoutManager="LinearLayoutManager" />
+        android:layout_marginTop="8dp"
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/TVEmptyText"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="@string/no_items_to_display"
-        android:textSize="24sp"
-        android:visibility="gone" />
+        <LinearLayout
+            style="@style/FieldSet"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:tag="theme_card">
 
-    <View style="@style/HorizontalLine" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/RecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="vertical"
+                app:layoutManager="LinearLayoutManager" />
 
-    <LinearLayout
+            <TextView
+                android:id="@+id/TVEmptyText"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/no_items_to_display"
+                android:textSize="20sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/contents"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_marginTop="8dp">
 
-        <Button
-            android:id="@+id/BTInstallContent"
-            style="@style/ButtonNeutral"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/install_content" />
+        <LinearLayout
+            style="@style/FieldSet"
+            android:tag="theme_card">
 
-    </LinearLayout>
+            <Button
+                android:id="@+id/BTInstallContent"
+                style="@style/ButtonNeutral"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/install_content" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/install_content"
+            android:textStyle="bold" />
+    </FrameLayout>
 </LinearLayout>

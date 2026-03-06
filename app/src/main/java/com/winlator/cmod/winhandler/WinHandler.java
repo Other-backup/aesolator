@@ -25,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,6 +37,7 @@ public class WinHandler {
     private static final short CLIENT_PORT = 7946;
     private static final int SEND_PACKET_SIZE = 64;
     private static final int RECEIVE_PACKET_SIZE = 2048;
+    private static final int BRING_TO_FRONT_NAME_BYTES = SEND_PACKET_SIZE - 1 - Integer.BYTES - Long.BYTES;
     public static final byte FLAG_DINPUT_MAPPER_STANDARD = 0x01;
     public static final byte FLAG_DINPUT_MAPPER_XINPUT = 0x02;
     public static final byte FLAG_INPUT_TYPE_XINPUT = 0x04;
@@ -59,7 +61,7 @@ public class WinHandler {
     private SharedPreferences preferences;
     private byte triggerType;
 
-    private boolean xinputDisabled; // Used for exclusive mouse controllegacy
+    private boolean xinputDisabled; // Used for exclusive mouse control
     private boolean xinputDisabledInitialized = false;
 
 
@@ -319,19 +321,26 @@ public class WinHandler {
     public void bringToFront(final String processName, final long handle) {
         addAction(() -> {
             sendData.rewind();
-            try {
-                sendData.put(RequestCodes.BRING_TO_FRONT);
-                byte[] bytes = processName.getBytes();
-                sendData.putInt(bytes.length);
-                // FIXME: Chinese and Japanese got from winhandler.exe are broken, and they cause overflow.
-                sendData.put(bytes);
-                sendData.putLong(handle);
-            } catch (java.nio.BufferOverflowException e) {
-                e.printStackTrace();
-                sendData.rewind();
-            }
+            sendData.put(RequestCodes.BRING_TO_FRONT);
+            byte[] bytes = encodeProcessName(processName, BRING_TO_FRONT_NAME_BYTES);
+            sendData.putInt(bytes.length);
+            sendData.put(bytes);
+            sendData.putLong(handle);
             sendPacket(CLIENT_PORT);
         });
+    }
+
+    private byte[] encodeProcessName(String processName, int maxBytes) {
+        if (processName == null || processName.isEmpty() || maxBytes <= 0) return new byte[0];
+
+        byte[] encoded = processName.getBytes(StandardCharsets.UTF_8);
+        if (encoded.length <= maxBytes) return encoded;
+
+        for (int end = processName.length() - 1; end > 0; end--) {
+            encoded = processName.substring(0, end).getBytes(StandardCharsets.UTF_8);
+            if (encoded.length <= maxBytes) return encoded;
+        }
+        return new byte[0];
     }
 
     private void addAction(Runnable action) {

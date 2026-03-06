@@ -3,12 +3,12 @@ package com.winlator.cmod;
 import static com.winlator.cmod.core.AppUtils.showToast;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,7 +31,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
-import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -45,6 +45,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
@@ -83,7 +84,6 @@ public class ContainersFragment extends Fragment {
         recyclerView = frameLayout.findViewById(R.id.RecyclerView);
         emptyTextView = frameLayout.findViewById(R.id.TVEmptyText);
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-        recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
         return frameLayout;
     }
 
@@ -173,8 +173,16 @@ public class ContainersFragment extends Fragment {
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
             final Container item = data.get(position); // Use 'item' instead of undefined 'container'
+            boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(holder.itemView.getContext()).getBoolean("dark_mode", false);
+            int accent = androidx.core.content.ContextCompat.getColor(
+                    holder.itemView.getContext(),
+                    isDarkMode ? R.color.colorAccentDark : R.color.colorAccent
+            );
             holder.imageView.setImageResource(R.drawable.icon_container);
+            holder.imageView.setColorFilter(accent);
             holder.title.setText(item.getName());
+            holder.title.setTextColor(accent);
+            holder.itemView.setBackground(buildRowBackground(accent, isDarkMode));
 
             holder.runButton.setOnClickListener(view -> runContainer(item)); // Correct item reference
 
@@ -244,6 +252,21 @@ public class ContainersFragment extends Fragment {
             });
             listItemMenu.show();
         }
+    }
+
+
+    private GradientDrawable buildRowBackground(int accent, boolean isDarkMode) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(UnitUtils.dpToPx(16));
+        background.setColor(withAlpha(accent, isDarkMode ? 50 : 20));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 130));
+        return background;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        int clamped = Math.max(0, Math.min(255, alpha));
+        return (color & 0x00ffffff) | (clamped << 24);
     }
 
 

@@ -3,15 +3,34 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:paddingTop="20dp"
-    android:paddingBottom="20dp"
-    android:paddingLeft="20dp"
-    android:paddingRight="20dp"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/surface_badge_background"
+        android:paddingStart="10dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="4dp"
+        android:tag="theme_badge"
+        android:text="@string/extra_keys_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/extra_keys_config_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/extra_keys_hint"
+        android:textSize="13sp" />
+
     <EditText
         android:id="@+id/extra_keys_config"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:gravity="top|start"
         android:inputType="textMultiLine"
         android:lines="10"
@@ -20,12 +39,14 @@
         android:scrollHorizontally="true"
         android:scrollbars="vertical"
         android:autofillHints=""
+        android:background="@drawable/edit_text"
         tools:ignore="LabelFor" />
+
     <TextView
-        android:id="@+id/extra_keys_config_description"
         android:text="@string/extra_keys_config_desc"
-        android:textSize="18sp"
+        android:textSize="14sp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" />
 
 </LinearLayout>

@@ -296,6 +296,13 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_MOBOX_PATH_COMPAT", hasGlibcBin ? "1" : "0");
     }
 
+    private boolean shouldDisableFullscreenHack() {
+        if (shortcut != null && !shortcut.getExtra("fullscreenStretched").isEmpty()) {
+            return shortcut.getExtraBoolean("fullscreenStretched", false);
+        }
+        return container != null && container.isFullscreenStretched();
+    }
+
     public EnvVars getEnvVars() {
         return envVars;
     }
@@ -365,7 +372,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("WINE_NO_DUPLICATE_EXPLORER", "1");
         launchEnv.put("PREFIX", rootDir.getPath() + "/usr");
         launchEnv.put("DISPLAY", ":0");
-        launchEnv.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
+        if (shouldDisableFullscreenHack()) {
+            launchEnv.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
+        } else {
+            launchEnv.remove("WINE_DISABLE_FULLSCREEN_HACK");
+        }
         launchEnv.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
         launchEnv.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
         launchEnv.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
@@ -396,9 +407,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
         launchEnv.put("ANDROID_RESOLV_DNS", primaryDNS);
         launchEnv.put("WINE_NEW_NDIS", "1");
-        
+
         String ld_preload = "";
-        
+
         // Check for specific shared memory libraries
         if ((new File(imageFs.getLibDir(), "libandroid-sysvshm.so")).exists()){
             ld_preload = imageFs.getLibDir() + "/libandroid-sysvshm.so";

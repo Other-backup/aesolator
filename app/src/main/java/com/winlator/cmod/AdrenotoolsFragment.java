@@ -86,8 +86,8 @@ public class AdrenotoolsFragment extends Fragment {
     private GraphicsFeedAdapter graphicsFeedAdapter;
     private int graphicsFeedRefreshToken = 0;
     private String branchSelectorSignature = "";
-    
-    @Override 
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.adrenotoolsManager = new AdrenotoolsManager(getActivity());
@@ -97,7 +97,7 @@ public class AdrenotoolsFragment extends Fragment {
         if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "ae_archive";
         if (branchMode == null || branchMode.trim().isEmpty()) branchMode = "all";
     }
-    
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         ViewGroup layout = (ViewGroup)inflater.inflate(R.layout.adrenotools_fragment, container, false);
@@ -123,7 +123,7 @@ public class AdrenotoolsFragment extends Fragment {
                 isDarkMode,
                 new ArrayList<>(Collections.singletonList(getString(R.string.graphics_center_branch_all)))
         ));
-        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         sGraphicsFeedSourceMode.setPopupBackgroundResource(popupBackground);
         sGraphicsFeedBranchMode.setPopupBackgroundResource(popupBackground);
         applyFeedSpinnerTheme(isDarkMode);
@@ -175,7 +175,7 @@ public class AdrenotoolsFragment extends Fragment {
         refreshGraphicsFeed();
         return layout;
     }
-    
+
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -197,7 +197,7 @@ public class AdrenotoolsFragment extends Fragment {
         refreshGraphicsFeed();
         maybeOpenPendingX11Dialog();
     }
-    
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == MainActivity.OPEN_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
@@ -208,7 +208,7 @@ public class AdrenotoolsFragment extends Fragment {
                 refreshGraphicsCenterStatus();
             }
         }
-     }       
+     }
 
     private void setSpinnerSelectionByValue(Spinner spinner, String[] values, String value, int fallbackIndex) {
         if (spinner == null || values == null || values.length == 0) return;
@@ -240,7 +240,7 @@ public class AdrenotoolsFragment extends Fragment {
                 .putString(PREF_GRAPHICS_BRANCH_MODE, branchMode)
                 .apply();
     }
-    
+
     private class DriversAdapter extends RecyclerView.Adapter<DriversAdapter.ViewHolder> {
         private ArrayList<String> driversList;
 
@@ -260,17 +260,17 @@ public class AdrenotoolsFragment extends Fragment {
                 btMenu = v.findViewById(R.id.BTMenu);
             }
         }
-        
+
         public DriversAdapter(ArrayList<String> driversList) {
             this.driversList = driversList;
         }
-        
+
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
             View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.adrenotools_list_item, viewGroup, false);
             return new ViewHolder(view);
         }
-        
+
         @Override
         public void onBindViewHolder(ViewHolder viewHolder, final int position) {
             final String entryId = driversList.get(position);
@@ -294,7 +294,7 @@ public class AdrenotoolsFragment extends Fragment {
                 removeAtIndex(position);
             });
         }
-        
+
         public void addItem(String item) {
             driversList.add(item);
             notifyItemInserted(getItemCount() - 1);
@@ -305,7 +305,7 @@ public class AdrenotoolsFragment extends Fragment {
             if (updatedDriversList != null) driversList.addAll(updatedDriversList);
             notifyDataSetChanged();
         }
-        
+
         public void removeAtIndex(int index) {
             String deletedDriver = driversList.remove(index);
             adrenotoolsManager.removeDriver(deletedDriver);
@@ -313,7 +313,7 @@ public class AdrenotoolsFragment extends Fragment {
             notifyItemRangeChanged(index, getItemCount());
             refreshGraphicsCenterStatus();
         }
-        
+
         @Override
         public int getItemCount() {
             return driversList.size();
@@ -391,8 +391,8 @@ public class AdrenotoolsFragment extends Fragment {
         final TextView tvDenoise = dialog.findViewById(R.id.TVSharpnessDenoise);
         final TextView tvProfileInfo = dialog.findViewById(R.id.TVUpscalerProfileInfo);
 
-        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
-        int commandBackground = isDarkMode ? R.drawable.forensic_command_background_dark : R.drawable.forensic_command_background;
+        int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
+        int commandBackground = isDarkMode ? R.drawable.surface_command_background_dark : R.drawable.surface_command_background;
         int[] cardIds = new int[]{
                 R.id.LLUpscalerProfileCard,
                 R.id.LLUpscalerCoreCard,
@@ -407,12 +407,12 @@ public class AdrenotoolsFragment extends Fragment {
             tvProfileInfo.setBackgroundResource(commandBackground);
             int profileTextColor = ContextCompat.getColor(
                     requireContext(),
-                    isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                    isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
             );
             tvProfileInfo.setTextColor(profileTextColor);
         }
 
-        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
         Spinner[] allSpinners = new Spinner[]{
                 sProfile, sPreset, sBackend, sEffect, sScale, sGeneratedFrames, sFgSource, sFgOutput, sFramegenMode
@@ -730,14 +730,14 @@ public class AdrenotoolsFragment extends Fragment {
         View llX11Dri3Card = dialog.findViewById(R.id.LLX11Dri3Card);
         View llX11InputCard = dialog.findViewById(R.id.LLX11InputCard);
 
-        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
+        int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
         if (llX11Dri3Card != null) llX11Dri3Card.setBackgroundResource(panelBackground);
         if (llX11InputCard != null) llX11InputCard.setBackgroundResource(panelBackground);
 
         String[] dri3Entries = getResources().getStringArray(R.array.dri3_mode_entries);
         String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
         sDri3Mode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, dri3Entries));
-        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         sDri3Mode.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
 
         cbUseDri3.setChecked(sharedPreferences.getBoolean("use_dri3", true));

@@ -1,37 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
-    <ScrollView
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_margin="16dp">
+
+        <LinearLayout
+            style="@style/FieldSet"
+            android:tag="theme_card">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/terminal_command_hint" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="240dp">
+
+                <TextView
+                    android:id="@+id/outputTextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/black"
+                    android:padding="10dp"
+                    android:scrollbars="vertical"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColor="@android:color/white"
+                    android:textIsSelectable="true" />
+            </ScrollView>
+
+            <EditText
+                android:id="@+id/commandInput"
+                style="@style/EditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/terminal_command_hint"
+                android:inputType="text" />
+
+            <Button
+                android:id="@+id/executeButton"
+                style="@style/ButtonPositive"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/terminal_execute" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/outputTextView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:textColor="@android:color/white"
-            android:background="@android:color/black"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:scrollbars="vertical"
-            android:textIsSelectable="true" />
-    </ScrollView>
-
-    <EditText
-        android:id="@+id/commandInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter command"
-        android:inputType="text" />
-
-    <Button
-        android:id="@+id/executeButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Execute" />
-</LinearLayout>
+            style="@style/FieldSetLabel"
+            android:tag="theme_badge"
+            android:text="@string/terminal_title" />
+    </FrameLayout>
+</FrameLayout>

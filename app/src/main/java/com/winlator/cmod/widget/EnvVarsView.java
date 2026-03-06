@@ -2,6 +2,7 @@ package com.winlator.cmod.widget;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -18,6 +19,7 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
@@ -141,7 +143,7 @@ public class EnvVarsView extends FrameLayout {
                 ((EditText) view).setTextColor(Color.WHITE);
                 ((EditText) view).setHintTextColor(Color.GRAY);
             } else if (view instanceof Spinner) {
-                ((Spinner) view).setPopupBackgroundResource(R.drawable.content_dialog_background_dark);
+                ((Spinner) view).setPopupBackgroundResource(R.drawable.surface_dialog_background_dark);
             } else if (view instanceof ToggleButton) {
                 // Apply custom styles if needed for ToggleButton
                 // For example, you could change the background or text colors
@@ -179,6 +181,8 @@ public class EnvVarsView extends FrameLayout {
         final Context context = getContext();
         final View itemView = inflater.inflate(R.layout.env_vars_list_item, container, false);
         ((TextView) itemView.findViewById(R.id.TextView)).setText(name);
+        int accent = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
+        itemView.setBackground(buildInlineCardBackground(accent));
 
         String[] knownEnvVar = findKnownEnvVar(name);
         GetValueCallback getValueCallback;
@@ -250,6 +254,15 @@ public class EnvVarsView extends FrameLayout {
         for (int i = 0; i < container.getChildCount(); i++) {
             applyDarkTheme(container.getChildAt(i));
         }
+    }
+
+    private GradientDrawable buildInlineCardBackground(int accent) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(UnitUtils.dpToPx(14));
+        background.setColor((accent & 0x00ffffff) | ((isDarkMode ? 50 : 20) << 24));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), (accent & 0x00ffffff) | ((isDarkMode ? 220 : 130) << 24));
+        return background;
     }
 
 }

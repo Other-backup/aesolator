@@ -15,9 +15,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
-            android:background="@drawable/forensic_panel_background"
+            android:background="@drawable/surface_card_background"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:tag="theme_card">
 
             <TextView
                 android:layout_width="match_parent"
@@ -103,10 +104,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:background="@drawable/forensic_command_background"
-                android:paddingLeft="10dp"
+                android:background="@drawable/surface_command_background"
+                android:paddingStart="10dp"
                 android:paddingTop="8dp"
-                android:paddingRight="10dp"
+                android:paddingEnd="10dp"
                 android:paddingBottom="8dp"
                 android:text="@string/upscaler_profile_info"
                 android:textSize="12sp" />
@@ -117,9 +118,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
-            android:background="@drawable/forensic_panel_background"
+            android:background="@drawable/surface_card_background"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:tag="theme_card">
 
             <TextView
                 android:layout_width="match_parent"
@@ -245,9 +247,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
-            android:background="@drawable/forensic_panel_background"
+            android:background="@drawable/surface_card_background"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:tag="theme_card">
 
             <TextView
                 android:layout_width="match_parent"
@@ -379,7 +382,7 @@
             android:id="@+id/LLUpscalerDebugCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/forensic_panel_background"
+            android:background="@drawable/surface_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 

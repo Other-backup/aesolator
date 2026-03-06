@@ -18,6 +18,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.inputcontrols.Binding;
@@ -27,6 +28,7 @@ import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.NumberPicker;
@@ -38,12 +40,14 @@ import java.util.Arrays;
 public class ControlsEditorActivity extends AppCompatActivity implements View.OnClickListener {
     private InputControlsView inputControlsView;
     private ControlsProfile profile;
+    private boolean isDarkMode;
 
     @Override
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         AppUtils.hideSystemUI(this);
         setContentView(R.layout.controls_editor_activity);
+        isDarkMode = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
 
         inputControlsView = new InputControlsView(this);
         inputControlsView.setEditMode(true);
@@ -59,6 +63,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         container.findViewById(R.id.BTAddElement).setOnClickListener(this);
         container.findViewById(R.id.BTRemoveElement).setOnClickListener(this);
         container.findViewById(R.id.BTElementSettings).setOnClickListener(this);
+        ThemeAssetPainter.apply(this, findViewById(android.R.id.content), isDarkMode);
     }
 
     @Override
@@ -87,6 +92,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
     private void showControlElementSettings(View anchorView) {
         final ControlElement element = inputControlsView.getSelectedElement();
         View view = LayoutInflater.from(this).inflate(R.layout.control_element_settings, null);
+        ThemeAssetPainter.apply(this, view, isDarkMode);
 
         final Runnable updateLayout = () -> {
             ControlElement.Type type = element.getType();

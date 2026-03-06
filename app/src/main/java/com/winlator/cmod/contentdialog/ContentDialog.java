@@ -46,8 +46,6 @@ public class ContentDialog extends Dialog {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
 
-//        contentView.setBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark: R.drawable.content_dialog_background);
-
         if (isDarkMode) {
             this.getContext().setTheme(R.style.ContentDialog_Dark);
         }
@@ -57,13 +55,14 @@ public class ContentDialog extends Dialog {
             FrameLayout frameLayout = contentView.findViewById(R.id.FrameLayout);
             frameLayout.setVisibility(View.VISIBLE);
             View view = LayoutInflater.from(context).inflate(layoutResId, frameLayout, false);
+            inflatedLayout = view;
             frameLayout.addView(view);
         }
 
         LinearLayout titleBar = contentView.findViewById(R.id.LLTitleBar);
         titleBar.setBackgroundResource(isDarkMode
-                ? R.drawable.forensic_panel_background_dark
-                : R.drawable.forensic_panel_background);
+                ? R.drawable.surface_card_background_dark
+                : R.drawable.surface_card_background);
 
         View confirmButton = contentView.findViewById(R.id.BTConfirm);
         confirmButton.setOnClickListener((v) -> {
