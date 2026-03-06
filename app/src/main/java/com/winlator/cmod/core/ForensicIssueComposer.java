@@ -28,6 +28,7 @@ import java.util.zip.ZipOutputStream;
 
 public final class ForensicIssueComposer {
     private static final String[] RUNTIME_LOG_PREFIXES = {
+            "graphics_mesa",
             "wine_loader",
             "box64",
             "fex_runtime",

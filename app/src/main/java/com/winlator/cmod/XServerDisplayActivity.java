@@ -2469,7 +2469,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         addForensicRuntimeFileCallback(snapshot.enableFexLogs,
                 "fex_runtime", "fex", "thunk");
         addForensicRuntimeFileCallback(snapshot.enableTurnipLogs,
-                "turnip_mesa", "turnip", "mesa", "freedreno", "gallium", "zink");
+                "graphics_mesa", "turnip", "mesa", "freedreno", "gallium", "zink", "opengl");
         addForensicRuntimeFileCallback(snapshot.enableVulkanApiDump,
                 "vulkan_api_dump", "api_dump", "vkcreate", "vkqueue", "vkcmd");
         addForensicRuntimeFileCallback(snapshot.enableVulkanLoaderDebug,
@@ -2741,6 +2741,78 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private void applyGraphicsDriverPackages(String selectedDriverId, boolean dxvkRoute) {
+        AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
+        AdrenotoolsManager.DriverPackageInfo selectedInfo = adrenotoolsManager.getDriverPackageInfo(selectedDriverId);
+        AdrenotoolsManager.DriverPackageInfo turnipInfo = adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", selectedInfo);
+        AdrenotoolsManager.DriverPackageInfo openGlInfo = adrenotoolsManager.resolvePreferredDriverForLane("freedreno-opengl", selectedInfo);
+        AdrenotoolsManager.DriverPackageInfo activeInfo = dxvkRoute ? turnipInfo : openGlInfo;
+        AdrenotoolsManager.DriverPackageInfo companionInfo = dxvkRoute ? openGlInfo : turnipInfo;
+        if (activeInfo == null && selectedInfo != null && selectedInfo.isSystemSelection()) {
+            activeInfo = selectedInfo;
+        }
+
+        if (activeInfo != null && !activeInfo.isSystemSelection()) {
+            adrenotoolsManager.setDriverByInfo(envVars, imageFs, activeInfo);
+            if (!activeInfo.preferredGalliumDriver.isEmpty()) {
+                envVars.put("GALLIUM_DRIVER", activeInfo.preferredGalliumDriver);
+            }
+        }
+
+        adrenotoolsManager.restoreManagedOverlay(imageFs);
+        boolean openGlOverlayApplied = openGlInfo != null && adrenotoolsManager.applyManagedOverlay(imageFs, openGlInfo);
+
+        setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", selectedDriverId);
+        setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", selectedInfo == null ? "" : selectedInfo.name);
+        setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", selectedInfo == null ? "" : selectedInfo.providerLane);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", activeInfo == null ? "" : activeInfo.providerLane);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", activeInfo == null ? "" : activeInfo.name);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", activeInfo == null ? "" : activeInfo.driverVersion);
+        setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", companionInfo == null ? "" : companionInfo.providerLane);
+        setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", companionInfo == null ? "" : companionInfo.name);
+        setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", companionInfo == null ? "" : companionInfo.driverVersion);
+        setOrClearEnv("AERO_OPENGL_OVERLAY_ACTIVE", openGlOverlayApplied ? "1" : "0");
+        setOrClearEnv("AERO_OPENGL_OVERLAY_PACKAGE", openGlInfo == null ? "" : openGlInfo.name);
+        setOrClearEnv("AERO_OPENGL_OVERLAY_ENTRY", openGlInfo == null ? "" : openGlInfo.entryId);
+        setOrClearEnv("AERO_OPENGL_OVERLAY_VERSION", openGlInfo == null ? "" : openGlInfo.driverVersion);
+        setOrClearEnv("AERO_TURNIP_PACKAGE", turnipInfo == null ? "" : turnipInfo.name);
+        setOrClearEnv("AERO_TURNIP_VERSION", turnipInfo == null ? "" : turnipInfo.driverVersion);
+        setOrClearEnv("AERO_TURNIP_SOURCE_REPO", turnipInfo == null ? "" : turnipInfo.sourceRepo);
+        setOrClearEnv("AERO_TURNIP_RELEASE_TAG", turnipInfo == null ? "" : turnipInfo.releaseTag);
+        setOrClearEnv("AERO_TURNIP_GALLIUM_BRIDGE", turnipInfo == null ? "" : turnipInfo.preferredGalliumDriver);
+        setOrClearEnv("AERO_TURNIP_API_FOCUS", turnipInfo == null ? "" : joinCsv(turnipInfo.apiFocus));
+        setOrClearEnv("AERO_TURNIP_FORENSIC_LOG_PREFIXES", turnipInfo == null ? "" : joinCsv(turnipInfo.forensicLogPrefixes));
+        setOrClearEnv("AERO_OPENGL_PACKAGE", openGlInfo == null ? "" : openGlInfo.name);
+        setOrClearEnv("AERO_OPENGL_VERSION", openGlInfo == null ? "" : openGlInfo.driverVersion);
+        setOrClearEnv("AERO_OPENGL_SOURCE_REPO", openGlInfo == null ? "" : openGlInfo.sourceRepo);
+        setOrClearEnv("AERO_OPENGL_RELEASE_TAG", openGlInfo == null ? "" : openGlInfo.releaseTag);
+        setOrClearEnv("AERO_OPENGL_GALLIUM_DRIVER", openGlInfo == null ? "" : openGlInfo.preferredGalliumDriver);
+        setOrClearEnv("AERO_OPENGL_API_FOCUS", openGlInfo == null ? "" : joinCsv(openGlInfo.apiFocus));
+        setOrClearEnv("AERO_OPENGL_FORENSIC_LOG_PREFIXES", openGlInfo == null ? "" : joinCsv(openGlInfo.forensicLogPrefixes));
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "GRAPHICS_PROVIDER_CONTRACT_APPLIED",
+                null,
+                "graphics_provider",
+                "graphics_provider_contract_applied",
+                ForensicLogger.fields(
+                        "selected_driver_id", selectedDriverId,
+                        "selected_provider_lane", selectedInfo == null ? "" : selectedInfo.providerLane,
+                        "active_provider_lane", activeInfo == null ? "" : activeInfo.providerLane,
+                        "active_provider_package", activeInfo == null ? "" : activeInfo.name,
+                        "active_provider_version", activeInfo == null ? "" : activeInfo.driverVersion,
+                        "active_provider_route", activeInfo == null ? "" : activeInfo.driverRoute,
+                        "companion_provider_lane", companionInfo == null ? "" : companionInfo.providerLane,
+                        "companion_provider_package", companionInfo == null ? "" : companionInfo.name,
+                        "opengl_overlay_active", openGlOverlayApplied ? "1" : "0",
+                        "turnip_provider_package", turnipInfo == null ? "" : turnipInfo.name,
+                        "opengl_provider_package", openGlInfo == null ? "" : openGlInfo.name
+                )
+        );
+    }
+
     private void applyRuntimeWrapperEnvFromProfile(@Nullable ContentProfile profile) {
         if (profile == null) return;
         envVars.put("AERO_RUNTIME_WRAPPER_ENV_SOURCE", ContentsManager.getEntryName(profile));
@@ -2922,10 +2994,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/zink_dlls" + ".tzst", new File(rootDir, imageFs.WINEPREFIX + "/drive_c/windows"));
         }
 
-        if (!"System".equals(adrenoToolsDriverId)) {
-            AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
-            adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
-        }
+        applyGraphicsDriverPackages(adrenoToolsDriverId, dxvkRoute);
 
         String requestedVulkanApi = normalizeRequestedVulkanApi(graphicsDriverConfig.get("vulkanVersion"));
         List<ContentProfile> selectedVulkanSdkProfiles = resolveVulkanSdkProfilesForApi(requestedVulkanApi);
@@ -3067,6 +3136,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "dri3_enabled", envVars.get("AERO_DRI3_ENABLED"),
                         "dri3_present_wait", envVars.get("AERO_DRI3_PRESENT_WAIT"),
                         "dri3_force_sw_wsi", envVars.get("AERO_DRI3_FORCE_SW_WSI"),
+                        "selected_driver_entry", envVars.get("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY"),
+                        "active_provider_lane", envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE"),
+                        "active_provider_package", envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE"),
+                        "active_provider_version", envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION"),
+                        "companion_provider_lane", envVars.get("AERO_GRAPHICS_COMPANION_PROVIDER_LANE"),
+                        "opengl_overlay_active", envVars.get("AERO_OPENGL_OVERLAY_ACTIVE"),
                         "vulkan_api_selected", envVars.get("AERO_VULKAN_API_SELECTED"),
                         "vulkan_sdk_profiles", envVars.get("AERO_VULKAN_SDK_PROFILE"),
                         "vulkan_sdk_profile_count", envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"),
@@ -3510,4 +3585,3 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
 }
-

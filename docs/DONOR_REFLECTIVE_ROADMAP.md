@@ -249,7 +249,7 @@ Applied in current tree (incremental):
   - `GuestProgramLauncherComponent.setBindingPaths()` now canonicalizes and de-duplicates bind paths, dropping invalid/non-directory entries.
   - Normalized bind-set is exported into runtime env markers (`AESO_BIND_PATHS`, `AESO_BIND_PATH_COUNT`) for deterministic bootstrap and forensic correlation.
 - `winlator-fork` selective forensic/runtime hooks were integrated into live launcher stream:
-  - `XServerDisplayActivity` now attaches lane-scoped runtime log callbacks (`FileDebugLogger`) based on forensic toggles (`wine_loader`, `box64`, `fex_runtime`, `turnip_mesa`, `vulkan_api_dump`, `vulkan_loader`, `dxvk`, `vkd3d`, `pulse`, `alsa`).
+  - `XServerDisplayActivity` now attaches lane-scoped runtime log callbacks (`FileDebugLogger`) based on forensic toggles (`wine_loader`, `box64`, `fex_runtime`, `graphics_mesa`, `vulkan_api_dump`, `vulkan_loader`, `dxvk`, `vkd3d`, `pulse`, `alsa`), while issue bundles still accept legacy `turnip_mesa` logs for backward compatibility.
   - Runtime hook activation is emitted as `FORENSIC_STREAM_HOOKS_READY` in forensic JSONL for traceability.
 - `coffincolors/winlator` cmod-bionic deltas were folded into runtime/env and issue metadata:
   - `composeLaunchEnvVars()` now exports explicit bionic/runtime markers (`AERO_RUNTIME_LIBC`, `AERO_RUNTIME_ANDROID_BIONIC_ONLY`, SDK/release, ABI list, wow-route).
@@ -466,6 +466,11 @@ Closed in-tree during the current card-migration round:
   - `WinHandler.bringToFront()` no longer relies on a fragile CJK-overflow workaround; the process name is now UTF-8 packed into the fixed packet budget safely
   - fullscreen/XInput/sim-touch shortcut overrides are now parsed consistently through `Shortcut.getExtraBoolean()` across settings, launch-time env construction and runtime container shell
   - toolbar title color on main shell surfaces was aligned with the shared surface palette instead of raw platform white constants
+  - final graphics-provider pass split runtime handling into real provider lanes: `turnip-vulkan` for Vulkan route and `freedreno-opengl` for GL route, with package-driven companion selection instead of filename heuristics
+  - source-built `AeTurnip` and `AeOpenGLDriver` archives now publish a shared adrenotools-compatible metadata contract (`providerLane`, `driverRoute`, `artifactName`, forensic hooks, archive format/layout), and `AeOpenGLDriver` now ships a real `meta.json` so Graphics Center can install it through the same ZIP path as Turnip
+  - installed Graphics Center drivers now expose provider/source/route metadata from package contracts, not only a guessed architecture string
+  - runtime startup now restores then reapplies managed GL overlays from installed graphics ZIPs, so `freedreno-opengl` works as the actual GL fallback lane while `turnip-vulkan` remains the Vulkan lane
+  - forensic runtime capture and issue bundles now use the neutral `graphics_mesa` prefix for Mesa/Turnip/freedreno/zink activity while still keeping backward-compatible `turnip_mesa` bundle pickup
 
 ## No-Regression Contract
 

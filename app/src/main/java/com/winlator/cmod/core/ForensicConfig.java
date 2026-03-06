@@ -128,7 +128,7 @@ public final class ForensicConfig {
                 + ";dxvk:" + (snapshot.enableDxvkLogs ? "native,file" : "off")
                 + ";vkd3d:" + (snapshot.enableVkd3dLogs ? "native,file" : "off")
                 + ";dgvoodoo:" + (snapshot.enableDgVoodooLogs ? "native,file" : "off")
-                + ";turnip:" + (snapshot.enableTurnipLogs ? "mesa,file" : "off")
+                + ";mesa_graphics:" + (snapshot.enableTurnipLogs ? "mesa,file" : "off")
                 + ";pulse:" + (snapshot.enablePulseLogs ? "service" : "off")
                 + ";alsa:" + (snapshot.enableAlsaLogs ? "service" : "off");
     }
@@ -198,7 +198,7 @@ public final class ForensicConfig {
                 + " | Loader=" + flag(snapshot.enableLoaderTrace)
                 + " | Box64=" + flag(snapshot.enableBox64Logs)
                 + " | FEX=" + flag(snapshot.enableFexLogs)
-                + " | Turnip=" + flag(snapshot.enableTurnipLogs)
+                + " | MesaGraphics=" + flag(snapshot.enableTurnipLogs)
                 + " | DXVK=" + flag(snapshot.enableDxvkLogs)
                 + " | VKD3D=" + flag(snapshot.enableVkd3dLogs)
                 + " | dgVoodoo=" + flag(snapshot.enableDgVoodooLogs)

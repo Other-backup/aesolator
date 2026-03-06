@@ -320,18 +320,25 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         private String buildDriverMeta(String entryId) {
-            String normalized = entryId == null ? "" : entryId.toLowerCase(Locale.US);
-            String arch;
-            if (normalized.contains("arm64ec")) arch = "ARM64EC";
-            else if (normalized.contains("x86_64") || normalized.contains("amd64")) arch = "x86_64";
-            else if (normalized.contains("arm64")) arch = "ARM64";
-            else arch = "generic";
-            return "Installed • " + arch;
+            AdrenotoolsManager.DriverPackageInfo info = adrenotoolsManager.getDriverPackageInfo(entryId);
+            if (info == null) return "Installed";
+
+            StringBuilder meta = new StringBuilder("Installed");
+            meta.append(" • ").append(info.getDisplayProviderLabel());
+            meta.append(" • ").append(info.getDisplayRouteLabel());
+            String arch = info.getArchLabel();
+            if (!"generic".equalsIgnoreCase(arch)) meta.append(" • ").append(arch);
+            String source = info.getSourceLabel();
+            if (!source.isEmpty() && !"local package".equalsIgnoreCase(source)) meta.append(" • ").append(source);
+            return meta.toString();
         }
 
         private int resolveInstalledDriverAccent(String entryId) {
+            AdrenotoolsManager.DriverPackageInfo info = adrenotoolsManager.getDriverPackageInfo(entryId);
             String normalized = entryId == null ? "" : entryId.toLowerCase(Locale.US);
-            boolean openGlLike = normalized.contains("opengl")
+            boolean openGlLike = info != null
+                    ? info.isOpenGlProvider()
+                    : normalized.contains("opengl")
                     || normalized.contains("gallium")
                     || normalized.contains("zink")
                     || normalized.contains("gl");
@@ -995,7 +1002,7 @@ public class AdrenotoolsFragment extends Fragment {
                     profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                     profile.delivery = resolveAssetBranch(sourceKey, lowerName, tag, releaseName);
                     profile.channel = ContentProfile.CHANNEL_STABLE;
-                    profile.locallyInstalled = isLikelyInstalledDriver(profile.verName);
+                    profile.locallyInstalled = isLikelyInstalledDriver(profile);
                     profiles.add(profile);
                 }
             }
@@ -1048,7 +1055,7 @@ public class AdrenotoolsFragment extends Fragment {
                 profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                 profile.delivery = branch;
                 profile.channel = ContentProfile.CHANNEL_STABLE;
-                profile.locallyInstalled = isLikelyInstalledDriver(profile.verName);
+                profile.locallyInstalled = isLikelyInstalledDriver(profile);
                 profiles.add(profile);
             }
         } catch (Exception ignored) {
@@ -1274,7 +1281,7 @@ public class AdrenotoolsFragment extends Fragment {
         profile.delivery = delivery;
         profile.channel = ContentProfile.CHANNEL_STABLE;
         profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
-        profile.locallyInstalled = isLikelyInstalledDriver(profile.verName);
+        profile.locallyInstalled = isLikelyInstalledDriver(profile);
         return profile;
     }
 
@@ -1299,17 +1306,60 @@ public class AdrenotoolsFragment extends Fragment {
         return out;
     }
 
-    private boolean isLikelyInstalledDriver(String remoteName) {
-        if (remoteName == null || remoteName.trim().isEmpty()) return false;
-        String remoteToken = remoteName.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "");
-        if (remoteToken.isEmpty()) return false;
-        ArrayList<String> installed = adrenotoolsManager.enumarateInstalledDrivers();
-        for (String local : installed) {
-            if (local == null) continue;
-            String localToken = local.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "");
-            if (localToken.contains(remoteToken) || remoteToken.contains(localToken)) return true;
+    private boolean isLikelyInstalledDriver(ContentProfile remoteProfile) {
+        if (remoteProfile == null) return false;
+        ArrayList<AdrenotoolsManager.DriverPackageInfo> installed = adrenotoolsManager.enumerateInstalledDriverPackages();
+        for (AdrenotoolsManager.DriverPackageInfo info : installed) {
+            if (matchesInstalledDriverProfile(remoteProfile, info)) return true;
         }
         return false;
+    }
+
+    private boolean matchesInstalledDriverProfile(ContentProfile remoteProfile, AdrenotoolsManager.DriverPackageInfo info) {
+        if (remoteProfile == null || info == null) return false;
+        String expectedLane = remoteProfile.type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                ? "freedreno-opengl"
+                : "turnip-vulkan";
+        if (!info.providerLane.isEmpty() && !expectedLane.equalsIgnoreCase(info.providerLane)) return false;
+
+        String remoteNameToken = normalizeDriverToken(remoteProfile.verName);
+        String remoteTagToken = normalizeDriverToken(remoteProfile.releaseTag);
+        String remoteDescToken = normalizeDriverToken(remoteProfile.desc);
+
+        ArrayList<String> localTokens = new ArrayList<>();
+        localTokens.add(normalizeDriverToken(info.entryId));
+        localTokens.add(normalizeDriverToken(info.name));
+        localTokens.add(normalizeDriverToken(stripZipSuffix(info.artifactName)));
+        localTokens.add(normalizeDriverToken(info.releaseTag));
+        localTokens.add(normalizeDriverToken(info.driverVersion));
+
+        for (String localToken : localTokens) {
+            if (localToken.isEmpty()) continue;
+            if (!remoteNameToken.isEmpty() && localToken.equals(remoteNameToken)) return true;
+            if (!remoteTagToken.isEmpty() && localToken.equals(remoteTagToken)) return true;
+        }
+
+        boolean sameSource = info.sourceRepo != null
+                && remoteProfile.sourceRepo != null
+                && !info.sourceRepo.trim().isEmpty()
+                && info.sourceRepo.equalsIgnoreCase(remoteProfile.sourceRepo);
+
+        for (String localToken : localTokens) {
+            if (localToken.isEmpty()) continue;
+            if (remoteNameToken.length() >= 8 && (localToken.contains(remoteNameToken) || remoteNameToken.contains(localToken))) {
+                return true;
+            }
+            if (sameSource && remoteDescToken.length() >= 10
+                    && (localToken.contains(remoteDescToken) || remoteDescToken.contains(localToken))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeDriverToken(String value) {
+        if (value == null) return "";
+        return value.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "");
     }
 
     private void updateBranchSelector(List<ContentProfile> profiles) {
@@ -1455,6 +1505,11 @@ public class AdrenotoolsFragment extends Fragment {
 
     private String buildFeedMetaLine(ContentProfile profile) {
         StringBuilder meta = new StringBuilder(profile.getDisplayCategory());
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER) {
+            meta.append(" • Freedreno Gallium");
+        } else if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) {
+            meta.append(" • Turnip Vulkan");
+        }
         String branch = profile.delivery == null ? "" : profile.delivery.trim();
         if (!branch.isEmpty()) meta.append(" • ").append(branch.replace('-', ' '));
         if (profile.releaseTag != null && !profile.releaseTag.trim().isEmpty()) {
