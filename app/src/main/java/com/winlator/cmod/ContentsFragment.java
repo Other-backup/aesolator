@@ -14,7 +14,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
@@ -45,6 +44,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.SpinnerAdapters;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -180,23 +180,23 @@ public class ContentsFragment extends Fragment {
         channelValues = getResources().getStringArray(R.array.contents_channel_values);
         archValues = getResources().getStringArray(R.array.contents_arch_values);
 
-        sContentsSourceMode.setAdapter(new ArrayAdapter<>(
+        sContentsSourceMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                isDarkMode,
                 getResources().getStringArray(R.array.contents_source_entries)
         ));
         sContentsSourceMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
-        sContentsChannelMode.setAdapter(new ArrayAdapter<>(
+        sContentsChannelMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                isDarkMode,
                 getResources().getStringArray(R.array.contents_channel_entries)
         ));
         sContentsChannelMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
-        sContentsArchMode.setAdapter(new ArrayAdapter<>(
+        sContentsArchMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                isDarkMode,
                 getResources().getStringArray(R.array.contents_arch_entries)
         ));
         sContentsArchMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
@@ -271,7 +271,7 @@ public class ContentsFragment extends Fragment {
         for (ContentProfile.ContentType type : SUPPORTED_CONTENT_TYPES) {
             typeList.add(getTypeLabel(type));
         }
-        spinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, typeList));
+        spinner.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, typeList));
         spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
     }
 
@@ -324,6 +324,9 @@ public class ContentsFragment extends Fragment {
                 continue;
             }
             boolean locallyInstalled = profile != null && profile.locallyInstalled;
+            if (!locallyInstalled && !matchesSelectedSourceMode(profile)) {
+                continue;
+            }
             if (!locallyInstalled && supportsChannelFilter(currentContentType)) {
                 if ("stable".equalsIgnoreCase(channelMode) && profile.isBetaLike()) {
                     continue;
@@ -346,6 +349,32 @@ public class ContentsFragment extends Fragment {
             filtered.add(profile);
         }
         return filtered;
+    }
+
+    private boolean matchesSelectedSourceMode(ContentProfile profile) {
+        if (profile == null) return false;
+        String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        if ("all".equals(mode) || "custom".equals(mode)) return true;
+
+        String joined = (
+                (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
+                        (profile.remoteUrl == null ? "" : profile.remoteUrl)
+        ).toLowerCase(Locale.US);
+
+        if ("aesolator".equals(mode)) {
+            return joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator");
+        }
+        if ("wcphub".equals(mode)) {
+            return joined.contains("open-wine-components")
+                    || joined.contains("wcphub")
+                    || joined.contains("arihany");
+        }
+        if ("fallback".equals(mode)) {
+            return joined.contains("winlator-contents")
+                    || joined.contains("stevenmxz")
+                    || joined.contains("fallback");
+        }
+        return true;
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -1184,6 +1213,12 @@ public class ContentsFragment extends Fragment {
             int accentColor = resolveProfileAccentColor(profile);
             int secondaryColor = withAlpha(accentColor, isDarkMode ? 228 : 176);
             holder.ivIcon.setColorFilter(accentColor);
+            GradientDrawable itemBackground = new GradientDrawable();
+            itemBackground.setShape(GradientDrawable.RECTANGLE);
+            itemBackground.setCornerRadius(dpToPx(12f));
+            itemBackground.setColor(withAlpha(accentColor, isDarkMode ? 56 : 26));
+            itemBackground.setStroke(dpToPx(1f), withAlpha(accentColor, isDarkMode ? 210 : 138));
+            holder.itemView.setBackground(itemBackground);
 
             holder.tvVersionName.setText(buildProfileTitleLine(profile));
             holder.tvVersionName.setTextColor(accentColor);

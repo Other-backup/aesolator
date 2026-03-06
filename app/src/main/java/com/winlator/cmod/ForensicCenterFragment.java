@@ -10,7 +10,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -27,6 +26,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.contentdialog.ContentDialog;
 
 import java.io.File;
@@ -129,7 +129,7 @@ public class ForensicCenterFragment extends Fragment {
         String selectedAdbTransport = ForensicConfig.normalizeAdbCaptureMode(
                 preferences.getString(ForensicConfig.PREF_ADB_CAPTURE_MODE, ForensicConfig.ADB_CAPTURE_MODE_AUTO)
         );
-        sAdbTransport.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, adbTransportLabels));
+        sAdbTransport.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, adbTransportLabels));
         sAdbTransport.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         for (int i = 0; i < adbTransportValues.length; i++) {
             if (adbTransportValues[i].equalsIgnoreCase(selectedAdbTransport)) {
@@ -173,7 +173,7 @@ public class ForensicCenterFragment extends Fragment {
         String[] dri3Labels = getResources().getStringArray(R.array.dri3_mode_entries);
         String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
         String selectedDri3Mode = preferences.getString("dri3_mode", cbUseDri3.isChecked() ? "auto" : "off");
-        sDri3Mode.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, dri3Labels));
+        sDri3Mode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, dri3Labels));
         sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         for (int i = 0; i < dri3Values.length; i++) {
             if (dri3Values[i].equalsIgnoreCase(selectedDri3Mode)) {

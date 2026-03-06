@@ -14,7 +14,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -34,6 +33,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -101,17 +101,17 @@ public class AdrenotoolsFragment extends Fragment {
 
         sourceValues = getResources().getStringArray(R.array.graphics_feed_source_values);
 
-        sGraphicsFeedSourceMode.setAdapter(new ArrayAdapter<>(
+        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        sGraphicsFeedSourceMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                isDarkMode,
                 getResources().getStringArray(R.array.graphics_feed_source_entries)
         ));
-        sGraphicsFeedBranchMode.setAdapter(new ArrayAdapter<>(
+        sGraphicsFeedBranchMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                isDarkMode,
                 new ArrayList<>(Collections.singletonList(getString(R.string.graphics_center_branch_all)))
         ));
-        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
         int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
         sGraphicsFeedSourceMode.setPopupBackgroundResource(popupBackground);
         sGraphicsFeedBranchMode.setPopupBackgroundResource(popupBackground);
@@ -271,10 +271,22 @@ public class AdrenotoolsFragment extends Fragment {
         @Override
         public void onBindViewHolder(ViewHolder viewHolder, final int position) {
             final String entryId = driversList.get(position);
+            int accent = resolveInstalledDriverAccent(entryId);
+            boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
             viewHolder.tvName.setText(adrenotoolsManager.getDriverName(driversList.get(position)));
             viewHolder.tvVersion.setText(adrenotoolsManager.getDriverVersion(driversList.get(position)));
             viewHolder.tvMeta.setText(buildDriverMeta(entryId));
             viewHolder.ivIcon.setImageResource(R.drawable.icon_open);
+            viewHolder.ivIcon.setColorFilter(accent);
+            viewHolder.tvName.setTextColor(accent);
+            viewHolder.tvVersion.setTextColor(withAlpha(accent, isDarkMode ? 228 : 176));
+            viewHolder.tvMeta.setTextColor(withAlpha(accent, isDarkMode ? 214 : 164));
+            GradientDrawable rowBackground = new GradientDrawable();
+            rowBackground.setShape(GradientDrawable.RECTANGLE);
+            rowBackground.setCornerRadius(dpToPx(12f));
+            rowBackground.setColor(withAlpha(accent, isDarkMode ? 56 : 26));
+            rowBackground.setStroke(dpToPx(1f), withAlpha(accent, isDarkMode ? 210 : 138));
+            viewHolder.itemView.setBackground(rowBackground);
             viewHolder.btMenu.setOnClickListener((v) -> {
                 removeAtIndex(position);
             });
@@ -306,6 +318,19 @@ public class AdrenotoolsFragment extends Fragment {
             else if (normalized.contains("arm64")) arch = "ARM64";
             else arch = "generic";
             return "Installed • " + arch;
+        }
+
+        private int resolveInstalledDriverAccent(String entryId) {
+            String normalized = entryId == null ? "" : entryId.toLowerCase(Locale.US);
+            boolean openGlLike = normalized.contains("opengl")
+                    || normalized.contains("gallium")
+                    || normalized.contains("zink")
+                    || normalized.contains("gl");
+            boolean isDark = sharedPreferences.getBoolean("dark_mode", false);
+            int colorRes = openGlLike
+                    ? (isDark ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl)
+                    : (isDark ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip);
+            return ContextCompat.getColor(requireContext(), colorRes);
         }
     }
 
@@ -697,9 +722,9 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         suppressBranchCallback = true;
-        sGraphicsFeedBranchMode.setAdapter(new ArrayAdapter<>(
+        sGraphicsFeedBranchMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
+                sharedPreferences.getBoolean("dark_mode", false),
                 branchEntries
         ));
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
