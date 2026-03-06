@@ -5,11 +5,12 @@ Final delivery split for Ae.solator.
 ## Repositories
 
 - `kosoymiki/aesolator`
-  - Android app source + APK release lane (`winlator-latest`).
+  - Android app source-of-truth.
 - `kosoymiki/freewine11`
   - Native FreeWine source tree.
 - `kosoymiki/wcp-runtime-lanes` (**WCP Archive**)
-  - WCP release host for:
+  - Archive release host for:
+    - `aesolator-latest` (APK lane)
     - `freewine11-arm64ec-latest`
     - `vulkan-sdk-arm64-latest`
     - `vulkan-sdk-x86_64-latest`
@@ -31,9 +32,10 @@ Final delivery split for Ae.solator.
 ## Contract Rules
 
 1. `contents/contents.json` and artifact maps must use the real release owner per lane.
-2. DXVK/VKD3D/VulkanSDK must route to `wcp-runtime-lanes`.
-3. Turnip/OpenGL lanes route to `wcp-graphics-lanes`; dgVoodoo WCP routes to `wcp-runtime-lanes`.
-4. Legacy monorepo is excluded from active release routing.
+2. Aesolator APK release lane is owned by `wcp-runtime-lanes` (`aesolator-latest`).
+3. DXVK/VKD3D/VulkanSDK must route to `wcp-runtime-lanes`.
+4. Turnip/OpenGL lanes route to `wcp-graphics-lanes`; dgVoodoo WCP routes to `wcp-runtime-lanes`.
+5. Legacy monorepo is excluded from active release routing.
 
 ## Status
 

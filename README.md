@@ -17,9 +17,9 @@ Android application repository for Ae.solator (`by.aero.so.benchmark`).
 
 ## Split Model
 
-- `kosoymiki/aesolator`: app source + APK lane.
+- `kosoymiki/aesolator`: app source-of-truth.
 - `kosoymiki/freewine11`: native FreeWine source tree.
-- `kosoymiki/wcp-runtime-lanes` (WCP Archive): FreeWine + VulkanSDK + DXVK + VKD3D + dgVoodoo WCP lanes.
+- `kosoymiki/wcp-runtime-lanes` (WCP Archive): Aesolator APK lane + FreeWine + VulkanSDK + DXVK + VKD3D + dgVoodoo WCP lanes.
 - `kosoymiki/wcp-graphics-lanes`: Turnip/OpenGL provider lanes + build owner for dgVoodoo archive lane.
 - `kosoymiki/winlator-wine-proton-arm64ec-wcp`: legacy archived history only.
 
@@ -28,10 +28,11 @@ Legacy donor runtime lanes are not active in Ae.solator.
 ## Main Workflow
 
 - `.github/workflows/ci-winlator.yml`
-  - builds APK from native app source stored directly in this repo,
-  - publishes APK release lane in this repo.
+  - legacy stub in this repository (disabled mainline build lane).
+  - active APK build/release lane runs in `kosoymiki/wcp-runtime-lanes`:
+    `.github/workflows/ci-aesolator-apk.yml`.
 
-Legacy CI patch-overlay stack has been removed; this repository is the native source of truth for APK builds.
+Legacy CI patch-overlay stack has been removed; this repository stays native source-of-truth for app code, while archive publishing is centralized in WCP Archive.
 
 ## Local Build
 
