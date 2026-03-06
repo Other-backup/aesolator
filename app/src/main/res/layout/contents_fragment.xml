@@ -33,30 +33,52 @@
         android:layout_marginTop="8dp"
         android:text="@string/contents_sources" />
 
-    <LinearLayout
-        android:id="@+id/LLContentsSources"
+    <HorizontalScrollView
+        android:id="@+id/HSVContentsSources"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:fadeScrollbars="false"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="none">
 
-        <CheckBox
-            android:id="@+id/CBSourceWcpHub"
+        <LinearLayout
+            android:id="@+id/LLContentsSources"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/contents_source_wcphub" />
+            android:orientation="horizontal">
 
-        <CheckBox
-            android:id="@+id/CBSourceFallback"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/contents_source_fallback" />
+            <CheckBox
+                android:id="@+id/CBSourceWcpHub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/contents_source_wcphub"
+                android:textSize="13sp" />
 
-        <CheckBox
-            android:id="@+id/CBSourceAesolator"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/contents_source_aesolator" />
-    </LinearLayout>
+            <CheckBox
+                android:id="@+id/CBSourceFallback"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/contents_source_fallback"
+                android:textSize="13sp" />
+
+            <CheckBox
+                android:id="@+id/CBSourceAesolator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/contents_source_aesolator"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/TVContentsLaneScope"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/TVContentsFiltersLabel"
@@ -65,30 +87,44 @@
         android:layout_marginTop="8dp"
         android:text="@string/contents_filters" />
 
-    <LinearLayout
-        android:id="@+id/LLContentsFilters"
+    <HorizontalScrollView
+        android:id="@+id/HSVContentsFilters"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:fadeScrollbars="false"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="none">
 
-        <CheckBox
-            android:id="@+id/CBFilterArm64ec"
+        <LinearLayout
+            android:id="@+id/LLContentsFilters"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/contents_filter_arm64ec" />
+            android:orientation="horizontal">
 
-        <CheckBox
-            android:id="@+id/CBFilterX64"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/contents_filter_x64" />
+            <CheckBox
+                android:id="@+id/CBFilterArm64ec"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/contents_filter_arm64ec"
+                android:textSize="13sp" />
 
-        <CheckBox
-            android:id="@+id/CBFilterBeta"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/contents_filter_beta" />
-    </LinearLayout>
+            <CheckBox
+                android:id="@+id/CBFilterX64"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/contents_filter_x64"
+                android:textSize="13sp" />
+
+            <CheckBox
+                android:id="@+id/CBFilterBeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/contents_filter_beta"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
 
     <View style="@style/HorizontalLine" />

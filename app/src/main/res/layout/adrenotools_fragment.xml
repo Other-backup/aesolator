@@ -14,6 +14,14 @@
         android:text="@string/graphics_center_hint" />
 
     <TextView
+        android:id="@+id/TVGraphicsCenterStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/graphics_center_status_empty"
+        android:textStyle="bold" />
+
+    <TextView
         android:id="@+id/TVGraphicsLaneLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -37,6 +45,8 @@
                 style="@style/ButtonNeutral"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:drawableStart="@drawable/icon_cpu"
+                android:drawablePadding="6dp"
                 android:minWidth="0dp"
                 android:text="@string/graphics_center_lane_turnip" />
 
@@ -49,46 +59,44 @@
                 style="@style/ButtonNeutral"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:drawableStart="@drawable/icon_screen_effect"
+                android:drawablePadding="6dp"
                 android:minWidth="0dp"
                 android:text="@string/graphics_center_lane_opengl" />
-
-            <Space
-                android:layout_width="8dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTLaneDgVoodoo"
-                style="@style/ButtonNeutral"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_dgvoodoo" />
-
-            <Space
-                android:layout_width="8dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTLaneDxvkVkd3d"
-                style="@style/ButtonNeutral"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_dxvk_vkd3d" />
-
-            <Space
-                android:layout_width="8dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTLaneVulkanSdk"
-                style="@style/ButtonNeutral"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_vulkan_sdk" />
         </LinearLayout>
     </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/TVGraphicsDownloadsLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/graphics_center_driver_feed_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/TVGraphicsDownloadsHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/graphics_center_driver_feed_hint"
+        android:textSize="12sp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/RVGraphicsFeed"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:layout_marginTop="6dp"
+        android:scrollbars="vertical" />
+
+    <TextView
+        android:id="@+id/TVGraphicsFeedEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:text="@string/graphics_center_driver_feed_empty"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/TVGraphicsActionsLabel"
@@ -124,6 +132,14 @@
             android:layout_weight="1"
             android:text="@string/open_forensic_center" />
     </LinearLayout>
+
+    <Button
+        android:id="@+id/BTOpenUpscalerSettings"
+        style="@style/ButtonNeutral"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/open_upscaler_settings" />
 
     <androidx.recyclerview.widget.RecyclerView xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/RecyclerView"

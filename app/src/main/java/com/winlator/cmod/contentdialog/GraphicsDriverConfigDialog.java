@@ -21,6 +21,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.widget.MultiSelectionComboBox;
@@ -345,6 +346,28 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 graphicsDriverVersionView.setText(selectedVersion);
 
             anchor.setTag(writeGraphicsDriverConfig());
+            ForensicLogger.logEvent(
+                    anchor.getContext(),
+                    "info",
+                    "GRAPHICS_DRIVER_CONFIG_SAVED",
+                    null,
+                    "graphics_config",
+                    "graphics_driver_config_saved",
+                    ForensicLogger.fields(
+                            "graphics_driver", graphicsDriver,
+                            "driver_version", selectedVersion,
+                            "vulkan_api", selectedVulkanVersion,
+                            "gpu_name", selectedGPUName,
+                            "max_device_memory", selectedDeviceMemory,
+                            "present_mode", selectedPresentMode,
+                            "resource_type", selectedResourceType,
+                            "bcn_emulation", selectedBCnEmulation,
+                            "bcn_emulation_type", selectedBCnEmulationType,
+                            "bcn_cache", isBCnCacheEnabled,
+                            "sync_frame", isSyncFrame,
+                            "disable_present_wait", isDisablePresentWait
+                    )
+            );
         });
     }
 

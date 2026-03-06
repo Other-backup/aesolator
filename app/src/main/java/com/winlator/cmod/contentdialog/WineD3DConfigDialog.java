@@ -10,6 +10,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.StringUtils;
 
@@ -71,6 +72,22 @@ public class WineD3DConfigDialog extends ContentDialog {
             config.put("videoMemorySize", StringUtils.parseNumber(sVideoMemorySize.getSelectedItem().toString()));
             config.put("renderer", sRenderer.getSelectedItem().toString());
             anchor.setTag(config.toString());
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "WINED3D_CONFIG_SAVED",
+                    null,
+                    "wrapper_config",
+                    "wined3d_config_saved",
+                    ForensicLogger.fields(
+                            "csmt", config.get("csmt"),
+                            "strict_shader_math", config.get("strict_shader_math"),
+                            "offscreen_mode", config.get("OffscreenRenderingMode"),
+                            "gpu_name", config.get("gpuName"),
+                            "video_memory", config.get("videoMemorySize"),
+                            "renderer", config.get("renderer")
+                    )
+            );
         });
 
     }

@@ -169,6 +169,12 @@
                     android:text="@string/enable_vkd3d_logs" />
 
                 <CheckBox
+                    android:id="@+id/CBForensicDgVoodooLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/enable_dgvoodoo_logs" />
+
+                <CheckBox
                     android:id="@+id/CBForensicVulkanApiDump"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

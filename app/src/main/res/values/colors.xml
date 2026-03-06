@@ -5,10 +5,11 @@
     <color name="colorPrimary">#1F5A43</color>
     <color name="colorPrimaryDark">#143A2B</color>
     <color name="colorAccent">#2CCB7F</color>
+    <color name="colorAccentOverlay">#332CCB7F</color>
     <color name="black">#000000</color>
     <color name="contents_lane_wine">#0D7F67</color>
     <color name="contents_lane_proton">#2E7D32</color>
-    <color name="contents_lane_vulkansdk">#1565C0</color>
+    <color name="contents_lane_vulkansdk">#1B8D5A</color>
     <color name="contents_lane_turnip">#00897B</color>
     <color name="contents_lane_opengl">#EF6C00</color>
     <color name="contents_lane_dgvoodoo">#C62828</color>
@@ -20,10 +21,11 @@
     <color name="colorPrimaryDarkMode">#19382C</color>
     <color name="colorPrimaryDarkModeDark">#10241C</color>
     <color name="colorAccentDark">#39D98A</color>
+    <color name="colorAccentDarkOverlay">#3339D98A</color>
     <color name="white">#ffffff</color>
     <color name="contents_lane_wine_dark">#6FF0BF</color>
     <color name="contents_lane_proton_dark">#81C784</color>
-    <color name="contents_lane_vulkansdk_dark">#90CAF9</color>
+    <color name="contents_lane_vulkansdk_dark">#98F5C2</color>
     <color name="contents_lane_turnip_dark">#80CBC4</color>
     <color name="contents_lane_opengl_dark">#FFB74D</color>
     <color name="contents_lane_dgvoodoo_dark">#EF9A9A</color>

@@ -29,6 +29,19 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R8_COFFINCOLORS_FILE_COVERAGE.md` - file-level coverage control for Round 8 donor sweep, closed.
 - `docs/rounds/R9_GAMEHUBAPK_MATRIX.md` - Round 9 donor transfer matrix (`GameHub-Lite-5.3.3-RC2.apk`), closed.
 - `docs/rounds/R9_GAMEHUBAPK_FILE_COVERAGE.md` - file-level coverage control for Round 9 APK donor sweep, closed.
+- `docs/rounds/R10_MOBFGSR_MATRIX.md` - Round 10 donor transfer matrix (`Mob-FGSR/MobFGSR`), `gate_hold`.
+- `docs/rounds/R10_MOBFGSR_FILE_COVERAGE.md` - file-level coverage control for Round 10 donor sweep, `gate_hold`.
+- `docs/rounds/R11_LINUXFG_MATRIX.md` - Round 11 donor transfer matrix (`xXJSONDeruloXx/linux-fg`), `gate_hold`.
+- `docs/rounds/R11_LINUXFG_FILE_COVERAGE.md` - file-level coverage control for Round 11 donor sweep, `gate_hold`.
+- `docs/rounds/R12_DLSSGTOFSR3_MATRIX.md` - Round 12 donor transfer matrix (`Nukem9/dlssg-to-fsr3`), `gate_hold`.
+- `docs/rounds/R12_DLSSGTOFSR3_FILE_COVERAGE.md` - file-level coverage control for Round 12 donor sweep, `gate_hold`.
+- `docs/rounds/R13_FRAMEGENAPP_MATRIX.md` - Round 13 donor transfer matrix (`proqaz2-design/Frame-generation-`), `gate_hold`.
+- `docs/rounds/R13_FRAMEGENAPP_FILE_COVERAGE.md` - file-level coverage control for Round 13 donor sweep, `gate_hold`.
+- `docs/rounds/R14_OPTISCALER_MATRIX.md` - Round 14 donor transfer matrix (`optiscaler/OptiScaler`), `gate_hold`.
+- `docs/rounds/R14_OPTISCALER_FILE_COVERAGE.md` - file-level coverage control for Round 14 donor sweep, `gate_hold`.
+- `docs/rounds/R15_EDENAPK_MATRIX.md` - Round 15 donor transfer matrix (`Eden-Android-9d2341eaea-standard.apk`), `closed`.
+- `docs/rounds/R15_EDENAPK_FILE_COVERAGE.md` - file-level coverage control for Round 15 donor sweep, `closed`.
+- `docs/rounds/R15_EDENAPK_HEX_ASM_NOTES.md` - IDE/HEX/ASM extraction notes and transfer boundary decisions for Round 15.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 

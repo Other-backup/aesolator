@@ -344,6 +344,50 @@
     <string-array name="wine_entries">
         <item>freewine11-arm64ec</item>
     </string-array>
+    <string-array name="upscaler_preset_entries">
+        <item>auto</item>
+        <item>conservative</item>
+        <item>balanced</item>
+        <item>aggressive</item>
+    </string-array>
+    <string-array name="upscaler_backend_entries">
+        <item>Off</item>
+        <item>vkBasalt</item>
+        <item>MobFGSR</item>
+    </string-array>
+    <string-array name="upscaler_effect_entries">
+        <item>None</item>
+        <item>CAS</item>
+        <item>DLS</item>
+        <item>FSR</item>
+        <item>NIS</item>
+    </string-array>
+    <string-array name="upscaler_scale_entries">
+        <item>100</item>
+        <item>125</item>
+        <item>150</item>
+        <item>175</item>
+        <item>200</item>
+    </string-array>
+    <string-array name="upscaler_generated_frames_entries">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+    <string-array name="upscaler_fg_source_entries">
+        <item>native</item>
+        <item>opti_fg</item>
+    </string-array>
+    <string-array name="upscaler_fg_output_entries">
+        <item>auto</item>
+        <item>mobfgsr</item>
+        <item>dlssg_to_fsr3</item>
+    </string-array>
+    <string-array name="upscaler_framegen_mode_entries">
+        <item>balanced</item>
+        <item>quality</item>
+        <item>low_latency</item>
+    </string-array>
     <string-array name="vkbasalt_sharpness_entries">
         <item>None</item>
         <item>CAS</item>

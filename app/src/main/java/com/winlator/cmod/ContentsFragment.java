@@ -89,8 +89,10 @@ public class ContentsFragment extends Fragment {
     private ContentProfile.ContentType currentContentType = ContentProfile.ContentType.CONTENT_TYPE_WINE;
     private Spinner sContentType;
     private boolean isDarkMode;
+    private TextView tvContentsLaneScope;
     private TextView tvContentsFiltersLabel;
     private ViewGroup llContentsFilters;
+    private View hsvContentsFilters;
     private CheckBox cbSourceWcpHub;
     private CheckBox cbSourceFallback;
     private CheckBox cbSourceAesolator;
@@ -103,6 +105,7 @@ public class ContentsFragment extends Fragment {
     private boolean filterArm64ecEnabled;
     private boolean filterX64Enabled;
     private boolean filterBetaEnabled;
+    private String preselectedDisplayCategory = "";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -118,6 +121,9 @@ public class ContentsFragment extends Fragment {
         filterArm64ecEnabled = sharedPreferences.getBoolean("contents_filter_arm64ec", true);
         filterX64Enabled = sharedPreferences.getBoolean("contents_filter_x64", true);
         filterBetaEnabled = sharedPreferences.getBoolean("contents_filter_beta", false);
+        preselectedDisplayCategory = sharedPreferences.getString("contents_preselected_display_category", "");
+        if (preselectedDisplayCategory == null) preselectedDisplayCategory = "";
+        sharedPreferences.edit().remove("contents_preselected_display_category").apply();
     }
 
     @Override
@@ -149,6 +155,12 @@ public class ContentsFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 currentContentType = SUPPORTED_CONTENT_TYPES.get(position);
+                if (currentContentType != ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                        && preselectedDisplayCategory != null
+                        && !preselectedDisplayCategory.trim().isEmpty()) {
+                    preselectedDisplayCategory = "";
+                }
+                updateLaneScopeLabel();
                 updateFilterControlsVisibility();
                 if (emptyText != null && recyclerView != null) {
                     loadContentList();
@@ -164,8 +176,10 @@ public class ContentsFragment extends Fragment {
         cbSourceWcpHub = layout.findViewById(R.id.CBSourceWcpHub);
         cbSourceFallback = layout.findViewById(R.id.CBSourceFallback);
         cbSourceAesolator = layout.findViewById(R.id.CBSourceAesolator);
+        tvContentsLaneScope = layout.findViewById(R.id.TVContentsLaneScope);
         tvContentsFiltersLabel = layout.findViewById(R.id.TVContentsFiltersLabel);
         llContentsFilters = layout.findViewById(R.id.LLContentsFilters);
+        hsvContentsFilters = layout.findViewById(R.id.HSVContentsFilters);
         cbFilterArm64ec = layout.findViewById(R.id.CBFilterArm64ec);
         cbFilterX64 = layout.findViewById(R.id.CBFilterX64);
         cbFilterBeta = layout.findViewById(R.id.CBFilterBeta);
@@ -192,6 +206,7 @@ public class ContentsFragment extends Fragment {
         cbFilterArm64ec.setOnCheckedChangeListener(refreshListListener);
         cbFilterX64.setOnCheckedChangeListener(refreshListListener);
         cbFilterBeta.setOnCheckedChangeListener(refreshListListener);
+        updateLaneScopeLabel();
         updateFilterControlsVisibility();
 
         emptyText = layout.findViewById(R.id.TVEmptyText);
@@ -262,6 +277,10 @@ public class ContentsFragment extends Fragment {
                 if (arm64ec && !filterArm64ecEnabled) continue;
                 if (x64 && !filterX64Enabled) continue;
             }
+            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                    && !matchesPreselectedDisplayCategory(profile)) {
+                continue;
+            }
             filtered.add(profile);
         }
         return filtered;
@@ -296,6 +315,38 @@ public class ContentsFragment extends Fragment {
             currentContentType = preferred;
         }
         sharedPreferences.edit().remove("contents_preselected_type").apply();
+    }
+
+    private void updateLaneScopeLabel() {
+        if (tvContentsLaneScope == null) return;
+        String lane = preselectedDisplayCategory == null ? "" : preselectedDisplayCategory.trim();
+        boolean showLaneScope = currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                && !lane.isEmpty();
+        if (showLaneScope) {
+            tvContentsLaneScope.setText(getString(R.string.contents_lane_scope_format, lane));
+            tvContentsLaneScope.setVisibility(View.VISIBLE);
+        } else {
+            tvContentsLaneScope.setVisibility(View.GONE);
+        }
+    }
+
+    private boolean matchesPreselectedDisplayCategory(ContentProfile profile) {
+        String lane = preselectedDisplayCategory == null ? "" : preselectedDisplayCategory.trim().toLowerCase(Locale.US);
+        if (lane.isEmpty()) return true;
+        String combined = (
+                profile.getDisplayCategory() + " "
+                        + (profile.verName == null ? "" : profile.verName) + " "
+                        + (profile.desc == null ? "" : profile.desc) + " "
+                        + (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        if ("turnip".equals(lane)) return combined.contains("turnip");
+        if ("opengl".equals(lane)) {
+            return combined.contains("opengl") || combined.contains("zink") || combined.contains("gallium");
+        }
+        if ("vulkansdk".equals(lane) || "vulkan sdk".equals(lane) || "sdk".equals(lane)) {
+            return combined.contains("vulkan") || combined.contains("sdk");
+        }
+        return combined.contains(lane);
     }
 
     private boolean isGraphicsStackType(ContentProfile.ContentType type) {
@@ -333,6 +384,7 @@ public class ContentsFragment extends Fragment {
         boolean showFiltersCard = showArchFilters || showChannelFilter;
         if (tvContentsFiltersLabel != null) tvContentsFiltersLabel.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
         if (llContentsFilters != null) llContentsFilters.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
+        if (hsvContentsFilters != null) hsvContentsFilters.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
     }
 
     private boolean isArm64EcProfile(ContentProfile profile) {

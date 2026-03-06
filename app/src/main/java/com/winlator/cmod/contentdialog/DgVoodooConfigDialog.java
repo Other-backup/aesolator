@@ -16,6 +16,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 
 import java.util.Locale;
@@ -119,6 +120,22 @@ public class DgVoodooConfigDialog extends ContentDialog {
             }
             config.put("dgvoodooVersionHint", manager.getVersionHint());
             anchor.setTag(config.toString());
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "DGVOODOO_CONFIG_SAVED",
+                    null,
+                    "wrapper_config",
+                    "dgvoodoo_config_saved",
+                    ForensicLogger.fields(
+                            "package_installed", packageInstalled ? "1" : "0",
+                            "version_hint", manager.getVersionHint(),
+                            "arch", normalizeArch(config.get("dgvoodooArch")),
+                            "force_d3d11", normalizeToggle(config.get("dgvoodooForceD3D11"), DEFAULT_FORCE_D3D11),
+                            "vsync", normalizeToggle(config.get("dgvoodooVSync"), DEFAULT_VSYNC),
+                            "flip_model", normalizeToggle(config.get("dgvoodooFlipModel"), DEFAULT_FLIP_MODEL)
+                    )
+            );
         });
     }
 

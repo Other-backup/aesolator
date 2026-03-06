@@ -3,10 +3,14 @@
     <!-- Light Theme -->
     <style name="AppTheme" parent="@style/Theme.AppCompat.Light.NoActionBar">
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="colorControlHighlight">@color/colorAccentOverlay</item>
+        <item name="android:colorControlHighlight">@color/colorAccentOverlay</item>
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="android:windowBackground">@color/window_background_color</item>
         <item name="android:colorBackground">@color/window_background_color</item>
+        <item name="listChoiceBackgroundIndicator">@drawable/list_selector_light_accent</item>
+        <item name="android:listChoiceBackgroundIndicator">@drawable/list_selector_light_accent</item>
         <item name="android:textViewStyle">@style/TextView</item>
         <item name="android:checkboxStyle">@style/CheckBox</item>
         <item name="android:listPopupWindowStyle">@style/ListPopupWindow</item>
@@ -20,10 +24,14 @@
     <!-- Dark Theme -->
     <style name="AppTheme.Dark" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="colorAccent">@color/colorAccentDark</item>
+        <item name="colorControlHighlight">@color/colorAccentDarkOverlay</item>
+        <item name="android:colorControlHighlight">@color/colorAccentDarkOverlay</item>
         <item name="colorPrimary">@color/colorPrimaryDarkMode</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDarkModeDark</item>
         <item name="android:windowBackground">@color/window_background_color_dark</item>
         <item name="android:colorBackground">@color/window_background_color_dark</item>
+        <item name="listChoiceBackgroundIndicator">@drawable/list_selector_dark_accent</item>
+        <item name="android:listChoiceBackgroundIndicator">@drawable/list_selector_dark_accent</item>
         <item name="android:textViewStyle">@style/TextView.Dark</item>
         <item name="android:checkboxStyle">@style/CheckBox.Dark</item>
         <item name="android:listPopupWindowStyle">@style/ListPopupWindow.Dark</item>

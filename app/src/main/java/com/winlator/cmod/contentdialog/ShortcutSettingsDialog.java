@@ -35,6 +35,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.fexcore.FEXCoreManager;
@@ -59,6 +60,22 @@ public class ShortcutSettingsDialog extends ContentDialog {
     private static final String TOUCHPAD_PROFILE_BALANCED = "balanced";
     private static final String TOUCHPAD_PROFILE_AGGRESSIVE = "aggressive";
     private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
+    private static final String UPSCALER_BACKEND_OFF = "off";
+    private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
+    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String UPSCALER_EFFECT_NONE = "none";
+    private static final String FG_SOURCE_NATIVE = "native";
+    private static final String FG_SOURCE_OPTI_FG = "opti_fg";
+    private static final String FG_OUTPUT_AUTO = "auto";
+    private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
+    private static final String FG_OUTPUT_DLSSG_TO_FSR3 = "dlssg_to_fsr3";
+    private static final String FRAMEGEN_MODE_BALANCED = "balanced";
+    private static final String FRAMEGEN_MODE_QUALITY = "quality";
+    private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
+    private static final String UPSCALER_PRESET_AUTO = "auto";
+    private static final String UPSCALER_PRESET_CONSERVATIVE = "conservative";
+    private static final String UPSCALER_PRESET_BALANCED = "balanced";
+    private static final String UPSCALER_PRESET_AGGRESSIVE = "aggressive";
     private final ShortcutsFragment fragment;
     private final Shortcut shortcut;
     private InputControlsManager inputControlsManager;
@@ -378,16 +395,102 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
         sStartupSelection.setSelection(Integer.parseInt(shortcut.getExtra("startupSelection", String.valueOf(shortcut.container.getStartupSelection()))));
 
-        final Spinner sSharpnessEffect = findViewById(R.id.SSharpnessEffect);
+        final Spinner sUpscalerPreset = findViewById(R.id.SUpscalerPreset);
+        final Spinner sUpscalerBackend = findViewById(R.id.SUpscalerBackend);
+        final Spinner sUpscalerEffect = findViewById(R.id.SUpscalerEffect);
+        final Spinner sUpscalerScale = findViewById(R.id.SUpscalerScale);
+        final CheckBox cbEnableFrameGeneration = findViewById(R.id.CBEnableFrameGeneration);
+        final Spinner sGeneratedFrames = findViewById(R.id.SGeneratedFrames);
+        final Spinner sUpscalerFgSource = findViewById(R.id.SUpscalerFgSource);
+        final Spinner sUpscalerFgOutput = findViewById(R.id.SUpscalerFgOutput);
+        final Spinner sUpscalerFramegenMode = findViewById(R.id.SUpscalerFramegenMode);
+        final CheckBox cbUpscalerThermalGuard = findViewById(R.id.CBUpscalerThermalGuard);
+        final SeekBar sbUpscalerTargetFps = findViewById(R.id.SBUpscalerTargetFps);
+        final TextView tvUpscalerTargetFps = findViewById(R.id.TVUpscalerTargetFps);
+        final SeekBar sbInterpolationFactor = findViewById(R.id.SBInterpolationFactor);
+        final TextView tvInterpolationFactor = findViewById(R.id.TVInterpolationFactor);
+        final CheckBox cbUpscalerDebugOverlay = findViewById(R.id.CBUpscalerDebugOverlay);
+        final CheckBox cbUpscalerDebugTearLines = findViewById(R.id.CBUpscalerDebugTearLines);
+        final CheckBox cbUpscalerInterpolatedOnly = findViewById(R.id.CBUpscalerInterpolatedOnly);
+        final CheckBox cbEnableVulkanValidationLayer = findViewById(R.id.CBEnableVulkanValidationLayer);
         final SeekBar sbSharpnessLevel = findViewById(R.id.SBSharpnessLevel);
         final SeekBar sbSharpnessDenoise = findViewById(R.id.SBSharpnessDenoise);
         final TextView tvSharpnessLevel = findViewById(R.id.TVSharpnessLevel);
         final TextView tvSharpnessDenoise = findViewById(R.id.TVSharpnessDenoise);
 
-        AppUtils.setSpinnerSelectionFromValue(sSharpnessEffect, shortcut.getExtra("sharpnessEffect", "None"));
+        String legacySharpnessEffect = shortcut.getExtra("sharpnessEffect", "None");
+        String initialUpscalerBackend = shortcut.getExtra("upscalerBackend", "");
+        if (initialUpscalerBackend.isEmpty()) {
+            initialUpscalerBackend = !"none".equalsIgnoreCase(legacySharpnessEffect)
+                    ? UPSCALER_BACKEND_VKBASALT
+                    : UPSCALER_BACKEND_OFF;
+        }
+        String initialUpscalerEffect = shortcut.getExtra("upscalerEffect", "");
+        if (initialUpscalerEffect.isEmpty()) {
+            initialUpscalerEffect = normalizeLegacyUpscalerEffect(legacySharpnessEffect);
+        }
+        String initialUpscalerPreset = normalizeUpscalerPreset(shortcut.getExtra("upscalerPreset", UPSCALER_PRESET_AUTO));
+        int initialUpscalerScale = parseBoundedInt(shortcut.getExtra("upscalerScale", "100"), 100, 100, 200);
+        int initialGeneratedFrames = parseBoundedInt(shortcut.getExtra("upscalerGeneratedFrames", "1"), 1, 1, 3);
+        boolean initialFrameGenerationEnabled = parseBooleanValue(shortcut.getExtra("upscalerFrameGeneration", "0"));
+        String initialFgSource = normalizeFgSource(shortcut.getExtra("upscalerFgSource", FG_SOURCE_NATIVE));
+        String initialFgOutput = normalizeFgOutput(shortcut.getExtra("upscalerFgOutput", FG_OUTPUT_AUTO));
+        String initialFramegenMode = normalizeFramegenMode(
+                shortcut.getExtra("upscalerFramegenMode", FRAMEGEN_MODE_BALANCED)
+        );
+        boolean initialUpscalerThermalGuard = parseBooleanValue(shortcut.getExtra("upscalerThermalGuard", "1"));
+        int initialUpscalerTargetFps = parseBoundedInt(shortcut.getExtra("upscalerTargetFps", "60"), 60, 30, 144);
+        int initialInterpolationFactor = parseBoundedIntAllowZero(
+                shortcut.getExtra("upscalerInterpolationFactor", "50"),
+                50,
+                0,
+                100
+        );
+        boolean initialUpscalerDebugOverlay = parseBooleanValue(shortcut.getExtra("upscalerDebugOverlay", "0"));
+        boolean initialUpscalerDebugTearLines = parseBooleanValue(shortcut.getExtra("upscalerDebugTearLines", "0"));
+        boolean initialUpscalerInterpolatedOnly = parseBooleanValue(shortcut.getExtra("upscalerInterpolatedOnly", "0"));
+        boolean initialVulkanValidationLayer = parseBooleanValue(shortcut.getExtra("vulkanValidationLayer", "0"));
+        int initialSharpnessLevel = parseBoundedIntAllowZero(
+                shortcut.getExtra("upscalerSharpness", shortcut.getExtra("sharpnessLevel", "100")),
+                100,
+                0,
+                100
+        );
+        int initialSharpnessDenoise = parseBoundedIntAllowZero(
+                shortcut.getExtra("upscalerDenoise", shortcut.getExtra("sharpnessDenoise", "100")),
+                100,
+                0,
+                100
+        );
 
-        sbSharpnessLevel.setProgress(Integer.parseInt(shortcut.getExtra("sharpnessLevel", "100")));
-        tvSharpnessLevel.setText(shortcut.getExtra("sharpnessLevel", "100") + "%");
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerPreset, initialUpscalerPreset);
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerBackend, initialUpscalerBackend);
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerEffect, initialUpscalerEffect);
+        AppUtils.setSpinnerSelectionFromValue(sUpscalerScale, String.valueOf(initialUpscalerScale));
+        AppUtils.setSpinnerSelectionFromValue(sGeneratedFrames, String.valueOf(initialGeneratedFrames));
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerFgSource, initialFgSource);
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerFgOutput, initialFgOutput);
+        AppUtils.setSpinnerSelectionFromIdentifier(sUpscalerFramegenMode, initialFramegenMode);
+        cbEnableFrameGeneration.setChecked(initialFrameGenerationEnabled);
+        cbUpscalerThermalGuard.setChecked(initialUpscalerThermalGuard);
+        sbUpscalerTargetFps.setProgress(initialUpscalerTargetFps);
+        tvUpscalerTargetFps.setText(String.valueOf(initialUpscalerTargetFps));
+        sbInterpolationFactor.setProgress(initialInterpolationFactor);
+        tvInterpolationFactor.setText(formatInterpolationFactor(initialInterpolationFactor));
+        cbUpscalerDebugOverlay.setChecked(initialUpscalerDebugOverlay);
+        cbUpscalerDebugTearLines.setChecked(initialUpscalerDebugTearLines);
+        cbUpscalerInterpolatedOnly.setChecked(initialUpscalerInterpolatedOnly);
+        cbEnableVulkanValidationLayer.setChecked(initialVulkanValidationLayer);
+
+        sbUpscalerTargetFps.setOnSeekBarChangeListener(new SimpleSeekbarListener(
+                () -> tvUpscalerTargetFps.setText(String.valueOf(sbUpscalerTargetFps.getProgress()))
+        ));
+        sbInterpolationFactor.setOnSeekBarChangeListener(new SimpleSeekbarListener(
+                () -> tvInterpolationFactor.setText(formatInterpolationFactor(sbInterpolationFactor.getProgress()))
+        ));
+
+        sbSharpnessLevel.setProgress(initialSharpnessLevel);
+        tvSharpnessLevel.setText(initialSharpnessLevel + "%");
         sbSharpnessLevel.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -404,8 +507,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
             }
         });
-        sbSharpnessDenoise.setProgress(Integer.parseInt(shortcut.getExtra("sharpnessDenoise", "100")));
-        tvSharpnessDenoise.setText(shortcut.getExtra("sharpnessDenoise", "100") + "%");
+        sbSharpnessDenoise.setProgress(initialSharpnessDenoise);
+        tvSharpnessDenoise.setText(initialSharpnessDenoise + "%");
         sbSharpnessDenoise.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -422,6 +525,48 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
             }
         });
+
+        final Runnable updateUpscalerUiState = () -> {
+            String backendId = StringUtils.parseIdentifier(sUpscalerBackend.getSelectedItem());
+            boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(backendId);
+            boolean frameGenerationSupported = UPSCALER_BACKEND_VKBASALT.equals(backendId)
+                    || UPSCALER_BACKEND_MOBFGSR.equals(backendId);
+            boolean mobfgsrDebugSupported = UPSCALER_BACKEND_MOBFGSR.equals(backendId);
+            sUpscalerPreset.setEnabled(upscalerEnabled);
+            sUpscalerEffect.setEnabled(upscalerEnabled);
+            sUpscalerScale.setEnabled(upscalerEnabled);
+            cbEnableFrameGeneration.setEnabled(upscalerEnabled && frameGenerationSupported);
+            if ((!upscalerEnabled || !frameGenerationSupported) && cbEnableFrameGeneration.isChecked()) {
+                cbEnableFrameGeneration.setChecked(false);
+            }
+            sGeneratedFrames.setEnabled(upscalerEnabled && frameGenerationSupported && cbEnableFrameGeneration.isChecked());
+            sUpscalerFgSource.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            sUpscalerFgOutput.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            sUpscalerFramegenMode.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            cbUpscalerThermalGuard.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            sbUpscalerTargetFps.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            sbInterpolationFactor.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
+            cbUpscalerDebugOverlay.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbUpscalerDebugTearLines.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbUpscalerInterpolatedOnly.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbEnableVulkanValidationLayer.setEnabled(upscalerEnabled);
+            sbSharpnessLevel.setEnabled(upscalerEnabled);
+            sbSharpnessDenoise.setEnabled(upscalerEnabled);
+        };
+
+        sUpscalerBackend.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateUpscalerUiState.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateUpscalerUiState.run();
+            }
+        });
+        cbEnableFrameGeneration.setOnCheckedChangeListener((buttonView, isChecked) -> updateUpscalerUiState.run());
+        updateUpscalerUiState.run();
 
         final CPUListView cpuListView = findViewById(R.id.CPUListView);
         cpuListView.setCheckedCPUList(shortcut.getExtra("cpuList", shortcut.container.getCPUList(true)));
@@ -515,12 +660,76 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 byte startupSelection = (byte)sStartupSelection.getSelectedItemPosition();
                 shortcut.putExtra("startupSelection", String.valueOf(startupSelection));
 
-                String sharpeningEffect = sSharpnessEffect.getSelectedItem().toString();
-                String sharpeningLevel = String.valueOf(sbSharpnessLevel.getProgress());
-                String sharpeningDenoise = String.valueOf(sbSharpnessDenoise.getProgress());
-                shortcut.putExtra("sharpnessEffect", sharpeningEffect);
-                shortcut.putExtra("sharpnessLevel", sharpeningLevel);
-                shortcut.putExtra("sharpnessDenoise", sharpeningDenoise);
+                String upscalerPreset = normalizeUpscalerPreset(
+                        StringUtils.parseIdentifier(sUpscalerPreset.getSelectedItem())
+                );
+                String upscalerBackend = StringUtils.parseIdentifier(sUpscalerBackend.getSelectedItem());
+                String upscalerEffect = StringUtils.parseIdentifier(sUpscalerEffect.getSelectedItem());
+                String upscalerScale = String.valueOf(parseBoundedIntAllowZero(
+                        String.valueOf(sUpscalerScale.getSelectedItem()),
+                        100,
+                        100,
+                        200
+                ));
+                String generatedFrames = String.valueOf(parseBoundedIntAllowZero(
+                        String.valueOf(sGeneratedFrames.getSelectedItem()),
+                        1,
+                        1,
+                        3
+                ));
+                String upscalerFgSource = normalizeFgSource(
+                        StringUtils.parseIdentifier(sUpscalerFgSource.getSelectedItem())
+                );
+                String upscalerFgOutput = normalizeFgOutput(
+                        StringUtils.parseIdentifier(sUpscalerFgOutput.getSelectedItem())
+                );
+                String upscalerFramegenMode = normalizeFramegenMode(
+                        StringUtils.parseIdentifier(sUpscalerFramegenMode.getSelectedItem())
+                );
+                String upscalerThermalGuard = cbUpscalerThermalGuard.isChecked() ? "1" : "0";
+                String upscalerTargetFps = String.valueOf(parseBoundedIntAllowZero(
+                        String.valueOf(sbUpscalerTargetFps.getProgress()),
+                        60,
+                        30,
+                        144
+                ));
+                String upscalerInterpolationFactor = String.valueOf(parseBoundedIntAllowZero(
+                        String.valueOf(sbInterpolationFactor.getProgress()),
+                        50,
+                        0,
+                        100
+                ));
+                String upscalerDebugOverlay = cbUpscalerDebugOverlay.isChecked() ? "1" : "0";
+                String upscalerDebugTearLines = cbUpscalerDebugTearLines.isChecked() ? "1" : "0";
+                String upscalerInterpolatedOnly = cbUpscalerInterpolatedOnly.isChecked() ? "1" : "0";
+                String vulkanValidationLayer = cbEnableVulkanValidationLayer.isChecked() ? "1" : "0";
+                String sharpnessLevel = String.valueOf(sbSharpnessLevel.getProgress());
+                String sharpnessDenoise = String.valueOf(sbSharpnessDenoise.getProgress());
+                String frameGenerationEnabled = cbEnableFrameGeneration.isChecked() ? "1" : "0";
+
+                shortcut.putExtra("upscalerPreset", upscalerPreset);
+                shortcut.putExtra("upscalerBackend", upscalerBackend);
+                shortcut.putExtra("upscalerEffect", upscalerEffect);
+                shortcut.putExtra("upscalerScale", upscalerScale);
+                shortcut.putExtra("upscalerFrameGeneration", frameGenerationEnabled);
+                shortcut.putExtra("upscalerGeneratedFrames", generatedFrames);
+                shortcut.putExtra("upscalerFgSource", upscalerFgSource);
+                shortcut.putExtra("upscalerFgOutput", upscalerFgOutput);
+                shortcut.putExtra("upscalerFramegenMode", upscalerFramegenMode);
+                shortcut.putExtra("upscalerThermalGuard", upscalerThermalGuard);
+                shortcut.putExtra("upscalerTargetFps", upscalerTargetFps);
+                shortcut.putExtra("upscalerInterpolationFactor", upscalerInterpolationFactor);
+                shortcut.putExtra("upscalerDebugOverlay", upscalerDebugOverlay);
+                shortcut.putExtra("upscalerDebugTearLines", upscalerDebugTearLines);
+                shortcut.putExtra("upscalerInterpolatedOnly", upscalerInterpolatedOnly);
+                shortcut.putExtra("vulkanValidationLayer", vulkanValidationLayer);
+                shortcut.putExtra("upscalerSharpness", sharpnessLevel);
+                shortcut.putExtra("upscalerDenoise", sharpnessDenoise);
+
+                // Keep legacy keys for backward compatibility with previously created shortcuts.
+                shortcut.putExtra("sharpnessEffect", toLegacyVkBasaltEffect(upscalerBackend, upscalerEffect));
+                shortcut.putExtra("sharpnessLevel", sharpnessLevel);
+                shortcut.putExtra("sharpnessDenoise", sharpnessDenoise);
 
                 ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
                 int controlsProfile = sControlsProfile.getSelectedItemPosition() > 0 ? profiles.get(sControlsProfile.getSelectedItemPosition() - 1).id : 0;
@@ -531,6 +740,32 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
                 // Save all changes to the shortcut
                 shortcut.saveData();
+                ForensicLogger.logEvent(
+                        context,
+                        "info",
+                        "SHORTCUT_SETTINGS_SAVED",
+                        shortcut.path,
+                        "shortcut_settings",
+                        "shortcut_settings_saved",
+                        ForensicLogger.fields(
+                                "shortcut_name", shortcut.name,
+                                "graphics_driver", graphicsDriver,
+                                "dxwrapper", dxwrapper,
+                                "audio_driver", audioDriver,
+                                "emulator", emulator,
+                                "upscaler_backend", upscalerBackend,
+                                "upscaler_preset", upscalerPreset,
+                                "upscaler_effect", upscalerEffect,
+                                "upscaler_frame_generation", frameGenerationEnabled,
+                                "upscaler_fg_source", upscalerFgSource,
+                                "upscaler_fg_output", upscalerFgOutput,
+                                "vulkan_validation_layer", vulkanValidationLayer,
+                                "box64_preset", box64Preset,
+                                "fexcore_preset", fexcorePreset,
+                                "startup_selection", startupSelection,
+                                "touchpad_profile", selectedGestureProfile
+                        )
+                );
             }
         });
     }
@@ -558,7 +793,9 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 text.equalsIgnoreCase("Box64") ||
                 text.equalsIgnoreCase("Input Controls") ||
                 text.equalsIgnoreCase("Game Controller") ||
-                text.equalsIgnoreCase("System");
+                text.equalsIgnoreCase("System") ||
+                text.equalsIgnoreCase("vkBasalt") ||
+                text.equalsIgnoreCase("AE Upscaler / Frame Generation");
     }
 
     public void onWinComponentsViewsAdded(boolean isDarkMode) {
@@ -619,10 +856,80 @@ public class ShortcutSettingsDialog extends ContentDialog {
         }
     }
 
+    private int parseBoundedIntAllowZero(String value, int fallback, int min, int max) {
+        if (value == null || value.trim().isEmpty()) return fallback;
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return Math.max(min, Math.min(max, parsed));
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private String formatInterpolationFactor(int value) {
+        int clamped = Math.max(0, Math.min(100, value));
+        return clamped + "%";
+    }
+
     private boolean parseBooleanValue(String value) {
         return "1".equals(value)
                 || "true".equalsIgnoreCase(value)
                 || "yes".equalsIgnoreCase(value);
+    }
+
+    private String normalizeLegacyUpscalerEffect(String legacyEffect) {
+        String normalized = legacyEffect == null ? UPSCALER_EFFECT_NONE : legacyEffect.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case "cas", "dls", "fsr", "nis" -> normalized;
+            default -> UPSCALER_EFFECT_NONE;
+        };
+    }
+
+    private String normalizeUpscalerPreset(String preset) {
+        String normalized = preset == null ? UPSCALER_PRESET_AUTO : preset.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case UPSCALER_PRESET_CONSERVATIVE -> UPSCALER_PRESET_CONSERVATIVE;
+            case UPSCALER_PRESET_BALANCED -> UPSCALER_PRESET_BALANCED;
+            case UPSCALER_PRESET_AGGRESSIVE -> UPSCALER_PRESET_AGGRESSIVE;
+            default -> UPSCALER_PRESET_AUTO;
+        };
+    }
+
+    private String normalizeFramegenMode(String mode) {
+        String normalized = mode == null ? FRAMEGEN_MODE_BALANCED : mode.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case FRAMEGEN_MODE_QUALITY -> FRAMEGEN_MODE_QUALITY;
+            case FRAMEGEN_MODE_LOW_LATENCY, "low-latency" -> FRAMEGEN_MODE_LOW_LATENCY;
+            default -> FRAMEGEN_MODE_BALANCED;
+        };
+    }
+
+    private String normalizeFgSource(String source) {
+        String normalized = source == null ? FG_SOURCE_NATIVE : source.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case FG_SOURCE_OPTI_FG, "optifg" -> FG_SOURCE_OPTI_FG;
+            default -> FG_SOURCE_NATIVE;
+        };
+    }
+
+    private String normalizeFgOutput(String output) {
+        String normalized = output == null ? FG_OUTPUT_AUTO : output.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
+            case FG_OUTPUT_DLSSG_TO_FSR3, "dlssg-to-fsr3" -> FG_OUTPUT_DLSSG_TO_FSR3;
+            default -> FG_OUTPUT_AUTO;
+        };
+    }
+
+    private String toLegacyVkBasaltEffect(String backend, String effect) {
+        if (!UPSCALER_BACKEND_VKBASALT.equals(backend)) return "None";
+        String normalized = effect == null ? UPSCALER_EFFECT_NONE : effect.trim().toLowerCase(Locale.ENGLISH);
+        return switch (normalized) {
+            case "cas" -> "CAS";
+            case "dls" -> "DLS";
+            case "fsr", "nis" -> "CAS";
+            default -> "None";
+        };
     }
 
 
@@ -675,6 +982,14 @@ public class ShortcutSettingsDialog extends ContentDialog {
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         Spinner sTouchpadGestureProfile = view.findViewById(R.id.STouchpadGestureProfile);
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
+        Spinner sUpscalerPreset = view.findViewById(R.id.SUpscalerPreset);
+        Spinner sUpscalerBackend = view.findViewById(R.id.SUpscalerBackend);
+        Spinner sUpscalerEffect = view.findViewById(R.id.SUpscalerEffect);
+        Spinner sUpscalerScale = view.findViewById(R.id.SUpscalerScale);
+        Spinner sGeneratedFrames = view.findViewById(R.id.SGeneratedFrames);
+        Spinner sUpscalerFgSource = view.findViewById(R.id.SUpscalerFgSource);
+        Spinner sUpscalerFgOutput = view.findViewById(R.id.SUpscalerFgOutput);
+        Spinner sUpscalerFramegenMode = view.findViewById(R.id.SUpscalerFramegenMode);
         
 
         // Set dark or light mode background for spinners
@@ -691,6 +1006,14 @@ public class ShortcutSettingsDialog extends ContentDialog {
         sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sTouchpadGestureProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerPreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerBackend.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerEffect.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerScale.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sGeneratedFrames.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerFgSource.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerFgOutput.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sUpscalerFramegenMode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
 //        EditText etLC_ALL = view.findViewById(R.id.ETlcall);
         EditText etExecArgs = view.findViewById(R.id.ETExecArgs);

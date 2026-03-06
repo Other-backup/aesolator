@@ -43,6 +43,12 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 7 | `ewt45/winlator-fork` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 8 | `coffincolors/winlator` | `closed` | donor sweep completed (`integrated/rejected` finalized) |
 | 9 | `GameHub-Lite-5.3.3-RC2.apk` | `closed` | APK donor sweep completed (`integrated/rejected` finalized) |
+| 10 | `Mob-FGSR/MobFGSR` | `gate_hold` | core upscaler lane integrated; closure deferred by owner override to next donor |
+| 11 | `xXJSONDeruloXx/linux-fg` | `gate_hold` | target-fps/interpolation lane integrated; closure deferred by owner override to next donor |
+| 12 | `Nukem9/dlssg-to-fsr3` | `gate_hold` | debug/interposer bridge lane integrated; closure deferred by owner override to next donor |
+| 13 | `proqaz2-design/Frame-generation-` | `gate_hold` | mobile framegen mode/thermal lane integrated; closure deferred by owner override to next donor |
+| 14 | `optiscaler/OptiScaler` | `gate_hold` | FG source/output routing lane integrated; closure deferred by owner override to next donor |
+| 15 | `Eden-Android-9d2341eaea-standard.apk` | `closed` | Vulkan validation lane integrated; env-layer merge + VulkanSDK guard hardened; app-tree closure completed |
 
 ## Round 6 (termux-x11-fork) Historical Workset (Completed)
 
@@ -220,3 +226,111 @@ What was added to smooth the transition:
     - forensic events: `FORENSIC_RUNTIME_SNAPSHOT_CAPTURED` / `FORENSIC_RUNTIME_SNAPSHOT_FAILED`.
 - `2026-03-05` closure:
   - Round 9 moved to `closed`.
+
+## Round 10 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 10 opened as `active`.
+  - `R10_MOBFGSR_MATRIX` and `R10_MOBFGSR_FILE_COVERAGE` initialized.
+  - app-tree upscaler lane rebuilt: unified `AE Upscaler / Frame Generation` UI + runtime env contract + forensic signal binding.
+- `2026-03-06` pass 2:
+  - integrated SoC-aware upscaler preset lane (`upscalerPreset`) with runtime auto-resolution and effective policy export:
+    - `AERO_UPSCALER_PRESET_REQUESTED`, `AERO_UPSCALER_PRESET_EFFECTIVE`, `AERO_UPSCALER_SOC_CLASS`;
+    - preset-aware clamps for generated-frames/target-fps/interpolation/thermal guard;
+    - forensic marker extended with requested/effective policy values.
+- `2026-03-05` hold:
+  - Round 10 moved to `gate_hold`.
+  - owner override recorded to open Round 11 before final Round 10 closure gates.
+
+## Round 11 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 11 opened as `active`.
+  - `R11_LINUXFG_MATRIX` and `R11_LINUXFG_FILE_COVERAGE` initialized.
+  - integrated `Target FPS` + `Interpolation Factor` controls into shortcut contract and runtime env lane:
+    - shortcut keys: `upscalerTargetFps`, `upscalerInterpolationFactor`;
+    - runtime env: `AERO_UPSCALER_TARGET_FPS`, `AERO_FRAMEGEN_INTERPOLATION_FACTOR`,
+      `AERO_MOBFGSR_TARGET_FPS`, `AERO_MOBFGSR_INTERPOLATION_FACTOR`;
+    - forensic marker `UPSCALER_ROUTE_APPLIED` extended with both fields.
+- `2026-03-06` pass 2:
+  - pacing lane moved to raw+effective policy model via preset+SoC resolution;
+  - forensic marker extended with `target_fps_effective` and `interpolation_factor_effective`.
+- `2026-03-05` hold:
+  - Round 11 moved to `gate_hold`.
+  - owner override recorded to open Round 12 before final Round 11 closure gates.
+
+## Round 12 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 12 opened as `active`.
+  - `R12_DLSSGTOFSR3_MATRIX` and `R12_DLSSGTOFSR3_FILE_COVERAGE` initialized.
+  - integrated dlssg-to-fsr3 debug control bridge into upscaler lane:
+    - shortcut keys: `upscalerDebugOverlay`, `upscalerDebugTearLines`, `upscalerInterpolatedOnly`;
+    - runtime env: `AERO_FRAMEGEN_DEBUG_OVERLAY`, `AERO_FRAMEGEN_DEBUG_TEAR_LINES`, `AERO_FRAMEGEN_INTERPOLATED_ONLY`;
+    - bridge env for translator compatibility: `DLSSGTOFSR3_EnableDebugOverlay`, `DLSSGTOFSR3_EnableDebugTearLines`, `DLSSGTOFSR3_EnableInterpolatedFramesOnly`;
+    - forensic marker `UPSCALER_ROUTE_APPLIED` extended with debug fields.
+- `2026-03-06` pass 2:
+  - bridge lane aligned with preset-aware effective framegen policy and SoC-aware preset markers.
+- `2026-03-05` hold:
+  - Round 12 moved to `gate_hold`.
+  - owner override recorded to open Round 13 before final Round 12 closure gates.
+
+## Round 13 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 13 opened as `active`.
+  - `R13_FRAMEGENAPP_MATRIX` and `R13_FRAMEGENAPP_FILE_COVERAGE` initialized.
+  - integrated framegen mode/thermal policy lane:
+    - shortcut keys: `upscalerFramegenMode`, `upscalerThermalGuard`;
+    - runtime env: `AERO_FRAMEGEN_MODE`, `AERO_FRAMEGEN_THERMAL_GUARD`;
+    - mobfgsr policy env: `AERO_MOBFGSR_MODE`, `AERO_MOBFGSR_THERMAL_GUARD`,
+      `AERO_MOBFGSR_MODEL_SCALE`, `AERO_MOBFGSR_QUALITY`, `AERO_MOBFGSR_FRAME_BUDGET_MS`;
+    - forensic marker `UPSCALER_ROUTE_APPLIED` extended with `framegen_mode`/`thermal_guard`.
+- `2026-03-06` pass 2:
+  - thermal/mode policy now exported as effective values after preset resolution (auto/conservative/balanced/aggressive).
+- `2026-03-05` hold:
+  - Round 13 moved to `gate_hold`.
+  - owner override recorded to open Round 14 before final Round 13 closure gates.
+
+## Round 14 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 14 opened as `active`.
+  - `R14_OPTISCALER_MATRIX` and `R14_OPTISCALER_FILE_COVERAGE` initialized.
+  - integrated OptiScaler-style FG source/output routing:
+    - shortcut keys: `upscalerFgSource`, `upscalerFgOutput`;
+    - runtime env: `AERO_FRAMEGEN_SOURCE`, `AERO_FRAMEGEN_OUTPUT`, `AERO_DLSSG_TO_FSR3_BRIDGE`;
+    - mobfgsr bridge env: `AERO_MOBFGSR_FG_SOURCE`, `AERO_MOBFGSR_FG_OUTPUT`;
+    - forensic marker `UPSCALER_ROUTE_APPLIED` extended with `fg_source`/`fg_output`.
+- `2026-03-06` pass 2:
+  - source/output routing finalized under preset-aware policy and SoC trace markers.
+- `2026-03-05` hold:
+  - Round 14 moved to `gate_hold`.
+  - owner override recorded to open Round 15 before final Round 14 closure gates.
+
+## Round 15 Progress Snapshot
+
+- `2026-03-05` pass 1:
+  - Round 15 opened as `active`.
+  - `R15_EDENAPK_MATRIX` and `R15_EDENAPK_FILE_COVERAGE` initialized.
+  - integrated APK-driven Vulkan validation lane:
+    - shortcut key: `vulkanValidationLayer`;
+    - runtime env: `AERO_VK_VALIDATION_LAYER`, `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`;
+    - forensic marker `UPSCALER_ROUTE_APPLIED` extended with `vk_validation_layer`.
+- `2026-03-06` pass 2:
+  - env-layer merge hardened to prevent forensic lane from overwriting upscaler Vulkan validation:
+    - forensic now appends to existing `VK_INSTANCE_LAYERS` instead of replacing it;
+    - upscaler validation layer is applied only when upscaler backend is active (`Backend != Off`).
+- `2026-03-06` hold:
+  - Round 15 moved to `gate_hold`.
+  - owner override recorded to continue UI hardening before final closure gates.
+- `2026-03-06` pass 3:
+  - strict VulkanSDK presence guard added for validation request path:
+    - `AERO_VK_VALIDATION_GUARD=vulkan_sdk_missing` when validation requested without installed VulkanSDK lane;
+    - forensic event expanded with requested/effective/guard fields.
+  - compile gate revalidated after guard hardening.
+- `2026-03-06` pass 4:
+  - IDE/HEX/ASM pass completed for Eden donor (`DEX strings + ELF symbols + AArch64 disassembly anchors`);
+  - request/effective validation env split finalized (`AERO_VK_VALIDATION_REQUESTED` + effective layer signal).
+- `2026-03-06` closure:
+  - Round 15 moved to `closed`.

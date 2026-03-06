@@ -29,6 +29,7 @@ public final class ForensicConfig {
     public static final String PREF_ENABLE_VULKAN_VALIDATION = "enable_vulkan_validation";
     public static final String PREF_ENABLE_DXVK_LOGS = "enable_dxvk_logs";
     public static final String PREF_ENABLE_VKD3D_LOGS = "enable_vkd3d_logs";
+    public static final String PREF_ENABLE_DGVOODOO_LOGS = "enable_dgvoodoo_logs";
     public static final String PREF_ENABLE_PULSE_LOGS = "enable_pulse_logs";
     public static final String PREF_ENABLE_ALSA_LOGS = "enable_alsa_logs";
     public static final String PREF_ENABLE_DEVICE_SNAPSHOT = "forensic_issue_include_device_snapshot";
@@ -54,6 +55,7 @@ public final class ForensicConfig {
         snapshot.enableVulkanValidation = preferences.getBoolean(PREF_ENABLE_VULKAN_VALIDATION, false);
         snapshot.enableDxvkLogs = preferences.getBoolean(PREF_ENABLE_DXVK_LOGS, false);
         snapshot.enableVkd3dLogs = preferences.getBoolean(PREF_ENABLE_VKD3D_LOGS, false);
+        snapshot.enableDgVoodooLogs = preferences.getBoolean(PREF_ENABLE_DGVOODOO_LOGS, false);
         snapshot.enablePulseLogs = preferences.getBoolean(PREF_ENABLE_PULSE_LOGS, false);
         snapshot.enableAlsaLogs = preferences.getBoolean(PREF_ENABLE_ALSA_LOGS, false);
         snapshot.enableDeviceSnapshot = preferences.getBoolean(PREF_ENABLE_DEVICE_SNAPSHOT, true);
@@ -80,6 +82,7 @@ public final class ForensicConfig {
         editor.putBoolean(PREF_ENABLE_VULKAN_VALIDATION, snapshot.enableVulkanValidation);
         editor.putBoolean(PREF_ENABLE_DXVK_LOGS, snapshot.enableDxvkLogs);
         editor.putBoolean(PREF_ENABLE_VKD3D_LOGS, snapshot.enableVkd3dLogs);
+        editor.putBoolean(PREF_ENABLE_DGVOODOO_LOGS, snapshot.enableDgVoodooLogs);
         editor.putBoolean(PREF_ENABLE_PULSE_LOGS, snapshot.enablePulseLogs);
         editor.putBoolean(PREF_ENABLE_ALSA_LOGS, snapshot.enableAlsaLogs);
         editor.putBoolean(PREF_ENABLE_DEVICE_SNAPSHOT, snapshot.enableDeviceSnapshot);
@@ -113,6 +116,7 @@ public final class ForensicConfig {
                 + ";fex:" + (snapshot.enableFexLogs ? "debug,file" : "off")
                 + ";dxvk:" + (snapshot.enableDxvkLogs ? "native,file" : "off")
                 + ";vkd3d:" + (snapshot.enableVkd3dLogs ? "native,file" : "off")
+                + ";dgvoodoo:" + (snapshot.enableDgVoodooLogs ? "native,file" : "off")
                 + ";turnip:" + (snapshot.enableTurnipLogs ? "mesa,file" : "off")
                 + ";pulse:" + (snapshot.enablePulseLogs ? "service" : "off")
                 + ";alsa:" + (snapshot.enableAlsaLogs ? "service" : "off");
@@ -160,6 +164,7 @@ public final class ForensicConfig {
             obj.put("enableVulkanValidation", snapshot.enableVulkanValidation);
             obj.put("enableDxvkLogs", snapshot.enableDxvkLogs);
             obj.put("enableVkd3dLogs", snapshot.enableVkd3dLogs);
+            obj.put("enableDgVoodooLogs", snapshot.enableDgVoodooLogs);
             obj.put("enablePulseLogs", snapshot.enablePulseLogs);
             obj.put("enableAlsaLogs", snapshot.enableAlsaLogs);
             obj.put("enableDeviceSnapshot", snapshot.enableDeviceSnapshot);
@@ -182,6 +187,7 @@ public final class ForensicConfig {
                 + " | Turnip=" + flag(snapshot.enableTurnipLogs)
                 + " | DXVK=" + flag(snapshot.enableDxvkLogs)
                 + " | VKD3D=" + flag(snapshot.enableVkd3dLogs)
+                + " | dgVoodoo=" + flag(snapshot.enableDgVoodooLogs)
                 + " | Pulse=" + flag(snapshot.enablePulseLogs)
                 + " | ALSA=" + flag(snapshot.enableAlsaLogs)
                 + " | VulkanDump=" + flag(snapshot.enableVulkanApiDump)
@@ -251,6 +257,7 @@ public final class ForensicConfig {
         public boolean enableVulkanValidation;
         public boolean enableDxvkLogs;
         public boolean enableVkd3dLogs;
+        public boolean enableDgVoodooLogs;
         public boolean enablePulseLogs;
         public boolean enableAlsaLogs;
         public boolean enableDeviceSnapshot = true;

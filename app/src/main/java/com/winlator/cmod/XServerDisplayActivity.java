@@ -59,6 +59,7 @@ import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.ScreenEffectDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
+import com.winlator.cmod.contract.RuntimeSignalContract;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -190,6 +191,24 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private String midiSoundFont = "";
     private String lc_all = "";
     private String vkbasaltConfig = "";
+    private String upscalerPreset = "auto";
+    private String upscalerBackend = "off";
+    private String upscalerEffect = "none";
+    private int upscalerScalePercent = 100;
+    private int upscalerSharpnessPercent = 100;
+    private int upscalerDenoisePercent = 100;
+    private boolean upscalerFrameGeneration = false;
+    private int upscalerGeneratedFrames = 1;
+    private String upscalerFgSource = "native";
+    private String upscalerFgOutput = "auto";
+    private String upscalerFramegenMode = "balanced";
+    private boolean upscalerThermalGuard = true;
+    private int upscalerTargetFps = 60;
+    private int upscalerInterpolationFactor = 50;
+    private boolean upscalerDebugOverlay = false;
+    private boolean upscalerDebugTearLines = false;
+    private boolean upscalerInterpolatedOnly = false;
+    private boolean upscalerVulkanValidationLayer = false;
     PreloaderDialog preloaderDialog = null;
     private Runnable configChangedCallback = null;
     private boolean isPaused = false;
@@ -221,6 +240,22 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     private static final String TOUCHPAD_PROFILE_BALANCED = "balanced";
     private static final String TOUCHPAD_PROFILE_AGGRESSIVE = "aggressive";
     private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
+    private static final String UPSCALER_BACKEND_OFF = "off";
+    private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
+    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String UPSCALER_EFFECT_NONE = "none";
+    private static final String FG_SOURCE_NATIVE = "native";
+    private static final String FG_SOURCE_OPTI_FG = "opti_fg";
+    private static final String FG_OUTPUT_AUTO = "auto";
+    private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
+    private static final String FG_OUTPUT_DLSSG_TO_FSR3 = "dlssg_to_fsr3";
+    private static final String FRAMEGEN_MODE_BALANCED = "balanced";
+    private static final String FRAMEGEN_MODE_QUALITY = "quality";
+    private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
+    private static final String UPSCALER_PRESET_AUTO = "auto";
+    private static final String UPSCALER_PRESET_CONSERVATIVE = "conservative";
+    private static final String UPSCALER_PRESET_BALANCED = "balanced";
+    private static final String UPSCALER_PRESET_AGGRESSIVE = "aggressive";
 
     private static final class TouchpadGestureDefaults {
         final boolean strictFsm;
@@ -596,12 +631,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             xinputDisabledFromShortcut = parseBoolean(xinputDisabledString);
             // Pass the value to WinHandler
             winHandler.setXInputDisabled(xinputDisabledFromShortcut);
-            String sharpnessEffect = shortcut.getExtra("sharpnessEffect", "None");
-            if (!sharpnessEffect.equals("None")) {
-                double sharpnessLevel = Double.parseDouble(shortcut.getExtra("sharpnessLevel", "100"));
-                double sharpnessDenoise = Double.parseDouble(shortcut.getExtra("sharpnessDenoise", "100"));
-                vkbasaltConfig = "effects=" + sharpnessEffect.toLowerCase() + ";" + "casSharpness=" + sharpnessLevel / 100 + ";" + "dlsSharpness=" + sharpnessLevel / 100  + ";" + "dlsDenoise=" + sharpnessDenoise / 100 + ";" + "enableOnLaunch=True";
-            }
+            parseUpscalerFromShortcut(shortcut);
             Log.d("XServerDisplayActivity", "XInput Disabled from Shortcut: " + xinputDisabledFromShortcut);
         }
 
@@ -1465,6 +1495,422 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         return Math.max(min, Math.min(max, parsed));
     }
 
+    private int parseBoundedIntAllowZero(String raw, int fallback, int min, int max) {
+        if (raw == null || raw.trim().isEmpty()) return fallback;
+        int parsed = safeParseInt(raw.trim());
+        return Math.max(min, Math.min(max, parsed));
+    }
+
+    private void parseUpscalerFromShortcut(@NonNull Shortcut activeShortcut) {
+        String legacySharpnessEffect = activeShortcut.getExtra("sharpnessEffect", "None");
+        String backend = activeShortcut.getExtra("upscalerBackend", "");
+        if (backend == null || backend.trim().isEmpty()) {
+            backend = !"none".equalsIgnoreCase(legacySharpnessEffect) ? UPSCALER_BACKEND_VKBASALT : UPSCALER_BACKEND_OFF;
+        }
+        backend = StringUtils.parseIdentifier(backend);
+        if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
+            backend = UPSCALER_BACKEND_OFF;
+        }
+
+        String effect = activeShortcut.getExtra("upscalerEffect", "");
+        if (effect == null || effect.trim().isEmpty()) {
+            effect = mapLegacySharpnessEffect(legacySharpnessEffect);
+        }
+        effect = normalizeUpscalerEffect(effect);
+
+        upscalerPreset = normalizeUpscalerPreset(activeShortcut.getExtra("upscalerPreset", UPSCALER_PRESET_AUTO));
+        upscalerBackend = backend;
+        upscalerEffect = effect;
+        upscalerScalePercent = parseBoundedInt(
+                activeShortcut.getExtra("upscalerScale", "100"),
+                100,
+                100,
+                200
+        );
+        upscalerSharpnessPercent = parseBoundedIntAllowZero(
+                activeShortcut.getExtra("upscalerSharpness", activeShortcut.getExtra("sharpnessLevel", "100")),
+                100,
+                0,
+                100
+        );
+        upscalerDenoisePercent = parseBoundedIntAllowZero(
+                activeShortcut.getExtra("upscalerDenoise", activeShortcut.getExtra("sharpnessDenoise", "100")),
+                100,
+                0,
+                100
+        );
+        upscalerFrameGeneration = parseBoolean(activeShortcut.getExtra("upscalerFrameGeneration", "0"));
+        upscalerGeneratedFrames = parseBoundedInt(
+                activeShortcut.getExtra("upscalerGeneratedFrames", "1"),
+                1,
+                1,
+                3
+        );
+        upscalerFgSource = normalizeFgSource(activeShortcut.getExtra("upscalerFgSource", FG_SOURCE_NATIVE));
+        upscalerFgOutput = normalizeFgOutput(activeShortcut.getExtra("upscalerFgOutput", FG_OUTPUT_AUTO));
+        upscalerFramegenMode = normalizeFramegenMode(activeShortcut.getExtra("upscalerFramegenMode", FRAMEGEN_MODE_BALANCED));
+        upscalerThermalGuard = parseBoolean(activeShortcut.getExtra("upscalerThermalGuard", "1"));
+        upscalerTargetFps = parseBoundedIntAllowZero(
+                activeShortcut.getExtra("upscalerTargetFps", "60"),
+                60,
+                30,
+                144
+        );
+        upscalerInterpolationFactor = parseBoundedIntAllowZero(
+                activeShortcut.getExtra("upscalerInterpolationFactor", "50"),
+                50,
+                0,
+                100
+        );
+        upscalerDebugOverlay = parseBoolean(activeShortcut.getExtra("upscalerDebugOverlay", "0"));
+        upscalerDebugTearLines = parseBoolean(activeShortcut.getExtra("upscalerDebugTearLines", "0"));
+        upscalerInterpolatedOnly = parseBoolean(activeShortcut.getExtra("upscalerInterpolatedOnly", "0"));
+        upscalerVulkanValidationLayer = parseBoolean(activeShortcut.getExtra("vulkanValidationLayer", "0"));
+        vkbasaltConfig = buildVkBasaltConfig(upscalerEffect, upscalerSharpnessPercent, upscalerDenoisePercent);
+    }
+
+    private String normalizeUpscalerEffect(String effect) {
+        String normalized = StringUtils.parseIdentifier(effect);
+        return switch (normalized) {
+            case "cas", "dls", "fsr", "nis" -> normalized;
+            default -> UPSCALER_EFFECT_NONE;
+        };
+    }
+
+    private String normalizeUpscalerPreset(String preset) {
+        String normalized = StringUtils.parseIdentifier(preset);
+        return switch (normalized) {
+            case UPSCALER_PRESET_CONSERVATIVE -> UPSCALER_PRESET_CONSERVATIVE;
+            case UPSCALER_PRESET_BALANCED -> UPSCALER_PRESET_BALANCED;
+            case UPSCALER_PRESET_AGGRESSIVE -> UPSCALER_PRESET_AGGRESSIVE;
+            default -> UPSCALER_PRESET_AUTO;
+        };
+    }
+
+    private String resolveUpscalerPresetForSoc(String requestedPreset, String socClass) {
+        String normalizedRequested = normalizeUpscalerPreset(requestedPreset);
+        if (!UPSCALER_PRESET_AUTO.equals(normalizedRequested)) {
+            return normalizedRequested;
+        }
+        if (socClass == null || socClass.trim().isEmpty()) {
+            return UPSCALER_PRESET_BALANCED;
+        }
+        return switch (socClass) {
+            case "adreno-7xx" -> UPSCALER_PRESET_AGGRESSIVE;
+            case "adreno-6xx-and-older" -> UPSCALER_PRESET_CONSERVATIVE;
+            case "mali-g7xx-or-newer", "xclipse-rdna-mobile" -> UPSCALER_PRESET_BALANCED;
+            default -> UPSCALER_PRESET_BALANCED;
+        };
+    }
+
+    private String mapLegacySharpnessEffect(String legacyEffect) {
+        String normalized = StringUtils.parseIdentifier(legacyEffect);
+        return switch (normalized) {
+            case "cas", "dls", "fsr", "nis" -> normalized;
+            default -> UPSCALER_EFFECT_NONE;
+        };
+    }
+
+    private String normalizeFramegenMode(String mode) {
+        String normalized = StringUtils.parseIdentifier(mode);
+        return switch (normalized) {
+            case FRAMEGEN_MODE_QUALITY -> FRAMEGEN_MODE_QUALITY;
+            case FRAMEGEN_MODE_LOW_LATENCY, "low-latency" -> FRAMEGEN_MODE_LOW_LATENCY;
+            default -> FRAMEGEN_MODE_BALANCED;
+        };
+    }
+
+    private String normalizeFgSource(String source) {
+        String normalized = StringUtils.parseIdentifier(source);
+        return switch (normalized) {
+            case FG_SOURCE_OPTI_FG, "optifg" -> FG_SOURCE_OPTI_FG;
+            default -> FG_SOURCE_NATIVE;
+        };
+    }
+
+    private String normalizeFgOutput(String output) {
+        String normalized = StringUtils.parseIdentifier(output);
+        return switch (normalized) {
+            case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
+            case FG_OUTPUT_DLSSG_TO_FSR3, "dlssg-to-fsr3" -> FG_OUTPUT_DLSSG_TO_FSR3;
+            default -> FG_OUTPUT_AUTO;
+        };
+    }
+
+    private String buildVkBasaltConfig(String effect, int sharpnessPercent, int denoisePercent) {
+        String normalizedEffect = normalizeUpscalerEffect(effect);
+        if (UPSCALER_EFFECT_NONE.equals(normalizedEffect)) return "";
+        float sharpness = sharpnessPercent / 100.0f;
+        float denoise = denoisePercent / 100.0f;
+        return "effects=" + normalizedEffect + ";"
+                + "casSharpness=" + sharpness + ";"
+                + "dlsSharpness=" + sharpness + ";"
+                + "dlsDenoise=" + denoise + ";"
+                + "fsrSharpness=" + sharpness + ";"
+                + "nisSharpness=" + sharpness + ";"
+                + "enableOnLaunch=True";
+    }
+
+    private void applyUpscalerEnvVars(boolean dxvkRoute, String socClass) {
+        String guardReason = "none";
+        String normalizedSocClass = socClass == null || socClass.trim().isEmpty() ? "unknown" : socClass.trim();
+        boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(upscalerBackend)
+                && !UPSCALER_EFFECT_NONE.equals(upscalerEffect);
+        boolean frameGenerationActive = upscalerFrameGeneration && upscalerEnabled;
+        String resolvedFgOutput = upscalerFgOutput;
+        if (FG_OUTPUT_AUTO.equals(resolvedFgOutput)) {
+            resolvedFgOutput = UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend) ? FG_OUTPUT_MOBFGSR : FG_OUTPUT_AUTO;
+        }
+        String requestedPreset = normalizeUpscalerPreset(upscalerPreset);
+        String effectivePreset = resolveUpscalerPresetForSoc(requestedPreset, normalizedSocClass);
+        int effectiveGeneratedFrames = upscalerGeneratedFrames;
+        int effectiveTargetFps = upscalerTargetFps;
+        int effectiveInterpolationFactor = upscalerInterpolationFactor;
+        boolean effectiveThermalGuard = upscalerThermalGuard;
+        float presetModeScaleMultiplier = 1.0f;
+        float presetModeQualityMultiplier = 1.0f;
+        float presetModeBudgetMultiplier = 1.0f;
+        float depthDiffThresholdSr = 0.0100f;
+        float colorDiffThresholdFg = 0.0100f;
+        float depthDiffThresholdFg = 0.0040f;
+        switch (effectivePreset) {
+            case UPSCALER_PRESET_CONSERVATIVE -> {
+                effectiveGeneratedFrames = Math.min(effectiveGeneratedFrames, 1);
+                effectiveTargetFps = Math.min(effectiveTargetFps, 60);
+                effectiveInterpolationFactor = Math.min(effectiveInterpolationFactor, 45);
+                effectiveThermalGuard = true;
+                presetModeScaleMultiplier = 0.85f;
+                presetModeQualityMultiplier = 0.85f;
+                presetModeBudgetMultiplier = 0.90f;
+                depthDiffThresholdSr = 0.0150f;
+                colorDiffThresholdFg = 0.0130f;
+                depthDiffThresholdFg = 0.0060f;
+            }
+            case UPSCALER_PRESET_AGGRESSIVE -> {
+                effectiveGeneratedFrames = Math.min(effectiveGeneratedFrames, 3);
+                effectiveTargetFps = Math.min(effectiveTargetFps, 144);
+                effectiveInterpolationFactor = Math.min(effectiveInterpolationFactor, 100);
+                presetModeScaleMultiplier = 1.15f;
+                presetModeQualityMultiplier = 1.10f;
+                presetModeBudgetMultiplier = 1.10f;
+                depthDiffThresholdSr = 0.0075f;
+                colorDiffThresholdFg = 0.0085f;
+                depthDiffThresholdFg = 0.0030f;
+            }
+            default -> {
+                effectiveGeneratedFrames = Math.min(effectiveGeneratedFrames, 2);
+                effectiveTargetFps = Math.min(effectiveTargetFps, 90);
+                effectiveInterpolationFactor = Math.min(effectiveInterpolationFactor, 65);
+            }
+        }
+
+        boolean mobfgsrDebugBridgeActive = frameGenerationActive && UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend);
+        float modeScale;
+        float modeQuality;
+        float modeBudgetMs;
+        switch (upscalerFramegenMode) {
+            case FRAMEGEN_MODE_QUALITY -> {
+                modeScale = 0.75f;
+                modeQuality = 0.80f;
+                modeBudgetMs = 11.0f;
+            }
+            case FRAMEGEN_MODE_LOW_LATENCY -> {
+                modeScale = 0.35f;
+                modeQuality = 0.30f;
+                modeBudgetMs = 6.5f;
+            }
+            default -> {
+                modeScale = 0.50f;
+                modeQuality = 0.50f;
+                modeBudgetMs = 8.0f;
+            }
+        }
+        modeScale = Math.max(0.20f, Math.min(1.25f, modeScale * presetModeScaleMultiplier));
+        modeQuality = Math.max(0.20f, Math.min(1.20f, modeQuality * presetModeQualityMultiplier));
+        modeBudgetMs = Math.max(4.0f, Math.min(14.0f, modeBudgetMs * presetModeBudgetMultiplier));
+
+        if (frameGenerationActive && !dxvkRoute) {
+            frameGenerationActive = false;
+            guardReason = "framegen_requires_dxvk_route";
+            mobfgsrDebugBridgeActive = false;
+        }
+        if (!frameGenerationActive) {
+            resolvedFgOutput = "off";
+        }
+
+        setOrClearEnv("AERO_UPSCALER_ENABLED", upscalerEnabled ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_BACKEND", upscalerBackend);
+        setOrClearEnv("AERO_UPSCALER_EFFECT", upscalerEffect);
+        setOrClearEnv("AERO_UPSCALER_PRESET_REQUESTED", requestedPreset);
+        setOrClearEnv("AERO_UPSCALER_PRESET_EFFECTIVE", effectivePreset);
+        setOrClearEnv("AERO_UPSCALER_SOC_CLASS", normalizedSocClass);
+        setOrClearEnv("AERO_UPSCALER_SCALE_PERCENT", String.valueOf(upscalerScalePercent));
+        setOrClearEnv("AERO_UPSCALER_SHARPNESS_PERCENT", String.valueOf(upscalerSharpnessPercent));
+        setOrClearEnv("AERO_UPSCALER_DENOISE_PERCENT", String.valueOf(upscalerDenoisePercent));
+        int vulkanSdkProfileCount = safeParseInt(envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"));
+        boolean vulkanSdkAvailable = vulkanSdkProfileCount > 0;
+        boolean requestedValidationLayer = upscalerEnabled && upscalerVulkanValidationLayer;
+        boolean upscalerValidationLayerActive = requestedValidationLayer && vulkanSdkAvailable;
+        if (requestedValidationLayer && !vulkanSdkAvailable && "none".equals(guardReason)) {
+            guardReason = "vk_validation_requires_vulkansdk";
+        }
+        setOrClearEnv("AERO_VK_VALIDATION_REQUESTED", requestedValidationLayer ? "1" : "0");
+        setOrClearEnv("AERO_VK_VALIDATION_LAYER", upscalerValidationLayerActive ? "1" : "0");
+        setOrClearEnv(
+                "AERO_VK_VALIDATION_GUARD",
+                requestedValidationLayer && !vulkanSdkAvailable ? "vulkan_sdk_missing" : ""
+        );
+        setOrClearEnv("VK_INSTANCE_LAYERS", upscalerValidationLayerActive ? "VK_LAYER_KHRONOS_validation" : "");
+        setOrClearEnv("AERO_UPSCALER_TARGET_FPS", String.valueOf(effectiveTargetFps));
+        setOrClearEnv("AERO_FRAMEGEN_ENABLED", frameGenerationActive ? "1" : "0");
+        setOrClearEnv("AERO_FRAMEGEN_GENERATED_FRAMES", String.valueOf(effectiveGeneratedFrames));
+        setOrClearEnv("AERO_FRAMEGEN_SOURCE", frameGenerationActive ? upscalerFgSource : "");
+        setOrClearEnv("AERO_FRAMEGEN_OUTPUT", resolvedFgOutput);
+        setOrClearEnv("AERO_FRAMEGEN_MODE", frameGenerationActive ? upscalerFramegenMode : "");
+        setOrClearEnv("AERO_FRAMEGEN_THERMAL_GUARD", frameGenerationActive && effectiveThermalGuard ? "1" : "0");
+        setOrClearEnv(
+                "AERO_DLSSG_TO_FSR3_BRIDGE",
+                frameGenerationActive && FG_OUTPUT_DLSSG_TO_FSR3.equals(resolvedFgOutput) ? "1" : "0"
+        );
+        setOrClearEnv(
+                "AERO_FRAMEGEN_INTERPOLATION_FACTOR",
+                frameGenerationActive ? String.valueOf(effectiveInterpolationFactor) : ""
+        );
+        setOrClearEnv(
+                "AERO_FRAMEGEN_DEBUG_OVERLAY",
+                mobfgsrDebugBridgeActive && upscalerDebugOverlay ? "1" : "0"
+        );
+        setOrClearEnv(
+                "AERO_FRAMEGEN_DEBUG_TEAR_LINES",
+                mobfgsrDebugBridgeActive && upscalerDebugTearLines ? "1" : "0"
+        );
+        setOrClearEnv(
+                "AERO_FRAMEGEN_INTERPOLATED_ONLY",
+                mobfgsrDebugBridgeActive && upscalerInterpolatedOnly ? "1" : "0"
+        );
+
+        if (UPSCALER_BACKEND_VKBASALT.equals(upscalerBackend) && upscalerEnabled && !vkbasaltConfig.isEmpty()) {
+            envVars.put("ENABLE_VKBASALT", "1");
+            envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
+            setOrClearEnv("AERO_UPSCALER_PROVIDER", "vkbasalt");
+        }
+        else {
+            envVars.remove("ENABLE_VKBASALT");
+            envVars.remove("VKBASALT_CONFIG");
+            setOrClearEnv("AERO_UPSCALER_PROVIDER", upscalerEnabled ? upscalerBackend : "");
+        }
+
+        if (UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend) && upscalerEnabled) {
+            setOrClearEnv("AERO_MOBFGSR_ENABLE_SR", "1");
+            setOrClearEnv("AERO_MOBFGSR_ENABLE_INTERP", frameGenerationActive ? "1" : "0");
+            setOrClearEnv("AERO_MOBFGSR_PRESET", effectivePreset);
+            setOrClearEnv("AERO_MOBFGSR_SOC_CLASS", normalizedSocClass);
+            setOrClearEnv("AERO_MOBFGSR_GENERATED_FRAMES", String.valueOf(effectiveGeneratedFrames));
+            setOrClearEnv("AERO_MOBFGSR_RENDER_SCALE", String.format(Locale.US, "%.2f", upscalerScalePercent / 100.0f));
+            setOrClearEnv("AERO_MOBFGSR_MODE", upscalerFramegenMode);
+            setOrClearEnv("AERO_MOBFGSR_THERMAL_GUARD", effectiveThermalGuard ? "1" : "0");
+            setOrClearEnv("AERO_MOBFGSR_FG_SOURCE", upscalerFgSource);
+            setOrClearEnv("AERO_MOBFGSR_FG_OUTPUT", resolvedFgOutput);
+            setOrClearEnv("AERO_MOBFGSR_MODEL_SCALE", String.format(Locale.US, "%.2f", modeScale));
+            setOrClearEnv("AERO_MOBFGSR_QUALITY", String.format(Locale.US, "%.2f", modeQuality));
+            setOrClearEnv("AERO_MOBFGSR_FRAME_BUDGET_MS", String.format(Locale.US, "%.2f", modeBudgetMs));
+            setOrClearEnv("AERO_MOBFGSR_TARGET_FPS", String.valueOf(effectiveTargetFps));
+            setOrClearEnv(
+                    "AERO_MOBFGSR_INTERPOLATION_FACTOR",
+                    frameGenerationActive ? String.valueOf(effectiveInterpolationFactor) : ""
+            );
+            setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", upscalerDebugOverlay ? "1" : "0");
+            setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", upscalerDebugTearLines ? "1" : "0");
+            setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", upscalerInterpolatedOnly ? "1" : "0");
+            if (FG_OUTPUT_DLSSG_TO_FSR3.equals(resolvedFgOutput)) {
+                setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", upscalerDebugOverlay ? "1" : "0");
+                setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", upscalerDebugTearLines ? "1" : "0");
+                setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", upscalerInterpolatedOnly ? "1" : "0");
+            } else {
+                setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", "");
+                setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", "");
+                setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", "");
+            }
+            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", String.format(Locale.US, "%.4f", depthDiffThresholdSr));
+            setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", colorDiffThresholdFg));
+            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", depthDiffThresholdFg));
+        }
+        else {
+            setOrClearEnv("AERO_MOBFGSR_ENABLE_SR", "");
+            setOrClearEnv("AERO_MOBFGSR_ENABLE_INTERP", "");
+            setOrClearEnv("AERO_MOBFGSR_PRESET", "");
+            setOrClearEnv("AERO_MOBFGSR_SOC_CLASS", "");
+            setOrClearEnv("AERO_MOBFGSR_GENERATED_FRAMES", "");
+            setOrClearEnv("AERO_MOBFGSR_RENDER_SCALE", "");
+            setOrClearEnv("AERO_MOBFGSR_MODE", "");
+            setOrClearEnv("AERO_MOBFGSR_THERMAL_GUARD", "");
+            setOrClearEnv("AERO_MOBFGSR_FG_SOURCE", "");
+            setOrClearEnv("AERO_MOBFGSR_FG_OUTPUT", "");
+            setOrClearEnv("AERO_MOBFGSR_MODEL_SCALE", "");
+            setOrClearEnv("AERO_MOBFGSR_QUALITY", "");
+            setOrClearEnv("AERO_MOBFGSR_FRAME_BUDGET_MS", "");
+            setOrClearEnv("AERO_MOBFGSR_TARGET_FPS", "");
+            setOrClearEnv("AERO_MOBFGSR_INTERPOLATION_FACTOR", "");
+            setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", "");
+            setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", "");
+            setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", "");
+            setOrClearEnv("DLSSGTOFSR3_EnableDebugOverlay", "");
+            setOrClearEnv("DLSSGTOFSR3_EnableDebugTearLines", "");
+            setOrClearEnv("DLSSGTOFSR3_EnableInterpolatedFramesOnly", "");
+            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", "");
+            setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", "");
+            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", "");
+        }
+
+        String runtimeGuardReason = envVars.get(RuntimeSignalContract.WINLATOR_RUNTIME_PRESET_GUARD_REASON);
+        RuntimeSignalContract.putSignalPolicyMarkers(
+                envVars,
+                "aero-signal-v1",
+                "shortcut+graphics+runtime",
+                runtimeGuardReason,
+                guardReason
+        );
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "UPSCALER_ROUTE_APPLIED",
+                null,
+                "graphics_route",
+                "Applied upscaler/frame-generation contract",
+                ForensicLogger.fields(
+                        "backend", upscalerBackend,
+                        "preset_requested", requestedPreset,
+                        "preset_effective", effectivePreset,
+                        "soc_class", normalizedSocClass,
+                        "effect", upscalerEffect,
+                        "scale_percent", upscalerScalePercent,
+                        "sharpness_percent", upscalerSharpnessPercent,
+                        "denoise_percent", upscalerDenoisePercent,
+                        "vk_validation_layer_requested", requestedValidationLayer ? "1" : "0",
+                        "vk_validation_layer", upscalerValidationLayerActive ? "1" : "0",
+                        "vk_validation_guard", requestedValidationLayer && !vulkanSdkAvailable ? "vulkan_sdk_missing" : "none",
+                        "vulkan_sdk_profile_count", vulkanSdkProfileCount,
+                        "framegen_enabled", frameGenerationActive ? "1" : "0",
+                        "generated_frames", upscalerGeneratedFrames,
+                        "generated_frames_effective", effectiveGeneratedFrames,
+                        "fg_source", upscalerFgSource,
+                        "fg_output", resolvedFgOutput,
+                        "framegen_mode", upscalerFramegenMode,
+                        "thermal_guard", upscalerThermalGuard ? "1" : "0",
+                        "thermal_guard_effective", effectiveThermalGuard ? "1" : "0",
+                        "target_fps", upscalerTargetFps,
+                        "target_fps_effective", effectiveTargetFps,
+                        "interpolation_factor", upscalerInterpolationFactor,
+                        "interpolation_factor_effective", effectiveInterpolationFactor,
+                        "debug_overlay", upscalerDebugOverlay ? "1" : "0",
+                        "debug_tearlines", upscalerDebugTearLines ? "1" : "0",
+                        "interpolated_only", upscalerInterpolatedOnly ? "1" : "0",
+                        "guard_reason", guardReason
+                )
+        );
+    }
+
 
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1790,6 +2236,25 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             overrideEnvVars.clear();
         }
         mergedEnv.put("AERO_ENV_LAYER_ORDER", "graphics->container->shortcut->forensic->runtime->override");
+        mergedEnv.put("AERO_FORENSIC_RUNTIME_SUMMARY", ForensicConfig.buildRuntimeSummary(forensicSnapshot));
+        mergedEnv.put("AERO_FORENSIC_CAPTURE_SUMMARY", ForensicConfig.buildCaptureSummary(this, forensicSnapshot));
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "FORENSIC_ENV_APPLIED",
+                null,
+                "xserver",
+                "forensic_env_applied",
+                ForensicLogger.fields(
+                        "runtime_summary", ForensicConfig.buildRuntimeSummary(forensicSnapshot),
+                        "capture_summary", ForensicConfig.buildCaptureSummary(this, forensicSnapshot),
+                        "wine_debug", forensicSnapshot.enableWineDebug ? "1" : "0",
+                        "loader_trace", ForensicConfig.shouldEnableLoaderTrace(forensicSnapshot, false) ? "1" : "0",
+                        "trace_mode", ForensicConfig.buildLoaderTraceMode(forensicSnapshot),
+                        "env_hash", ForensicLogger.hashEnvVars(mergedEnv)
+                )
+        );
 
         envVars.clear();
         envVars.putAll(mergedEnv);
@@ -1818,11 +2283,12 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         setOrClearEnv(targetEnv, "MESA_DEBUG", snapshot.enableTurnipLogs ? "context" : "");
         setOrClearEnv(targetEnv, "DXVK_LOG_LEVEL", snapshot.enableDxvkLogs ? "info" : "none");
         setOrClearEnv(targetEnv, "VKD3D_DEBUG", snapshot.enableVkd3dLogs ? "warn" : "");
+        setOrClearEnv(targetEnv, "AERO_DGVOODOO_LOGS", snapshot.enableDgVoodooLogs ? "1" : "0");
         setOrClearEnv(targetEnv, "PULSE_LOG", snapshot.enablePulseLogs ? "4" : "");
         setOrClearEnv(targetEnv, "ALSA_DEBUG", snapshot.enableAlsaLogs ? "1" : "");
         setOrClearEnv(targetEnv, "VK_LOADER_DEBUG", snapshot.enableVulkanLoaderDebug ? "all" : "");
 
-        String vkLayers = "";
+        String vkLayers = targetEnv.get("VK_INSTANCE_LAYERS");
         if (snapshot.enableVulkanApiDump) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_LUNARG_api_dump");
         if (snapshot.enableVulkanValidation) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
         setOrClearEnv(targetEnv, "VK_INSTANCE_LAYERS", vkLayers);
@@ -1848,6 +2314,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 "dxvk", "dxvk", "d3d9", "d3d11", "d3d12");
         addForensicRuntimeFileCallback(snapshot.enableVkd3dLogs,
                 "vkd3d", "vkd3d", "d3d12");
+        addForensicRuntimeFileCallback(snapshot.enableDgVoodooLogs,
+                "dgvoodoo", "dgvoodoo", "ddraw", "glide", "d3d8");
         addForensicRuntimeFileCallback(snapshot.enablePulseLogs,
                 "pulse", "pulse", "pulseaudio");
         addForensicRuntimeFileCallback(snapshot.enableAlsaLogs,
@@ -2420,10 +2888,29 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String bcnEmulationCache = graphicsDriverConfig.get("bcnEmulationCache");
         envVars.put("WRAPPER_USE_BCN_CACHE", bcnEmulationCache);
 
-        if (!vkbasaltConfig.isEmpty()) {
-            envVars.put("ENABLE_VKBASALT", "1");
-            envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
-        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "GRAPHICS_ROUTE_APPLIED",
+                null,
+                "graphics_route",
+                "graphics_route_applied",
+                ForensicLogger.fields(
+                        "graphics_driver", graphicsDriver,
+                        "driver_id", adrenoToolsDriverId,
+                        "dxwrapper_active", envVars.get("AERO_DXWRAPPER_ACTIVE"),
+                        "dri3_mode", envVars.get("AERO_DRI3_MODE"),
+                        "dri3_enabled", envVars.get("AERO_DRI3_ENABLED"),
+                        "dri3_present_wait", envVars.get("AERO_DRI3_PRESENT_WAIT"),
+                        "dri3_force_sw_wsi", envVars.get("AERO_DRI3_FORCE_SW_WSI"),
+                        "vulkan_api_selected", envVars.get("AERO_VULKAN_API_SELECTED"),
+                        "vulkan_sdk_profiles", envVars.get("AERO_VULKAN_SDK_PROFILE"),
+                        "vulkan_sdk_profile_count", envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"),
+                        "wrapper_vk_version", envVars.get("WRAPPER_VK_VERSION")
+                )
+        );
+
+        applyUpscalerEnvVars(dxvkRoute, socClass);
     }
 
     @Override
@@ -2532,6 +3019,19 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
 
             Log.d(TAG, "Finished extraction of DXVK wrapper files, version: " + dxwrapper);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DXWRAPPER_RUNTIME_STAGE_READY",
+                    null,
+                    "dxwrapper",
+                    "dxvk_runtime_stage_ready",
+                    ForensicLogger.fields(
+                            "dxwrapper", dxwrapper,
+                            "dxvk_wrapper", dxvkWrapper,
+                            "vkd3d_wrapper", vkd3dWrapper
+                    )
+            );
         } else if (dxwrapper.contains("dgvoodoo")) {
             Log.d(TAG, "Staging dgVoodoo runtime for legacy API route.");
             restoreOriginalDllFiles(dlls);
@@ -2552,9 +3052,32 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             if (!staged) {
                 Log.w(TAG, "dgVoodoo runtime stage failed for target " + stageTarget.getAbsolutePath());
             }
+            ForensicLogger.logEvent(
+                    this,
+                    staged ? "info" : "warn",
+                    "DXWRAPPER_RUNTIME_STAGE_READY",
+                    null,
+                    "dxwrapper",
+                    staged ? "dgvoodoo_runtime_stage_ready" : "dgvoodoo_runtime_stage_failed",
+                    ForensicLogger.fields(
+                            "dxwrapper", dxwrapper,
+                            "stage_target", stageTarget.getAbsolutePath(),
+                            "arch_active", activeArch,
+                            "stage_ready", staged ? "1" : "0"
+                    )
+            );
         } else if (dxwrapper.contains("wined3d")) {
             Log.d(TAG, "Restoring original DLL files for wined3d.");
             restoreOriginalDllFiles(dlls);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DXWRAPPER_RUNTIME_STAGE_READY",
+                    null,
+                    "dxwrapper",
+                    "wined3d_runtime_route_restored",
+                    ForensicLogger.fields("dxwrapper", dxwrapper)
+            );
         }
     }
 

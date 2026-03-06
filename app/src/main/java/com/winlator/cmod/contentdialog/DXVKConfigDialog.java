@@ -17,6 +17,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.VKD3DVersionItem;
@@ -187,6 +188,23 @@ public class DXVKConfigDialog extends ContentDialog {
             // Legacy DDraw wrapper key is removed from DXVK config; dgVoodoo has its own wrapper mode.
             config.remove("ddrawrapper");
             anchor.setTag(config.toString());
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "DXVK_VKD3D_CONFIG_SAVED",
+                    null,
+                    "wrapper_config",
+                    "dxvk_vkd3d_config_saved",
+                    ForensicLogger.fields(
+                            "dxvk_version", config.get("version"),
+                            "vkd3d_version", config.get("vkd3dVersion"),
+                            "vkd3d_feature_level", config.get("vkd3dLevel"),
+                            "framerate", config.get("framerate"),
+                            "async", config.get("async"),
+                            "async_cache", config.get("asyncCache"),
+                            "is_arm64ec", isARM64EC ? "1" : "0"
+                    )
+            );
         });
     }
 

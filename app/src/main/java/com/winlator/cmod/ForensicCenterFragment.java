@@ -54,6 +54,7 @@ public class ForensicCenterFragment extends Fragment {
         CheckBox cbTurnipLogs = view.findViewById(R.id.CBForensicTurnipLogs);
         CheckBox cbDxvkLogs = view.findViewById(R.id.CBForensicDxvkLogs);
         CheckBox cbVkd3dLogs = view.findViewById(R.id.CBForensicVkd3dLogs);
+        CheckBox cbDgVoodooLogs = view.findViewById(R.id.CBForensicDgVoodooLogs);
         CheckBox cbVulkanApiDump = view.findViewById(R.id.CBForensicVulkanApiDump);
         CheckBox cbVulkanLoaderDebug = view.findViewById(R.id.CBForensicVulkanLoaderDebug);
         CheckBox cbVulkanValidation = view.findViewById(R.id.CBForensicVulkanValidation);
@@ -102,6 +103,7 @@ public class ForensicCenterFragment extends Fragment {
         cbTurnipLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_TURNIP_LOGS, false));
         cbDxvkLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DXVK_LOGS, false));
         cbVkd3dLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VKD3D_LOGS, false));
+        cbDgVoodooLogs.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DGVOODOO_LOGS, false));
         cbVulkanApiDump.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_API_DUMP, false));
         cbVulkanLoaderDebug.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_LOADER_DEBUG, false));
         cbVulkanValidation.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_VULKAN_VALIDATION, false));
@@ -110,6 +112,22 @@ public class ForensicCenterFragment extends Fragment {
         cbDeviceSnapshot.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DEVICE_SNAPSHOT, true));
         cbNonRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, true));
         cbRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, true));
+        ForensicConfig.Snapshot openSnapshot = ForensicConfig.fromPreferences(preferences);
+        ForensicLogger.logEvent(
+                requireContext(),
+                "info",
+                "FORENSIC_CENTER_OPENED",
+                null,
+                "forensic_center",
+                "forensic_center_opened",
+                ForensicLogger.fields(
+                        "runtime_summary", ForensicConfig.buildRuntimeSummary(openSnapshot),
+                        "capture_summary", ForensicConfig.buildCaptureSummary(requireContext(), openSnapshot),
+                        "dri3_mode", preferences.getString("dri3_mode", "auto"),
+                        "dri3_present_wait", preferences.getBoolean("dri3_present_wait", true) ? "1" : "0",
+                        "dri3_force_sw_wsi", preferences.getBoolean("dri3_force_sw_wsi", false) ? "1" : "0"
+                )
+        );
         String[] dri3Labels = getResources().getStringArray(R.array.dri3_mode_entries);
         String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
         String selectedDri3Mode = preferences.getString("dri3_mode", cbUseDri3.isChecked() ? "auto" : "off");
@@ -145,12 +163,9 @@ public class ForensicCenterFragment extends Fragment {
         });
 
         view.findViewById(R.id.BTCopyAdbCommand).setOnClickListener(v -> {
-            ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard != null) {
-                clipboard.setPrimaryClip(ClipData.newPlainText("adb_forensic_command", getString(R.string.diagnostics_adb_command)));
-                AppUtils.showToast(getContext(), R.string.copied_to_clipboard);
-            }
+            copyAdbCommandToClipboard();
         });
+        adbCommand.setOnClickListener(v -> copyAdbCommandToClipboard());
 
         view.findViewById(R.id.BTSaveForensic).setOnClickListener(v -> {
             preferences.edit()
@@ -165,6 +180,7 @@ public class ForensicCenterFragment extends Fragment {
                     .putBoolean(ForensicConfig.PREF_ENABLE_TURNIP_LOGS, cbTurnipLogs.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_DXVK_LOGS, cbDxvkLogs.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_VKD3D_LOGS, cbVkd3dLogs.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_DGVOODOO_LOGS, cbDgVoodooLogs.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_API_DUMP, cbVulkanApiDump.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_LOADER_DEBUG, cbVulkanLoaderDebug.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_VULKAN_VALIDATION, cbVulkanValidation.isChecked())
@@ -174,6 +190,23 @@ public class ForensicCenterFragment extends Fragment {
                     .putBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, cbNonRootCapture.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, cbRootCapture.isChecked())
                     .apply();
+
+            ForensicConfig.Snapshot savedSnapshot = ForensicConfig.fromPreferences(preferences);
+            ForensicLogger.logEvent(
+                    requireContext(),
+                    "info",
+                    "FORENSIC_PROFILE_SAVED",
+                    null,
+                    "forensic_center",
+                    "forensic_profile_saved",
+                    ForensicLogger.fields(
+                            "runtime_summary", ForensicConfig.buildRuntimeSummary(savedSnapshot),
+                            "capture_summary", ForensicConfig.buildCaptureSummary(requireContext(), savedSnapshot),
+                            "dri3_mode", preferences.getString("dri3_mode", "auto"),
+                            "dri3_present_wait", preferences.getBoolean("dri3_present_wait", true) ? "1" : "0",
+                            "dri3_force_sw_wsi", preferences.getBoolean("dri3_force_sw_wsi", false) ? "1" : "0"
+                    )
+            );
             AppUtils.showToast(getContext(), R.string.diagnostics_saved);
         });
 
@@ -183,6 +216,15 @@ public class ForensicCenterFragment extends Fragment {
             if (getActivity() instanceof MainActivity) {
                 NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
                 if (navigationView != null) {
+                    ForensicLogger.logEvent(
+                            requireContext(),
+                            "info",
+                            "FORENSIC_OPEN_X11_SETTINGS",
+                            null,
+                            "forensic_center",
+                            "open_x11_settings_from_forensic",
+                            null
+                    );
                     navigationView.setCheckedItem(R.id.main_menu_settings);
                     ((MainActivity) getActivity()).onNavigationItemSelected(
                             navigationView.getMenu().findItem(R.id.main_menu_settings)
@@ -227,6 +269,20 @@ public class ForensicCenterFragment extends Fragment {
             tail = getString(R.string.diagnostics_forensic_log_empty);
         }
 
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "FORENSIC_LOG_VIEW_OPENED",
+                null,
+                "forensic_center",
+                "forensic_log_view_opened",
+                ForensicLogger.fields(
+                        "log_file", latestFile != null ? latestFile.getAbsolutePath() : "",
+                        "log_exists", latestFile != null && latestFile.isFile() ? "1" : "0",
+                        "tail_chars", tail.length()
+                )
+        );
+
         ContentDialog dialog = new ContentDialog(context, R.layout.forensic_log_viewer_dialog);
         dialog.setTitle(R.string.diagnostics_forensic_log_title);
         dialog.setBottomBarText(null);
@@ -253,6 +309,15 @@ public class ForensicCenterFragment extends Fragment {
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", finalTail));
                 AppUtils.showToast(context, R.string.copied_to_clipboard);
+                ForensicLogger.logEvent(
+                        context,
+                        "info",
+                        "FORENSIC_LOG_TAIL_COPIED",
+                        null,
+                        "forensic_center",
+                        "forensic_log_tail_copied",
+                        ForensicLogger.fields("tail_chars", finalTail.length())
+                );
             }
         });
 
@@ -272,11 +337,49 @@ public class ForensicCenterFragment extends Fragment {
             File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
             if (FileUtils.writeString(outFile, finalTail)) {
                 AppUtils.showToast(context, getString(R.string.diagnostics_forensic_log_export_ok, outFile.getAbsolutePath()));
+                ForensicLogger.logEvent(
+                        context,
+                        "info",
+                        "FORENSIC_LOG_EXPORTED",
+                        null,
+                        "forensic_center",
+                        "forensic_log_exported",
+                        ForensicLogger.fields(
+                                "export_file", outFile.getAbsolutePath(),
+                                "tail_chars", finalTail.length()
+                        )
+                );
             } else {
                 AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+                ForensicLogger.logEvent(
+                        context,
+                        "warn",
+                        "FORENSIC_LOG_EXPORT_FAILED",
+                        null,
+                        "forensic_center",
+                        "forensic_log_export_failed",
+                        ForensicLogger.fields("export_file", outFile.getAbsolutePath())
+                );
             }
         });
 
         dialog.show();
+    }
+
+    private void copyAdbCommandToClipboard() {
+        ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("adb_forensic_command", getString(R.string.diagnostics_adb_command)));
+            AppUtils.showToast(getContext(), R.string.copied_to_clipboard);
+            ForensicLogger.logEvent(
+                    requireContext(),
+                    "info",
+                    "FORENSIC_ADB_COMMAND_COPIED",
+                    null,
+                    "forensic_center",
+                    "adb_forensic_command_copied",
+                    null
+            );
+        }
     }
 }
