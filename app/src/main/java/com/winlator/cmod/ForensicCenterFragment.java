@@ -3,8 +3,11 @@ package com.winlator.cmod;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,15 +28,25 @@ import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
+import com.winlator.cmod.core.ForensicIssueComposer;
 import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.contentdialog.ContentDialog;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.util.LinkedHashMap;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.Executors;
 
 public class ForensicCenterFragment extends Fragment {
+    private static final String PREF_OPEN_X11_DIALOG_ONCE = "graphics_open_x11_dialog_once";
     private SharedPreferences preferences;
 
     @Nullable
@@ -204,9 +217,8 @@ public class ForensicCenterFragment extends Fragment {
             }
         });
 
-        view.findViewById(R.id.BTCopyAdbCommand).setOnClickListener(v -> {
-            copyAdbCommandToClipboard();
-        });
+        view.findViewById(R.id.BTRunRootCapture).setOnClickListener(v ->
+                runRootCaptureNow(cbRootCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
         view.findViewById(R.id.BTCopyAdbCaptureCommand).setOnClickListener(v ->
                 copyAdbCaptureCommandToClipboard(adbCaptureCommand));
         adbCommand.setOnClickListener(v -> copyAdbCommandToClipboard());
@@ -274,9 +286,10 @@ public class ForensicCenterFragment extends Fragment {
                             "open_x11_settings_from_forensic",
                             null
                     );
-                    navigationView.setCheckedItem(R.id.main_menu_settings);
+                    preferences.edit().putBoolean(PREF_OPEN_X11_DIALOG_ONCE, true).apply();
+                    navigationView.setCheckedItem(R.id.main_menu_adrenotools_gpu_drivers);
                     ((MainActivity) getActivity()).onNavigationItemSelected(
-                            navigationView.getMenu().findItem(R.id.main_menu_settings)
+                            navigationView.getMenu().findItem(R.id.main_menu_adrenotools_gpu_drivers)
                     );
                 }
             }
@@ -339,14 +352,16 @@ public class ForensicCenterFragment extends Fragment {
         if (dialogMessage != null) dialogMessage.setVisibility(View.GONE);
 
         TextView tvFile = dialog.findViewById(R.id.TVForensicLogFile);
+        TextView tvStats = dialog.findViewById(R.id.TVForensicLogStats);
         TextView tvBody = dialog.findViewById(R.id.TVForensicLogBody);
         tvFile.setText(getString(R.string.diagnostics_forensic_log_file, latestFile != null ? latestFile.getName() : "-"));
+        tvStats.setText(buildLogViewerStats(latestFile, tail));
         tvBody.setText(tail);
 
         View btConfirm = dialog.findViewById(R.id.BTConfirm);
         View btCancel = dialog.findViewById(R.id.BTCancel);
         if (btConfirm instanceof TextView) {
-            ((TextView) btConfirm).setText(R.string.copy);
+            ((TextView) btConfirm).setText(R.string.diagnostics_forensic_log_report);
         }
         if (btCancel instanceof TextView) {
             ((TextView) btCancel).setText(R.string.cancel);
@@ -354,65 +369,318 @@ public class ForensicCenterFragment extends Fragment {
 
         final String finalTail = tail;
         dialog.setOnConfirmCallback(() -> {
-            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard != null) {
-                clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", finalTail));
-                AppUtils.showToast(context, R.string.copied_to_clipboard);
-                ForensicLogger.logEvent(
-                        context,
-                        "info",
-                        "FORENSIC_LOG_TAIL_COPIED",
-                        null,
-                        "forensic_center",
-                        "forensic_log_tail_copied",
-                        ForensicLogger.fields("tail_chars", finalTail.length())
-                );
-            }
+            reportForensicIssue(finalTail, latestFile);
         });
 
         View btExport = dialog.findViewById(R.id.BTForensicExportLog);
-        btExport.setOnClickListener(v -> {
-            File rootDir = context.getExternalFilesDir(null);
-            if (rootDir == null) {
-                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
-                return;
-            }
-            File outDir = new File(rootDir, "forensics/exports");
-            if (!outDir.exists() && !outDir.mkdirs()) {
-                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
-                return;
-            }
-            String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
-            File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
-            if (FileUtils.writeString(outFile, finalTail)) {
-                AppUtils.showToast(context, getString(R.string.diagnostics_forensic_log_export_ok, outFile.getAbsolutePath()));
-                ForensicLogger.logEvent(
-                        context,
-                        "info",
-                        "FORENSIC_LOG_EXPORTED",
-                        null,
-                        "forensic_center",
-                        "forensic_log_exported",
-                        ForensicLogger.fields(
-                                "export_file", outFile.getAbsolutePath(),
-                                "tail_chars", finalTail.length()
-                        )
-                );
-            } else {
-                AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
-                ForensicLogger.logEvent(
-                        context,
-                        "warn",
-                        "FORENSIC_LOG_EXPORT_FAILED",
-                        null,
-                        "forensic_center",
-                        "forensic_log_export_failed",
-                        ForensicLogger.fields("export_file", outFile.getAbsolutePath())
-                );
-            }
+        btExport.setOnClickListener(v -> exportForensicSnapshot(finalTail));
+
+        View btCopy = dialog.findViewById(R.id.BTForensicCopyLog);
+        btCopy.setOnClickListener(v -> {
+            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) return;
+            clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", finalTail));
+            AppUtils.showToast(context, R.string.copied_to_clipboard);
         });
 
         dialog.show();
+    }
+
+    private String buildLogViewerStats(File latestFile, String tail) {
+        ForensicConfig.Snapshot snapshot = ForensicConfig.fromPreferences(preferences);
+        int lineCount = tail == null || tail.isEmpty() ? 0 : tail.split("\n").length;
+        long fileSize = latestFile != null && latestFile.isFile() ? latestFile.length() : 0L;
+        int jsonRecords = 0;
+        int infoCount = 0;
+        int warnCount = 0;
+        int errorCount = 0;
+        int dxvkHits = 0;
+        int vkd3dHits = 0;
+        int turnipHits = 0;
+        int dgVoodooHits = 0;
+        int box64Hits = 0;
+        int fexHits = 0;
+
+        if (tail != null && !tail.isEmpty()) {
+            String[] lines = tail.split("\n");
+            for (String line : lines) {
+                if (line == null || line.trim().isEmpty()) continue;
+                String lower = line.toLowerCase(Locale.US);
+                if (lower.contains("dxvk")) dxvkHits++;
+                if (lower.contains("vkd3d")) vkd3dHits++;
+                if (lower.contains("turnip") || lower.contains("freedreno")) turnipHits++;
+                if (lower.contains("dgvoodoo")) dgVoodooHits++;
+                if (lower.contains("box64")) box64Hits++;
+                if (lower.contains("fex")) fexHits++;
+                try {
+                    JSONObject obj = new JSONObject(line);
+                    jsonRecords++;
+                    String level = obj.optString("level", "").trim().toLowerCase(Locale.US);
+                    if ("info".equals(level)) infoCount++;
+                    else if ("warn".equals(level)) warnCount++;
+                    else if ("error".equals(level)) errorCount++;
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        return "Path: " + (latestFile != null ? latestFile.getAbsolutePath() : "-")
+                + "\nSize: " + fileSize + " bytes"
+                + "\nTail lines: " + lineCount
+                + "\nJSON records: " + jsonRecords
+                + "\nLevel counts: info=" + infoCount + " warn=" + warnCount + " error=" + errorCount
+                + "\nSignals: dxvk=" + dxvkHits
+                + " vkd3d=" + vkd3dHits
+                + " turnip=" + turnipHits
+                + " dgvoodoo=" + dgVoodooHits
+                + " box64=" + box64Hits
+                + " fex=" + fexHits
+                + "\nRuntime: " + ForensicConfig.buildRuntimeSummary(snapshot)
+                + "\nCapture: " + ForensicConfig.buildCaptureSummary(requireContext(), snapshot);
+    }
+
+    private void exportForensicSnapshot(String tail) {
+        Context context = getContext();
+        if (context == null) return;
+
+        File outDir = new File(Environment.getExternalStorageDirectory(), "Winlator/forensics/exports");
+        if (!outDir.exists() && !outDir.mkdirs()) {
+            AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+            return;
+        }
+        String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
+        File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
+        if (!FileUtils.writeString(outFile, tail)) {
+            AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
+            return;
+        }
+        AppUtils.showToast(context, getString(R.string.diagnostics_forensic_log_export_ok, outFile.getAbsolutePath()));
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "FORENSIC_LOG_EXPORTED",
+                null,
+                "forensic_center",
+                "forensic_log_exported",
+                ForensicLogger.fields(
+                        "export_file", outFile.getAbsolutePath(),
+                        "tail_chars", tail != null ? tail.length() : 0
+                )
+        );
+    }
+
+    private void runRootCaptureNow(CheckBox cbRootCapture,
+                                   Spinner sAdbTransport,
+                                   String[] adbTransportValues,
+                                   TextView captureCommandView) {
+        Context context = getContext();
+        if (context == null) return;
+        if (!cbRootCapture.isChecked() || !ForensicConfig.isRootBinaryPresent()) {
+            AppUtils.showToast(context, R.string.forensic_root_unavailable);
+            return;
+        }
+
+        int modeIndex = sAdbTransport.getSelectedItemPosition();
+        String mode = (modeIndex >= 0 && modeIndex < adbTransportValues.length)
+                ? ForensicConfig.normalizeAdbCaptureMode(adbTransportValues[modeIndex])
+                : ForensicConfig.ADB_CAPTURE_MODE_AUTO;
+        if (!ForensicConfig.ADB_CAPTURE_MODE_ROOT.equals(mode)) {
+            AppUtils.showToast(context, R.string.forensic_root_mode_required);
+            return;
+        }
+
+        PreloaderDialog preloaderDialog = new PreloaderDialog(requireActivity());
+        preloaderDialog.showOnUiThread(R.string.diagnostics_forensic_root_capture_running);
+        ForensicConfig.Snapshot snapshot = ForensicConfig.fromPreferences(preferences);
+        String script = ForensicConfig.buildOnDeviceRootCaptureScript(context, snapshot);
+        String previewCommand = captureCommandView != null
+                ? String.valueOf(captureCommandView.getText())
+                : ForensicConfig.buildOnDeviceRootCaptureCommand(context, snapshot);
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            boolean success = false;
+            String output = "";
+            int exitCode = -1;
+            try {
+                Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", script});
+                StringBuilder builder = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (builder.length() > 0) builder.append('\n');
+                        builder.append(line.trim());
+                    }
+                }
+                exitCode = process.waitFor();
+                output = builder.toString().trim();
+                success = exitCode == 0;
+            } catch (Exception ignored) {
+            }
+
+            final boolean finalSuccess = success;
+            final int finalExitCode = exitCode;
+            final String finalOutput = output;
+            if (!isAdded() || getActivity() == null) return;
+            requireActivity().runOnUiThread(() -> {
+                preloaderDialog.closeOnUiThread();
+                if (finalSuccess) {
+                    String location = "/sdcard/Winlator/forensics/issue-bundles";
+                    if (finalOutput != null && !finalOutput.trim().isEmpty()) {
+                        String[] lines = finalOutput.split("\n");
+                        for (String line : lines) {
+                            if (line == null) continue;
+                            String trimmed = line.trim();
+                            if (trimmed.startsWith("archive=")) {
+                                location = trimmed.substring("archive=".length());
+                                break;
+                            }
+                            if (trimmed.startsWith("bundle=")) {
+                                location = trimmed.substring("bundle=".length());
+                            }
+                        }
+                    }
+                    AppUtils.showToast(context, getString(R.string.diagnostics_forensic_root_capture_ok, location));
+                } else {
+                    AppUtils.showToast(context, getString(R.string.diagnostics_forensic_root_capture_fail, finalExitCode));
+                }
+                ForensicLogger.logEvent(
+                        context,
+                        finalSuccess ? "info" : "warn",
+                        "FORENSIC_ROOT_CAPTURE_RUN",
+                        null,
+                        "forensic_center",
+                        finalSuccess ? "forensic_root_capture_ok" : "forensic_root_capture_fail",
+                        ForensicLogger.fields(
+                            "exit_code", finalExitCode,
+                            "capture_mode", mode,
+                            "capture_command", previewCommand,
+                            "output", finalOutput,
+                            "runtime_summary", ForensicConfig.buildRuntimeSummary(snapshot),
+                            "capture_summary", ForensicConfig.buildCaptureSummary(context, snapshot)
+                        )
+                );
+            });
+        });
+    }
+
+    private void reportForensicIssue(String tail, File latestFile) {
+        Context context = getContext();
+        if (context == null) return;
+        String issueTitle = "Forensic report: " + (latestFile != null ? latestFile.getName() : "runtime");
+        PreloaderDialog preloaderDialog = new PreloaderDialog(requireActivity());
+        preloaderDialog.showOnUiThread(R.string.diagnostics_forensic_report_running);
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                Map<String, String> extras = new LinkedHashMap<>();
+                String summary = buildLogViewerStats(latestFile, tail);
+                String digest = buildErrorDigest(tail);
+                extras.put("forensic-tail.txt", tail == null ? "" : tail);
+                extras.put("forensic-summary.txt", summary);
+                extras.put("forensic-errors.txt", digest);
+                extras.put("capture-preview.txt", ForensicConfig.buildCaptureCommand(context, ForensicConfig.fromPreferences(preferences)));
+                JSONObject supplemental = ForensicLogger.fields(
+                        "report_source", "forensic_log_viewer",
+                        "log_file", latestFile != null ? latestFile.getAbsolutePath() : "",
+                        "tail_chars", tail != null ? tail.length() : 0,
+                        "runtime_summary", ForensicConfig.buildRuntimeSummary(ForensicConfig.fromPreferences(preferences)),
+                        "capture_summary", ForensicConfig.buildCaptureSummary(context, ForensicConfig.fromPreferences(preferences))
+                );
+                ForensicIssueComposer.IssueBundleResult bundle = ForensicIssueComposer.createIssueBundle(
+                        context,
+                        issueTitle,
+                        "Auto-generated from Forensic Log Viewer",
+                        null,
+                        extras,
+                        supplemental
+                );
+                StringBuilder bodyBuilder = new StringBuilder();
+                bodyBuilder.append("Auto-generated forensic report from Ae.solator.\n\n");
+                bodyBuilder.append("Bundle ZIP path (attach manually): `").append(bundle.zipFile.getAbsolutePath()).append("`\n");
+                bodyBuilder.append("Bundle directory: `").append(bundle.bundleDir.getAbsolutePath()).append("`\n\n");
+                bodyBuilder.append("### Runtime summary\n```text\n")
+                        .append(summary)
+                        .append("\n```\n\n");
+                bodyBuilder.append("### Error digest\n```text\n")
+                        .append(digest)
+                        .append("\n```\n\n");
+                bodyBuilder.append(bundle.markdown);
+                String body = bodyBuilder.toString();
+                if (body.length() > 7000) {
+                    body = body.substring(0, 7000) + "\n\n[truncated by reporter]";
+                }
+                String url = "https://github.com/kosoymiki/wcp-runtime-lanes/issues/new?title="
+                        + Uri.encode(issueTitle)
+                        + "&body="
+                        + Uri.encode(body);
+
+                if (!isAdded() || getActivity() == null) return;
+                String finalBody = body;
+                requireActivity().runOnUiThread(() -> {
+                    preloaderDialog.closeOnUiThread();
+                    Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    startActivity(browser);
+                    AppUtils.showToast(context, getString(R.string.diagnostics_forensic_report_bundle_ready, bundle.zipFile.getAbsolutePath()));
+                    ForensicLogger.logEvent(
+                            context,
+                            "info",
+                            "FORENSIC_REPORT_PREPARED",
+                            null,
+                            "forensic_center",
+                            "forensic_report_bundle_ready",
+                            ForensicLogger.fields(
+                                    "bundle_zip", bundle.zipFile.getAbsolutePath(),
+                                    "bundle_dir", bundle.bundleDir.getAbsolutePath(),
+                                    "issue_body_chars", finalBody.length()
+                            )
+                    );
+                });
+            } catch (Exception error) {
+                if (!isAdded() || getActivity() == null) return;
+                requireActivity().runOnUiThread(() -> {
+                    preloaderDialog.closeOnUiThread();
+                    AppUtils.showToast(context, R.string.diagnostics_forensic_report_failed);
+                    ForensicLogger.logEvent(
+                            context,
+                            "error",
+                            "FORENSIC_REPORT_FAILED",
+                            null,
+                            "forensic_center",
+                            "forensic_report_failed",
+                            ForensicLogger.fields("error", String.valueOf(error.getMessage()))
+                    );
+                });
+            }
+        });
+    }
+
+    private String buildErrorDigest(String tail) {
+        if (tail == null || tail.trim().isEmpty()) {
+            return "No log lines available.";
+        }
+        String[] lines = tail.split("\n");
+        StringBuilder digest = new StringBuilder();
+        int added = 0;
+        for (int i = lines.length - 1; i >= 0 && added < 25; i--) {
+            String line = lines[i];
+            if (line == null) continue;
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            String lower = trimmed.toLowerCase(Locale.US);
+            if (lower.contains(" error")
+                    || lower.startsWith("error")
+                    || lower.contains("\"level\":\"error\"")
+                    || lower.contains(" fatal")
+                    || lower.contains(" failed")
+                    || lower.contains(" exception")) {
+                digest.append(trimmed).append('\n');
+                added++;
+            }
+        }
+        if (added == 0) {
+            return "No explicit error lines in current tail.";
+        }
+        return digest.toString().trim();
     }
 
     private void copyAdbCommandToClipboard() {

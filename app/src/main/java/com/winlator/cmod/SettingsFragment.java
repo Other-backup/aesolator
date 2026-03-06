@@ -36,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.collection.ArrayMap;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
@@ -268,53 +269,13 @@ public class SettingsFragment extends Fragment {
                 AppUtils.showToast(context, R.string.cannot_remove_default_sound_font);
         });
 
-        final CheckBox cbUseDRI3 = view.findViewById(R.id.CBUseDRI3);
-        cbUseDRI3.setChecked(preferences.getBoolean("use_dri3", true));
-        final Spinner sDri3Mode = view.findViewById(R.id.SDri3Mode);
-        final CheckBox cbDri3PresentWait = view.findViewById(R.id.CBDri3PresentWait);
-        final CheckBox cbDri3ForceSwWsi = view.findViewById(R.id.CBDri3ForceSwWsi);
-        String[] dri3Modes = getResources().getStringArray(R.array.dri3_mode_values);
-        String selectedDri3Mode = preferences.getString("dri3_mode", cbUseDRI3.isChecked() ? "auto" : "off");
-        int selectedDri3ModeIndex = 0;
-        for (int i = 0; i < dri3Modes.length; i++) {
-            if (dri3Modes[i].equalsIgnoreCase(selectedDri3Mode)) {
-                selectedDri3ModeIndex = i;
-                break;
-            }
-        }
-        sDri3Mode.setSelection(selectedDri3ModeIndex);
-        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        cbDri3PresentWait.setChecked(preferences.getBoolean("dri3_present_wait", true));
-        cbDri3ForceSwWsi.setChecked(preferences.getBoolean("dri3_force_sw_wsi", false));
-        updateDri3AdvancedControls(cbUseDRI3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Modes);
-
-        cbUseDRI3.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (!isChecked) {
-                setSpinnerByValue(sDri3Mode, dri3Modes, "off");
-            } else if ("off".equalsIgnoreCase(dri3Modes[sDri3Mode.getSelectedItemPosition()])) {
-                setSpinnerByValue(sDri3Mode, dri3Modes, "auto");
-            }
-            updateDri3AdvancedControls(cbUseDRI3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Modes);
-        });
-
-        sDri3Mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view1, int position, long id) {
-                String mode = dri3Modes[position];
-                cbUseDRI3.setChecked(!"off".equalsIgnoreCase(mode));
-                updateDri3AdvancedControls(cbUseDRI3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Modes);
-            }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {
-            }
-        });
-        cbUseDRI3.setVisibility(View.GONE);
+        // X11/DRI3 controls are managed in Graphics Center.
+        view.findViewById(R.id.CBUseDRI3).setVisibility(View.GONE);
         view.findViewById(R.id.TVDri3ModeLabel).setVisibility(View.GONE);
-        sDri3Mode.setVisibility(View.GONE);
+        view.findViewById(R.id.SDri3Mode).setVisibility(View.GONE);
         view.findViewById(R.id.TVDri3ModeHint).setVisibility(View.GONE);
-        cbDri3PresentWait.setVisibility(View.GONE);
-        cbDri3ForceSwWsi.setVisibility(View.GONE);
+        view.findViewById(R.id.CBDri3PresentWait).setVisibility(View.GONE);
+        view.findViewById(R.id.CBDri3ForceSwWsi).setVisibility(View.GONE);
 
         final CheckBox cbUseXR = view.findViewById(R.id.CBUseXR);
         cbUseXR.setChecked(preferences.getBoolean("use_xr", true));
@@ -380,10 +341,6 @@ public class SettingsFragment extends Fragment {
             editor.putString("box64_preset", Box64PresetManager.getSpinnerSelectedId(sBox64Preset));
             editor.putString("fexcore_preset", FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset));
             editor.putString("runtime_profile_global", RuntimeProfileManager.getSpinnerSelectedId(sRuntimeProfileGlobal));
-            editor.putBoolean("use_dri3", cbUseDRI3.isChecked());
-            editor.putString("dri3_mode", dri3Modes[sDri3Mode.getSelectedItemPosition()]);
-            editor.putBoolean("dri3_present_wait", cbDri3PresentWait.isChecked());
-            editor.putBoolean("dri3_force_sw_wsi", cbDri3ForceSwWsi.isChecked());
             editor.putBoolean("use_xr", cbUseXR.isChecked());
             editor.putFloat("cursor_speed", sbCursorSpeed.getProgress() / 100.0f);
             editor.putBoolean("enable_wine_debug", cbEnableWineDebug.isChecked());
@@ -469,6 +426,8 @@ public class SettingsFragment extends Fragment {
     }
 
     private void applyDynamicStylesRecursively(View view) {
+        applyModernSectionCards(view, isDarkMode);
+
         TextView box64Label = view.findViewById(R.id.TVBox64);
         applyFieldSetLabelStyle(box64Label, isDarkMode);
 
@@ -509,18 +468,57 @@ public class SettingsFragment extends Fragment {
 
     }
 
-    private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-//        Context context = textView.getContext();
+    private void applyModernSectionCards(View root, boolean isDarkMode) {
+        if (root == null) return;
+        int panelBackground = isDarkMode
+                ? R.drawable.forensic_panel_background_dark
+                : R.drawable.forensic_panel_background;
+        int[] labelIds = new int[]{
+                R.id.TVBox64,
+                R.id.TVFEXCore,
+                R.id.TVSound,
+                R.id.TVTheme,
+                R.id.TVShortcutSettings,
+                R.id.TVRuntimeProfileGlobal,
+                R.id.TVBigPictureMode,
+                R.id.TVCustomApiKey,
+                R.id.TVXServer,
+                R.id.TVExperimental,
+                R.id.TVImageFs
+        };
 
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundResource(R.color.window_background_color_dark); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
+        for (int labelId : labelIds) {
+            TextView label = root.findViewById(labelId);
+            if (label == null) continue;
+            View parent = (View) label.getParent();
+            if (!(parent instanceof ViewGroup)) continue;
+            ViewGroup group = (ViewGroup) parent;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                if (child == label) continue;
+                if (child instanceof LinearLayout) {
+                    child.setBackgroundResource(panelBackground);
+                    int padding = dpToPx(child.getContext(), 12f);
+                    child.setPadding(padding, padding, padding, padding);
+                }
+            }
         }
+    }
+
+    private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
+        if (textView == null) return;
+        Context context = textView.getContext();
+        textView.setBackgroundResource(isDarkMode
+                ? R.drawable.forensic_badge_background_dark
+                : R.drawable.forensic_badge_background);
+        textView.setTextColor(ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+        ));
+    }
+
+    private int dpToPx(Context context, float dp) {
+        return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 
     private void initCustomApiKeySettings(View view) {
@@ -747,27 +745,6 @@ public class SettingsFragment extends Fragment {
             });
             container.addView(itemView);
         }
-    }
-
-    private void setSpinnerByValue(Spinner spinner, String[] values, String selectedValue) {
-        if (spinner == null || values == null || selectedValue == null) return;
-        for (int i = 0; i < values.length; i++) {
-            if (selectedValue.equalsIgnoreCase(values[i])) {
-                spinner.setSelection(i);
-                return;
-            }
-        }
-    }
-
-    private void updateDri3AdvancedControls(CheckBox cbUseDRI3, Spinner sDri3Mode, CheckBox cbDri3PresentWait,
-                                            CheckBox cbDri3ForceSwWsi, String[] dri3Modes) {
-        if (cbUseDRI3 == null || sDri3Mode == null || cbDri3PresentWait == null || cbDri3ForceSwWsi == null || dri3Modes == null) {
-            return;
-        }
-        String mode = dri3Modes[sDri3Mode.getSelectedItemPosition()];
-        boolean dri3Enabled = cbUseDRI3.isChecked() && !"off".equalsIgnoreCase(mode);
-        cbDri3PresentWait.setEnabled(dri3Enabled);
-        cbDri3ForceSwWsi.setEnabled(dri3Enabled);
     }
 
     public static void resetEmulatorsVersion(AppCompatActivity activity) {

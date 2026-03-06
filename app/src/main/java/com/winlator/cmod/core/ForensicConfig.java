@@ -234,8 +234,11 @@ public final class ForensicConfig {
     }
 
     public static String buildIssueCaptureContract(Context context) {
+        Snapshot snapshot = load(context);
         return "App forensic bundle includes JSONL/runtime files only. For maximum capture run adb matrix: "
-                + buildIssueCaptureCommand(context) + ".";
+                + buildIssueCaptureCommand(context) + ". "
+                + "For on-device root capture use: " + buildOnDeviceRootCaptureCommand(context, snapshot)
+                + " (bundle and archive are written to /sdcard/Winlator/forensics).";
     }
 
     public static String buildIssueCaptureCommand(Context context) {
@@ -254,6 +257,58 @@ public final class ForensicConfig {
                 + " --bundle-dir <out-dir>";
     }
 
+    public static String buildOnDeviceRootCaptureScript(Context context) {
+        return buildOnDeviceRootCaptureScript(context, load(context));
+    }
+
+    public static String buildOnDeviceRootCaptureScript(Context context, Snapshot snapshot) {
+        String packageName = context == null ? "" : context.getPackageName();
+        Snapshot safeSnapshot = snapshot == null ? load(context) : snapshot;
+        String runtimeSummary = sanitizeForShell(buildRuntimeSummary(safeSnapshot));
+        String captureSummary = sanitizeForShell(buildCaptureSummary(context, safeSnapshot));
+        return "set -e;"
+                + " ROOT_DIR=/sdcard/Winlator;"
+                + " FORENSIC_DIR=\"$ROOT_DIR/forensics\";"
+                + " BUNDLES_DIR=\"$FORENSIC_DIR/issue-bundles\";"
+                + " TS=$(date +%Y-%m-%d_%H-%M-%S);"
+                + " ISSUE_DIR=\"$BUNDLES_DIR/issue_$TS\";"
+                + " ARCHIVE=\"$FORENSIC_DIR/issue_$TS.tar.gz\";"
+                + " mkdir -p \"$ISSUE_DIR\";"
+                + " logcat -d -v threadtime > \"$ISSUE_DIR/logcat_root.txt\" 2>/dev/null || true;"
+                + " getprop > \"$ISSUE_DIR/getprop.txt\" 2>/dev/null || true;"
+                + " ps -A -o PID,PPID,USER,NAME,ARGS > \"$ISSUE_DIR/ps.txt\" 2>/dev/null || true;"
+                + " printf '%s\\n' '" + runtimeSummary + "' > \"$ISSUE_DIR/runtime_summary.txt\";"
+                + " printf '%s\\n' '" + captureSummary + "' > \"$ISSUE_DIR/capture_summary.txt\";"
+                + " printf 'WINE_DEBUG=%s\\n' '" + (safeSnapshot.enableWineDebug ? "1" : "0") + "' > \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'LOADER_TRACE=%s\\n' '" + (safeSnapshot.enableLoaderTrace ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'BOX64_LOGS=%s\\n' '" + (safeSnapshot.enableBox64Logs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'FEX_LOGS=%s\\n' '" + (safeSnapshot.enableFexLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'TURNIP_LOGS=%s\\n' '" + (safeSnapshot.enableTurnipLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'DXVK_LOGS=%s\\n' '" + (safeSnapshot.enableDxvkLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'VKD3D_LOGS=%s\\n' '" + (safeSnapshot.enableVkd3dLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'DGVOODOO_LOGS=%s\\n' '" + (safeSnapshot.enableDgVoodooLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'VULKAN_API_DUMP=%s\\n' '" + (safeSnapshot.enableVulkanApiDump ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'VULKAN_LOADER_DEBUG=%s\\n' '" + (safeSnapshot.enableVulkanLoaderDebug ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'VULKAN_VALIDATION=%s\\n' '" + (safeSnapshot.enableVulkanValidation ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'PULSE_LOGS=%s\\n' '" + (safeSnapshot.enablePulseLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " printf 'ALSA_LOGS=%s\\n' '" + (safeSnapshot.enableAlsaLogs ? "1" : "0") + "' >> \"$ISSUE_DIR/layer_markers.env\";"
+                + " cp -a /data/data/" + packageName + "/files/Winlator/logs/forensics \"$ISSUE_DIR/forensics\" 2>/dev/null || true;"
+                + " cp -a /data/data/" + packageName + "/files/forensics/issue-bundles \"$ISSUE_DIR/app_issue_bundles\" 2>/dev/null || true;"
+                + " if command -v tar >/dev/null 2>&1; then tar -czf \"$ARCHIVE\" -C \"$BUNDLES_DIR\" \"issue_$TS\" 2>/dev/null || true;"
+                + " elif command -v toybox >/dev/null 2>&1; then toybox tar -czf \"$ARCHIVE\" -C \"$BUNDLES_DIR\" \"issue_$TS\" 2>/dev/null || true; fi;"
+                + " echo \"bundle=$ISSUE_DIR\";"
+                + " echo \"archive=$ARCHIVE\";";
+    }
+
+    public static String buildOnDeviceRootCaptureCommand(Context context) {
+        return buildOnDeviceRootCaptureCommand(context, load(context));
+    }
+
+    public static String buildOnDeviceRootCaptureCommand(Context context, Snapshot snapshot) {
+        String script = buildOnDeviceRootCaptureScript(context, snapshot);
+        return "su -c '" + script.replace("'", "'\\''") + "'";
+    }
+
     public static String buildCaptureCommand(Context context, Snapshot snapshot) {
         if (snapshot == null) {
             return buildIssueCaptureCommand(context, isRootBinaryPresent(), false);
@@ -261,7 +316,9 @@ public final class ForensicConfig {
         String mode = normalizeAdbCaptureMode(snapshot.adbCaptureMode);
         boolean allowRoot = snapshot.enableRootCapture && isRootBinaryPresent();
         boolean allowShizuku = snapshot.enableShizukuCapture && isShizukuInstalled(context);
-        if (ADB_CAPTURE_MODE_ROOT.equals(mode)) return buildIssueCaptureCommand(context, allowRoot, false);
+        if (ADB_CAPTURE_MODE_ROOT.equals(mode)) {
+            return allowRoot ? buildOnDeviceRootCaptureCommand(context, snapshot) : buildIssueCaptureCommand(context, false, false);
+        }
         if (ADB_CAPTURE_MODE_NONROOT.equals(mode)) return buildIssueCaptureCommand(context, false, false);
         if (ADB_CAPTURE_MODE_SHIZUKU.equals(mode)) return buildIssueCaptureCommand(context, false, allowShizuku);
         return buildIssueCaptureCommand(context, allowRoot, allowShizuku && !allowRoot);
@@ -293,6 +350,14 @@ public final class ForensicConfig {
 
     private static String flag(boolean enabled) {
         return enabled ? "on" : "off";
+    }
+
+    private static String sanitizeForShell(String value) {
+        if (value == null) return "";
+        return value
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .replace("'", "");
     }
 
     public static final class Snapshot {

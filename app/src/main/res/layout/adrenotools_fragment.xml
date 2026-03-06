@@ -162,13 +162,32 @@
                 android:text="@string/open_forensic_center" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/BTOpenUpscalerSettings"
-            style="@style/ButtonNeutral"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/open_upscaler_settings" />
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/BTOpenUpscalerSettings"
+                style="@style/ButtonNeutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/open_upscaler_profiles" />
+
+            <Space
+                android:layout_width="10dp"
+                android:layout_height="0dp" />
+
+            <Button
+                android:id="@+id/BTOpenUpscalerShortcut"
+                style="@style/ButtonNeutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/open_upscaler_shortcuts" />
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/RecyclerView"

@@ -80,6 +80,7 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineRequestHandler;
@@ -1502,10 +1503,13 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     }
 
     private void parseUpscalerFromShortcut(@NonNull Shortcut activeShortcut) {
+        UpscalerProfileStore.Profile globalProfile = UpscalerProfileStore.getSelectedProfile(preferences);
         String legacySharpnessEffect = activeShortcut.getExtra("sharpnessEffect", "None");
         String backend = activeShortcut.getExtra("upscalerBackend", "");
         if (backend == null || backend.trim().isEmpty()) {
-            backend = !"none".equalsIgnoreCase(legacySharpnessEffect) ? UPSCALER_BACKEND_VKBASALT : UPSCALER_BACKEND_OFF;
+            backend = !"none".equalsIgnoreCase(legacySharpnessEffect)
+                    ? UPSCALER_BACKEND_VKBASALT
+                    : globalProfile.backend;
         }
         backend = StringUtils.parseIdentifier(backend);
         if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
@@ -1514,58 +1518,134 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         String effect = activeShortcut.getExtra("upscalerEffect", "");
         if (effect == null || effect.trim().isEmpty()) {
-            effect = mapLegacySharpnessEffect(legacySharpnessEffect);
+            effect = !"none".equalsIgnoreCase(legacySharpnessEffect)
+                    ? mapLegacySharpnessEffect(legacySharpnessEffect)
+                    : globalProfile.effect;
         }
         effect = normalizeUpscalerEffect(effect);
 
-        upscalerPreset = normalizeUpscalerPreset(activeShortcut.getExtra("upscalerPreset", UPSCALER_PRESET_AUTO));
+        String presetRaw = activeShortcut.getExtra("upscalerPreset", "");
+        if (presetRaw == null || presetRaw.trim().isEmpty()) presetRaw = globalProfile.preset;
+        if (presetRaw == null || presetRaw.trim().isEmpty()) presetRaw = UPSCALER_PRESET_AUTO;
+        upscalerPreset = normalizeUpscalerPreset(presetRaw);
         upscalerBackend = backend;
         upscalerEffect = effect;
+
+        String scaleRaw = activeShortcut.getExtra("upscalerScale", "");
+        if (scaleRaw == null || scaleRaw.trim().isEmpty()) scaleRaw = String.valueOf(globalProfile.scalePercent);
         upscalerScalePercent = parseBoundedInt(
-                activeShortcut.getExtra("upscalerScale", "100"),
+                scaleRaw,
                 100,
                 100,
                 200
         );
+
+        String sharpnessRaw = activeShortcut.getExtra("upscalerSharpness", "");
+        if (sharpnessRaw == null || sharpnessRaw.trim().isEmpty()) {
+            sharpnessRaw = activeShortcut.getExtra("sharpnessLevel", "");
+        }
+        if (sharpnessRaw == null || sharpnessRaw.trim().isEmpty()) {
+            sharpnessRaw = String.valueOf(globalProfile.sharpness);
+        }
         upscalerSharpnessPercent = parseBoundedIntAllowZero(
-                activeShortcut.getExtra("upscalerSharpness", activeShortcut.getExtra("sharpnessLevel", "100")),
+                sharpnessRaw,
                 100,
                 0,
                 100
         );
+
+        String denoiseRaw = activeShortcut.getExtra("upscalerDenoise", "");
+        if (denoiseRaw == null || denoiseRaw.trim().isEmpty()) {
+            denoiseRaw = activeShortcut.getExtra("sharpnessDenoise", "");
+        }
+        if (denoiseRaw == null || denoiseRaw.trim().isEmpty()) {
+            denoiseRaw = String.valueOf(globalProfile.denoise);
+        }
         upscalerDenoisePercent = parseBoundedIntAllowZero(
-                activeShortcut.getExtra("upscalerDenoise", activeShortcut.getExtra("sharpnessDenoise", "100")),
+                denoiseRaw,
                 100,
                 0,
                 100
         );
-        upscalerFrameGeneration = parseBoolean(activeShortcut.getExtra("upscalerFrameGeneration", "0"));
+
+        String framegenRaw = activeShortcut.getExtra("upscalerFrameGeneration", "");
+        if (framegenRaw == null || framegenRaw.trim().isEmpty()) {
+            framegenRaw = globalProfile.frameGeneration ? "1" : "0";
+        }
+        upscalerFrameGeneration = parseBoolean(framegenRaw);
+
+        String generatedFramesRaw = activeShortcut.getExtra("upscalerGeneratedFrames", "");
+        if (generatedFramesRaw == null || generatedFramesRaw.trim().isEmpty()) {
+            generatedFramesRaw = String.valueOf(globalProfile.generatedFrames);
+        }
         upscalerGeneratedFrames = parseBoundedInt(
-                activeShortcut.getExtra("upscalerGeneratedFrames", "1"),
+                generatedFramesRaw,
                 1,
                 1,
                 3
         );
-        upscalerFgSource = normalizeFgSource(activeShortcut.getExtra("upscalerFgSource", FG_SOURCE_NATIVE));
-        upscalerFgOutput = normalizeFgOutput(activeShortcut.getExtra("upscalerFgOutput", FG_OUTPUT_AUTO));
-        upscalerFramegenMode = normalizeFramegenMode(activeShortcut.getExtra("upscalerFramegenMode", FRAMEGEN_MODE_BALANCED));
-        upscalerThermalGuard = parseBoolean(activeShortcut.getExtra("upscalerThermalGuard", "1"));
+
+        String fgSourceRaw = activeShortcut.getExtra("upscalerFgSource", "");
+        if (fgSourceRaw == null || fgSourceRaw.trim().isEmpty()) fgSourceRaw = globalProfile.fgSource;
+        upscalerFgSource = normalizeFgSource(fgSourceRaw);
+
+        String fgOutputRaw = activeShortcut.getExtra("upscalerFgOutput", "");
+        if (fgOutputRaw == null || fgOutputRaw.trim().isEmpty()) fgOutputRaw = globalProfile.fgOutput;
+        upscalerFgOutput = normalizeFgOutput(fgOutputRaw);
+
+        String framegenModeRaw = activeShortcut.getExtra("upscalerFramegenMode", "");
+        if (framegenModeRaw == null || framegenModeRaw.trim().isEmpty()) framegenModeRaw = globalProfile.framegenMode;
+        upscalerFramegenMode = normalizeFramegenMode(framegenModeRaw);
+
+        String thermalGuardRaw = activeShortcut.getExtra("upscalerThermalGuard", "");
+        if (thermalGuardRaw == null || thermalGuardRaw.trim().isEmpty()) {
+            thermalGuardRaw = globalProfile.thermalGuard ? "1" : "0";
+        }
+        upscalerThermalGuard = parseBoolean(thermalGuardRaw);
+
+        String targetFpsRaw = activeShortcut.getExtra("upscalerTargetFps", "");
+        if (targetFpsRaw == null || targetFpsRaw.trim().isEmpty()) targetFpsRaw = String.valueOf(globalProfile.targetFps);
         upscalerTargetFps = parseBoundedIntAllowZero(
-                activeShortcut.getExtra("upscalerTargetFps", "60"),
+                targetFpsRaw,
                 60,
                 30,
                 144
         );
+
+        String interpolationRaw = activeShortcut.getExtra("upscalerInterpolationFactor", "");
+        if (interpolationRaw == null || interpolationRaw.trim().isEmpty()) {
+            interpolationRaw = String.valueOf(globalProfile.interpolationFactor);
+        }
         upscalerInterpolationFactor = parseBoundedIntAllowZero(
-                activeShortcut.getExtra("upscalerInterpolationFactor", "50"),
+                interpolationRaw,
                 50,
                 0,
                 100
         );
-        upscalerDebugOverlay = parseBoolean(activeShortcut.getExtra("upscalerDebugOverlay", "0"));
-        upscalerDebugTearLines = parseBoolean(activeShortcut.getExtra("upscalerDebugTearLines", "0"));
-        upscalerInterpolatedOnly = parseBoolean(activeShortcut.getExtra("upscalerInterpolatedOnly", "0"));
-        upscalerVulkanValidationLayer = parseBoolean(activeShortcut.getExtra("vulkanValidationLayer", "0"));
+
+        String debugOverlayRaw = activeShortcut.getExtra("upscalerDebugOverlay", "");
+        if (debugOverlayRaw == null || debugOverlayRaw.trim().isEmpty()) {
+            debugOverlayRaw = globalProfile.debugOverlay ? "1" : "0";
+        }
+        upscalerDebugOverlay = parseBoolean(debugOverlayRaw);
+
+        String debugTearRaw = activeShortcut.getExtra("upscalerDebugTearLines", "");
+        if (debugTearRaw == null || debugTearRaw.trim().isEmpty()) {
+            debugTearRaw = globalProfile.debugTearLines ? "1" : "0";
+        }
+        upscalerDebugTearLines = parseBoolean(debugTearRaw);
+
+        String interpolatedOnlyRaw = activeShortcut.getExtra("upscalerInterpolatedOnly", "");
+        if (interpolatedOnlyRaw == null || interpolatedOnlyRaw.trim().isEmpty()) {
+            interpolatedOnlyRaw = globalProfile.interpolatedOnly ? "1" : "0";
+        }
+        upscalerInterpolatedOnly = parseBoolean(interpolatedOnlyRaw);
+
+        String vkValidationRaw = activeShortcut.getExtra("vulkanValidationLayer", "");
+        if (vkValidationRaw == null || vkValidationRaw.trim().isEmpty()) {
+            vkValidationRaw = globalProfile.vulkanValidationLayer ? "1" : "0";
+        }
+        upscalerVulkanValidationLayer = parseBoolean(vkValidationRaw);
         vkbasaltConfig = buildVkBasaltConfig(upscalerEffect, upscalerSharpnessPercent, upscalerDenoisePercent);
     }
 

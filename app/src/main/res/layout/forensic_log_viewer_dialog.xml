@@ -11,6 +11,22 @@
         android:layout_height="wrap_content"
         android:textStyle="bold" />
 
+    <TextView
+        android:id="@+id/TVForensicLogStats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="12sp"
+        android:typeface="monospace" />
+
+    <Button
+        android:id="@+id/BTForensicCopyLog"
+        style="@style/ButtonNeutral"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/copy" />
+
     <Button
         android:id="@+id/BTForensicExportLog"
         style="@style/ButtonNeutral"
@@ -19,19 +35,28 @@
         android:layout_marginTop="8dp"
         android:text="@string/diagnostics_forensic_log_export" />
 
-    <ScrollView
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="360dp"
         android:layout_marginTop="8dp"
-        android:background="@drawable/edit_text"
-        android:padding="8dp">
+        android:background="@drawable/forensic_command_background"
+        android:padding="8dp"
+        android:scrollbars="horizontal">
 
-        <TextView
-            android:id="@+id/TVForensicLogBody"
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textIsSelectable="true"
-            android:textSize="12sp"
-            android:typeface="monospace" />
-    </ScrollView>
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/TVForensicLogBody"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="720dp"
+                android:textIsSelectable="true"
+                android:textSize="12sp"
+                android:typeface="monospace" />
+        </ScrollView>
+    </HorizontalScrollView>
 </LinearLayout>

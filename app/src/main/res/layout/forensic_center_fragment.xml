@@ -318,12 +318,12 @@
                     android:orientation="horizontal">
 
                     <Button
-                        android:id="@+id/BTCopyAdbCommand"
+                        android:id="@+id/BTRunRootCapture"
                         style="@style/ButtonNeutral"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/copy" />
+                        android:text="@string/diagnostics_forensic_run_root_capture" />
 
                     <Space
                         android:layout_width="10dp"

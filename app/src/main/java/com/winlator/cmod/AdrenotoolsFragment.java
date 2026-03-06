@@ -15,9 +15,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -34,6 +36,8 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
+import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -46,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,8 +59,12 @@ import java.util.concurrent.Executors;
 public class AdrenotoolsFragment extends Fragment {
     private static final String PREF_GRAPHICS_SOURCE_MODE = "graphics_feed_source_mode";
     private static final String PREF_GRAPHICS_BRANCH_MODE = "graphics_feed_branch_mode";
+    private static final String PREF_OPEN_X11_DIALOG_ONCE = "graphics_open_x11_dialog_once";
     private static final String LANE_TURNIP = "turnip";
     private static final String LANE_OPENGL = "opengl";
+    private static final String UPSCALER_BACKEND_OFF = "off";
+    private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
+    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
 
     private AdrenotoolsManager adrenotoolsManager;
     private SharedPreferences sharedPreferences;
@@ -157,15 +166,14 @@ public class AdrenotoolsFragment extends Fragment {
         layout.findViewById(R.id.BTLaneOpenGL).setOnClickListener(v ->
                 selectGraphicsLane(LANE_OPENGL, R.id.BTLaneOpenGL));
 
-        layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> {
-            navigateToMainMenuItem(R.id.main_menu_settings, new SettingsFragment());
-        });
+        layout.findViewById(R.id.BTDri3Settings).setOnClickListener(v -> showX11SettingsDialog());
 
         layout.findViewById(R.id.BTForensicCenter).setOnClickListener(v -> {
             navigateToMainMenuItem(R.id.main_menu_diagnostics, new ForensicCenterFragment());
         });
 
-        layout.findViewById(R.id.BTOpenUpscalerSettings).setOnClickListener(v -> openUpscalerSettings());
+        layout.findViewById(R.id.BTOpenUpscalerSettings).setOnClickListener(v -> showUpscalerSettingsDialog());
+        layout.findViewById(R.id.BTOpenUpscalerShortcut).setOnClickListener(v -> openUpscalerShortcutSettings());
         styleGraphicsCenterButtons(layout);
         refreshGraphicsCenterStatus();
         refreshGraphicsFeed();
@@ -193,6 +201,7 @@ public class AdrenotoolsFragment extends Fragment {
         styleGraphicsCenterButtons(rootView);
         refreshGraphicsCenterStatus();
         refreshGraphicsFeed();
+        maybeOpenPendingX11Dialog();
     }
     
     @Override
@@ -364,7 +373,7 @@ public class AdrenotoolsFragment extends Fragment {
         navigateToMainMenuItem(R.id.main_menu_contents, new ContentsFragment());
     }
 
-    private void openUpscalerSettings() {
+    private void openUpscalerShortcutSettings() {
         ForensicLogger.logEvent(
                 requireContext(),
                 "info",
@@ -375,7 +384,456 @@ public class AdrenotoolsFragment extends Fragment {
                 null
         );
         navigateToMainMenuItem(R.id.main_menu_shortcuts, new ShortcutsFragment());
-        AppUtils.showToast(getContext(), R.string.graphics_center_upscaler_hint);
+        AppUtils.showToast(getContext(), R.string.graphics_center_upscaler_shortcut_hint);
+    }
+
+    private void showUpscalerSettingsDialog() {
+        if (!isAdded()) return;
+        ContentDialog dialog = new ContentDialog(requireContext(), R.layout.graphics_upscaler_settings_dialog);
+        dialog.setTitle(R.string.graphics_center_upscaler_dialog_title);
+        dialog.setBottomBarText(null);
+
+        final boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        final Spinner sProfile = dialog.findViewById(R.id.SUpscalerProfile);
+        final Spinner sPreset = dialog.findViewById(R.id.SUpscalerPreset);
+        final Spinner sBackend = dialog.findViewById(R.id.SUpscalerBackend);
+        final Spinner sEffect = dialog.findViewById(R.id.SUpscalerEffect);
+        final Spinner sScale = dialog.findViewById(R.id.SUpscalerScale);
+        final CheckBox cbFramegen = dialog.findViewById(R.id.CBEnableFrameGeneration);
+        final Spinner sGeneratedFrames = dialog.findViewById(R.id.SGeneratedFrames);
+        final Spinner sFgSource = dialog.findViewById(R.id.SUpscalerFgSource);
+        final Spinner sFgOutput = dialog.findViewById(R.id.SUpscalerFgOutput);
+        final Spinner sFramegenMode = dialog.findViewById(R.id.SUpscalerFramegenMode);
+        final CheckBox cbThermalGuard = dialog.findViewById(R.id.CBUpscalerThermalGuard);
+        final SeekBar sbTargetFps = dialog.findViewById(R.id.SBUpscalerTargetFps);
+        final TextView tvTargetFps = dialog.findViewById(R.id.TVUpscalerTargetFps);
+        final SeekBar sbInterpolation = dialog.findViewById(R.id.SBInterpolationFactor);
+        final TextView tvInterpolation = dialog.findViewById(R.id.TVInterpolationFactor);
+        final CheckBox cbDebugOverlay = dialog.findViewById(R.id.CBUpscalerDebugOverlay);
+        final CheckBox cbDebugTear = dialog.findViewById(R.id.CBUpscalerDebugTearLines);
+        final CheckBox cbInterpolatedOnly = dialog.findViewById(R.id.CBUpscalerInterpolatedOnly);
+        final CheckBox cbVulkanValidation = dialog.findViewById(R.id.CBEnableVulkanValidationLayer);
+        final SeekBar sbSharpness = dialog.findViewById(R.id.SBSharpnessLevel);
+        final TextView tvSharpness = dialog.findViewById(R.id.TVSharpnessLevel);
+        final SeekBar sbDenoise = dialog.findViewById(R.id.SBSharpnessDenoise);
+        final TextView tvDenoise = dialog.findViewById(R.id.TVSharpnessDenoise);
+        final TextView tvProfileInfo = dialog.findViewById(R.id.TVUpscalerProfileInfo);
+
+        int panelBackground = isDarkMode ? R.drawable.forensic_panel_background_dark : R.drawable.forensic_panel_background;
+        int commandBackground = isDarkMode ? R.drawable.forensic_command_background_dark : R.drawable.forensic_command_background;
+        int[] cardIds = new int[]{
+                R.id.LLUpscalerProfileCard,
+                R.id.LLUpscalerCoreCard,
+                R.id.LLUpscalerFramegenCard,
+                R.id.LLUpscalerDebugCard
+        };
+        for (int cardId : cardIds) {
+            View card = dialog.findViewById(cardId);
+            if (card != null) card.setBackgroundResource(panelBackground);
+        }
+        if (tvProfileInfo != null) {
+            tvProfileInfo.setBackgroundResource(commandBackground);
+            int profileTextColor = ContextCompat.getColor(
+                    requireContext(),
+                    isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+            );
+            tvProfileInfo.setTextColor(profileTextColor);
+        }
+
+        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        int spinnerBackground = isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box;
+        Spinner[] allSpinners = new Spinner[]{
+                sProfile, sPreset, sBackend, sEffect, sScale, sGeneratedFrames, sFgSource, sFgOutput, sFramegenMode
+        };
+        for (Spinner spinner : allSpinners) {
+            spinner.setPopupBackgroundResource(popupBackground);
+            spinner.setBackgroundResource(spinnerBackground);
+        }
+
+        final ArrayList<UpscalerProfileStore.Profile> profiles = new ArrayList<>(UpscalerProfileStore.loadProfiles(sharedPreferences));
+        final String[] selectedProfileId = new String[]{UpscalerProfileStore.getSelectedProfileId(sharedPreferences)};
+        final boolean[] suppressSelectionCallbacks = new boolean[]{false};
+
+        final Runnable updateUiState = () -> {
+            String backend = UpscalerProfileStore.normalizeBackend(StringUtils.parseIdentifier(sBackend.getSelectedItem()));
+            boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(backend);
+            boolean framegenSupported = UPSCALER_BACKEND_VKBASALT.equals(backend) || UPSCALER_BACKEND_MOBFGSR.equals(backend);
+            boolean mobfgsrDebug = UPSCALER_BACKEND_MOBFGSR.equals(backend);
+
+            sPreset.setEnabled(upscalerEnabled);
+            sEffect.setEnabled(upscalerEnabled);
+            sScale.setEnabled(upscalerEnabled);
+            cbFramegen.setEnabled(upscalerEnabled && framegenSupported);
+            if ((!upscalerEnabled || !framegenSupported) && cbFramegen.isChecked()) cbFramegen.setChecked(false);
+
+            boolean framegenActive = upscalerEnabled && cbFramegen.isChecked();
+            sGeneratedFrames.setEnabled(framegenActive);
+            sFgSource.setEnabled(framegenActive);
+            sFgOutput.setEnabled(framegenActive);
+            sFramegenMode.setEnabled(framegenActive);
+            cbThermalGuard.setEnabled(framegenActive);
+            sbTargetFps.setEnabled(framegenActive);
+            sbInterpolation.setEnabled(framegenActive);
+            cbDebugOverlay.setEnabled(framegenActive && mobfgsrDebug);
+            cbDebugTear.setEnabled(framegenActive && mobfgsrDebug);
+            cbInterpolatedOnly.setEnabled(framegenActive && mobfgsrDebug);
+            cbVulkanValidation.setEnabled(upscalerEnabled);
+            sbSharpness.setEnabled(upscalerEnabled);
+            sbDenoise.setEnabled(upscalerEnabled);
+        };
+
+        final java.util.function.Consumer<UpscalerProfileStore.Profile> bindProfileToControls = (profile) -> {
+            UpscalerProfileStore.Profile safe = UpscalerProfileStore.normalize(profile);
+            AppUtils.setSpinnerSelectionFromIdentifier(sPreset, safe.preset);
+            AppUtils.setSpinnerSelectionFromIdentifier(sBackend, safe.backend);
+            AppUtils.setSpinnerSelectionFromIdentifier(sEffect, safe.effect);
+            AppUtils.setSpinnerSelectionFromValue(sScale, String.valueOf(safe.scalePercent));
+            cbFramegen.setChecked(safe.frameGeneration);
+            AppUtils.setSpinnerSelectionFromValue(sGeneratedFrames, String.valueOf(safe.generatedFrames));
+            AppUtils.setSpinnerSelectionFromIdentifier(sFgSource, safe.fgSource);
+            AppUtils.setSpinnerSelectionFromIdentifier(sFgOutput, safe.fgOutput);
+            AppUtils.setSpinnerSelectionFromIdentifier(sFramegenMode, safe.framegenMode);
+            cbThermalGuard.setChecked(safe.thermalGuard);
+            sbTargetFps.setProgress(safe.targetFps);
+            tvTargetFps.setText(String.valueOf(safe.targetFps));
+            sbInterpolation.setProgress(safe.interpolationFactor);
+            tvInterpolation.setText(safe.interpolationFactor + "%");
+            cbDebugOverlay.setChecked(safe.debugOverlay);
+            cbDebugTear.setChecked(safe.debugTearLines);
+            cbInterpolatedOnly.setChecked(safe.interpolatedOnly);
+            cbVulkanValidation.setChecked(safe.vulkanValidationLayer);
+            sbSharpness.setProgress(safe.sharpness);
+            tvSharpness.setText(safe.sharpness + "%");
+            sbDenoise.setProgress(safe.denoise);
+            tvDenoise.setText(safe.denoise + "%");
+            tvProfileInfo.setText(getString(R.string.upscaler_profile_info) + "\nID: " + safe.id);
+            updateUiState.run();
+        };
+
+        final java.util.function.Supplier<UpscalerProfileStore.Profile> readControlsToProfile = () -> {
+            UpscalerProfileStore.Profile out = new UpscalerProfileStore.Profile();
+            out.preset = UpscalerProfileStore.normalizePreset(StringUtils.parseIdentifier(sPreset.getSelectedItem()));
+            out.backend = UpscalerProfileStore.normalizeBackend(StringUtils.parseIdentifier(sBackend.getSelectedItem()));
+            out.effect = UpscalerProfileStore.normalizeEffect(StringUtils.parseIdentifier(sEffect.getSelectedItem()));
+            out.scalePercent = parseBoundedIntAllowZero(String.valueOf(sScale.getSelectedItem()), 100, 100, 200);
+            out.frameGeneration = cbFramegen.isChecked();
+            out.generatedFrames = parseBoundedIntAllowZero(String.valueOf(sGeneratedFrames.getSelectedItem()), 1, 1, 3);
+            out.fgSource = UpscalerProfileStore.normalizeFgSource(StringUtils.parseIdentifier(sFgSource.getSelectedItem()));
+            out.fgOutput = UpscalerProfileStore.normalizeFgOutput(StringUtils.parseIdentifier(sFgOutput.getSelectedItem()));
+            out.framegenMode = UpscalerProfileStore.normalizeFramegenMode(StringUtils.parseIdentifier(sFramegenMode.getSelectedItem()));
+            out.thermalGuard = cbThermalGuard.isChecked();
+            out.targetFps = parseBoundedIntAllowZero(String.valueOf(sbTargetFps.getProgress()), 60, 30, 144);
+            out.interpolationFactor = parseBoundedIntAllowZero(String.valueOf(sbInterpolation.getProgress()), 50, 0, 100);
+            out.debugOverlay = cbDebugOverlay.isChecked();
+            out.debugTearLines = cbDebugTear.isChecked();
+            out.interpolatedOnly = cbInterpolatedOnly.isChecked();
+            out.vulkanValidationLayer = cbVulkanValidation.isChecked();
+            out.sharpness = parseBoundedIntAllowZero(String.valueOf(sbSharpness.getProgress()), 100, 0, 100);
+            out.denoise = parseBoundedIntAllowZero(String.valueOf(sbDenoise.getProgress()), 100, 0, 100);
+            return UpscalerProfileStore.normalize(out);
+        };
+
+        final Runnable refreshProfileSpinner = () -> {
+            ArrayList<String> names = new ArrayList<>();
+            int selectedIndex = 0;
+            for (int i = 0; i < profiles.size(); i++) {
+                UpscalerProfileStore.Profile profile = profiles.get(i);
+                String label = profile.name + " [" + profile.id + "]";
+                names.add(label);
+                if (profile.id.equals(selectedProfileId[0])) selectedIndex = i;
+            }
+            suppressSelectionCallbacks[0] = true;
+            sProfile.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, names));
+            sProfile.setSelection(selectedIndex, false);
+            suppressSelectionCallbacks[0] = false;
+            if (!profiles.isEmpty()) bindProfileToControls.accept(profiles.get(selectedIndex));
+        };
+
+        final Runnable saveCurrentProfile = () -> {
+            if (profiles.isEmpty()) return;
+            int index = sProfile.getSelectedItemPosition();
+            if (index < 0 || index >= profiles.size()) index = 0;
+            UpscalerProfileStore.Profile current = profiles.get(index);
+            UpscalerProfileStore.Profile edited = readControlsToProfile.get();
+            edited.id = current.id;
+            edited.name = current.name;
+            profiles.set(index, UpscalerProfileStore.normalize(edited));
+            selectedProfileId[0] = edited.id;
+            UpscalerProfileStore.saveProfiles(sharedPreferences, profiles);
+            UpscalerProfileStore.setSelectedProfileId(sharedPreferences, selectedProfileId[0]);
+            ForensicLogger.logEvent(
+                    requireContext(),
+                    "info",
+                    "GRAPHICS_UPSCALER_PROFILE_SAVED",
+                    null,
+                    "graphics_center",
+                    "upscaler_profile_saved",
+                    ForensicLogger.fields(
+                            "profile_id", edited.id,
+                            "profile_name", edited.name,
+                            "backend", edited.backend,
+                            "effect", edited.effect,
+                            "framegen", edited.frameGeneration ? "1" : "0"
+                    )
+            );
+            AppUtils.showToast(getContext(), R.string.upscaler_profile_saved);
+            refreshProfileSpinner.run();
+        };
+
+        sProfile.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressSelectionCallbacks[0]) return;
+                if (position < 0 || position >= profiles.size()) return;
+                selectedProfileId[0] = profiles.get(position).id;
+                bindProfileToControls.accept(profiles.get(position));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        sBackend.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateUiState.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateUiState.run();
+            }
+        });
+        cbFramegen.setOnCheckedChangeListener((buttonView, isChecked) -> updateUiState.run());
+        sbTargetFps.setOnSeekBarChangeListener(new SimpleSeekbarListener(() ->
+                tvTargetFps.setText(String.valueOf(sbTargetFps.getProgress()))
+        ));
+        sbInterpolation.setOnSeekBarChangeListener(new SimpleSeekbarListener(() ->
+                tvInterpolation.setText(sbInterpolation.getProgress() + "%")
+        ));
+        sbSharpness.setOnSeekBarChangeListener(new SimpleSeekbarListener(() ->
+                tvSharpness.setText(sbSharpness.getProgress() + "%")
+        ));
+        sbDenoise.setOnSeekBarChangeListener(new SimpleSeekbarListener(() ->
+                tvDenoise.setText(sbDenoise.getProgress() + "%")
+        ));
+
+        dialog.findViewById(R.id.BTUpscalerProfileAdd).setOnClickListener(v -> {
+            ContentDialog.prompt(requireContext(), R.string.upscaler_profile_name_prompt, "", name -> {
+                UpscalerProfileStore.Profile base = readControlsToProfile.get();
+                base.id = makeUniqueProfileId(name, profiles);
+                base.name = name.trim();
+                profiles.add(UpscalerProfileStore.normalize(base));
+                selectedProfileId[0] = base.id;
+                refreshProfileSpinner.run();
+            });
+        });
+
+        dialog.findViewById(R.id.BTUpscalerProfileDuplicate).setOnClickListener(v -> {
+            if (profiles.isEmpty()) return;
+            int index = sProfile.getSelectedItemPosition();
+            if (index < 0 || index >= profiles.size()) index = 0;
+            UpscalerProfileStore.Profile source = profiles.get(index);
+            ContentDialog.prompt(
+                    requireContext(),
+                    R.string.upscaler_profile_name_prompt,
+                    source.name + " copy",
+                    name -> {
+                        UpscalerProfileStore.Profile copy = readControlsToProfile.get();
+                        copy.id = makeUniqueProfileId(name, profiles);
+                        copy.name = name.trim();
+                        profiles.add(UpscalerProfileStore.normalize(copy));
+                        selectedProfileId[0] = copy.id;
+                        refreshProfileSpinner.run();
+                    }
+            );
+        });
+
+        dialog.findViewById(R.id.BTUpscalerProfileRename).setOnClickListener(v -> {
+            if (profiles.isEmpty()) return;
+            int index = sProfile.getSelectedItemPosition();
+            if (index < 0 || index >= profiles.size()) index = 0;
+            final int selectedIndex = index;
+            UpscalerProfileStore.Profile profile = profiles.get(index);
+            ContentDialog.prompt(requireContext(), R.string.upscaler_profile_name_prompt, profile.name, name -> {
+                profile.name = name.trim();
+                profiles.set(selectedIndex, UpscalerProfileStore.normalize(profile));
+                refreshProfileSpinner.run();
+            });
+        });
+
+        dialog.findViewById(R.id.BTUpscalerProfileRemove).setOnClickListener(v -> {
+            if (profiles.isEmpty()) return;
+            int index = sProfile.getSelectedItemPosition();
+            if (index < 0 || index >= profiles.size()) index = 0;
+            UpscalerProfileStore.Profile profile = profiles.get(index);
+            if (UpscalerProfileStore.DEFAULT_PROFILE_ID.equals(profile.id)) {
+                AppUtils.showToast(getContext(), R.string.upscaler_profile_remove_default);
+                return;
+            }
+            profiles.remove(index);
+            if (profiles.isEmpty()) profiles.add(UpscalerProfileStore.defaults());
+            selectedProfileId[0] = profiles.get(Math.max(0, index - 1)).id;
+            AppUtils.showToast(getContext(), R.string.upscaler_profile_removed);
+            refreshProfileSpinner.run();
+        });
+
+        refreshProfileSpinner.run();
+
+        dialog.setOnConfirmCallback(saveCurrentProfile);
+        dialog.show();
+    }
+
+    private String makeUniqueProfileId(String name, List<UpscalerProfileStore.Profile> profiles) {
+        String base = UpscalerProfileStore.sanitizeId(name);
+        if (base.isEmpty()) base = "profile";
+        String candidate = base;
+        int seq = 1;
+        while (containsProfileId(profiles, candidate)) {
+            candidate = base + "_" + seq++;
+        }
+        return candidate;
+    }
+
+    private boolean containsProfileId(List<UpscalerProfileStore.Profile> profiles, String profileId) {
+        if (profiles == null || profiles.isEmpty()) return false;
+        String normalized = UpscalerProfileStore.sanitizeId(profileId);
+        for (UpscalerProfileStore.Profile profile : profiles) {
+            if (profile != null && normalized.equals(UpscalerProfileStore.sanitizeId(profile.id))) return true;
+        }
+        return false;
+    }
+
+    private static final class SimpleSeekbarListener implements SeekBar.OnSeekBarChangeListener {
+        private final Runnable onChanged;
+
+        private SimpleSeekbarListener(Runnable onChanged) {
+            this.onChanged = onChanged;
+        }
+
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            if (onChanged != null) onChanged.run();
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+        }
+    }
+
+    private int parseBoundedIntAllowZero(String value, int fallback, int min, int max) {
+        if (value == null || value.trim().isEmpty()) return fallback;
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return Math.max(min, Math.min(max, parsed));
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private void maybeOpenPendingX11Dialog() {
+        if (!sharedPreferences.getBoolean(PREF_OPEN_X11_DIALOG_ONCE, false)) return;
+        sharedPreferences.edit().putBoolean(PREF_OPEN_X11_DIALOG_ONCE, false).apply();
+        showX11SettingsDialog();
+    }
+
+    private void showX11SettingsDialog() {
+        if (!isAdded()) return;
+        ContentDialog dialog = new ContentDialog(requireContext(), R.layout.graphics_x11_settings_dialog);
+        dialog.setTitle(R.string.graphics_center_x11_settings_title);
+        dialog.setBottomBarText(null);
+
+        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        CheckBox cbUseDri3 = dialog.findViewById(R.id.CBX11UseDri3);
+        Spinner sDri3Mode = dialog.findViewById(R.id.SX11Dri3Mode);
+        CheckBox cbDri3PresentWait = dialog.findViewById(R.id.CBX11Dri3PresentWait);
+        CheckBox cbDri3ForceSwWsi = dialog.findViewById(R.id.CBX11Dri3ForceSwWsi);
+        CheckBox cbCursorLock = dialog.findViewById(R.id.CBX11CursorLock);
+        CheckBox cbXinputToggle = dialog.findViewById(R.id.CBX11XinputToggle);
+
+        String[] dri3Entries = getResources().getStringArray(R.array.dri3_mode_entries);
+        String[] dri3Values = getResources().getStringArray(R.array.dri3_mode_values);
+        sDri3Mode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, dri3Entries));
+        sDri3Mode.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDri3Mode.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
+
+        cbUseDri3.setChecked(sharedPreferences.getBoolean("use_dri3", true));
+        cbDri3PresentWait.setChecked(sharedPreferences.getBoolean("dri3_present_wait", true));
+        cbDri3ForceSwWsi.setChecked(sharedPreferences.getBoolean("dri3_force_sw_wsi", false));
+        cbCursorLock.setChecked(sharedPreferences.getBoolean("cursor_lock", false));
+        cbXinputToggle.setChecked(sharedPreferences.getBoolean("xinput_toggle", false));
+
+        String selectedDri3Mode = sharedPreferences.getString("dri3_mode", cbUseDri3.isChecked() ? "auto" : "off");
+        setSpinnerSelectionByValue(sDri3Mode, dri3Values, selectedDri3Mode, 0);
+        updateX11Dri3State(cbUseDri3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Values);
+
+        cbUseDri3.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (!isChecked) {
+                setSpinnerSelectionByValue(sDri3Mode, dri3Values, "off", 0);
+            } else if ("off".equalsIgnoreCase(dri3Values[sDri3Mode.getSelectedItemPosition()])) {
+                setSpinnerSelectionByValue(sDri3Mode, dri3Values, "auto", 0);
+            }
+            updateX11Dri3State(cbUseDri3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Values);
+        });
+
+        sDri3Mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selected = dri3Values[position];
+                cbUseDri3.setChecked(!"off".equalsIgnoreCase(selected));
+                updateX11Dri3State(cbUseDri3, sDri3Mode, cbDri3PresentWait, cbDri3ForceSwWsi, dri3Values);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        dialog.setOnConfirmCallback(() -> {
+            sharedPreferences.edit()
+                    .putBoolean("use_dri3", cbUseDri3.isChecked())
+                    .putString("dri3_mode", dri3Values[sDri3Mode.getSelectedItemPosition()])
+                    .putBoolean("dri3_present_wait", cbDri3PresentWait.isChecked())
+                    .putBoolean("dri3_force_sw_wsi", cbDri3ForceSwWsi.isChecked())
+                    .putBoolean("cursor_lock", cbCursorLock.isChecked())
+                    .putBoolean("xinput_toggle", cbXinputToggle.isChecked())
+                    .apply();
+            ForensicLogger.logEvent(
+                    requireContext(),
+                    "info",
+                    "GRAPHICS_X11_SETTINGS_SAVED",
+                    null,
+                    "graphics_center",
+                    "x11_settings_saved",
+                    ForensicLogger.fields(
+                            "dri3_mode", dri3Values[sDri3Mode.getSelectedItemPosition()],
+                            "dri3_present_wait", cbDri3PresentWait.isChecked() ? "1" : "0",
+                            "dri3_force_sw_wsi", cbDri3ForceSwWsi.isChecked() ? "1" : "0",
+                            "cursor_lock", cbCursorLock.isChecked() ? "1" : "0",
+                            "xinput_toggle", cbXinputToggle.isChecked() ? "1" : "0"
+                    )
+            );
+            AppUtils.showToast(getContext(), R.string.diagnostics_saved);
+        });
+        dialog.show();
+    }
+
+    private void updateX11Dri3State(CheckBox cbUseDri3,
+                                    Spinner sDri3Mode,
+                                    CheckBox cbDri3PresentWait,
+                                    CheckBox cbDri3ForceSwWsi,
+                                    String[] dri3Values) {
+        int selectedIndex = sDri3Mode.getSelectedItemPosition();
+        if (selectedIndex < 0 || selectedIndex >= dri3Values.length) selectedIndex = 0;
+        String mode = dri3Values[selectedIndex];
+        boolean enabled = cbUseDri3.isChecked() && !"off".equalsIgnoreCase(mode);
+        cbDri3PresentWait.setEnabled(enabled);
+        cbDri3ForceSwWsi.setEnabled(enabled);
     }
 
     private void styleGraphicsCenterButtons(View root) {
@@ -386,6 +844,7 @@ public class AdrenotoolsFragment extends Fragment {
         styleLaneButton(root, R.id.BTDri3Settings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTForensicCenter, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenUpscalerSettings, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
+        styleLaneButton(root, R.id.BTOpenUpscalerShortcut, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTInstallDriver, R.color.colorPrimary, R.color.colorAccentDark, isDarkMode, false);
         styleLaneButton(root, R.id.BTOpenContentsGraphics, R.color.colorAccent, R.color.colorAccentDark, isDarkMode, false);
     }
@@ -586,39 +1045,42 @@ public class AdrenotoolsFragment extends Fragment {
     private List<ContentProfile> fetchGameNativeZipProfiles(String lane) {
         ArrayList<ContentProfile> profiles = new ArrayList<>();
         try {
-            String html = Downloader.downloadString("https://gamenative.app/drivers/");
-            if (html == null || html.trim().isEmpty()) return profiles;
+            LinkedHashSet<String> visitedPages = new LinkedHashSet<>();
+            ArrayList<String> pendingPages = new ArrayList<>();
+            pendingPages.add("https://gamenative.app/drivers/");
+            LinkedHashMap<String, RemoteZipCandidate> candidates = new LinkedHashMap<>();
 
-            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                    "href\\s*=\\s*\"([^\"]+\\.zip(?:\\?[^\"]*)?)\"",
-                    java.util.regex.Pattern.CASE_INSENSITIVE
-            ).matcher(html);
+            int pageIndex = 0;
+            while (pageIndex < pendingPages.size() && pageIndex < 18) {
+                String pageUrl = pendingPages.get(pageIndex++);
+                if (!visitedPages.add(pageUrl)) continue;
+                String html = Downloader.downloadString(pageUrl);
+                if (html == null || html.trim().isEmpty()) continue;
 
-            HashSet<String> seen = new HashSet<>();
+                collectGameNativeZipCandidates(html, pageUrl, candidates);
+                for (String child : extractGameNativeChildPages(html, pageUrl)) {
+                    if (!visitedPages.contains(child) && !pendingPages.contains(child)) {
+                        pendingPages.add(child);
+                    }
+                }
+            }
+
+            int fallbackCode = (int) (System.currentTimeMillis() / 1000L);
             int offset = 0;
-            while (matcher.find()) {
-                String raw = matcher.group(1);
-                if (raw == null || raw.trim().isEmpty()) continue;
-                String url = raw.startsWith("http://") || raw.startsWith("https://")
-                        ? raw.trim()
-                        : "https://gamenative.app" + (raw.startsWith("/") ? raw : "/" + raw);
-                if (!seen.add(url)) continue;
+            for (RemoteZipCandidate candidate : candidates.values()) {
+                String laneHint = (candidate.url + " " + candidate.hint + " " + candidate.sourcePage).toLowerCase(Locale.US);
+                if (!matchesAssetLane(lane, laneHint)) continue;
 
-                String lower = url.toLowerCase(Locale.US);
-                if (!matchesAssetLane(lane, lower)) continue;
-
-                String fileName = url.substring(url.lastIndexOf('/') + 1);
-                String branch = lower.contains("qcom") ? "qcom"
-                        : (lower.contains("turnip") ? "turnip" : "main");
-
+                String fileName = candidate.url.substring(candidate.url.lastIndexOf('/') + 1);
+                String branch = resolveGameNativeBranch(laneHint);
                 ContentProfile profile = new ContentProfile();
                 profile.type = LANE_OPENGL.equals(lane)
                         ? ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
                         : ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER;
                 profile.verName = stripZipSuffix(fileName);
-                profile.verCode = (int) ((System.currentTimeMillis() / 1000L) - offset++);
-                profile.desc = fileName;
-                profile.remoteUrl = url;
+                profile.verCode = deriveGameNativeVerCode(fileName, fallbackCode - offset++);
+                profile.desc = (candidate.hint == null || candidate.hint.trim().isEmpty()) ? fileName : candidate.hint.trim();
+                profile.remoteUrl = candidate.url;
                 profile.sourceRepo = "gamenative.app/drivers";
                 profile.releaseTag = branch;
                 profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
@@ -630,6 +1092,122 @@ public class AdrenotoolsFragment extends Fragment {
         } catch (Exception ignored) {
         }
         return profiles;
+    }
+
+    private static final class RemoteZipCandidate {
+        private final String url;
+        private final String hint;
+        private final String sourcePage;
+
+        private RemoteZipCandidate(String url, String hint, String sourcePage) {
+            this.url = url;
+            this.hint = hint;
+            this.sourcePage = sourcePage;
+        }
+    }
+
+    private void collectGameNativeZipCandidates(String html,
+                                                String pageUrl,
+                                                LinkedHashMap<String, RemoteZipCandidate> outCandidates) {
+        if (html == null || html.trim().isEmpty() || outCandidates == null) return;
+
+        String[] patterns = new String[]{
+                "(?i)(?:href|data-href|data-url|src)\\s*=\\s*\"([^\"]+?\\.zip(?:\\?[^\"#]*)?)\"",
+                "(?i)(?:href|data-href|data-url|src)\\s*=\\s*'([^']+?\\.zip(?:\\?[^'#]*)?)'",
+                "(?i)(?:href|data-href|data-url|src)\\s*=\\s*([^\\s\"'>]+?\\.zip(?:\\?[^\\s\"'>#]*)?)",
+                "(?i)(https?://[^\\s\"'<>]+?\\.zip(?:\\?[^\\s\"'<>#]*)?)"
+        };
+
+        for (String patternText : patterns) {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(patternText).matcher(html);
+            while (matcher.find()) {
+                String raw = matcher.group(1);
+                String normalizedUrl = normalizeGameNativeUrl(raw, pageUrl);
+                if (normalizedUrl.isEmpty()) continue;
+                if (outCandidates.containsKey(normalizedUrl)) continue;
+                String hint = extractGameNativeHint(html, matcher.start(), matcher.end());
+                outCandidates.put(normalizedUrl, new RemoteZipCandidate(normalizedUrl, hint, pageUrl));
+            }
+        }
+
+        java.util.regex.Matcher directDownloads = java.util.regex.Pattern.compile(
+                "(?i)https?:\\\\?/\\\\?/downloads\\.gamenative\\.app/[^\\s\"'<>]+?\\.zip"
+        ).matcher(html);
+        while (directDownloads.find()) {
+            String raw = directDownloads.group();
+            String normalizedUrl = normalizeGameNativeUrl(raw, pageUrl);
+            if (normalizedUrl.isEmpty()) continue;
+            if (outCandidates.containsKey(normalizedUrl)) continue;
+            String hint = extractGameNativeHint(html, directDownloads.start(), directDownloads.end());
+            outCandidates.put(normalizedUrl, new RemoteZipCandidate(normalizedUrl, hint, pageUrl));
+        }
+    }
+
+    private List<String> extractGameNativeChildPages(String html, String pageUrl) {
+        ArrayList<String> pages = new ArrayList<>();
+        if (html == null || html.trim().isEmpty()) return pages;
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                "(?i)href\\s*=\\s*\"([^\"]+)\"|href\\s*=\\s*'([^']+)'"
+        ).matcher(html);
+        while (matcher.find()) {
+            String raw = matcher.group(1);
+            if (raw == null || raw.trim().isEmpty()) raw = matcher.group(2);
+            String normalized = normalizeGameNativeUrl(raw, pageUrl);
+            if (normalized.isEmpty()) continue;
+            String lower = normalized.toLowerCase(Locale.US);
+            if (!lower.startsWith("https://gamenative.app/")) continue;
+            if (!lower.contains("/drivers")) continue;
+            if (lower.endsWith(".zip")) continue;
+            if (!pages.contains(normalized)) pages.add(normalized);
+        }
+        return pages;
+    }
+
+    private String normalizeGameNativeUrl(String raw, String basePageUrl) {
+        if (raw == null) return "";
+        String normalized = raw.trim()
+                .replace("&amp;", "&")
+                .replace("\\/", "/")
+                .replace("\\u002F", "/")
+                .replace("\\u003A", ":");
+        while (normalized.endsWith("\\") || normalized.endsWith("\"") || normalized.endsWith("'")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.isEmpty() || normalized.startsWith("#") || normalized.startsWith("javascript:")) return "";
+        try {
+            java.net.URI baseUri = new java.net.URI(basePageUrl == null ? "https://gamenative.app/drivers/" : basePageUrl);
+            java.net.URI resolved = baseUri.resolve(normalized);
+            String out = resolved.toString();
+            if (!out.startsWith("http://") && !out.startsWith("https://")) return "";
+            out = out.replaceAll("\\\\+$", "");
+            while (out.endsWith("/") && !out.endsWith("://")) out = out.substring(0, out.length() - 1);
+            return out;
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private String extractGameNativeHint(String html, int start, int end) {
+        int left = Math.max(0, start - 110);
+        int right = Math.min(html.length(), end + 160);
+        String snippet = html.substring(left, right);
+        return snippet
+                .replaceAll("<[^>]+>", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String resolveGameNativeBranch(String lower) {
+        if (lower.contains("qcom") || lower.contains("qualcomm") || lower.contains("adreno")) {
+            return "qcom-opengl";
+        }
+        if (lower.contains("gallium") || lower.contains("zink") || lower.contains("opengl")) {
+            return "mesa-opengl";
+        }
+        if (lower.contains("gen8")) return "gen8-turnip";
+        if (lower.contains("turnip") || lower.contains("freedreno")) return "turnip";
+        return "main";
     }
 
     private int parsePublishedAtVerCode(String publishedAt, int fallback) {
@@ -644,12 +1222,22 @@ public class AdrenotoolsFragment extends Fragment {
     }
 
     private boolean matchesAssetLane(String lane, String lowerName) {
-        boolean openGlAsset = lowerName.contains("opengl")
-                || lowerName.contains("gallium")
-                || lowerName.contains("zink")
-                || lowerName.contains("aeopengl")
-                || lowerName.contains("gl-driver");
-        if (LANE_OPENGL.equals(lane)) return openGlAsset;
+        String value = lowerName == null ? "" : lowerName.toLowerCase(Locale.US);
+        boolean turnipAsset = value.contains("turnip")
+                || value.contains("freedreno")
+                || value.contains("turnip_")
+                || value.contains("turnip-")
+                || value.contains("gen8");
+        boolean openGlAsset = value.contains("opengl")
+                || value.contains("gallium")
+                || value.contains("zink")
+                || value.contains("aeopengl")
+                || value.contains("gl-driver")
+                || value.contains("qcom")
+                || value.contains("qualcomm")
+                || value.contains("adreno");
+        if (LANE_OPENGL.equals(lane)) return openGlAsset && !turnipAsset;
+        if (turnipAsset) return true;
         return !openGlAsset;
     }
 
@@ -672,6 +1260,18 @@ public class AdrenotoolsFragment extends Fragment {
         }
         if (releaseName != null && !releaseName.trim().isEmpty()) return releaseName.trim().toLowerCase(Locale.US);
         return "main";
+    }
+
+    private int deriveGameNativeVerCode(String fileName, int fallback) {
+        if (fileName == null || fileName.trim().isEmpty()) return fallback;
+        String digits = fileName.replaceAll("[^0-9]", "");
+        if (digits.length() > 9) digits = digits.substring(0, 9);
+        if (digits.isEmpty()) return fallback;
+        try {
+            return Integer.parseInt(digits);
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private String stripZipSuffix(String value) {

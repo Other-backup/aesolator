@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/LLUpscalerProfileCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/TVUpscalerGlobalHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/graphics_center_upscaler_hint" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/upscaler_profile"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/SUpscalerProfile"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:spinnerMode="dialog" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/BTUpscalerProfileAdd"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/add" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="0dp" />
+
+                <Button
+                    android:id="@+id/BTUpscalerProfileDuplicate"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/duplicate" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="0dp" />
+
+                <Button
+                    android:id="@+id/BTUpscalerProfileRename"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/edit" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="0dp" />
+
+                <Button
+                    android:id="@+id/BTUpscalerProfileRemove"
+                    style="@style/ButtonNeutral"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/remove" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/TVUpscalerProfileInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/forensic_command_background"
+                android:paddingLeft="10dp"
+                android:paddingTop="8dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="8dp"
+                android:text="@string/upscaler_profile_info"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLUpscalerCoreCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_section_render"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/upscaler_preset" />
+
+            <Spinner
+                android:id="@+id/SUpscalerPreset"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_preset_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_backend" />
+
+            <Spinner
+                android:id="@+id/SUpscalerBackend"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_backend_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_effect" />
+
+            <Spinner
+                android:id="@+id/SUpscalerEffect"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_effect_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_scale" />
+
+            <Spinner
+                android:id="@+id/SUpscalerScale"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_scale_entries"
+                android:spinnerMode="dialog" />
+
+            <CheckBox
+                android:id="@+id/CBEnableVulkanValidationLayer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/upscaler_vulkan_validation_layer" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/vkbasalt_sharpness_level" />
+
+                <TextView
+                    android:id="@+id/TVSharpnessLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/SBSharpnessLevel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:min="0" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/vkbasalt_sharpness_denoise" />
+
+                <TextView
+                    android:id="@+id/TVSharpnessDenoise"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/SBSharpnessDenoise"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:min="0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLUpscalerFramegenCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_section_framegen"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/CBEnableFrameGeneration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/upscaler_enable_frame_generation" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/upscaler_generated_frames" />
+
+            <Spinner
+                android:id="@+id/SGeneratedFrames"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_generated_frames_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_fg_source" />
+
+            <Spinner
+                android:id="@+id/SUpscalerFgSource"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_fg_source_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_fg_output" />
+
+            <Spinner
+                android:id="@+id/SUpscalerFgOutput"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_fg_output_entries"
+                android:spinnerMode="dialog" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_framegen_mode" />
+
+            <Spinner
+                android:id="@+id/SUpscalerFramegenMode"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/upscaler_framegen_mode_entries"
+                android:spinnerMode="dialog" />
+
+            <CheckBox
+                android:id="@+id/CBUpscalerThermalGuard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upscaler_thermal_guard" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/upscaler_target_fps" />
+
+                <TextView
+                    android:id="@+id/TVUpscalerTargetFps"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/SBUpscalerTargetFps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="144"
+                android:min="30" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/upscaler_interpolation_factor" />
+
+                <TextView
+                    android:id="@+id/TVInterpolationFactor"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/SBInterpolationFactor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:min="0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/LLUpscalerDebugCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/forensic_panel_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_section_debug"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/CBUpscalerDebugOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/upscaler_debug_overlay" />
+
+            <CheckBox
+                android:id="@+id/CBUpscalerDebugTearLines"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_debug_tearlines" />
+
+            <CheckBox
+                android:id="@+id/CBUpscalerInterpolatedOnly"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/upscaler_interpolated_only" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
