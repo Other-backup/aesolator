@@ -93,7 +93,7 @@
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="@string/import"
+                            android:tooltipText="@string/import_action"
                             android:id="@+id/BTImportBox64Preset"
                             android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_popup_menu_download" />
@@ -179,7 +179,7 @@
 
                         <ImageButton
                             style="@style/ListMenuButton"
-                            android:tooltipText="@string/import"
+                            android:tooltipText="@string/import_action"
                             android:id="@+id/BTImportFEXCorePreset"
                             android:layout_marginEnd="0dp"
                             android:src="@drawable/icon_popup_menu_download" />
