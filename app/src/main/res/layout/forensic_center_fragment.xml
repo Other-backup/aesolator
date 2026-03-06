@@ -268,6 +268,49 @@
                     android:textStyle="bold"
                     android:typeface="monospace" />
 
+                <CheckBox
+                    android:id="@+id/CBForensicShizukuCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/enable_shizuku_capture" />
+
+                <TextView
+                    android:id="@+id/TVForensicAdbTransportLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/forensic_adb_transport_title" />
+
+                <Spinner
+                    android:id="@+id/SForensicAdbTransport"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:entries="@array/forensic_adb_transport_entries"
+                    android:spinnerMode="dialog" />
+
+                <TextView
+                    android:id="@+id/TVAdbCaptureCommandLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/diagnostics_adb_capture_label" />
+
+                <TextView
+                    android:id="@+id/TVAdbCaptureCommand"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/forensic_command_background"
+                    android:paddingLeft="10dp"
+                    android:paddingTop="8dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="8dp"
+                    android:textIsSelectable="true"
+                    android:textStyle="bold"
+                    android:typeface="monospace" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -281,6 +324,18 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/copy" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/BTCopyAdbCaptureCommand"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/copy_capture_command" />
 
                     <Space
                         android:layout_width="10dp"

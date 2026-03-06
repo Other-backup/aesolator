@@ -1144,7 +1144,11 @@ public class ContainerDetailFragment extends Fragment {
             ImageFs imageFs = ImageFs.find(context);
             if (imageFs == null) return false;
             File wineDir = new File(imageFs.getRootDir(), "opt/" + version);
-            return wineDir.isDirectory();
+            if (!wineDir.isDirectory()) return false;
+            File wineBin = new File(wineDir, "bin/wine");
+            File wine64Bin = new File(wineDir, "bin/wine64");
+            File wineLib = new File(wineDir, "lib/wine");
+            return wineBin.isFile() || wine64Bin.isFile() || wineLib.isDirectory();
         } catch (Exception ignored) {
             return false;
         }

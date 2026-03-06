@@ -29,7 +29,7 @@ public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
     public static final String REMOTE_PROFILES_FALLBACK = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
-    public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/aesolator/main/contents/contents.json";
+    public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/wcp-graphics-lanes/main/contents/contents.json";
     public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",

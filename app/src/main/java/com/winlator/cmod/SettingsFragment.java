@@ -341,6 +341,7 @@ public class SettingsFragment extends Fragment {
         view.findViewById(R.id.LLWineDebugChannels).setVisibility(View.GONE);
         cbEnableBox64Logs.setVisibility(View.GONE);
         view.findViewById(R.id.TVLogs).setVisibility(View.GONE);
+        view.findViewById(R.id.FLLegacyLogs).setVisibility(View.GONE);
 
         final TextView tvCursorSpeed = view.findViewById(R.id.TVCursorSpeed);
         final SeekBar sbCursorSpeed = view.findViewById(R.id.SBCursorSpeed);

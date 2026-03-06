@@ -29,42 +29,38 @@
         android:text="@string/graphics_center_lanes"
         android:textStyle="bold" />
 
-    <HorizontalScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:scrollbars="none">
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/BTLaneTurnip"
+            style="@style/ButtonNeutral"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_weight="1"
+            android:drawableStart="@drawable/icon_cpu"
+            android:drawablePadding="6dp"
+            android:minWidth="0dp"
+            android:text="@string/graphics_center_lane_turnip" />
 
-            <Button
-                android:id="@+id/BTLaneTurnip"
-                style="@style/ButtonNeutral"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:drawableStart="@drawable/icon_cpu"
-                android:drawablePadding="6dp"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_turnip" />
+        <Space
+            android:layout_width="10dp"
+            android:layout_height="0dp" />
 
-            <Space
-                android:layout_width="8dp"
-                android:layout_height="0dp" />
-
-            <Button
-                android:id="@+id/BTLaneOpenGL"
-                style="@style/ButtonNeutral"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:drawableStart="@drawable/icon_screen_effect"
-                android:drawablePadding="6dp"
-                android:minWidth="0dp"
-                android:text="@string/graphics_center_lane_opengl" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        <Button
+            android:id="@+id/BTLaneOpenGL"
+            style="@style/ButtonNeutral"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableStart="@drawable/icon_screen_effect"
+            android:drawablePadding="6dp"
+            android:minWidth="0dp"
+            android:text="@string/graphics_center_lane_opengl" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/TVGraphicsDownloadsLabel"
@@ -81,6 +77,43 @@
         android:layout_marginTop="2dp"
         android:text="@string/graphics_center_driver_feed_hint"
         android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/TVGraphicsFeedSourceLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/contents_source_selector" />
+
+    <Spinner
+        android:id="@+id/SGraphicsFeedSourceMode"
+        style="@style/ComboBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
+
+    <LinearLayout
+        android:id="@+id/LLGraphicsFeedFilters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <Spinner
+            android:id="@+id/SGraphicsFeedChannelMode"
+            style="@style/ComboBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1" />
+
+        <Spinner
+            android:id="@+id/SGraphicsFeedArchMode"
+            style="@style/ComboBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/RVGraphicsFeed"

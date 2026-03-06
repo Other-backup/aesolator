@@ -63,10 +63,13 @@ public class ForensicCenterFragment extends Fragment {
         CheckBox cbDeviceSnapshot = view.findViewById(R.id.CBForensicDeviceSnapshot);
         CheckBox cbNonRootCapture = view.findViewById(R.id.CBForensicNonRootCapture);
         CheckBox cbRootCapture = view.findViewById(R.id.CBForensicRootCapture);
+        CheckBox cbShizukuCapture = view.findViewById(R.id.CBForensicShizukuCapture);
+        Spinner sAdbTransport = view.findViewById(R.id.SForensicAdbTransport);
         TextView badgeFreeWine = view.findViewById(R.id.TVPolicyBadgeFreeWine);
         TextView badgeDxvk = view.findViewById(R.id.TVPolicyBadgeDxvk);
         TextView badgeDgVoodoo = view.findViewById(R.id.TVPolicyBadgeDgVoodoo);
         TextView adbCommand = view.findViewById(R.id.TVAdbCommand);
+        TextView adbCaptureCommand = view.findViewById(R.id.TVAdbCaptureCommand);
 
         int panelBackground = isDarkMode
                 ? R.drawable.forensic_panel_background_dark
@@ -86,6 +89,7 @@ public class ForensicCenterFragment extends Fragment {
         view.findViewById(R.id.LLForensicTogglesCard).setBackgroundResource(panelBackground);
         view.findViewById(R.id.LLForensicAdbCard).setBackgroundResource(panelBackground);
         adbCommand.setBackgroundResource(commandBackground);
+        adbCaptureCommand.setBackgroundResource(commandBackground);
         badgeFreeWine.setBackgroundResource(badgeBackground);
         badgeDxvk.setBackgroundResource(badgeBackground);
         badgeDgVoodoo.setBackgroundResource(badgeBackground);
@@ -112,6 +116,39 @@ public class ForensicCenterFragment extends Fragment {
         cbDeviceSnapshot.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_DEVICE_SNAPSHOT, true));
         cbNonRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, true));
         cbRootCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, true));
+        cbShizukuCapture.setChecked(preferences.getBoolean(ForensicConfig.PREF_ENABLE_SHIZUKU_CAPTURE, false));
+        if (!ForensicConfig.isShizukuInstalled(requireContext())) {
+            cbShizukuCapture.setChecked(false);
+            cbShizukuCapture.setEnabled(false);
+        }
+        String[] adbTransportLabels = getResources().getStringArray(R.array.forensic_adb_transport_entries);
+        String[] adbTransportValues = getResources().getStringArray(R.array.forensic_adb_transport_values);
+        String selectedAdbTransport = ForensicConfig.normalizeAdbCaptureMode(
+                preferences.getString(ForensicConfig.PREF_ADB_CAPTURE_MODE, ForensicConfig.ADB_CAPTURE_MODE_AUTO)
+        );
+        sAdbTransport.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, adbTransportLabels));
+        sAdbTransport.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        for (int i = 0; i < adbTransportValues.length; i++) {
+            if (adbTransportValues[i].equalsIgnoreCase(selectedAdbTransport)) {
+                sAdbTransport.setSelection(i);
+                break;
+            }
+        }
+        updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand);
+        cbRootCapture.setOnCheckedChangeListener((buttonView, isChecked) ->
+                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
+        cbShizukuCapture.setOnCheckedChangeListener((buttonView, isChecked) ->
+                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand));
+        sAdbTransport.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view1, int position, long id) {
+                updateCaptureCommandPreview(cbRootCapture, cbShizukuCapture, sAdbTransport, adbTransportValues, adbCaptureCommand);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
         ForensicConfig.Snapshot openSnapshot = ForensicConfig.fromPreferences(preferences);
         ForensicLogger.logEvent(
                 requireContext(),
@@ -123,6 +160,8 @@ public class ForensicCenterFragment extends Fragment {
                 ForensicLogger.fields(
                         "runtime_summary", ForensicConfig.buildRuntimeSummary(openSnapshot),
                         "capture_summary", ForensicConfig.buildCaptureSummary(requireContext(), openSnapshot),
+                        "adb_capture_mode", ForensicConfig.normalizeAdbCaptureMode(openSnapshot.adbCaptureMode),
+                        "shizuku_requested", openSnapshot.enableShizukuCapture ? "1" : "0",
                         "dri3_mode", preferences.getString("dri3_mode", "auto"),
                         "dri3_present_wait", preferences.getBoolean("dri3_present_wait", true) ? "1" : "0",
                         "dri3_force_sw_wsi", preferences.getBoolean("dri3_force_sw_wsi", false) ? "1" : "0"
@@ -165,7 +204,10 @@ public class ForensicCenterFragment extends Fragment {
         view.findViewById(R.id.BTCopyAdbCommand).setOnClickListener(v -> {
             copyAdbCommandToClipboard();
         });
+        view.findViewById(R.id.BTCopyAdbCaptureCommand).setOnClickListener(v ->
+                copyAdbCaptureCommandToClipboard(adbCaptureCommand));
         adbCommand.setOnClickListener(v -> copyAdbCommandToClipboard());
+        adbCaptureCommand.setOnClickListener(v -> copyAdbCaptureCommandToClipboard(adbCaptureCommand));
 
         view.findViewById(R.id.BTSaveForensic).setOnClickListener(v -> {
             preferences.edit()
@@ -189,6 +231,8 @@ public class ForensicCenterFragment extends Fragment {
                     .putBoolean(ForensicConfig.PREF_ENABLE_DEVICE_SNAPSHOT, cbDeviceSnapshot.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_NONROOT_CAPTURE, cbNonRootCapture.isChecked())
                     .putBoolean(ForensicConfig.PREF_ENABLE_ROOT_CAPTURE, cbRootCapture.isChecked())
+                    .putBoolean(ForensicConfig.PREF_ENABLE_SHIZUKU_CAPTURE, cbShizukuCapture.isChecked())
+                    .putString(ForensicConfig.PREF_ADB_CAPTURE_MODE, adbTransportValues[sAdbTransport.getSelectedItemPosition()])
                     .apply();
 
             ForensicConfig.Snapshot savedSnapshot = ForensicConfig.fromPreferences(preferences);
@@ -202,6 +246,8 @@ public class ForensicCenterFragment extends Fragment {
                     ForensicLogger.fields(
                             "runtime_summary", ForensicConfig.buildRuntimeSummary(savedSnapshot),
                             "capture_summary", ForensicConfig.buildCaptureSummary(requireContext(), savedSnapshot),
+                            "adb_capture_mode", ForensicConfig.normalizeAdbCaptureMode(savedSnapshot.adbCaptureMode),
+                            "shizuku_requested", savedSnapshot.enableShizukuCapture ? "1" : "0",
                             "dri3_mode", preferences.getString("dri3_mode", "auto"),
                             "dri3_present_wait", preferences.getBoolean("dri3_present_wait", true) ? "1" : "0",
                             "dri3_force_sw_wsi", preferences.getBoolean("dri3_force_sw_wsi", false) ? "1" : "0"
@@ -381,5 +427,40 @@ public class ForensicCenterFragment extends Fragment {
                     null
             );
         }
+    }
+
+    private void updateCaptureCommandPreview(CheckBox cbRootCapture,
+                                             CheckBox cbShizukuCapture,
+                                             Spinner sAdbTransport,
+                                             String[] adbTransportValues,
+                                             TextView tvCaptureCommand) {
+        if (tvCaptureCommand == null || adbTransportValues == null || adbTransportValues.length == 0) return;
+        int selectedIndex = sAdbTransport.getSelectedItemPosition();
+        if (selectedIndex < 0 || selectedIndex >= adbTransportValues.length) selectedIndex = 0;
+
+        ForensicConfig.Snapshot snapshot = ForensicConfig.fromPreferences(preferences);
+        snapshot.enableRootCapture = cbRootCapture.isChecked();
+        snapshot.enableShizukuCapture = cbShizukuCapture.isChecked();
+        snapshot.adbCaptureMode = adbTransportValues[selectedIndex];
+        tvCaptureCommand.setText(ForensicConfig.buildCaptureCommand(requireContext(), snapshot));
+    }
+
+    private void copyAdbCaptureCommandToClipboard(TextView captureCommandView) {
+        if (captureCommandView == null) return;
+        CharSequence value = captureCommandView.getText();
+        if (value == null || value.toString().trim().isEmpty()) return;
+        ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) return;
+        clipboard.setPrimaryClip(ClipData.newPlainText("adb_forensic_capture_command", value.toString()));
+        AppUtils.showToast(getContext(), R.string.copied_to_clipboard);
+        ForensicLogger.logEvent(
+                requireContext(),
+                "info",
+                "FORENSIC_ADB_CAPTURE_COMMAND_COPIED",
+                null,
+                "forensic_center",
+                "adb_forensic_capture_command_copied",
+                null
+        );
     }
 }

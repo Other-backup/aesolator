@@ -12,10 +12,13 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -49,6 +52,7 @@ import java.util.concurrent.Executors;
 
 public class AdrenotoolsFragment extends Fragment {
     private static final String PREF_REMOTE_CACHE_JSON = "contents_remote_cache_json";
+    private static final String PREF_REMOTE_CACHE_SOURCE_SIGNATURE = "contents_remote_cache_source_signature";
     private static final String LANE_TURNIP = "turnip";
     private static final String LANE_OPENGL = "opengl";
     private static final long REMOTE_FEED_REFRESH_INTERVAL_MS = 180_000L;
@@ -60,8 +64,17 @@ public class AdrenotoolsFragment extends Fragment {
     private View rootView;
     private TextView tvGraphicsCenterStatus;
     private TextView tvGraphicsFeedEmpty;
+    private Spinner sGraphicsFeedSourceMode;
+    private Spinner sGraphicsFeedChannelMode;
+    private Spinner sGraphicsFeedArchMode;
     private int selectedLaneButtonId = R.id.BTLaneTurnip;
     private String selectedLane = LANE_TURNIP;
+    private String sourceMode = "aesolator";
+    private String channelMode = "stable";
+    private String archMode = "all";
+    private String[] sourceValues;
+    private String[] channelValues;
+    private String[] archValues;
     private long lastRemoteFeedRefreshMs = 0L;
     private final HashSet<String> installingEntries = new HashSet<>();
     
@@ -70,6 +83,12 @@ public class AdrenotoolsFragment extends Fragment {
         super.onCreate(savedInstanceState);
         this.adrenotoolsManager = new AdrenotoolsManager(getActivity());
         this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext());
+        sourceMode = sharedPreferences.getString("contents_source_mode", "aesolator");
+        channelMode = sharedPreferences.getString("contents_channel_mode", "stable");
+        archMode = sharedPreferences.getString("contents_arch_mode", "all");
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "aesolator";
+        if (channelMode == null || channelMode.trim().isEmpty()) channelMode = "stable";
+        if (archMode == null || archMode.trim().isEmpty()) archMode = "all";
     }
     
     @Override
@@ -81,6 +100,52 @@ public class AdrenotoolsFragment extends Fragment {
         tvGraphicsCenterStatus = layout.findViewById(R.id.TVGraphicsCenterStatus);
         rvGraphicsFeed = layout.findViewById(R.id.RVGraphicsFeed);
         tvGraphicsFeedEmpty = layout.findViewById(R.id.TVGraphicsFeedEmpty);
+        sGraphicsFeedSourceMode = layout.findViewById(R.id.SGraphicsFeedSourceMode);
+        sGraphicsFeedChannelMode = layout.findViewById(R.id.SGraphicsFeedChannelMode);
+        sGraphicsFeedArchMode = layout.findViewById(R.id.SGraphicsFeedArchMode);
+
+        sourceValues = getResources().getStringArray(R.array.contents_source_values);
+        channelValues = getResources().getStringArray(R.array.contents_channel_values);
+        archValues = getResources().getStringArray(R.array.contents_arch_values);
+
+        sGraphicsFeedSourceMode.setAdapter(new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(R.array.contents_source_entries)
+        ));
+        sGraphicsFeedChannelMode.setAdapter(new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(R.array.contents_channel_entries)
+        ));
+        sGraphicsFeedArchMode.setAdapter(new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(R.array.contents_arch_entries)
+        ));
+        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        int popupBackground = isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        sGraphicsFeedSourceMode.setPopupBackgroundResource(popupBackground);
+        sGraphicsFeedChannelMode.setPopupBackgroundResource(popupBackground);
+        sGraphicsFeedArchMode.setPopupBackgroundResource(popupBackground);
+        setSpinnerSelectionByValue(sGraphicsFeedSourceMode, sourceValues, sourceMode, 0);
+        setSpinnerSelectionByValue(sGraphicsFeedChannelMode, channelValues, channelMode, 0);
+        setSpinnerSelectionByValue(sGraphicsFeedArchMode, archValues, archMode, 0);
+
+        AdapterView.OnItemSelectedListener feedFilterListener = new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateFeedFilterPreferencesFromUi();
+                refreshGraphicsFeed();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        };
+        sGraphicsFeedSourceMode.setOnItemSelectedListener(feedFilterListener);
+        sGraphicsFeedChannelMode.setOnItemSelectedListener(feedFilterListener);
+        sGraphicsFeedArchMode.setOnItemSelectedListener(feedFilterListener);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
         recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
@@ -137,6 +202,15 @@ public class AdrenotoolsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        sourceMode = sharedPreferences.getString("contents_source_mode", sourceMode);
+        channelMode = sharedPreferences.getString("contents_channel_mode", channelMode);
+        archMode = sharedPreferences.getString("contents_arch_mode", archMode);
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "aesolator";
+        if (channelMode == null || channelMode.trim().isEmpty()) channelMode = "stable";
+        if (archMode == null || archMode.trim().isEmpty()) archMode = "all";
+        setSpinnerSelectionByValue(sGraphicsFeedSourceMode, sourceValues, sourceMode, 0);
+        setSpinnerSelectionByValue(sGraphicsFeedChannelMode, channelValues, channelMode, 0);
+        setSpinnerSelectionByValue(sGraphicsFeedArchMode, archValues, archMode, 0);
         if (recyclerView != null) {
             recyclerView.setAdapter(new DriversAdapter(adrenotoolsManager.enumarateInstalledDrivers()));
         }
@@ -155,6 +229,39 @@ public class AdrenotoolsFragment extends Fragment {
             }
         }
      }       
+
+    private void setSpinnerSelectionByValue(Spinner spinner, String[] values, String value, int fallbackIndex) {
+        if (spinner == null || values == null || values.length == 0) return;
+        int index = fallbackIndex;
+        if (value != null) {
+            for (int i = 0; i < values.length; i++) {
+                if (value.equalsIgnoreCase(values[i])) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        if (index < 0 || index >= values.length) index = 0;
+        spinner.setSelection(index, false);
+    }
+
+    private String getSpinnerSelectedValue(Spinner spinner, String[] values, String fallback) {
+        if (spinner == null || values == null || values.length == 0) return fallback;
+        int index = spinner.getSelectedItemPosition();
+        if (index < 0 || index >= values.length) return fallback;
+        return values[index];
+    }
+
+    private void updateFeedFilterPreferencesFromUi() {
+        sourceMode = getSpinnerSelectedValue(sGraphicsFeedSourceMode, sourceValues, sourceMode);
+        channelMode = getSpinnerSelectedValue(sGraphicsFeedChannelMode, channelValues, channelMode);
+        archMode = getSpinnerSelectedValue(sGraphicsFeedArchMode, archValues, archMode);
+        sharedPreferences.edit()
+                .putString("contents_source_mode", sourceMode)
+                .putString("contents_channel_mode", channelMode)
+                .putString("contents_arch_mode", archMode)
+                .apply();
+    }
     
     private class DriversAdapter extends RecyclerView.Adapter<DriversAdapter.ViewHolder> {
         private ArrayList<String> driversList;
@@ -388,31 +495,77 @@ public class AdrenotoolsFragment extends Fragment {
 
     private String resolveMergedFeedJson() {
         String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
+        String sourceSignature = buildSourceSignature();
+        String cachedSourceSignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
         long now = System.currentTimeMillis();
-        boolean shouldRefresh = (now - lastRemoteFeedRefreshMs) > REMOTE_FEED_REFRESH_INTERVAL_MS;
+        boolean shouldRefresh = !sourceSignature.equalsIgnoreCase(cachedSourceSignature)
+                || (now - lastRemoteFeedRefreshMs) > REMOTE_FEED_REFRESH_INTERVAL_MS;
         if (shouldRefresh) {
             String fresh = fetchRemoteFeedJson();
             if (fresh != null && !fresh.trim().isEmpty() && !"[]".equals(fresh.trim())) {
-                sharedPreferences.edit().putString(PREF_REMOTE_CACHE_JSON, fresh).apply();
+                sharedPreferences.edit()
+                        .putString(PREF_REMOTE_CACHE_JSON, fresh)
+                        .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
+                        .apply();
                 lastRemoteFeedRefreshMs = now;
                 return fresh;
+            }
+            if (!sourceSignature.equalsIgnoreCase(cachedSourceSignature)) {
+                return "[]";
             }
         }
         return cached != null && !cached.trim().isEmpty() ? cached : "[]";
     }
 
-    private String fetchRemoteFeedJson() {
-        boolean useWcpHub = sharedPreferences.getBoolean("contents_source_wcphub", true);
-        boolean useFallback = sharedPreferences.getBoolean("contents_source_fallback", true);
-        boolean useAesolator = sharedPreferences.getBoolean("contents_source_aesolator", true);
-        if (!useWcpHub && !useFallback && !useAesolator) useWcpHub = true;
+    private String buildSourceSignature() {
+        String normalizedMode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        String customUrl = "";
+        if ("custom".equals(normalizedMode)) {
+            String value = sharedPreferences.getString("downloadable_contents_url", "");
+            customUrl = value == null ? "" : value.trim().toLowerCase(Locale.US);
+        }
+        return normalizedMode + "|" + customUrl;
+    }
 
+    private String fetchRemoteFeedJson() {
         ArrayList<String> payloads = new ArrayList<>();
-        if (useWcpHub) addFeedPayload(payloads, ContentsManager.REMOTE_PROFILES);
-        if (useFallback) addFeedPayload(payloads, ContentsManager.REMOTE_PROFILES_FALLBACK);
-        if (useAesolator) addFeedPayload(payloads, ContentsManager.REMOTE_PROFILES_AE);
+        HashSet<String> uniqueUrls = new HashSet<>();
+        for (String url : resolveSelectedSourceUrls(sourceMode)) {
+            if (url == null) continue;
+            String normalized = url.trim();
+            if (normalized.isEmpty() || !uniqueUrls.add(normalized)) continue;
+            addFeedPayload(payloads, normalized);
+        }
         if (payloads.isEmpty()) return "[]";
         return mergeFeedPayloads(payloads);
+    }
+
+    private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
+        ArrayList<String> urls = new ArrayList<>();
+        String normalized = selectedSourceMode == null ? "aesolator" : selectedSourceMode.trim().toLowerCase(Locale.US);
+        if ("wcphub".equals(normalized)) {
+            urls.add(ContentsManager.REMOTE_PROFILES);
+            return urls;
+        }
+        if ("fallback".equals(normalized)) {
+            urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
+            return urls;
+        }
+        if ("custom".equals(normalized)) {
+            String preferredUrl = sharedPreferences.getString("downloadable_contents_url", "");
+            if (preferredUrl != null && !preferredUrl.trim().isEmpty()) {
+                urls.add(preferredUrl.trim());
+            }
+            return urls;
+        }
+        if ("all".equals(normalized)) {
+            urls.add(ContentsManager.REMOTE_PROFILES_AE);
+            urls.add(ContentsManager.REMOTE_PROFILES);
+            urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
+            return urls;
+        }
+        urls.add(ContentsManager.REMOTE_PROFILES_AE);
+        return urls;
     }
 
     private void addFeedPayload(List<String> payloads, String url) {
@@ -451,7 +604,8 @@ public class AdrenotoolsFragment extends Fragment {
         String verName = object.optString("verName", "").trim().toLowerCase(Locale.US);
         String displayCategory = object.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "").trim().toLowerCase(Locale.US);
         String channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
-        return type + "|" + verName + "|" + displayCategory + "|" + channel;
+        String arch = resolveRemoteArchHint(object);
+        return type + "|" + verName + "|" + displayCategory + "|" + channel + "|" + arch;
     }
 
     private boolean isBetterFeedCandidate(JSONObject candidate, JSONObject current) {
@@ -490,6 +644,19 @@ public class AdrenotoolsFragment extends Fragment {
         return 50;
     }
 
+    private String resolveRemoteArchHint(JSONObject object) {
+        String combined = (
+                object.optString("verName", "") + " "
+                        + object.optString("description", "") + " "
+                        + object.optString("remoteUrl", "") + " "
+                        + object.optString(ContentProfile.MARK_RELEASE_TAG, "")
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
+        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
+        if (combined.contains("arm64") || combined.contains("aarch64")) return "arm64";
+        return "generic";
+    }
+
     private List<ContentProfile> collectLaneProfiles(ContentsManager manager, String lane) {
         ArrayList<ContentProfile> selected = new ArrayList<>();
         if (manager == null) return selected;
@@ -504,6 +671,10 @@ public class AdrenotoolsFragment extends Fragment {
             if (left.locallyInstalled != right.locallyInstalled) {
                 return left.locallyInstalled ? -1 : 1;
             }
+            int sourceCmp = buildFeedSourceLabel(left).compareToIgnoreCase(buildFeedSourceLabel(right));
+            if (sourceCmp != 0) return sourceCmp;
+            int channelCmp = Integer.compare(resolveChannelPriority(right.getChannel()), resolveChannelPriority(left.getChannel()));
+            if (channelCmp != 0) return channelCmp;
             int codeCmp = Integer.compare(right.verCode, left.verCode);
             if (codeCmp != 0) return codeCmp;
             String lv = left.verName == null ? "" : left.verName;
@@ -519,8 +690,50 @@ public class AdrenotoolsFragment extends Fragment {
             if (profile == null) continue;
             if (!profile.locallyInstalled && (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty())) continue;
             if (!matchesLane(profile, lane)) continue;
+            if (!matchesChannelFilter(profile)) continue;
+            if (!matchesArchitectureFilter(profile)) continue;
             out.add(profile);
         }
+    }
+
+    private int resolveChannelPriority(String channel) {
+        String normalized = channel == null ? "" : channel.trim().toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return 30;
+        if (ContentProfile.CHANNEL_STABLE.equals(normalized)) return 30;
+        if (ContentProfile.CHANNEL_BETA.equals(normalized)) return 20;
+        if (ContentProfile.CHANNEL_NIGHTLY.equals(normalized)) return 10;
+        return 0;
+    }
+
+    private boolean matchesChannelFilter(ContentProfile profile) {
+        if (profile == null) return false;
+        String normalizedMode = channelMode == null ? "stable" : channelMode.trim().toLowerCase(Locale.US);
+        if ("all".equals(normalizedMode)) return true;
+        if ("stable".equals(normalizedMode)) return !profile.isBetaLike();
+        if ("nightly".equals(normalizedMode)) return profile.isBetaLike();
+        return true;
+    }
+
+    private boolean matchesArchitectureFilter(ContentProfile profile) {
+        if (profile == null) return false;
+        String normalizedMode = archMode == null ? "all" : archMode.trim().toLowerCase(Locale.US);
+        if ("all".equals(normalizedMode)) return true;
+        String profileArch = resolveProfileArchTag(profile);
+        return normalizedMode.equalsIgnoreCase(profileArch);
+    }
+
+    private String resolveProfileArchTag(ContentProfile profile) {
+        if (profile == null) return "generic";
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " "
+                        + (profile.desc == null ? "" : profile.desc) + " "
+                        + (profile.remoteUrl == null ? "" : profile.remoteUrl) + " "
+                        + (profile.releaseTag == null ? "" : profile.releaseTag)
+        ).toLowerCase(Locale.US);
+        if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
+        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
+        if (combined.contains("arm64") || combined.contains("aarch64")) return "arm64";
+        return "generic";
     }
 
     private boolean matchesLane(ContentProfile profile, String lane) {
@@ -577,9 +790,15 @@ public class AdrenotoolsFragment extends Fragment {
 
     private String buildFeedMetaLine(ContentProfile profile) {
         StringBuilder meta = new StringBuilder(profile.getDisplayCategory());
+        String arch = resolveProfileArchTag(profile);
+        if (!"generic".equals(arch)) meta.append(" • ").append(arch);
+        String channel = profile.getChannel();
+        if (channel != null && !channel.trim().isEmpty()) meta.append(" • ").append(channel.toLowerCase(Locale.US));
+        if (profile.releaseTag != null && !profile.releaseTag.trim().isEmpty()) {
+            meta.append(" • ").append(profile.releaseTag.trim());
+        }
         meta.append(" • ").append("verCode=").append(profile.verCode);
         if (profile.locallyInstalled) meta.append(" • installed");
-        if (profile.isBetaLike()) meta.append(" • ").append(profile.getChannel());
         return meta.toString();
     }
 

@@ -379,7 +379,18 @@
         <item>Box64</item>
     </string-array>
     <string-array name="wine_entries">
-        <item>freewine11-arm64ec</item>
+    </string-array>
+    <string-array name="forensic_adb_transport_entries">
+        <item>@string/forensic_adb_transport_auto</item>
+        <item>@string/forensic_adb_transport_nonroot</item>
+        <item>@string/forensic_adb_transport_root</item>
+        <item>@string/forensic_adb_transport_shizuku</item>
+    </string-array>
+    <string-array name="forensic_adb_transport_values">
+        <item>auto</item>
+        <item>nonroot</item>
+        <item>root</item>
+        <item>shizuku</item>
     </string-array>
     <string-array name="upscaler_preset_entries">
         <item>auto</item>

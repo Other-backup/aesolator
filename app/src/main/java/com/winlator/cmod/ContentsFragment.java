@@ -68,6 +68,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private static final String PREF_REMOTE_CACHE_JSON = "contents_remote_cache_json";
+    private static final String PREF_REMOTE_CACHE_SOURCE_SIGNATURE = "contents_remote_cache_source_signature";
     private static final List<ContentProfile.ContentType> SUPPORTED_CONTENT_TYPES = Arrays.asList(
             ContentProfile.ContentType.CONTENT_TYPE_WINE,
             ContentProfile.ContentType.CONTENT_TYPE_PROTON,
@@ -469,6 +470,8 @@ public class ContentsFragment extends Fragment {
 
     private void reloadRemoteContents() {
         final String selectedSourceMode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        final String sourceSignature = buildSourceSignature(selectedSourceMode);
+        final String cachedSourceSignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
         ForensicLogger.logEvent(
                 getContext(),
                 "info",
@@ -494,8 +497,9 @@ public class ContentsFragment extends Fragment {
                 if (payloads.isEmpty()) {
                     getActivity().runOnUiThread(() -> {
                         String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
-                        boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                        manager.setRemoteProfiles(cached != null && !cached.trim().isEmpty() ? cached : "[]");
+                        boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
+                        boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                        manager.setRemoteProfiles(useCached ? cached : "[]");
                         ForensicLogger.logEvent(
                                 getContext(),
                                 useCached ? "warn" : "warn",
@@ -516,7 +520,10 @@ public class ContentsFragment extends Fragment {
 
                 String merged = mergeJsonArrays(payloads);
                 getActivity().runOnUiThread(() -> {
-                    sharedPreferences.edit().putString(PREF_REMOTE_CACHE_JSON, merged).apply();
+                    sharedPreferences.edit()
+                            .putString(PREF_REMOTE_CACHE_JSON, merged)
+                            .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
+                            .apply();
                     manager.setRemoteProfiles(merged);
                     ForensicLogger.logEvent(
                             getContext(),
@@ -538,8 +545,9 @@ public class ContentsFragment extends Fragment {
                 if (!isAdded() || getActivity() == null) return;
                 getActivity().runOnUiThread(() -> {
                     String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
-                    boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                    manager.setRemoteProfiles(cached != null && !cached.trim().isEmpty() ? cached : "[]");
+                    boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
+                    boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                    manager.setRemoteProfiles(useCached ? cached : "[]");
                     ForensicLogger.logEvent(
                             getContext(),
                             "warn",
@@ -584,6 +592,16 @@ public class ContentsFragment extends Fragment {
         // Default source mode keeps one author lane selected to avoid mixed releases.
         urls.add(ContentsManager.REMOTE_PROFILES_AE);
         return urls;
+    }
+
+    private String buildSourceSignature(String selectedSourceMode) {
+        String normalized = selectedSourceMode == null ? "aesolator" : selectedSourceMode.trim().toLowerCase(Locale.US);
+        String custom = "";
+        if ("custom".equals(normalized)) {
+            String preferredUrl = sharedPreferences.getString("downloadable_contents_url", "");
+            custom = preferredUrl == null ? "" : preferredUrl.trim().toLowerCase(Locale.US);
+        }
+        return normalized + "|" + custom;
     }
 
     private void addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {

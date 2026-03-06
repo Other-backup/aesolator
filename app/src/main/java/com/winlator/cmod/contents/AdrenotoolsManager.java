@@ -163,43 +163,103 @@ public class AdrenotoolsManager {
     
     public String installDriver(Uri driverUri) {
         File tmpDir = new File(adrenotoolsContentDir, "tmp");
-        if (tmpDir.exists()) tmpDir.delete();
-        tmpDir.mkdirs();
-        ZipInputStream zis;
-        InputStream is;
+        if (tmpDir.exists()) FileUtils.delete(tmpDir);
+        if (!tmpDir.mkdirs()) return "";
+
         String name = "";
-        
-        try {
-            is = mContext.getContentResolver().openInputStream(driverUri);
-            zis = new ZipInputStream(is);
-            ZipEntry entry = zis.getNextEntry();
-            while (entry != null) {
-                File dstFile = new File(tmpDir, entry.getName());
-                Files.copy(zis, dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                entry = zis.getNextEntry();
+        try (InputStream is = mContext.getContentResolver().openInputStream(driverUri)) {
+            if (is == null) {
+                FileUtils.delete(tmpDir);
+                return "";
             }
-            zis.close();
-            if (new File(tmpDir, "meta.json").exists()) {
-                name = getDriverName(tmpDir.getName());
-                File dst = new File(adrenotoolsContentDir, name);
-                if (!dst.exists() && !name.equals(""))
-                    tmpDir.renameTo(dst);
-                else {
-                    name = "";
-                    FileUtils.delete(tmpDir);
-                }
+            if (!extractZipSafely(is, tmpDir)) {
+                Log.d("AdrenotoolsManager", "Failed to install driver, invalid zip payload");
+                FileUtils.delete(tmpDir);
+                return "";
             }
-            else {
-                Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
-                tmpDir.delete();
+
+            File packageRoot = findDriverPackageRoot(tmpDir);
+            if (packageRoot == null) {
+                Log.d("AdrenotoolsManager", "Failed to install driver, meta.json is missing");
+                FileUtils.delete(tmpDir);
+                return "";
+            }
+
+            name = readDriverName(packageRoot);
+            if (name.isEmpty()) {
+                Log.d("AdrenotoolsManager", "Failed to install driver, package meta has empty name");
+                FileUtils.delete(tmpDir);
+                return "";
+            }
+
+            File dst = new File(adrenotoolsContentDir, name);
+            if (dst.exists()) FileUtils.delete(dst);
+            if (!FileUtils.copy(packageRoot, dst)) {
+                Log.d("AdrenotoolsManager", "Failed to install driver, unable to copy payload");
+                name = "";
             }
         }
         catch (IOException e) {
-            Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
-            tmpDir.delete();
+            Log.d("AdrenotoolsManager", "Failed to install driver, invalid payload");
+            name = "";
         }
-        
+
+        FileUtils.delete(tmpDir);
         return name;
+    }
+
+    private boolean extractZipSafely(InputStream inputStream, File outputDir) {
+        try (ZipInputStream zis = new ZipInputStream(inputStream)) {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                File dstFile = getSafeZipEntryFile(outputDir, entry);
+                if (dstFile == null) return false;
+                if (entry.isDirectory()) {
+                    if (!dstFile.exists() && !dstFile.mkdirs()) return false;
+                } else {
+                    File parent = dstFile.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+                    Files.copy(zis, dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                entry = zis.getNextEntry();
+            }
+            return true;
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
+        File dstFile = new File(rootDir, entry.getName());
+        String rootPath = rootDir.getCanonicalPath() + File.separator;
+        String dstPath = dstFile.getCanonicalPath();
+        if (!dstPath.startsWith(rootPath)) return null;
+        return dstFile;
+    }
+
+    private File findDriverPackageRoot(File rootDir) {
+        if (rootDir == null || !rootDir.isDirectory()) return null;
+        if (new File(rootDir, "meta.json").isFile()) return rootDir;
+        File[] files = rootDir.listFiles();
+        if (files == null) return null;
+        for (File file : files) {
+            if (!file.isDirectory()) continue;
+            File nested = findDriverPackageRoot(file);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    private String readDriverName(File packageRoot) {
+        if (packageRoot == null) return "";
+        try {
+            File metaProfile = new File(packageRoot, "meta.json");
+            JSONObject jsonObject = new JSONObject(FileUtils.readString(metaProfile));
+            return jsonObject.optString("name", "").trim();
+        }
+        catch (JSONException e) {
+            return "";
+        }
     }
     
     public void setDriverById(EnvVars envVars, ImageFs imagefs, String adrenotoolsDriverId) {

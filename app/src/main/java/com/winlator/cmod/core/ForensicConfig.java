@@ -3,6 +3,7 @@ package com.winlator.cmod.core;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 
 import androidx.preference.PreferenceManager;
@@ -35,6 +36,12 @@ public final class ForensicConfig {
     public static final String PREF_ENABLE_DEVICE_SNAPSHOT = "forensic_issue_include_device_snapshot";
     public static final String PREF_ENABLE_NONROOT_CAPTURE = "forensic_issue_include_nonroot_capture";
     public static final String PREF_ENABLE_ROOT_CAPTURE = "forensic_issue_include_root_capture";
+    public static final String PREF_ENABLE_SHIZUKU_CAPTURE = "forensic_issue_include_shizuku_capture";
+    public static final String PREF_ADB_CAPTURE_MODE = "forensic_adb_capture_mode";
+    public static final String ADB_CAPTURE_MODE_AUTO = "auto";
+    public static final String ADB_CAPTURE_MODE_NONROOT = "nonroot";
+    public static final String ADB_CAPTURE_MODE_ROOT = "root";
+    public static final String ADB_CAPTURE_MODE_SHIZUKU = "shizuku";
 
     private ForensicConfig() {}
 
@@ -61,6 +68,8 @@ public final class ForensicConfig {
         snapshot.enableDeviceSnapshot = preferences.getBoolean(PREF_ENABLE_DEVICE_SNAPSHOT, true);
         snapshot.enableNonRootCapture = preferences.getBoolean(PREF_ENABLE_NONROOT_CAPTURE, true);
         snapshot.enableRootCapture = preferences.getBoolean(PREF_ENABLE_ROOT_CAPTURE, true);
+        snapshot.enableShizukuCapture = preferences.getBoolean(PREF_ENABLE_SHIZUKU_CAPTURE, false);
+        snapshot.adbCaptureMode = normalizeAdbCaptureMode(preferences.getString(PREF_ADB_CAPTURE_MODE, ADB_CAPTURE_MODE_AUTO));
         return snapshot;
     }
 
@@ -88,6 +97,8 @@ public final class ForensicConfig {
         editor.putBoolean(PREF_ENABLE_DEVICE_SNAPSHOT, snapshot.enableDeviceSnapshot);
         editor.putBoolean(PREF_ENABLE_NONROOT_CAPTURE, snapshot.enableNonRootCapture);
         editor.putBoolean(PREF_ENABLE_ROOT_CAPTURE, snapshot.enableRootCapture);
+        editor.putBoolean(PREF_ENABLE_SHIZUKU_CAPTURE, snapshot.enableShizukuCapture);
+        editor.putString(PREF_ADB_CAPTURE_MODE, normalizeAdbCaptureMode(snapshot.adbCaptureMode));
     }
 
     public static boolean shouldEnableLoaderTrace(Snapshot snapshot, boolean forensicMode) {
@@ -170,8 +181,11 @@ public final class ForensicConfig {
             obj.put("enableDeviceSnapshot", snapshot.enableDeviceSnapshot);
             obj.put("enableNonRootCapture", snapshot.enableNonRootCapture);
             obj.put("enableRootCapture", snapshot.enableRootCapture);
+            obj.put("enableShizukuCapture", snapshot.enableShizukuCapture);
+            obj.put("adbCaptureMode", normalizeAdbCaptureMode(snapshot.adbCaptureMode));
             obj.put("rootBinaryPresent", isRootBinaryPresent());
             obj.put("runAsCapable", isRunAsCapable(context));
+            obj.put("shizukuInstalled", isShizukuInstalled(context));
             obj.put("adbShellRecommended", true);
             obj.put("loaderTraceMode", buildLoaderTraceMode(snapshot));
         }
@@ -196,8 +210,13 @@ public final class ForensicConfig {
     }
 
     public static String buildCaptureSummary(Context context, Snapshot snapshot) {
+        if (snapshot == null) snapshot = new Snapshot();
+        String mode = normalizeAdbCaptureMode(snapshot.adbCaptureMode);
+        boolean shizukuReady = snapshot.enableShizukuCapture && isShizukuInstalled(context);
         return "ADB/non-root=" + flag(snapshot.enableNonRootCapture)
                 + " | root extras=" + (snapshot.enableRootCapture && isRootBinaryPresent() ? "ready" : snapshot.enableRootCapture ? "requested-no-su" : "off")
+                + " | shizuku=" + (shizukuReady ? "ready" : snapshot.enableShizukuCapture ? "requested-missing" : "off")
+                + " | adb mode=" + mode
                 + " | device snapshot=" + flag(snapshot.enableDeviceSnapshot)
                 + " | run-as=" + (isRunAsCapable(context) ? "ready" : "off");
     }
@@ -220,25 +239,56 @@ public final class ForensicConfig {
     }
 
     public static String buildIssueCaptureCommand(Context context) {
-        return buildIssueCaptureCommand(context, isRootBinaryPresent());
+        return buildIssueCaptureCommand(context, isRootBinaryPresent(), false);
     }
 
     public static String buildIssueCaptureCommand(Context context, boolean preferRoot) {
+        return buildIssueCaptureCommand(context, preferRoot, false);
+    }
+
+    public static String buildIssueCaptureCommand(Context context, boolean preferRoot, boolean preferShizuku) {
         return "bash ci/winlator/forensic-adb-issue-capture.sh --serial <serial> --package "
                 + context.getPackageName()
                 + (preferRoot ? " --prefer-root" : "")
+                + (preferShizuku ? " --prefer-shizuku" : "")
                 + " --bundle-dir <out-dir>";
     }
 
     public static String buildCaptureCommand(Context context, Snapshot snapshot) {
-        boolean preferRoot = snapshot != null && snapshot.enableRootCapture && isRootBinaryPresent();
-        return buildIssueCaptureCommand(context, preferRoot);
+        if (snapshot == null) {
+            return buildIssueCaptureCommand(context, isRootBinaryPresent(), false);
+        }
+        String mode = normalizeAdbCaptureMode(snapshot.adbCaptureMode);
+        boolean allowRoot = snapshot.enableRootCapture && isRootBinaryPresent();
+        boolean allowShizuku = snapshot.enableShizukuCapture && isShizukuInstalled(context);
+        if (ADB_CAPTURE_MODE_ROOT.equals(mode)) return buildIssueCaptureCommand(context, allowRoot, false);
+        if (ADB_CAPTURE_MODE_NONROOT.equals(mode)) return buildIssueCaptureCommand(context, false, false);
+        if (ADB_CAPTURE_MODE_SHIZUKU.equals(mode)) return buildIssueCaptureCommand(context, false, allowShizuku);
+        return buildIssueCaptureCommand(context, allowRoot, allowShizuku && !allowRoot);
     }
 
     public static String buildIssueBrowseCommand(Context context) {
         return "adb shell run-as "
                 + context.getPackageName()
                 + " sh -c 'cd files/forensics && find issue-bundles -maxdepth 2 -type f | sort'";
+    }
+
+    public static String normalizeAdbCaptureMode(String mode) {
+        String normalized = mode == null ? "" : mode.trim().toLowerCase(Locale.ROOT);
+        if (ADB_CAPTURE_MODE_NONROOT.equals(normalized)) return ADB_CAPTURE_MODE_NONROOT;
+        if (ADB_CAPTURE_MODE_ROOT.equals(normalized)) return ADB_CAPTURE_MODE_ROOT;
+        if (ADB_CAPTURE_MODE_SHIZUKU.equals(normalized)) return ADB_CAPTURE_MODE_SHIZUKU;
+        return ADB_CAPTURE_MODE_AUTO;
+    }
+
+    public static boolean isShizukuInstalled(Context context) {
+        if (context == null) return false;
+        try {
+            context.getPackageManager().getPackageInfo("moe.shizuku.privileged.api", 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
     }
 
     private static String flag(boolean enabled) {
@@ -263,5 +313,7 @@ public final class ForensicConfig {
         public boolean enableDeviceSnapshot = true;
         public boolean enableNonRootCapture = true;
         public boolean enableRootCapture = true;
+        public boolean enableShizukuCapture = false;
+        public String adbCaptureMode = ADB_CAPTURE_MODE_AUTO;
     }
 }

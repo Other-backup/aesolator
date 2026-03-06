@@ -694,6 +694,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="diagnostics_section_toggles">Runtime Telemetry Toggles</string>
     <string name="diagnostics_section_adb">Live ADB Diagnostics</string>
     <string name="diagnostics_adb_label">ADB command for live logs</string>
+    <string name="diagnostics_adb_capture_label">ADB capture command for issue bundle</string>
     <string name="diagnostics_adb_command">adb logcat -v time | grep -Ei "wine|box64|dxvk|vkd3d|dgvoodoo|turnip|opengl|aero_|aesolator"</string>
     <string name="diagnostics_view_forensic_log">View forensic log</string>
     <string name="diagnostics_forensic_log_title">Forensic Log Viewer</string>
@@ -783,6 +784,13 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="enable_device_snapshot">Include device snapshot in forensic issue bundle</string>
     <string name="enable_nonroot_capture">Enable non-root forensic capture</string>
     <string name="enable_root_capture">Enable root forensic capture (when available)</string>
+    <string name="enable_shizuku_capture">Enable Shizuku forensic capture (when available)</string>
+    <string name="forensic_adb_transport_title">Preferred capture transport</string>
+    <string name="forensic_adb_transport_auto">Auto (best available)</string>
+    <string name="forensic_adb_transport_nonroot">ADB non-root (run-as)</string>
+    <string name="forensic_adb_transport_root">ADB root (su)</string>
+    <string name="forensic_adb_transport_shizuku">Shizuku bridge</string>
+    <string name="copy_capture_command">Copy Capture</string>
     <string name="enable_vulkan_api_dump">Enable dumping of Vulkan api calls to file.</string>
     <string name="dll_emulator">32bit Emulator</string>
     <string name="open_with_android_browser">Open Android Browser in Wine</string>
