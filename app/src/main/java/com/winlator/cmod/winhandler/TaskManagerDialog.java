@@ -11,7 +11,6 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -33,7 +32,9 @@ import com.winlator.cmod.core.CPUStatus;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.widget.CPUListView;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xserver.Window;
@@ -46,6 +47,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -330,6 +332,11 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
                 Bitmap icon = activity.getXServer().pixmapManager.getWindowIcon(entry.window);
                 if (icon != null) ivIcon.setImageBitmap(icon);
             }
+            ThemeAssetPainter.apply(
+                    activity,
+                    itemView,
+                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false)
+            );
             container.addView(itemView);
         }
 
@@ -653,13 +660,12 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             public void afterTextChanged(Editable s) {}
         });
 
-        final Spinner sWindowsSort = findViewById(R.id.SWindowsSort);
-        ArrayAdapter<CharSequence> sortAdapter = ArrayAdapter.createFromResource(
-                activity,
-                R.array.task_manager_windows_sort_entries,
-                android.R.layout.simple_spinner_dropdown_item);
-        sWindowsSort.setAdapter(sortAdapter);
         boolean darkMode = PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false);
+        final Spinner sWindowsSort = findViewById(R.id.SWindowsSort);
+        ArrayList<String> sortEntries = new ArrayList<>(Arrays.asList(
+                activity.getResources().getStringArray(R.array.task_manager_windows_sort_entries)
+        ));
+        sWindowsSort.setAdapter(SpinnerAdapters.create(activity, darkMode, sortEntries));
         sWindowsSort.setPopupBackgroundResource(darkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         String[] sortValues = activity.getResources().getStringArray(R.array.task_manager_windows_sort_values);
         int selectedSort = 0;
@@ -865,6 +871,11 @@ public class TaskManagerDialog extends ContentDialog implements OnGetProcessInfo
             ((TextView)itemView.findViewById(R.id.TVLinuxMemory)).setText(StringUtils.formatBytes(sample.residentBytes));
             ((TextView)itemView.findViewById(R.id.TVLinuxIo)).setText(formatIoRate(sample));
             itemView.setOnClickListener((v) -> showLinuxProcessDetails(sample));
+            ThemeAssetPainter.apply(
+                    activity,
+                    itemView,
+                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false)
+            );
             container.addView(itemView);
         }
 

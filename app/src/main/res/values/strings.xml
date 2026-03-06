@@ -351,6 +351,7 @@
     <string name="export">Export</string>
     <string name="logs_exported_to">Logs exported to</string>
     <string name="general">General</string>
+    <string name="renderer">Renderer</string>
     <string name="msg_warning_install_wine">Warning: Installing a new version of Wine is recommended for testing purposes only.</string>
     <string name="startup_selection">Startup Selection</string>
     <string name="wine_debug_channel">Wine Debug Channel</string>
@@ -856,6 +857,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="upscaler_interpolated_only">Show Interpolated Frames Only</string>
     <string name="upscaler_vulkan_validation_layer">Enable Vulkan Validation Layer</string>
     <string name="container_fg_defaults">Container Framegen Defaults</string>
+    <string name="container_runtime_routing">Runtime Routing</string>
     <string name="container_fg_hint">Applies when shortcut does not override upscaler settings. Fine tuning remains in Graphics Center and per-shortcut settings.</string>
     <string name="vkbasalt">vkBasalt</string>
     <string name="vkbasalt_sharpness_effects">Sharpness Effect</string>

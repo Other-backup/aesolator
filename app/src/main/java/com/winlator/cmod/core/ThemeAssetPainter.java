@@ -28,10 +28,12 @@ public final class ThemeAssetPainter {
         int buttonTint = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
         int iconTint = ContextCompat.getColor(context, isDarkMode ? R.color.forensic_badge_text_dark : R.color.colorPrimaryDark);
         int buttonDrawableTint = ContextCompat.getColor(context, R.color.white);
-        traverse(root, buttonTint, iconTint, buttonDrawableTint);
+        traverse(root, buttonTint, iconTint, buttonDrawableTint, isDarkMode);
     }
 
-    private static void traverse(View view, int buttonTint, int iconTint, int buttonDrawableTint) {
+    private static void traverse(View view, int buttonTint, int iconTint, int buttonDrawableTint, boolean isDarkMode) {
+        applyTaggedSurface(view, isDarkMode);
+
         if (view instanceof ImageButton) {
             tint((ImageButton) view, buttonTint);
         } else if (view instanceof ImageView) {
@@ -46,13 +48,12 @@ public final class ThemeAssetPainter {
         if (!(view instanceof ViewGroup)) return;
         ViewGroup group = (ViewGroup) view;
         for (int i = 0; i < group.getChildCount(); i++) {
-            traverse(group.getChildAt(i), buttonTint, iconTint, buttonDrawableTint);
+            traverse(group.getChildAt(i), buttonTint, iconTint, buttonDrawableTint, isDarkMode);
         }
     }
 
     private static boolean shouldTintImageView(ImageView imageView) {
-        Object tag = imageView.getTag();
-        if (tag != null && "no_theme_tint".equalsIgnoreCase(String.valueOf(tag))) return false;
+        if (hasTagFlag(imageView, "no_theme_tint")) return false;
 
         int viewId = imageView.getId();
         if (viewId == View.NO_ID) return false;
@@ -70,6 +71,8 @@ public final class ThemeAssetPainter {
                 || idName.contains("banner")
                 || idName.contains("screenshot")
                 || idName.contains("logo")
+                || idName.contains("launcher")
+                || idName.contains("appicon")
                 || idName.contains("avatar")
                 || idName.contains("thumbnail")
                 || idName.contains("thumb")
@@ -92,6 +95,38 @@ public final class ThemeAssetPainter {
         int width = drawable.getIntrinsicWidth();
         int height = drawable.getIntrinsicHeight();
         return width > 0 && height > 0 && width <= 96 && height <= 96;
+    }
+
+    private static void applyTaggedSurface(View view, boolean isDarkMode) {
+        if (hasTagFlag(view, "theme_card")) {
+            view.setBackgroundResource(isDarkMode
+                    ? R.drawable.forensic_panel_background_dark
+                    : R.drawable.forensic_panel_background);
+        }
+
+        if (hasTagFlag(view, "theme_badge")) {
+            view.setBackgroundResource(isDarkMode
+                    ? R.drawable.forensic_badge_background_dark
+                    : R.drawable.forensic_badge_background);
+            if (view instanceof TextView) {
+                ((TextView) view).setTextColor(ContextCompat.getColor(
+                        view.getContext(),
+                        isDarkMode ? R.color.forensic_badge_text_dark : R.color.forensic_badge_text
+                ));
+            }
+        }
+    }
+
+    private static boolean hasTagFlag(View view, String flag) {
+        Object rawTag = view.getTag();
+        if (rawTag == null) return false;
+        String tag = String.valueOf(rawTag).toLowerCase(Locale.US);
+        if (tag.equals(flag)) return true;
+        String[] tokens = tag.split("[\\s,;|]+");
+        for (String token : tokens) {
+            if (flag.equals(token)) return true;
+        }
+        return false;
     }
 
     private static void tint(ImageView imageView, int color) {

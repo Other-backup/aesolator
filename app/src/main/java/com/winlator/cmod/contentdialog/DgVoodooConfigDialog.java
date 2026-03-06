@@ -2,6 +2,8 @@ package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -18,6 +20,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.SpinnerAdapters;
+import com.winlator.cmod.core.ThemeAssetPainter;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -45,13 +48,14 @@ public class DgVoodooConfigDialog extends ContentDialog {
         FrameLayout frameLayout = findViewById(R.id.FrameLayout);
         frameLayout.setVisibility(View.VISIBLE);
 
-        int padding = (int) (16f * context.getResources().getDisplayMetrics().density);
+        int compactPadding = (int) (12f * context.getResources().getDisplayMetrics().density);
 
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(padding, padding / 2, padding, padding / 2);
+        layout.setPadding(compactPadding / 2, compactPadding / 2, compactPadding / 2, compactPadding / 2);
 
-        TextView stateView = new TextView(context);
+        LinearLayout summaryCard = createCard(context, compactPadding);
+        TextView stateView = createBodyText(context);
         stateView.setText(context.getString(
                 R.string.dgvoodoo_config_summary,
                 packageInstalled
@@ -62,22 +66,26 @@ public class DgVoodooConfigDialog extends ContentDialog {
                         )
                         : context.getString(R.string.dgvoodoo_package_state_missing)
         ));
-        layout.addView(stateView);
+        stateView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        summaryCard.addView(stateView);
 
-        TextView noteView = new TextView(context);
-        noteView.setPadding(0, padding / 4, 0, 0);
+        TextView noteView = createBodyText(context);
+        noteView.setPadding(0, compactPadding / 2, 0, 0);
         noteView.setText(R.string.dgvoodoo_config_note);
-        layout.addView(noteView);
+        noteView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        summaryCard.addView(noteView);
+        layout.addView(wrapWithBadge(context, summaryCard, R.string.dgvoodoo_configuration, compactPadding));
 
-        TextView labelView = new TextView(context);
-        labelView.setPadding(0, padding / 2, 0, 0);
+        LinearLayout archCard = createCard(context, compactPadding);
+        TextView labelView = createBodyText(context);
+        labelView.setPadding(0, 0, 0, compactPadding / 2);
         labelView.setText(R.string.dgvoodoo_config_arch);
-        layout.addView(labelView);
+        archCard.addView(labelView);
 
-        TextView installedArchView = new TextView(context);
+        TextView installedArchView = createBodyText(context);
         installedArchView.setText(context.getString(R.string.dgvoodoo_config_arch_available, installedArchitectureSummary));
-        installedArchView.setPadding(0, padding / 6, 0, padding / 8);
-        layout.addView(installedArchView);
+        installedArchView.setPadding(0, 0, 0, compactPadding / 3);
+        archCard.addView(installedArchView);
 
         Spinner archSpinner = new Spinner(context);
         ArrayList<String> labels = new ArrayList<>();
@@ -118,27 +126,31 @@ public class DgVoodooConfigDialog extends ContentDialog {
             archSpinner.setSelection(0, false);
         }
         archSpinner.setEnabled(packageInstalled);
-        layout.addView(archSpinner);
+        archCard.addView(archSpinner);
+        layout.addView(wrapWithBadge(context, archCard, R.string.arch, compactPadding));
 
+        LinearLayout switchesCard = createCard(context, compactPadding);
         Switch forceD3D11Switch = new Switch(context);
         forceD3D11Switch.setText(R.string.dgvoodoo_force_d3d11);
         forceD3D11Switch.setChecked(parseSwitch(config.get("dgvoodooForceD3D11"), false));
         forceD3D11Switch.setEnabled(packageInstalled);
-        layout.addView(forceD3D11Switch);
+        switchesCard.addView(forceD3D11Switch);
 
         Switch vsyncSwitch = new Switch(context);
         vsyncSwitch.setText(R.string.dgvoodoo_vsync);
         vsyncSwitch.setChecked(parseSwitch(config.get("dgvoodooVSync"), false));
         vsyncSwitch.setEnabled(packageInstalled);
-        layout.addView(vsyncSwitch);
+        switchesCard.addView(vsyncSwitch);
 
         Switch flipModelSwitch = new Switch(context);
         flipModelSwitch.setText(R.string.dgvoodoo_flip_model);
         flipModelSwitch.setChecked(parseSwitch(config.get("dgvoodooFlipModel"), true));
         flipModelSwitch.setEnabled(packageInstalled);
-        layout.addView(flipModelSwitch);
+        switchesCard.addView(flipModelSwitch);
+        layout.addView(wrapWithBadge(context, switchesCard, R.string.advanced, compactPadding));
 
         frameLayout.addView(layout);
+        ThemeAssetPainter.apply(context, layout, isDarkMode);
 
         setOnConfirmCallback(() -> {
             if (packageInstalled) {
@@ -169,6 +181,53 @@ public class DgVoodooConfigDialog extends ContentDialog {
                     )
             );
         });
+    }
+
+    private LinearLayout createCard(Context context, int padding) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(padding, padding + (padding / 2), padding, padding);
+        card.setTag("theme_card");
+        return card;
+    }
+
+    private TextView createBodyText(Context context) {
+        TextView textView = new TextView(context);
+        textView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        return textView;
+    }
+
+    private View wrapWithBadge(Context context, View content, int badgeTextResId, int marginTop) {
+        FrameLayout frameLayout = new FrameLayout(context);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.topMargin = marginTop / 2;
+        frameLayout.setLayoutParams(params);
+        frameLayout.addView(content);
+
+        TextView badge = new TextView(context);
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        badgeParams.gravity = Gravity.TOP | Gravity.START;
+        badge.setLayoutParams(badgeParams);
+        badge.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 4));
+        badge.setTranslationX(dp(context, 10));
+        badge.setTag("theme_badge");
+        badge.setText(badgeTextResId);
+        badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        frameLayout.addView(badge);
+        return frameLayout;
+    }
+
+    private int dp(Context context, int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     public static KeyValueSet parseConfig(Object config) {

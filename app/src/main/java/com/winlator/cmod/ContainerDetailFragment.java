@@ -56,6 +56,7 @@ import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
@@ -321,6 +322,7 @@ public class ContainerDetailFragment extends Fragment {
         applyModernSectionCardStyle(gameControllerLabel, isDarkMode);
         TextView containerFramegenLabel = view.findViewById(R.id.TVContainerFramegen);
         applyModernSectionCardStyle(containerFramegenLabel, isDarkMode);
+        ThemeAssetPainter.apply(view.getContext(), view, isDarkMode);
 
     }
 

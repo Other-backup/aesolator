@@ -15,6 +15,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/forensic_panel_background"
+            android:tag="theme_card"
             android:gravity="center_vertical"
             android:minHeight="128dp"
             android:orientation="horizontal"
@@ -54,6 +55,7 @@
                 android:id="@+id/IVAboutLauncherIcon"
                 android:layout_width="74dp"
                 android:layout_height="74dp"
+                android:tag="no_theme_tint"
                 android:src="@mipmap/ic_launcher" />
         </LinearLayout>
 
@@ -67,6 +69,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/forensic_panel_background"
+                android:tag="theme_card"
                 android:orientation="vertical"
                 android:paddingBottom="14dp"
                 android:paddingLeft="14dp"
@@ -85,6 +88,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="12dp"
                 android:background="@drawable/forensic_badge_background"
+                android:tag="theme_badge"
                 android:paddingLeft="8dp"
                 android:paddingRight="8dp"
                 android:text="@string/credits_and_third_party_apps"
@@ -101,6 +105,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/forensic_panel_background"
+                android:tag="theme_card"
                 android:orientation="vertical"
                 android:paddingBottom="14dp"
                 android:paddingLeft="14dp"
@@ -119,6 +124,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="12dp"
                 android:background="@drawable/forensic_badge_background"
+                android:tag="theme_badge"
                 android:paddingLeft="8dp"
                 android:paddingRight="8dp"
                 android:text="@string/glibc_exp_edition"

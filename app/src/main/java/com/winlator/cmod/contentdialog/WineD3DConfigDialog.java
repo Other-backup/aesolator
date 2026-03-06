@@ -2,8 +2,9 @@ package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
@@ -12,6 +13,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 
 import org.json.JSONArray;
@@ -41,17 +43,18 @@ public class WineD3DConfigDialog extends ContentDialog {
         final Spinner sOffscreenRenderingMode = findViewById(R.id.SOffscreenRenderingMode);
         final Spinner sRenderer = findViewById(R.id.SRenderer);
 
-        ArrayAdapter<String> csmtAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, csmtValues);
-        sCSMT.setAdapter(csmtAdapter);
-
-        ArrayAdapter<String> ssmAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, strictShaderMathValues);
-        sStrictShaderMath.setAdapter(ssmAdapter);
-
-        ArrayAdapter<String> ormAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, offscreenRenderingModeValues);
-        sOffscreenRenderingMode.setAdapter(ormAdapter);
-
-        ArrayAdapter<String> rendererAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, rendererValues);
-        sRenderer.setAdapter(rendererAdapter);
+        boolean darkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
+        sCSMT.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(csmtValues)));
+        sStrictShaderMath.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(strictShaderMathValues)));
+        sOffscreenRenderingMode.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(offscreenRenderingModeValues)));
+        sRenderer.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(rendererValues)));
+        int popupBg = darkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background;
+        sCSMT.setPopupBackgroundResource(popupBg);
+        sGPUName.setPopupBackgroundResource(popupBg);
+        sVideoMemorySize.setPopupBackgroundResource(popupBg);
+        sStrictShaderMath.setPopupBackgroundResource(popupBg);
+        sOffscreenRenderingMode.setPopupBackgroundResource(popupBg);
+        sRenderer.setPopupBackgroundResource(popupBg);
 
         loadGPUNameSpinner(sGPUName);
 
@@ -108,8 +111,11 @@ public class WineD3DConfigDialog extends ContentDialog {
                 String gpuName = jobj.getString("name");
                 entries.add(gpuName);
             }
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, entries);
-            spinner.setAdapter(adapter);
+            spinner.setAdapter(SpinnerAdapters.create(
+                    context,
+                    PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false),
+                    entries
+            ));
         }
         catch (JSONException e) {
         }

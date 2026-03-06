@@ -6,281 +6,326 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="14dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/name" />
-
-            <EditText
-                style="@style/AppTheme"
-                android:id="@+id/ETName"
-                android:inputType="textCapSentences"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content">
 
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    style="@style/FieldSet"
+                    android:id="@+id/LLContainerIdentityCard"
+                    android:tag="theme_card">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/screen_size" />
+                        android:text="@string/name" />
 
-                    <Spinner
-                        style="@style/ComboBox"
+                    <EditText
+                        style="@style/EditText"
+                        android:id="@+id/ETName"
                         android:layout_width="match_parent"
-                        android:id="@+id/SScreenSize"
-                        android:entries="@array/screen_size_entries"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:clickable="true"
-                        android:spinnerMode="dialog" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/LLCustomScreenSize"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
+                        android:layout_height="wrap_content"
+                        android:inputType="textCapSentences" />
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/screen_size" />
+
+                            <Spinner
+                                android:id="@+id/SScreenSize"
+                                style="@style/ComboBox"
+                                android:layout_width="match_parent"
+                                android:entries="@array/screen_size_entries"
+                                android:focusable="true"
+                                android:focusableInTouchMode="true"
+                                android:spinnerMode="dialog" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/LLCustomScreenSize"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/width" />
+
+                                <EditText
+                                    android:id="@+id/ETScreenWidth"
+                                    style="@style/EditText"
+                                    android:layout_width="78dp"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="bottom"
+                                android:layout_marginLeft="4dp"
+                                android:layout_marginRight="4dp"
+                                android:layout_marginBottom="6dp"
+                                android:text="x"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/height" />
+
+                                <EditText
+                                    android:id="@+id/ETScreenHeight"
+                                    style="@style/EditText"
+                                    android:layout_width="78dp"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/LLWineVersion"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/width" />
+                            android:text="@string/wine_version" />
 
-                        <EditText
-                            style="@style/AppTheme"
-                            android:layout_width="78dp"
-                            android:layout_height="wrap_content"
-                            android:id="@+id/ETScreenWidth"
-                            android:inputType="number" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textStyle="bold"
-                        android:textSize="18dp"
-                        android:layout_gravity="bottom"
-                        android:layout_marginLeft="2dp"
-                        android:layout_marginRight="2dp"
-                        android:layout_marginBottom="4dp"
-                        android:text="x" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/height" />
-
-                        <EditText
-                            style="@style/AppTheme"
-                            android:layout_width="78dp"
-                            android:layout_height="wrap_content"
-                            android:id="@+id/ETScreenHeight"
-                            android:inputType="number" />
+                        <Spinner
+                            android:id="@+id/SWineVersion"
+                            style="@style/ComboBox"
+                            android:layout_width="match_parent" />
                     </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-
-
-            <LinearLayout
-                android:id="@+id/LLWineVersion"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/wine_version" />
-
-                <Spinner
-                    style="@style/ComboBox"
-                    android:layout_width="match_parent"
-                    android:id="@+id/SWineVersion" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/graphics_driver" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <Spinner
-                    style="@style/ComboBox"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:id="@+id/SGraphicsDriver"
-                    android:entries="@array/graphics_driver_entries" />
-
-                <ImageButton
-                    style="@style/ListMenuButton"
-                    android:id="@+id/BTGraphicsDriverConfig"
-                    android:src="@drawable/icon_settings"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/dxwrapper" />
-
-                <ImageView
-                    android:id="@+id/BTHelpDXWrapper"
-                    style="@style/HelpButton" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <Spinner
-                    android:id="@+id/SDXWrapper"
-                    style="@style/ComboBox"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:entries="@array/dxwrapper_entries" />
-
-                <ImageButton
-                    style="@style/ListMenuButton"
-                    android:id="@+id/BTDXWrapperConfig"
-                    android:src="@drawable/icon_settings"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/audio_driver" />
-
-            <Spinner
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:id="@+id/SAudioDriver"
-                android:entries="@array/audio_driver_entries" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:id="@+id/LLEmulator">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="64bit Emulator" />
-
-                <Spinner
-                    style="@style/ComboBox"
-                    android:layout_width="match_parent"
-                    android:id="@+id/SEmulator64"
-                    android:entries="@array/emulator_entries"/>
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/dll_emulator" />
-
-                <Spinner
-                    style="@style/ComboBox"
-                    android:layout_width="match_parent"
-                    android:id="@+id/SEmulator"
-                    android:entries="@array/emulator_entries"/>
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/midi_sound_font" />
-
-            <Spinner
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:id="@+id/SMIDISoundFont" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/lc_all" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <EditText
-                    style="@style/AppTheme"
-                    android:layout_gravity="center"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:id="@+id/ETlcall" />
-
-                <ImageButton
-                    style="@style/ListMenuButton"
-                    android:id="@+id/BTShowLCALL"
-                    android:layout_gravity="center"
-                    android:src="@drawable/icon_menu" />
-            </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/CBShowFPS"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/show_fps"
-                android:layout_marginTop="8dp" />
-
-            <CheckBox
-                android:id="@+id/CBFullscreenStretched"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/fullscreen_stretched"
-                android:layout_marginTop="8dp" />
+                    android:id="@+id/TVContainerIdentity"
+                    style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
+                    android:text="@string/general" />
+            </FrameLayout>
 
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp">
 
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:id="@+id/LLContainerRuntimeCard"
+                    android:tag="theme_card">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/graphics_driver" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <Spinner
+                            android:id="@+id/SGraphicsDriver"
+                            style="@style/ComboBox"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:entries="@array/graphics_driver_entries" />
+
+                        <ImageButton
+                            android:id="@+id/BTGraphicsDriverConfig"
+                            style="@style/ListMenuButton"
+                            android:src="@drawable/icon_settings"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dxwrapper" />
+
+                        <ImageView
+                            android:id="@+id/BTHelpDXWrapper"
+                            style="@style/HelpButton" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <Spinner
+                            android:id="@+id/SDXWrapper"
+                            style="@style/ComboBox"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:entries="@array/dxwrapper_entries" />
+
+                        <ImageButton
+                            android:id="@+id/BTDXWrapperConfig"
+                            style="@style/ListMenuButton"
+                            android:src="@drawable/icon_settings"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/audio_driver" />
+
+                    <Spinner
+                        android:id="@+id/SAudioDriver"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:entries="@array/audio_driver_entries" />
+
+                    <LinearLayout
+                        android:id="@+id/LLEmulator"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="64bit Emulator" />
+
+                        <Spinner
+                            android:id="@+id/SEmulator64"
+                            style="@style/ComboBox"
+                            android:layout_width="match_parent"
+                            android:entries="@array/emulator_entries" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/dll_emulator" />
+
+                        <Spinner
+                            android:id="@+id/SEmulator"
+                            style="@style/ComboBox"
+                            android:layout_width="match_parent"
+                            android:entries="@array/emulator_entries" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/midi_sound_font" />
+
+                    <Spinner
+                        android:id="@+id/SMIDISoundFont"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/lc_all" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <EditText
+                            android:id="@+id/ETlcall"
+                            style="@style/EditText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+
+                        <ImageButton
+                            android:id="@+id/BTShowLCALL"
+                            style="@style/ListMenuButton"
+                            android:src="@drawable/icon_menu" />
+                    </LinearLayout>
+
+                    <CheckBox
+                        android:id="@+id/CBShowFPS"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/show_fps" />
+
+                    <CheckBox
+                        android:id="@+id/CBFullscreenStretched"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/fullscreen_stretched" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVContainerRuntime"
+                    style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
+                    android:text="@string/container_runtime_routing" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:tag="theme_card">
 
                     <CheckBox
                         android:id="@+id/CBContainerFgEnable"
@@ -328,6 +373,7 @@
                 <TextView
                     android:id="@+id/TVContainerFramegen"
                     style="@style/FieldSetLabel"
+                    android:tag="theme_badge"
                     android:text="@string/container_fg_defaults" />
             </FrameLayout>
 

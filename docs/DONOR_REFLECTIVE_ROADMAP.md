@@ -33,6 +33,15 @@ Closed in tree:
   - `ScreenEffectDialog`
 - Global `FieldSet` / `FieldSetLabel` styles were re-based onto the new panel/badge system, so remaining secondary forms inherit the same card language without local white-background overrides.
 - `ContentDialog` roots now expose a top-left back/close action in the title bar and use the same themed card header surface as the rest of the app.
+- The container creation/edit surface now has explicit top-level card sections (`General`, `Runtime Routing`, `Container Framegen Defaults`) instead of loose stacked controls.
+- Runtime wrapper/config dialogs were re-based to the same card language:
+  - `GraphicsDriverConfigDialog`
+  - `DXVKConfigDialog`
+  - `WineD3DConfigDialog`
+  - `DgVoodooConfigDialog`
+- `TaskManagerDialog` list rows and telemetry side-panels were moved to card surfaces, and process rows now render in the same visual language as the rest of the app.
+- Theme asset painting now understands tagged `theme_card` / `theme_badge` surfaces and excludes launcher/app-brand icons from automatic tinting.
+- Launcher icon assets were rolled back to the pre-upscale baseline so adaptive icon masking no longer inherits the accidental accent-fill variant.
 
 Still open (UI tail queue):
 - Monitor-only queue: future dialogs introduced by new feature lanes must keep the same card/badge language and dialog-root back action.

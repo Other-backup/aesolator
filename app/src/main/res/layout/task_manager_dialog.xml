@@ -3,19 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:padding="4dp">
 
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="520dp"
+            android:layout_width="560dp"
             android:layout_height="match_parent"
             android:background="@drawable/bordered_panel"
+            android:tag="theme_card"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="12dp">
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/TabLayoutProcessScope"
@@ -46,7 +48,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -75,7 +77,7 @@
                     android:id="@+id/CBWindowsWindowedOnly"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/task_manager_windows_only_windowed" />
 
                 <LinearLayout
@@ -167,8 +169,9 @@
 
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:minHeight="160dp">
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="220dp">
 
                     <ScrollView
                         android:layout_width="match_parent"
@@ -242,8 +245,9 @@
 
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:minHeight="160dp">
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="220dp">
 
                     <ScrollView
                         android:layout_width="match_parent"
@@ -268,8 +272,8 @@
         </LinearLayout>
 
         <ScrollView
-            android:layout_width="190dp"
-            android:layout_height="wrap_content"
+            android:layout_width="220dp"
+            android:layout_height="match_parent"
             android:layout_marginStart="8dp">
 
             <LinearLayout
@@ -278,11 +282,13 @@
                 android:orientation="vertical">
 
                 <LinearLayout
+                    android:id="@+id/LLTaskManagerCpuCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bordered_panel"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="12dp"
+                    android:tag="theme_card">
 
                     <TextView
                         android:id="@+id/TVCPUTitle"
@@ -299,12 +305,14 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/LLTaskManagerMemoryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bordered_panel"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="12dp"
+                    android:tag="theme_card">
 
                     <TextView
                         android:id="@+id/TVMemoryTitle"
@@ -320,12 +328,14 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/LLTaskManagerTelemetryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bordered_panel"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="12dp"
+                    android:tag="theme_card">
 
                     <TextView
                         android:id="@+id/TVHostTelemetryTitle"
