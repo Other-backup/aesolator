@@ -5,20 +5,30 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:paddingBottom="96dp">
 
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="138dp">
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
-                <LinearLayout style="@style/FieldSet">
+                <TextView
+                    android:id="@+id/TVBox64"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/box64" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -91,18 +101,22 @@
                             android:layout_height="0dp" />
                     </LinearLayout>
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/TVBox64"
+                    android:id="@+id/TVFEXCore"
                     style="@style/FieldSetLabel"
-                    android:text="@string/box64" />
-            </FrameLayout>
+                    android:text="@string/fexcore_config" />
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -175,18 +189,22 @@
                             android:layout_height="0dp" />
                     </LinearLayout>
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/TVFEXCore"
+                    android:id="@+id/TVSound"
                     style="@style/FieldSetLabel"
-                    android:text="@string/fexcore_config" />
-            </FrameLayout>
+                    android:text="@string/sound" />
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -218,35 +236,46 @@
                             android:src="@drawable/icon_remove" />
                     </LinearLayout>
                 </LinearLayout>
-
-                <TextView
-                    android:id="@+id/TVSound"
-                    style="@style/FieldSetLabel"
-                    android:text="@string/sound" />
-            </FrameLayout>
+            </LinearLayout>
 
             <!-- Theme Settings -->
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-                <LinearLayout style="@style/FieldSet">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/TVTheme"
+                    style="@style/FieldSetLabel"
+                    android:text="Theme" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <CheckBox
                         android:id="@+id/CBDarkMode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Enable Dark Mode" />
                 </LinearLayout>
-                <TextView
-                    android:id="@+id/TVTheme"
-                    style="@style/FieldSetLabel"
-                    android:text="Theme" />
-            </FrameLayout>
+            </LinearLayout>
 
             <!-- Shortcuts -->
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-                <LinearLayout style="@style/FieldSet">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/TVShortcutSettings"
+                    style="@style/FieldSetLabel"
+                    android:text="Path Settings" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -293,17 +322,22 @@
                             android:text="Choose Path" />
                     </LinearLayout>
                 </LinearLayout>
-                <TextView
-                    android:id="@+id/TVShortcutSettings"
-                    style="@style/FieldSetLabel"
-                    android:text="Path Settings" />
-            </FrameLayout>
+            </LinearLayout>
 
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
-                <LinearLayout style="@style/FieldSet">
+                <TextView
+                    android:id="@+id/TVRuntimeProfileGlobal"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/runtime_profile_global" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -316,21 +350,25 @@
                         android:layout_height="wrap_content"
                         android:spinnerMode="dialog" />
                 </LinearLayout>
-
-                <TextView
-                    android:id="@+id/TVRuntimeProfileGlobal"
-                    style="@style/FieldSetLabel"
-                    android:text="@string/runtime_profile_global" />
-            </FrameLayout>
+            </LinearLayout>
 
 
             <!-- Big Picture Mode -->
 
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
-                <LinearLayout style="@style/FieldSet">
+                <TextView
+                    android:id="@+id/TVBigPictureMode"
+                    style="@style/FieldSetLabel"
+                    android:text="Big Picture Mode" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
 
                     <!-- SteamGridDB API Key Section -->
                     <CheckBox
@@ -375,20 +413,24 @@
                     </LinearLayout>
 
                 </LinearLayout>
+            </LinearLayout>
 
-                <TextView
-                    android:id="@+id/TVBigPictureMode"
-                    style="@style/FieldSetLabel"
-                    android:text="Big Picture Mode" />
-            </FrameLayout>
-
-            <FrameLayout
+            <LinearLayout
                 android:id="@+id/FLXServerSettings"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
                 android:visibility="gone">
 
-                <LinearLayout style="@style/FieldSet">
+                <TextView
+                    android:id="@+id/TVXServer"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/xserver" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -481,19 +523,23 @@
                         android:layout_marginTop="8dp" />
 
                 </LinearLayout>
+            </LinearLayout>
 
-                <TextView
-                    android:id="@+id/TVXServer"
-                    style="@style/FieldSetLabel"
-                    android:text="@string/xserver" />
-            </FrameLayout>
-
-            <FrameLayout
+            <LinearLayout
                 android:id="@+id/FLLegacyLogs"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
-                <LinearLayout style="@style/FieldSet">
+                <TextView
+                    android:id="@+id/TVLogs"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/logs" />
+
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <CheckBox
                         android:id="@+id/CBEnableWineDebug"
                         android:layout_width="wrap_content"
@@ -521,18 +567,22 @@
                         android:text="@string/enable_box64_logs"
                         android:layout_marginTop="8dp" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/TVLogs"
+                    android:id="@+id/TVExperimental"
                     style="@style/FieldSetLabel"
-                    android:text="@string/logs" />
-            </FrameLayout>
+                    android:text="@string/experimental" />
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -584,18 +634,22 @@
 
                     </LinearLayout>
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/TVExperimental"
+                    android:id="@+id/TVImageFs"
                     style="@style/FieldSetLabel"
-                    android:text="@string/experimental" />
-            </FrameLayout>
+                    android:text="@string/imagefs" />
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout style="@style/FieldSet">
+                <LinearLayout
+                    style="@style/FieldSet"
+                    android:layout_marginTop="6dp">
 
                     <Button
                         style="@style/ButtonPositive"
@@ -606,12 +660,7 @@
                         android:text="@string/reinstall_imagefs" />
 
                 </LinearLayout>
-
-                <TextView
-                    android:id="@+id/TVImageFs"
-                    style="@style/FieldSetLabel"
-                    android:text="@string/imagefs" />
-            </FrameLayout>
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

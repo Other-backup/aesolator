@@ -5,6 +5,16 @@
     ]>
 <resources>
     <string name="app_name">Ae.solator</string>
+    <string name="main_menu_home_subtitle">Unified control plane for containers, graphics lanes, forensic telemetry, contents packages, and runtime tuning.</string>
+    <string name="main_menu_home_section">Control Surface</string>
+    <string name="main_menu_hint_containers">Create and manage runtime containers</string>
+    <string name="main_menu_hint_shortcuts">Launch entries and shortcut rules</string>
+    <string name="main_menu_hint_contents">Install runtime lanes and packages</string>
+    <string name="main_menu_hint_graphics">Turnip, OpenGL, X11 and upscaler controls</string>
+    <string name="main_menu_hint_forensic">Diagnostics, logs and bundle capture</string>
+    <string name="main_menu_hint_settings">Global presets, theme and platform options</string>
+    <string name="main_menu_hint_input">Touch, gamepad and input profiles</string>
+    <string name="main_menu_hint_about">Version, credits and runtime model</string>
     <string name="run">Run</string>
     <string name="edit">Edit</string>
     <string name="remove">Remove</string>

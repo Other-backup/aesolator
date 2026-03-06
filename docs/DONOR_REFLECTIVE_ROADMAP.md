@@ -23,11 +23,12 @@ Closed in tree:
 - `Global Runtime Profile` is visually and behaviorally decoupled from forensic controls in Settings.
 - DRI3 controls were removed from `Forensic Center`; DRI3 remains only in `Graphics Center` (X11 settings lane).
 - Forensic policy hint text updated to reflect telemetry-only scope (without DRI3 ownership).
+- Main window drawer was replaced by a card-grid home dashboard in `MainActivity` (`3 cards per row`, root dashboard fragment, action-bar back flow instead of drawer toggling).
+- `Settings` section layout was migrated off overlay `FrameLayout` labels into native badge + card sections to remove label/content collisions and match the new card UI language.
 
 Still open (UI tail queue):
-- Full navigation redesign: replace drawer with main-grid navigation tab (3 cards per row).
 - Add consistent top-left back action for all major tabs/dialog roots.
-- Complete card-style migration for remaining legacy forms and spacing collisions.
+- Complete card-style migration for remaining legacy dialogs/forms outside the main dashboard and settings surfaces.
 
 Added scope (2026-03-06, extension batch):
 1. Graphics Center feed viewport overflow and non-scrollable artifact list.

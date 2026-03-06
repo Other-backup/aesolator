@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="6dp">
+
+    <LinearLayout
+        android:id="@+id/LLMainMenuCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/forensic_panel_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center_horizontal"
+        android:minHeight="132dp"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <ImageView
+            android:id="@+id/IVMainMenuCardIcon"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/TVMainMenuCardTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVMainMenuCardHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:textSize="12sp" />
+    </LinearLayout>
+</FrameLayout>

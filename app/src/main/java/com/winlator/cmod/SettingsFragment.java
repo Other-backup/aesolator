@@ -42,7 +42,6 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.box64.Box64EditPresetDialog;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
@@ -370,12 +369,15 @@ public class SettingsFragment extends Fragment {
             saveCustomApiKeySettings(editor);
 
             if (editor.commit()) {
-                NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
-                navigationView.setCheckedItem(R.id.main_menu_containers);
-                FragmentManager fragmentManager = getParentFragmentManager();
-                fragmentManager.beginTransaction()
-                        .replace(R.id.FLFragmentContainer, new ContainersFragment())
-                        .commit();
+                if (getActivity() instanceof MainActivity) {
+                    MainActivity mainActivity = (MainActivity) getActivity();
+                    mainActivity.openMainMenuItem(R.id.main_menu_containers, true);
+                } else {
+                    FragmentManager fragmentManager = getParentFragmentManager();
+                    fragmentManager.beginTransaction()
+                            .replace(R.id.FLFragmentContainer, new ContainersFragment())
+                            .commit();
+                }
             }
         });
 
@@ -449,6 +451,9 @@ public class SettingsFragment extends Fragment {
         TextView shortcutSettingsLabel = view.findViewById(R.id.TVShortcutSettings);
         applyFieldSetLabelStyle(shortcutSettingsLabel, isDarkMode);
 
+        TextView runtimeProfileGlobalLabel = view.findViewById(R.id.TVRuntimeProfileGlobal);
+        applyFieldSetLabelStyle(runtimeProfileGlobalLabel, isDarkMode);
+
         TextView bigPictureModeLabel = view.findViewById(R.id.TVBigPictureMode);
         applyFieldSetLabelStyle(bigPictureModeLabel, isDarkMode);
 
@@ -501,11 +506,11 @@ public class SettingsFragment extends Fragment {
                 if (child instanceof LinearLayout) {
                     child.setBackgroundResource(panelBackground);
                     int horizontalPadding = dpToPx(child.getContext(), 12f);
-                    child.setPadding(horizontalPadding, dpToPx(child.getContext(), 30f), horizontalPadding, dpToPx(child.getContext(), 14f));
-                    child.setMinimumHeight(dpToPx(child.getContext(), 120f));
+                    child.setPadding(horizontalPadding, dpToPx(child.getContext(), 16f), horizontalPadding, dpToPx(child.getContext(), 14f));
+                    child.setMinimumHeight(0);
                     ViewGroup.LayoutParams rawParams = child.getLayoutParams();
                     if (rawParams instanceof ViewGroup.MarginLayoutParams marginParams) {
-                        marginParams.topMargin = Math.max(marginParams.topMargin, dpToPx(child.getContext(), 12f));
+                        marginParams.topMargin = dpToPx(child.getContext(), 6f);
                         child.setLayoutParams(marginParams);
                     }
                 }

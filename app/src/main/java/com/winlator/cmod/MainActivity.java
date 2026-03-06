@@ -2,23 +2,18 @@ package com.winlator.cmod;
 
 import android.Manifest;
 import android.app.AlertDialog;
-import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.text.Html;
-import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
-import android.text.style.ForegroundColorSpan;
-import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -31,116 +26,69 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.navigation.NavigationView;
-import com.winlator.cmod.R;
 import com.winlator.cmod.contentdialog.ContentDialog;
-import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ThemeAssetPainter;
-import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.io.File;
-import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends AppCompatActivity {
     public static final @IntRange(from = 1, to = 19) byte CONTAINER_PATTERN_COMPRESSION_LEVEL = 9;
     public static final byte PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE = 1;
     public static final byte OPEN_FILE_REQUEST_CODE = 2;
     public static final byte EDIT_INPUT_CONTROLS_REQUEST_CODE = 3;
     public static final byte OPEN_DIRECTORY_REQUEST_CODE = 4;
     public static final byte OPEN_IMAGE_REQUEST_CODE = 5;
-    private DrawerLayout drawerLayout;
+
     public final PreloaderDialog preloaderDialog = new PreloaderDialog(this);
+
     private boolean editInputControls = false;
     private int selectedProfileId;
     private SharedPreferences sharedPreferences;
-    private ContainerManager containerManager;
     private boolean isDarkMode;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Get shared preferences
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-
-        // Check if Big Picture Mode is enabled
-        boolean isBigPictureModeEnabled = sharedPreferences.getBoolean("enable_big_picture_mode", false);
-
+        SharedPreferences startupPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean isBigPictureModeEnabled = startupPreferences.getBoolean("enable_big_picture_mode", false);
         if (isBigPictureModeEnabled) {
-            // If enabled, launch the BigPictureActivity and finish MainActivity
-            Intent intent = new Intent(MainActivity.this, BigPictureActivity.class);
-            startActivity(intent);
+            startActivity(new Intent(MainActivity.this, BigPictureActivity.class));
+            finish();
+            return;
         }
 
-        // Load the user's preferred theme
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
-
-        // Apply the theme based on the preference
-        if (isDarkMode) {
-            setTheme(R.style.AppTheme_Dark);
-        } else {
-            setTheme(R.style.AppTheme);
-        }
-
+        setTheme(isDarkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
 
         setContentView(R.layout.main_activity);
-
-        drawerLayout = findViewById(R.id.DrawerLayout);
-        NavigationView navigationView = findViewById(R.id.NavigationView);
-        navigationView.setNavigationItemSelectedListener(this);
-        while (navigationView.getHeaderCount() > 0) {
-            View header = navigationView.getHeaderView(0);
-            navigationView.removeHeaderView(header);
-        }
-
         setSupportActionBar(findViewById(R.id.Toolbar));
+
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_menu);
+            actionBar.setTitle(R.string.app_name);
         }
 
-        // Determine text color based on dark mode
-        int textColor = isDarkMode ? Color.WHITE : Color.BLACK;
-        setNavigationViewItemTextColor(navigationView, textColor);
-        navigationView.setItemIconTintList(ColorStateList.valueOf(
-                ContextCompat.getColor(this, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent)
-        ));
-
-        // Create Winlator folder if not present
         File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
-        if (!winlatorDir.exists())
-            winlatorDir.mkdirs();
-
-        containerManager = new ContainerManager(this);
+        if (!winlatorDir.exists()) winlatorDir.mkdirs();
 
         Intent intent = getIntent();
         editInputControls = intent.getBooleanExtra("edit_input_controls", false);
         if (editInputControls) {
             selectedProfileId = intent.getIntExtra("selected_profile_id", 0);
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
-            onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_input_controls));
-            navigationView.setCheckedItem(R.id.main_menu_input_controls);
+            openMainMenuItem(R.id.main_menu_input_controls, false);
         } else {
             int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
-            int menuItemId = selectedMenuItemId > 0 ? selectedMenuItemId : R.id.main_menu_containers;
-
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_menu);
-            onNavigationItemSelected(navigationView.getMenu().findItem(menuItemId));
-            navigationView.setCheckedItem(menuItemId);
 
             if (!requestAppPermissions()) {
                 ImageFsInstaller.installIfNeeded(this);
@@ -150,12 +98,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 showAllFilesAccessDialog();
             }
 
-            if (Build.VERSION.SDK_INT >= 33) {
-                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
-                }
+            if (Build.VERSION.SDK_INT >= 33
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
+            }
+
+            if (selectedMenuItemId > 0) {
+                openMainMenuItem(selectedMenuItemId, false);
+            } else {
+                showHomeDashboard(false);
             }
         }
+
+        updateActionBarNavigationState();
         applyThemeAssetTintPass();
     }
 
@@ -208,25 +163,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (requestCode == PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 ImageFsInstaller.installIfNeeded(this);
+            } else {
+                finish();
             }
-            else finish();
         }
     }
 
     @Override
     public void onBackPressed() {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        List<Fragment> fragments = fragmentManager.getFragments();
-        for (Fragment fragment : fragments) {
-            if (fragment instanceof ContainersFragment && fragment.isVisible()) {
-                finish();
-                return;
-            }
-        }
-        if (!editInputControls)
-            show(new ContainersFragment(), true);  // Pass `true` to trigger the reverse animation
-        else
+        if (editInputControls) {
             super.onBackPressed();
+            return;
+        }
+        if (isHomeDashboardVisible()) {
+            finish();
+            return;
+        }
+        showHomeDashboard(true);
     }
 
     private boolean requestAppPermissions() {
@@ -235,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         boolean hasManageStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager();
 
         if (hasWritePermission && hasReadPermission && hasManageStoragePermission) {
-            return false; // All permissions are granted
+            return false;
         }
 
         if (!hasWritePermission || !hasReadPermission) {
@@ -243,7 +196,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE);
         }
 
-        return true; // Permissions are still being requested
+        return true;
     }
 
     @Override
@@ -253,91 +206,75 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 onBackPressed();
                 return true;
             }
-
-            if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                drawerLayout.closeDrawer(GravityCompat.START);
-            } else {
-                drawerLayout.openDrawer(GravityCompat.START);
+            if (!isHomeDashboardVisible()) {
+                showHomeDashboard(true);
+                return true;
             }
-            return true;
-        } else {
-            return super.onOptionsItemSelected(menuItem);
         }
+        return super.onOptionsItemSelected(menuItem);
     }
 
-    public void toggleDrawer() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START);
-        } else {
-            drawerLayout.openDrawer(GravityCompat.START);
-        }
-    }
-
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+    public void openMainMenuItem(int menuItemId, boolean reverse) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         if (fragmentManager.getBackStackEntryCount() > 0) {
             fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
 
-        switch (item.getItemId()) {
+        switch (menuItemId) {
             case R.id.main_menu_shortcuts:
-                show(new ShortcutsFragment(), false);  // Forward animation
+                show(new ShortcutsFragment(), reverse);
                 break;
             case R.id.main_menu_containers:
-                show(new ContainersFragment(), false);  // Forward animation
+                show(new ContainersFragment(), reverse);
                 break;
             case R.id.main_menu_input_controls:
-                show(new InputControlsFragment(selectedProfileId), false);  // Forward animation
+                show(new InputControlsFragment(selectedProfileId), reverse);
                 break;
             case R.id.main_menu_contents:
-                show(new ContentsFragment(), false);  // Forward animation
+                show(new ContentsFragment(), reverse);
                 break;
             case R.id.main_menu_adrenotools_gpu_drivers:
-                show(new AdrenotoolsFragment(), false);
+                show(new AdrenotoolsFragment(), reverse);
                 break;
             case R.id.main_menu_diagnostics:
-                show(new ForensicCenterFragment(), false);
+                show(new ForensicCenterFragment(), reverse);
                 break;
             case R.id.main_menu_settings:
-                show(new SettingsFragment(), false);  // Forward animation
+                show(new SettingsFragment(), reverse);
                 break;
             case R.id.main_menu_about:
-                drawerLayout.closeDrawer(GravityCompat.START);
                 showAboutDialog();
                 break;
+            default:
+                showHomeDashboard(reverse);
+                return;
         }
-        return true;
     }
 
-
-//    private void show(Fragment fragment) {
-//        FragmentManager fragmentManager = getSupportFragmentManager();
-//        fragmentManager.beginTransaction()
-//                .replace(R.id.FLFragmentContainer, fragment)
-//                .commit();
-//
-//        drawerLayout.closeDrawer(GravityCompat.START);
-//    }
+    public void showHomeDashboard(boolean reverse) {
+        show(new MainMenuGridFragment(), reverse);
+    }
 
     private void show(Fragment fragment, boolean reverse) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         if (reverse) {
             fragmentManager.beginTransaction()
-                    .setCustomAnimations(R.anim.slide_in_down, R.anim.slide_out_up)  // Reverse animation
+                    .setCustomAnimations(R.anim.slide_in_down, R.anim.slide_out_up)
                     .replace(R.id.FLFragmentContainer, fragment)
                     .commit();
         } else {
             fragmentManager.beginTransaction()
-                    .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)  // Forward animation
+                    .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
                     .replace(R.id.FLFragmentContainer, fragment)
                     .commit();
         }
 
-        drawerLayout.closeDrawer(GravityCompat.START);
         View contentRoot = findViewById(android.R.id.content);
         if (contentRoot != null) {
-            contentRoot.post(this::applyThemeAssetTintPass);
+            contentRoot.post(() -> {
+                updateActionBarNavigationState();
+                applyThemeAssetTintPass();
+            });
         }
     }
 
@@ -348,7 +285,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (latestDark != isDarkMode) isDarkMode = latestDark;
         View decor = getWindow() != null ? getWindow().getDecorView() : null;
         if (decor != null && decor.getAlpha() != 1f) decor.setAlpha(1f);
+        updateActionBarNavigationState();
         applyThemeAssetTintPass();
+    }
+
+    private boolean isHomeDashboardVisible() {
+        Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
+        return current instanceof MainMenuGridFragment;
+    }
+
+    private void updateActionBarNavigationState() {
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar == null) return;
+        boolean showBack = editInputControls || !isHomeDashboardVisible();
+        actionBar.setDisplayHomeAsUpEnabled(showBack);
+        if (showBack) {
+            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+        }
     }
 
     private void applyThemeAssetTintPass() {
@@ -389,7 +342,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         try {
-            final PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
 
             TextView tvWebpage = dialog.findViewById(R.id.TVWebpage);
             tvWebpage.setText(Html.fromHtml("<a href=\"https://github.com/kosoymiki/aesolator\">github.com/kosoymiki/aesolator</a>", Html.FROM_HTML_MODE_LEGACY));
@@ -429,27 +382,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         dialog.show();
-    }
-
-    private void setNavigationViewItemTextColor(NavigationView navigationView, int color) {
-        for (int i = 0; i < navigationView.getMenu().size(); i++) {
-            MenuItem menuItem = navigationView.getMenu().getItem(i);
-            setMenuItemTextColor(menuItem, color);
-
-            // If the menu item has sub-items, iterate through them
-            if (menuItem.hasSubMenu()) {
-                for (int j = 0; j < menuItem.getSubMenu().size(); j++) {
-                    MenuItem subMenuItem = menuItem.getSubMenu().getItem(j);
-                    setMenuItemTextColor(subMenuItem, color);
-                }
-            }
-        }
-    }
-
-    private void setMenuItemTextColor(MenuItem menuItem, int color) {
-        SpannableString spanString = new SpannableString(menuItem.getTitle());
-        spanString.setSpan(new ForegroundColorSpan(color), 0, spanString.length(), 0);
-        menuItem.setTitle(spanString);
     }
 
     @Override
