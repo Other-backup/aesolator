@@ -301,33 +301,35 @@
     <style name="FieldSet">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:background">@drawable/bordered_panel</item>
+        <item name="android:background">@drawable/forensic_panel_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingLeft">8dp</item>
-        <item name="android:paddingRight">8dp</item>
-        <item name="android:paddingBottom">8dp</item>
-        <item name="android:paddingTop">20dp</item>
-        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:paddingTop">18dp</item>
+        <item name="android:layout_marginTop">6dp</item>
     </style>
 
     <style name="FieldSet.Dark" parent="FieldSet">
-        <item name="android:background">@drawable/bordered_panel_dark</item>
+        <item name="android:background">@drawable/forensic_panel_background_dark</item>
     </style>
 
     <style name="FieldSetLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:background">@color/window_background_color</item>
+        <item name="android:background">@drawable/forensic_badge_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingLeft">4dp</item>
-        <item name="android:paddingRight">4dp</item>
+        <item name="android:paddingLeft">10dp</item>
+        <item name="android:paddingRight">10dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
         <item name="android:layout_marginLeft">8dp</item>
-        <item name="android:textColor">@color/fieldset_label_text_light</item>
+        <item name="android:textColor">@color/forensic_badge_text</item>
     </style>
 
     <style name="FieldSetLabel.Dark" parent="FieldSetLabel">
-        <item name="android:background">@color/window_background_color_dark</item>
-        <item name="android:textColor">@color/fieldset_label_text_dark</item>
+        <item name="android:background">@drawable/forensic_badge_background_dark</item>
+        <item name="android:textColor">@color/forensic_badge_text_dark</item>
     </style>
 
     <!-- Table Header Styles -->

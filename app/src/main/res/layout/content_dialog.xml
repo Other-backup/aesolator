@@ -11,6 +11,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:paddingLeft="12dp"
+        android:paddingTop="10dp"
+        android:paddingRight="12dp"
+        android:paddingBottom="2dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -18,6 +22,15 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
+
+            <ImageButton
+                android:id="@+id/BTTitleBack"
+                style="@style/ListMenuButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginRight="8dp"
+                android:src="@drawable/icon_action_bar_back"
+                android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/IVIcon"

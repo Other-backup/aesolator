@@ -60,6 +60,11 @@ public class ContentDialog extends Dialog {
             frameLayout.addView(view);
         }
 
+        LinearLayout titleBar = contentView.findViewById(R.id.LLTitleBar);
+        titleBar.setBackgroundResource(isDarkMode
+                ? R.drawable.forensic_panel_background_dark
+                : R.drawable.forensic_panel_background);
+
         View confirmButton = contentView.findViewById(R.id.BTConfirm);
         confirmButton.setOnClickListener((v) -> {
             if (onConfirmCallback != null) onConfirmCallback.run();
@@ -68,6 +73,12 @@ public class ContentDialog extends Dialog {
 
         View cancelButton = contentView.findViewById(R.id.BTCancel);
         cancelButton.setOnClickListener((v) -> {
+            if (onCancelCallback != null) onCancelCallback.run();
+            dismiss();
+        });
+
+        View titleBackButton = contentView.findViewById(R.id.BTTitleBack);
+        titleBackButton.setOnClickListener((v) -> {
             if (onCancelCallback != null) onCancelCallback.run();
             dismiss();
         });
@@ -106,14 +117,17 @@ public class ContentDialog extends Dialog {
     public void setTitle(String title) {
         LinearLayout titleBar = findViewById(R.id.LLTitleBar);
         TextView tvTitle = findViewById(R.id.TVTitle);
+        View titleBackButton = findViewById(R.id.BTTitleBack);
 
         if (title != null && !title.isEmpty()) {
             tvTitle.setText(title);
             titleBar.setVisibility(View.VISIBLE);
+            if (titleBackButton != null) titleBackButton.setVisibility(View.VISIBLE);
         }
         else {
             tvTitle.setText("");
             titleBar.setVisibility(View.GONE);
+            if (titleBackButton != null) titleBackButton.setVisibility(View.GONE);
         }
     }
 

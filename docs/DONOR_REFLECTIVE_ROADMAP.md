@@ -31,10 +31,11 @@ Closed in tree:
   - `Box64EditPresetDialog`
   - `FEXCoreEditPresetDialog`
   - `ScreenEffectDialog`
+- Global `FieldSet` / `FieldSetLabel` styles were re-based onto the new panel/badge system, so remaining secondary forms inherit the same card language without local white-background overrides.
+- `ContentDialog` roots now expose a top-left back/close action in the title bar and use the same themed card header surface as the rest of the app.
 
 Still open (UI tail queue):
-- Add consistent top-left back action for all major tabs/dialog roots.
-- Complete card-style migration for remaining secondary dialogs/forms outside the main dashboard, settings, container, shortcut, preset, and screen-effect surfaces.
+- Monitor-only queue: future dialogs introduced by new feature lanes must keep the same card/badge language and dialog-root back action.
 
 Added scope (2026-03-06, extension batch):
 1. Graphics Center feed viewport overflow and non-scrollable artifact list.
