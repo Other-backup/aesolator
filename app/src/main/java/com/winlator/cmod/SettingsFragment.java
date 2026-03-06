@@ -42,6 +42,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
+import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.box64.Box64EditPresetDialog;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
