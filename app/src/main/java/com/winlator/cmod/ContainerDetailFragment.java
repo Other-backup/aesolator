@@ -680,7 +680,7 @@ public class ContainerDetailFragment extends Fragment {
                         saveWineRegistryKeys(view);
                         Activity activity = getActivity();
                         if (activity != null) {
-                            activity.getOnBackPressedDispatcher().onBackPressed();
+                            activity.onBackPressed();
                         }
                     });
                 }
