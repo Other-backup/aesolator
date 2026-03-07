@@ -68,6 +68,17 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/TVPolicyBadgeGraphics"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/forensic_badge_background"
+                    android:tag="theme_badge"
+                    android:text="@string/diagnostics_policy_badge_graphics"
+                    android:textColor="@color/forensic_badge_text"
+                    android:textStyle="bold" />
+
+                <TextView
                     android:id="@+id/TVPolicyBadgeDgVoodoo"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

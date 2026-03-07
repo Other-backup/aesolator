@@ -358,17 +358,25 @@ public class MainActivity extends AppCompatActivity {
             String creditsAndThirdPartyAppsHTML = String.join("<br />",
                     "<b>Ae.solator</b> by Ae team",
                     "<b>Stack:</b> FreeWine 11 + lane-based graphics stack + package lanes",
+                    "<b>Runtime donor lines:</b> FreeWine 11 baseline, driver archives, wrapper lanes and Android container integration",
                     "---",
+                    "FreeWine 11 baseline research: AndreRH + upstream Wine / Valve work",
                     "Termux Package (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
                     "Wine (<a href=\"https://www.winehq.org\">winehq.org</a>)",
                     "Box64 (<a href=\"https://github.com/ptitSeb/box64\">github.com/ptitSeb/box64</a>)",
+                    "FEX-Emu (<a href=\"https://github.com/FEX-Emu/FEX\">github.com/FEX-Emu/FEX</a>)",
                     "Mesa / Turnip / Zink (<a href=\"https://gitlab.freedesktop.org/mesa/mesa\">gitlab.freedesktop.org/mesa/mesa</a>)",
                     "DXVK (<a href=\"https://github.com/doitsujin/dxvk\">github.com/doitsujin/dxvk</a>)",
                     "VKD3D (<a href=\"https://gitlab.winehq.org/wine/vkd3d\">gitlab.winehq.org/wine/vkd3d</a>)",
                     "D8VK (<a href=\"https://github.com/AlpyneDreams/d8vk\">github.com/AlpyneDreams/d8vk</a>)",
                     "dgVoodoo2 (<a href=\"https://github.com/dege-diosg/dgVoodoo2\">github.com/dege-diosg/dgVoodoo2</a>)",
-                    "FEX-Emu (<a href=\"https://github.com/FEX-Emu/FEX\">github.com/FEX-Emu/FEX</a>)",
-                    "libadrenotools (<a href=\"https://github.com/bylaws/libadrenotools\">github.com/bylaws/libadrenotools</a>)"
+                    "libadrenotools (<a href=\"https://github.com/bylaws/libadrenotools\">github.com/bylaws/libadrenotools</a>)",
+                    "---",
+                    "<b>Graphics donor archives</b>",
+                    "StevenMXZ Turnip CI (<a href=\"https://github.com/StevenMXZ/freedreno_turnip-CI\">github.com/StevenMXZ/freedreno_turnip-CI</a>)",
+                    "whitebelyash Turnip CI (<a href=\"https://github.com/whitebelyash/freedreno_turnip-CI\">github.com/whitebelyash/freedreno_turnip-CI</a>)",
+                    "MrPurple Turnip (<a href=\"https://github.com/MrPurple666/purple-turnip\">github.com/MrPurple666/purple-turnip</a>)",
+                    "GameNative Drivers (<a href=\"https://gamenative.app/drivers/\">gamenative.app/drivers</a>)"
             );
 
             TextView tvCreditsAndThirdPartyApps = dialog.findViewById(R.id.TVCreditsAndThirdPartyApps);

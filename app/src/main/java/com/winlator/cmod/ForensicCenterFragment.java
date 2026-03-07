@@ -70,6 +70,7 @@ public class ForensicCenterFragment extends Fragment {
         CheckBox cbShizukuCapture = view.findViewById(R.id.CBForensicShizukuCapture);
         TextView badgeFreeWine = view.findViewById(R.id.TVPolicyBadgeFreeWine);
         TextView badgeDxvk = view.findViewById(R.id.TVPolicyBadgeDxvk);
+        TextView badgeGraphics = view.findViewById(R.id.TVPolicyBadgeGraphics);
         TextView badgeDgVoodoo = view.findViewById(R.id.TVPolicyBadgeDgVoodoo);
         TextView adbCommand = view.findViewById(R.id.TVAdbCommand);
         TextView adbCaptureCommand = view.findViewById(R.id.TVAdbCaptureCommand);
@@ -95,9 +96,11 @@ public class ForensicCenterFragment extends Fragment {
         adbCaptureCommand.setBackgroundResource(commandBackground);
         badgeFreeWine.setBackgroundResource(badgeBackground);
         badgeDxvk.setBackgroundResource(badgeBackground);
+        badgeGraphics.setBackgroundResource(badgeBackground);
         badgeDgVoodoo.setBackgroundResource(badgeBackground);
         badgeFreeWine.setTextColor(badgeTextColor);
         badgeDxvk.setTextColor(badgeTextColor);
+        badgeGraphics.setTextColor(badgeTextColor);
         badgeDgVoodoo.setTextColor(badgeTextColor);
 
         cbWineDebug.setChecked(preferences.getBoolean("enable_wine_debug", false));

@@ -5,7 +5,7 @@
     ]>
 <resources>
     <string name="app_name">Ae.solator</string>
-    <string name="main_menu_home_subtitle">Everything you need to launch, tune and troubleshoot containers in one place.</string>
+    <string name="main_menu_home_subtitle">Ae.solator is the Android control surface for FreeWine containers, graphics lanes, frame generation and forensic capture. Launch, tune and debug the full runtime from one dashboard.</string>
     <string name="main_menu_home_section">Main Dashboard</string>
     <string name="main_menu_hint_containers">Create containers and tune their runtime defaults</string>
     <string name="main_menu_hint_shortcuts">Manage launch entries and per-game overrides</string>
@@ -120,13 +120,13 @@
     <string name="duplicate">Duplicate</string>
     <string name="about">About</string>
     <string name="about_app_title">Ae.solator</string>
-    <string name="about_app_summary">Ae.solator keeps launch flow, graphics routing, runtime tuning and diagnostics together in one Android-first control surface.</string>
-    <string name="about_runtime_summary">Runtime stack: FreeWine 11, lane-based graphics routing, packaged components and native Ae.solator orchestration.</string>
-    <string name="about_runtime_detail">Containers, wrappers, drivers, frame generation and forensic export all stay inside one shared runtime path so tuning is easier to follow.</string>
+    <string name="about_app_summary">Ae.solator packages launch flow, graphics routing, runtime tuning and forensic export into one Android-first control surface for the full FreeWine stack.</string>
+    <string name="about_runtime_summary">Runtime stack: FreeWine 11, Turnip Vulkan, Freedreno Gallium, wrapper lanes, package feeds and native Ae.solator orchestration.</string>
+    <string name="about_runtime_detail">Containers, wrappers, drivers, frame generation and diagnostics are routed through one shared control path, so changes stay visible and reproducible.</string>
     <string name="about_project_url">github.com/kosoymiki/aesolator</string>
     <string name="about_version_format">Version %1$s</string>
     <string name="default_metric_zero">0</string>
-    <string name="credits_and_third_party_apps">Credits and upstream projects</string>
+    <string name="credits_and_third_party_apps">Credits, authors and upstream projects</string>
     <string name="external_controllers">External Controllers</string>
     <string name="graphics_driver">Graphics Driver</string>
     <string name="audio_driver">Audio Driver</string>
@@ -755,12 +755,13 @@
     <string name="runtime_profile_global">Global Runtime Profile</string>
     <string name="adrenotools_gpu_drivers">Graphics Center</string>
     <string name="diagnostics">Forensic Center</string>
-    <string name="diagnostics_hint">One forensic workspace for runtime logs, wrapper routing, driver lanes and live device diagnostics.</string>
-    <string name="diagnostics_policy_title">Active Runtime Policy</string>
-    <string name="diagnostics_policy_subtitle">Legacy APIs go through dgVoodoo. DXVK and VKD3D handle newer Direct3D paths.</string>
-    <string name="diagnostics_policy_badge_freewine">FreeWine11</string>
-    <string name="diagnostics_policy_badge_dxvk_vkd3d">DXVK + VKD3D</string>
-    <string name="diagnostics_policy_badge_dgvoodoo">dgVoodoo legacy route</string>
+    <string name="diagnostics_hint">One forensic workspace for launch traces, driver lanes, wrapper routing, root or non-root capture and issue-ready runtime bundles.</string>
+    <string name="diagnostics_policy_title">Runtime Forensic Overview</string>
+    <string name="diagnostics_policy_subtitle">Ae.solator routes FreeWine, Turnip, Freedreno Gallium, DXVK, VKD3D and dgVoodoo through one observable runtime path, so every log bundle matches the active graphics and wrapper stack.</string>
+    <string name="diagnostics_policy_badge_freewine">FreeWine 11 runtime</string>
+    <string name="diagnostics_policy_badge_dxvk_vkd3d">DXVK + VKD3D route</string>
+    <string name="diagnostics_policy_badge_graphics">Turnip + Freedreno lanes</string>
+    <string name="diagnostics_policy_badge_dgvoodoo">dgVoodoo legacy APIs</string>
     <string name="diagnostics_section_toggles">Runtime Telemetry Toggles</string>
     <string name="diagnostics_section_adb">Live ADB Diagnostics</string>
     <string name="diagnostics_adb_label">ADB command for live logs</string>

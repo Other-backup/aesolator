@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/surface_input_bg_dark" />
-    <stroke
-        android:width="1dp"
-        android:color="@color/surface_input_border_dark" />
-    <corners android:radius="14dp" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/surface_input_bg_dark" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/surface_input_border_dark" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item
+        android:width="18dp"
+        android:height="18dp"
+        android:right="12dp"
+        android:drawable="@drawable/ae_icon_spinner_chevron_dark"
+        android:gravity="end|center_vertical" />
+</layer-list>

@@ -2,6 +2,7 @@ package com.winlator.cmod.core;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.View;
@@ -129,6 +130,16 @@ public final class SpinnerAdapters {
         if (comboBox == null) return;
         comboBox.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
         comboBox.setTextColor(resolvePrimaryTextColor(comboBox.getContext(), isDarkMode));
+        Drawable chevron = ContextCompat.getDrawable(
+                comboBox.getContext(),
+                isDarkMode ? R.drawable.ae_icon_spinner_chevron_dark : R.drawable.ae_icon_spinner_chevron
+        );
+        comboBox.setCompoundDrawablePadding((int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                8,
+                comboBox.getResources().getDisplayMetrics()
+        ));
+        comboBox.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, chevron, null);
     }
 
     public static void applySurface(Spinner spinner) {
