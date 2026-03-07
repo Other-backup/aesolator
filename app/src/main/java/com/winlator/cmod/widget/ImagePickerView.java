@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -51,18 +53,53 @@ public class ImagePickerView extends View implements View.OnClickListener {
 
         int width = getWidth();
         int height = getHeight();
-        if (width == 0 || height == 0 || icon == null) return;
+        if (width == 0 || height == 0) return;
 
         float rectSize = height - UnitUtils.dpToPx(12);
         float startX = (width - rectSize) * 0.5f - UnitUtils.dpToPx(16);
         float startY = (height - rectSize) * 0.5f;
-        icon.setBounds(
-                Math.round(startX),
-                Math.round(startY),
-                Math.round(startX + rectSize),
-                Math.round(startY + rectSize)
-        );
-        icon.draw(canvas);
+        if (icon != null) {
+            try {
+                icon.setBounds(
+                        Math.round(startX),
+                        Math.round(startY),
+                        Math.round(startX + rectSize),
+                        Math.round(startY + rectSize)
+                );
+                icon.draw(canvas);
+                return;
+            } catch (Throwable ignored) {
+            }
+        }
+        drawFallbackGlyph(canvas, startX, startY, rectSize);
+    }
+
+    private void drawFallbackGlyph(Canvas canvas, float startX, float startY, float rectSize) {
+        Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeWidth(UnitUtils.dpToPx(1.6f));
+        strokePaint.setColor(0xFFFFFFFF);
+
+        Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fillPaint.setStyle(Paint.Style.FILL);
+        fillPaint.setColor(0x66FFFFFF);
+
+        float radius = UnitUtils.dpToPx(4);
+        RectF frame = new RectF(startX, startY, startX + rectSize, startY + rectSize);
+        canvas.drawRoundRect(frame, radius, radius, strokePaint);
+
+        float sunRadius = rectSize * 0.12f;
+        canvas.drawCircle(startX + rectSize * 0.28f, startY + rectSize * 0.30f, sunRadius, fillPaint);
+
+        Paint mountainPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mountainPaint.setStyle(Paint.Style.STROKE);
+        mountainPaint.setStrokeWidth(UnitUtils.dpToPx(1.4f));
+        mountainPaint.setColor(0xFFFFFFFF);
+        float baseY = startY + rectSize * 0.74f;
+        canvas.drawLine(startX + rectSize * 0.14f, baseY, startX + rectSize * 0.40f, startY + rectSize * 0.48f, mountainPaint);
+        canvas.drawLine(startX + rectSize * 0.40f, startY + rectSize * 0.48f, startX + rectSize * 0.56f, baseY, mountainPaint);
+        canvas.drawLine(startX + rectSize * 0.42f, baseY, startX + rectSize * 0.67f, startY + rectSize * 0.58f, mountainPaint);
+        canvas.drawLine(startX + rectSize * 0.67f, startY + rectSize * 0.58f, startX + rectSize * 0.84f, baseY, mountainPaint);
     }
 
     @Override
