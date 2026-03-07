@@ -545,8 +545,8 @@ public class ContentsFragment extends Fragment {
                 sourceMode = sourceValues.length > 0 ? sourceValues[0] : "wcphub";
             }
             setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
-            sContentsSourceMode.setEnabled(sourceValues.length > 1);
-            sContentsSourceMode.setAlpha(sourceValues.length > 1 ? 1.0f : 0.92f);
+            sContentsSourceMode.setEnabled(true);
+            sContentsSourceMode.setAlpha(1.0f);
             sharedPreferences.edit().putString("contents_source_mode", sourceMode).apply();
         } finally {
             suppressFilterCallbacks = false;
