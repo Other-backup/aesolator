@@ -94,12 +94,12 @@
     </string-array>
     <string-array name="contents_arch_entries_dxvk_vkd3d">
         <item>All lanes</item>
-        <item>Native lanes</item>
+        <item>x86_64 lanes</item>
         <item>ARM64EC lanes</item>
     </string-array>
     <string-array name="contents_arch_values_dxvk_vkd3d">
         <item>all</item>
-        <item>native</item>
+        <item>x86_64</item>
         <item>arm64ec</item>
     </string-array>
     <string-array name="dxvk_version_entries">

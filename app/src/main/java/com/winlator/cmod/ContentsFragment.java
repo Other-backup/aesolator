@@ -474,7 +474,7 @@ public class ContentsFragment extends Fragment {
 
     private void updateFilterControlsVisibility() {
         if (!isAdded()) return;
-        boolean showArchFilters = supportsArchitectureFilters(currentContentType);
+        boolean showArchFilters = supportsArchitectureFilters(currentContentType) && currentSourceHasMultipleArchitectureCandidates();
         boolean showChannelFilter = supportsChannelFilter(currentContentType) && currentSourceHasNightlyCandidates();
 
         if (sContentsArchMode != null) sContentsArchMode.setVisibility(showArchFilters ? View.VISIBLE : View.GONE);
@@ -542,6 +542,9 @@ public class ContentsFragment extends Fragment {
     }
 
     private String[] getArchEntriesForType(ContentProfile.ContentType type) {
+        if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
+            return new String[]{"All lanes"};
+        }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             return getResources().getStringArray(R.array.contents_arch_entries_dxvk_vkd3d);
@@ -554,6 +557,9 @@ public class ContentsFragment extends Fragment {
     }
 
     private String[] getArchValuesForType(ContentProfile.ContentType type) {
+        if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
+            return new String[]{"all"};
+        }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             return getResources().getStringArray(R.array.contents_arch_values_dxvk_vkd3d);
@@ -614,11 +620,34 @@ public class ContentsFragment extends Fragment {
     }
 
     private String resolveProfileArchTag(ContentProfile profile) {
-        if (isNativeProfile(profile)) return "native";
         if (isArm64EcProfile(profile)) return "arm64ec";
         if (isX64Profile(profile)) return "x86_64";
         if (isArm64Profile(profile)) return "arm64";
+        if (profile != null) {
+            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                return "x86_64";
+            }
+        }
         return "generic";
+    }
+
+    private boolean currentSourceHasMultipleArchitectureCandidates() {
+        List<ContentProfile> profiles = manager.getProfiles(currentContentType);
+        if (profiles == null) return false;
+        HashSet<String> archTags = new HashSet<>();
+        for (ContentProfile profile : profiles) {
+            if (profile == null || profile.locallyInstalled) continue;
+            if (!matchesSelectedSourceMode(profile)) continue;
+            String archTag = resolveProfileArchTag(profile);
+            if ("generic".equalsIgnoreCase(archTag)) continue;
+            archTags.add(archTag.toLowerCase(Locale.US));
+            if (archTags.size() > 1) return true;
+        }
+        return false;
     }
 
     private boolean currentSourceHasNightlyCandidates() {
