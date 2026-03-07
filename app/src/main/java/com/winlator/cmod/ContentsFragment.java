@@ -371,18 +371,21 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return false;
         String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
 
+        if ("aesolator".equals(mode)) {
+            // Mainline source is a curated composite: Ae overlay lanes + WCPHub runtime lanes.
+            return true;
+        }
+
         String joined = (
                 (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
                         (profile.remoteUrl == null ? "" : profile.remoteUrl)
         ).toLowerCase(Locale.US);
 
-        if ("aesolator".equals(mode)) {
-            return joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator");
-        }
         if ("wcphub".equals(mode)) {
             return joined.contains("open-wine-components")
                     || joined.contains("wcphub")
-                    || joined.contains("arihany");
+                    || joined.contains("arihany")
+                    || joined.contains("winlatorwcphub");
         }
         if ("fallback".equals(mode)) {
             return joined.contains("winlator-contents")
@@ -454,17 +457,11 @@ public class ContentsFragment extends Fragment {
                 || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
-                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
-                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
-                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
     }
 
     private boolean supportsChannelFilter(ContentProfile.ContentType type) {
-        return type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
-                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+        return type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
     }
@@ -472,7 +469,7 @@ public class ContentsFragment extends Fragment {
     private void updateFilterControlsVisibility() {
         if (!isAdded()) return;
         boolean showArchFilters = supportsArchitectureFilters(currentContentType);
-        boolean showChannelFilter = supportsChannelFilter(currentContentType);
+        boolean showChannelFilter = supportsChannelFilter(currentContentType) && currentSourceHasNightlyCandidates();
 
         if (sContentsArchMode != null) sContentsArchMode.setVisibility(showArchFilters ? View.VISIBLE : View.GONE);
         if (sContentsChannelMode != null) sContentsChannelMode.setVisibility(showChannelFilter ? View.VISIBLE : View.GONE);
@@ -510,6 +507,10 @@ public class ContentsFragment extends Fragment {
 
         setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
         setSpinnerSelectionByValue(sContentsArchMode, archValues, archMode, 0);
+        sharedPreferences.edit()
+                .putString("contents_channel_mode", channelMode)
+                .putString("contents_arch_mode", archMode)
+                .apply();
     }
 
     private boolean containsIgnoreCase(String[] values, String value) {
@@ -521,14 +522,14 @@ public class ContentsFragment extends Fragment {
     }
 
     private String[] getChannelEntriesForType(ContentProfile.ContentType type) {
-        if (!supportsChannelFilter(type)) {
-            return new String[]{"Release only"};
+        if (!supportsChannelFilter(type) || !currentSourceHasNightlyCandidates()) {
+            return new String[]{"Mainline release"};
         }
         return getResources().getStringArray(R.array.contents_channel_entries);
     }
 
     private String[] getChannelValuesForType(ContentProfile.ContentType type) {
-        if (!supportsChannelFilter(type)) {
+        if (!supportsChannelFilter(type) || !currentSourceHasNightlyCandidates()) {
             return new String[]{"stable"};
         }
         return getResources().getStringArray(R.array.contents_channel_values);
@@ -614,6 +615,17 @@ public class ContentsFragment extends Fragment {
         return "generic";
     }
 
+    private boolean currentSourceHasNightlyCandidates() {
+        List<ContentProfile> profiles = manager.getProfiles(currentContentType);
+        if (profiles == null) return false;
+        for (ContentProfile profile : profiles) {
+            if (profile == null || profile.locallyInstalled) continue;
+            if (!matchesSelectedSourceMode(profile)) continue;
+            if (profile.isBetaLike()) return true;
+        }
+        return false;
+    }
+
     private boolean isVulkanSdkRuntimePresent() {
         File shareRoot = new File(requireContext().getFilesDir(), "imagefs/usr/share");
         File vulkanDir = new File(shareRoot, "vulkan");
@@ -648,8 +660,12 @@ public class ContentsFragment extends Fragment {
             try {
                 ArrayList<String> payloads = new ArrayList<>();
                 HashSet<String> sources = new HashSet<>();
+                LinkedHashMap<String, String> payloadByUrl = new LinkedHashMap<>();
                 for (String sourceUrl : resolveSelectedSourceUrls(selectedSourceMode)) {
-                    addRemoteFeed(payloads, sources, sourceUrl);
+                    String payload = addRemoteFeed(payloads, sources, sourceUrl);
+                    if (payload != null && !payload.trim().isEmpty()) {
+                        payloadByUrl.put(sourceUrl, payload);
+                    }
                 }
 
                 if (!isAdded() || getActivity() == null) return;
@@ -672,6 +688,8 @@ public class ContentsFragment extends Fragment {
                                         "cached_used", useCached
                                 )
                         );
+                        refreshTypeScopedFilterSpinners();
+                        updateFilterControlsVisibility();
                         loadContentList();
                     });
                     return;
@@ -683,7 +701,13 @@ public class ContentsFragment extends Fragment {
                             .putString(PREF_REMOTE_CACHE_JSON, merged)
                             .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
                             .apply();
-                    manager.setRemoteProfiles(merged);
+                    if ("aesolator".equals(selectedSourceMode)) {
+                        String hubPayload = payloadByUrl.getOrDefault(ContentsManager.REMOTE_PROFILES, "[]");
+                        String overlayPayload = payloadByUrl.getOrDefault(ContentsManager.REMOTE_WINE_PROTON_OVERLAY, "[]");
+                        manager.setCompositeRemoteProfiles(hubPayload, overlayPayload, false);
+                    } else {
+                        manager.setRemoteProfiles(merged);
+                    }
                     ForensicLogger.logEvent(
                             getContext(),
                             "info",
@@ -698,6 +722,8 @@ public class ContentsFragment extends Fragment {
                                     "merged_size", merged.length()
                             )
                     );
+                    refreshTypeScopedFilterSpinners();
+                    updateFilterControlsVisibility();
                     loadContentList();
                 });
             } catch (Exception ignored) {
@@ -719,6 +745,8 @@ public class ContentsFragment extends Fragment {
                                     "cached_used", useCached
                             )
                     );
+                    refreshTypeScopedFilterSpinners();
+                    updateFilterControlsVisibility();
                     loadContentList();
                 });
             }
@@ -727,6 +755,11 @@ public class ContentsFragment extends Fragment {
 
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
+        if ("aesolator".equals(selectedSourceMode)) {
+            urls.add(ContentsManager.REMOTE_PROFILES);
+            urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
+            return urls;
+        }
         if ("wcphub".equals(selectedSourceMode)) {
             urls.add(ContentsManager.REMOTE_PROFILES);
             return urls;
@@ -735,8 +768,7 @@ public class ContentsFragment extends Fragment {
             urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
             return urls;
         }
-        // Default source mode keeps one author lane selected to avoid mixed releases.
-        urls.add(ContentsManager.REMOTE_PROFILES_AE);
+        urls.add(ContentsManager.REMOTE_PROFILES);
         return urls;
     }
 
@@ -745,15 +777,18 @@ public class ContentsFragment extends Fragment {
         return normalized;
     }
 
-    private void addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
-        if (url == null) return;
+    private String addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
+        if (url == null) return null;
         String normalized = url.trim();
-        if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return;
+        if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return null;
         seenSources.add(normalized);
         String json = Downloader.downloadString(normalized);
         if (json != null && !json.trim().isEmpty()) {
-            payloads.add(injectFeedSourceMetadata(json, normalized));
+            String enriched = injectFeedSourceMetadata(json, normalized);
+            payloads.add(enriched);
+            return enriched;
         }
+        return null;
     }
 
     private String injectFeedSourceMetadata(String json, String feedUrl) {
