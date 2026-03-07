@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="148dp"
-    android:padding="4dp">
+    android:layout_height="136dp"
+    android:padding="3dp">
 
     <LinearLayout
         android:id="@+id/LLMainMenuCard"
@@ -15,13 +15,14 @@
         android:gravity="center"
         android:orientation="vertical"
         android:padding="12dp"
-        android:tag="theme_card">
+        android:tag="preserve_background">
 
         <ImageView
             android:id="@+id/IVMainMenuCardIcon"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:contentDescription="@null" />
+            android:contentDescription="@null"
+            android:tag="no_theme_tint" />
 
         <TextView
             android:id="@+id/TVMainMenuCardTitle"

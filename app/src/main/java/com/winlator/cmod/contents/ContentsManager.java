@@ -112,6 +112,18 @@ public class ContentsManager {
         syncContents();
     }
 
+    public void setHubRemoteProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, false, true, false, true);
+        syncContents();
+    }
+
+    public void setArchiveRemoteProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, false, false, true, true);
+        syncContents();
+    }
+
     public void setCompositeRemoteProfiles(String hubJson, String repoOverlayJson, boolean showNightlyOnly) {
         remoteProfiles = new ArrayList<>();
         // Hub feed: keep all channels available in-memory, UI can filter by toggles.

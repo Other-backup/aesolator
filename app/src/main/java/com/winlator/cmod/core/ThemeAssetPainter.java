@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -28,14 +29,22 @@ public final class ThemeAssetPainter {
         int buttonTint = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
         int iconTint = ContextCompat.getColor(context, isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
         int buttonDrawableTint = ContextCompat.getColor(context, R.color.white);
-        traverse(root, buttonTint, iconTint, buttonDrawableTint, isDarkMode);
+        int primaryTextColor = ContextCompat.getColor(context, isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+        int hintTextColor = ContextCompat.getColor(context, isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
+        traverse(root, buttonTint, iconTint, buttonDrawableTint, primaryTextColor, hintTextColor, isDarkMode);
     }
 
-    private static void traverse(View view, int buttonTint, int iconTint, int buttonDrawableTint, boolean isDarkMode) {
+    private static void traverse(View view, int buttonTint, int iconTint, int buttonDrawableTint, int primaryTextColor, int hintTextColor, boolean isDarkMode) {
         applyTaggedSurface(view, isDarkMode);
 
         if (view instanceof ImageButton) {
             tint((ImageButton) view, buttonTint);
+        } else if (view instanceof EditText) {
+            EditText editText = (EditText) view;
+            editText.setTextColor(primaryTextColor);
+            editText.setHintTextColor(hintTextColor);
+            editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
+            tintCompoundDrawables(editText, iconTint);
         } else if (view instanceof ImageView) {
             ImageView imageView = (ImageView) view;
             if (shouldTintImageView(imageView)) tint(imageView, iconTint);
@@ -48,7 +57,7 @@ public final class ThemeAssetPainter {
         if (!(view instanceof ViewGroup)) return;
         ViewGroup group = (ViewGroup) view;
         for (int i = 0; i < group.getChildCount(); i++) {
-            traverse(group.getChildAt(i), buttonTint, iconTint, buttonDrawableTint, isDarkMode);
+            traverse(group.getChildAt(i), buttonTint, iconTint, buttonDrawableTint, primaryTextColor, hintTextColor, isDarkMode);
         }
     }
 

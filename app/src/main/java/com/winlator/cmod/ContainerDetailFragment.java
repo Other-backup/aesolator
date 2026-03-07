@@ -100,8 +100,6 @@ public class ContainerDetailFragment extends Fragment {
 
     private static boolean isDarkMode;
 
-    private ImageFs imageFs;
-
     public ContainerDetailFragment() {
         this(0);
     }
@@ -493,7 +491,8 @@ public class ContainerDetailFragment extends Fragment {
                         ? (String) vGraphicsDriverConfig.getTag()
                         : "";
                 HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
-                if (config.get("version").isEmpty()) {
+                String graphicsDriverVersion = config.get("version");
+                if (graphicsDriverVersion == null || graphicsDriverVersion.trim().isEmpty()) {
                     config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
@@ -512,7 +511,19 @@ public class ContainerDetailFragment extends Fragment {
                 byte startupSelection = (byte) sStartupSelection.getSelectedItemPosition();
                 String selectedWineVersion = sWineVersion.getSelectedItem() != null ? sWineVersion.getSelectedItem().toString() : "";
                 if (AppUtils.isMissingComponentValue(selectedWineVersion)) {
-                    selectedWineVersion = isEditMode() ? container.getWineVersion() : WineInfo.MAIN_WINE_VERSION.identifier();
+                    if (isEditMode() && container != null && !AppUtils.isMissingComponentValue(container.getWineVersion())) {
+                        selectedWineVersion = container.getWineVersion();
+                    } else if (hasEmbeddedWineVersion(context, WineInfo.MAIN_WINE_VERSION.identifier())) {
+                        selectedWineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
+                    } else {
+                        AppUtils.showToast(context, R.string.install_runtime_before_container);
+                        return;
+                    }
+                }
+                WineInfo selectedWineInfo = WineInfo.fromIdentifier(context, contentsManager, selectedWineVersion);
+                if (selectedWineInfo.path == null || !new File(selectedWineInfo.path).exists()) {
+                    AppUtils.showToast(context, R.string.install_runtime_before_container);
+                    return;
                 }
                 String containerUpscalerPreset = UpscalerProfileStore.normalizePreset(
                         StringUtils.parseIdentifier(sContainerFgPreset.getSelectedItem())
@@ -640,11 +651,6 @@ public class ContainerDetailFragment extends Fragment {
 
                     preloaderDialog.show(R.string.creating_container);
 
-                    // Initialize ImageFs
-                    File imageFsRoot = new File(context.getFilesDir(), "imagefs");
-                    imageFs = ImageFs.find(imageFsRoot);
-
-
                     manager.createContainerAsync(data, contentsManager, (container) -> {
                         if (!isAdded()) return;
                         preloaderDialog.close();
@@ -659,6 +665,10 @@ public class ContainerDetailFragment extends Fragment {
                 }
             } catch (JSONException e) {
                 e.printStackTrace();
+                AppUtils.showToast(context, R.string.unable_to_create_container);
+            } catch (Exception e) {
+                Log.e(TAG, "Container creation failed before async dispatch", e);
+                AppUtils.showToast(context, R.string.unable_to_create_container);
             }
         });
         return view;

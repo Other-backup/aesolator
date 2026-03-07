@@ -774,7 +774,7 @@
     <string name="forensic_root_unavailable">Root capture unavailable: enable root capture and ensure su is present.</string>
     <string name="diagnostics_view_forensic_log">View forensic log</string>
     <string name="diagnostics_forensic_log_title">Forensic Log</string>
-    <string name="diagnostics_forensic_log_file">Log file: %1$s</string>
+    <string name="diagnostics_forensic_log_file">Log: %1$s</string>
     <string name="diagnostics_forensic_log_report">Create GitHub issue</string>
     <string name="diagnostics_forensic_log_empty">No forensic trace file found.</string>
     <string name="diagnostics_forensic_log_export">Save log bundle</string>
@@ -911,6 +911,7 @@
     <string name="enable_shizuku_capture">Enable Shizuku forensic capture (when available)</string>
     <string name="copy_capture_command">Copy ADB capture</string>
     <string name="unable_to_create_container">Unable to create container.</string>
+    <string name="install_runtime_before_container">Install a Wine or Proton runtime before creating a container.</string>
     <string name="diagnostics_forensic_report_privacy_warning">A forensic issue draft will open on GitHub. The report body includes summary only; full logs stay in bundle files.</string>
     <string name="enable_vulkan_api_dump">Enable dumping of Vulkan api calls to file.</string>
     <string name="dll_emulator">32bit Emulator</string>

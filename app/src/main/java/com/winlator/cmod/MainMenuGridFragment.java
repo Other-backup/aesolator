@@ -1,7 +1,6 @@
 package com.winlator.cmod;
 
 import android.content.SharedPreferences;
-import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -17,8 +16,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -66,7 +63,7 @@ public class MainMenuGridFragment extends Fragment {
         TextView heroTitle = view.findViewById(R.id.TVMainMenuHeroTitle);
         TextView heroSubtitle = view.findViewById(R.id.TVMainMenuHeroSubtitle);
         TextView sectionLabel = view.findViewById(R.id.TVMainMenuSectionLabel);
-        RecyclerView recyclerView = view.findViewById(R.id.RVMainMenuCards);
+        LinearLayout rowsContainer = view.findViewById(R.id.LLMainMenuRows);
 
         int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
         int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
@@ -76,20 +73,7 @@ public class MainMenuGridFragment extends Fragment {
         heroSubtitle.setTextColor(bodyColor);
         sectionLabel.setTextColor(titleColor);
 
-        int spanCount = resolveSpanCount();
-        GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), spanCount) {
-            @Override
-            public boolean isAutoMeasureEnabled() {
-                return true;
-            }
-        };
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setHasFixedSize(false);
-        recyclerView.setItemAnimator(null);
-        if (recyclerView.getItemDecorationCount() == 0) {
-            recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, dpToPx(3f)));
-        }
-        recyclerView.setAdapter(new MainMenuCardAdapter(MENU_ENTRIES));
+        populateMenuRows(rowsContainer, LayoutInflater.from(requireContext()), resolveSpanCount());
         return view;
     }
 
@@ -99,70 +83,71 @@ public class MainMenuGridFragment extends Fragment {
         ((AppCompatActivity) requireActivity()).getSupportActionBar().setTitle(R.string.app_name);
     }
 
-    private final class MainMenuCardAdapter extends RecyclerView.Adapter<MainMenuCardAdapter.ViewHolder> {
-        private final List<MenuCardEntry> entries;
-
-        private MainMenuCardAdapter(List<MenuCardEntry> entries) {
-            this.entries = entries;
-        }
-
-        private final class ViewHolder extends RecyclerView.ViewHolder {
-            private final LinearLayout card;
-            private final ImageView icon;
-            private final TextView title;
-            private final TextView hint;
-
-            private ViewHolder(@NonNull View itemView) {
-                super(itemView);
-                card = itemView.findViewById(R.id.LLMainMenuCard);
-                icon = itemView.findViewById(R.id.IVMainMenuCardIcon);
-                title = itemView.findViewById(R.id.TVMainMenuCardTitle);
-                hint = itemView.findViewById(R.id.TVMainMenuCardHint);
+    private void populateMenuRows(LinearLayout rowsContainer, LayoutInflater inflater, int spanCount) {
+        rowsContainer.removeAllViews();
+        int spacing = dpToPx(3f);
+        for (int i = 0; i < MENU_ENTRIES.size(); i += spanCount) {
+            LinearLayout row = new LinearLayout(requireContext());
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            if (i > 0) {
+                ((LinearLayout.LayoutParams) row.getLayoutParams()).topMargin = spacing;
             }
-        }
 
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.main_menu_card_item, parent, false);
-            return new ViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            MenuCardEntry entry = entries.get(position);
-            int accent = ContextCompat.getColor(
-                    requireContext(),
-                    isDarkMode ? entry.darkColorRes : entry.lightColorRes
-            );
-            int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
-            int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
-
-            GradientDrawable background = new GradientDrawable();
-            background.setShape(GradientDrawable.RECTANGLE);
-            background.setCornerRadius(dpToPx(14f));
-            background.setColor(withAlpha(accent, isDarkMode ? 56 : 24));
-            background.setStroke(dpToPx(1f), withAlpha(accent, isDarkMode ? 220 : 132));
-            holder.card.setBackground(background);
-
-            holder.icon.setImageResource(entry.iconRes);
-            holder.icon.setColorFilter(accent);
-            holder.title.setText(entry.titleRes);
-            holder.title.setTextColor(titleColor);
-            holder.hint.setText(entry.hintRes);
-            holder.hint.setTextColor(bodyColor);
-            holder.card.setOnClickListener(v -> {
-                if (getActivity() instanceof MainActivity) {
-                    MainActivity activity = (MainActivity) getActivity();
-                    activity.openMainMenuItem(entry.menuId, false);
+            for (int column = 0; column < spanCount; column++) {
+                int index = i + column;
+                View itemView = inflater.inflate(R.layout.main_menu_card_item, row, false);
+                LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                if (column > 0) itemParams.setMarginStart(spacing);
+                itemView.setLayoutParams(itemParams);
+                if (index < MENU_ENTRIES.size()) {
+                    bindCard(itemView, MENU_ENTRIES.get(index));
+                    row.addView(itemView);
+                } else {
+                    itemView.setVisibility(View.INVISIBLE);
+                    row.addView(itemView);
                 }
-            });
+            }
+            rowsContainer.addView(row);
         }
+    }
 
-        @Override
-        public int getItemCount() {
-            return entries.size();
-        }
+    private void bindCard(View itemView, MenuCardEntry entry) {
+        LinearLayout card = itemView.findViewById(R.id.LLMainMenuCard);
+        ImageView icon = itemView.findViewById(R.id.IVMainMenuCardIcon);
+        TextView title = itemView.findViewById(R.id.TVMainMenuCardTitle);
+        TextView hint = itemView.findViewById(R.id.TVMainMenuCardHint);
+
+        int accent = ContextCompat.getColor(
+                requireContext(),
+                isDarkMode ? entry.darkColorRes : entry.lightColorRes
+        );
+        int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+        int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
+
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(dpToPx(14f));
+        background.setColor(withAlpha(accent, isDarkMode ? 56 : 24));
+        background.setStroke(dpToPx(1f), withAlpha(accent, isDarkMode ? 220 : 132));
+        card.setBackground(background);
+
+        icon.setImageResource(entry.iconRes);
+        icon.clearColorFilter();
+        icon.setColorFilter(accent);
+        title.setText(entry.titleRes);
+        title.setTextColor(titleColor);
+        hint.setText(entry.hintRes);
+        hint.setTextColor(bodyColor);
+        card.setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                MainActivity activity = (MainActivity) getActivity();
+                activity.openMainMenuItem(entry.menuId, false);
+            }
+        });
     }
 
     private int withAlpha(int color, int alpha) {
@@ -178,25 +163,5 @@ public class MainMenuGridFragment extends Fragment {
 
     private int dpToPx(float dp) {
         return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
-    }
-
-    private static final class GridSpacingItemDecoration extends RecyclerView.ItemDecoration {
-        private final int spanCount;
-        private final int spacing;
-
-        private GridSpacingItemDecoration(int spanCount, int spacing) {
-            this.spanCount = Math.max(1, spanCount);
-            this.spacing = Math.max(0, spacing);
-        }
-
-        @Override
-        public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
-            int position = parent.getChildAdapterPosition(view);
-            if (position == RecyclerView.NO_POSITION) return;
-            int column = position % spanCount;
-            outRect.left = spacing - column * spacing / spanCount;
-            outRect.right = (column + 1) * spacing / spanCount;
-            outRect.top = position < spanCount ? 0 : spacing;
-        }
     }
 }

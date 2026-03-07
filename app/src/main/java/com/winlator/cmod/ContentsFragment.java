@@ -637,32 +637,14 @@ public class ContentsFragment extends Fragment {
     }
 
     private ArrayList<String> getAvailableSourceModesForType(ContentProfile.ContentType type) {
-        LinkedHashMap<String, Boolean> available = new LinkedHashMap<>();
+        ArrayList<String> ordered = new ArrayList<>();
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
-            available.put("aesolator", Boolean.TRUE);
-        } else if (type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
-                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
-                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
-            available.put("wcphub", Boolean.TRUE);
-        } else {
-            List<ContentProfile> profiles = manager.getProfiles(type);
-            if (profiles != null) {
-                for (ContentProfile profile : profiles) {
-                    if (profile == null || profile.locallyInstalled) continue;
-                    String profileMode = resolveProfileSourceMode(profile);
-                    if ("wcphub".equals(profileMode) || "aesolator".equals(profileMode) || "fallback".equals(profileMode)) {
-                        available.put(profileMode, Boolean.TRUE);
-                    }
-                }
-            }
-            if (available.isEmpty()) available.put("wcphub", Boolean.TRUE);
+            ordered.add("aesolator");
+            return ordered;
         }
 
-        ArrayList<String> ordered = new ArrayList<>();
-        for (String candidate : Arrays.asList("wcphub", "aesolator", "fallback")) {
-            if (available.containsKey(candidate)) ordered.add(candidate);
-        }
+        ordered.add("wcphub");
         return ordered;
     }
 
@@ -820,7 +802,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private void reloadRemoteContents() {
-        final String selectedSourceMode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        final String selectedSourceMode = sourceMode == null ? "wcphub" : sourceMode.trim().toLowerCase(Locale.US);
         final String sourceSignature = buildSourceSignature(selectedSourceMode);
         final String cachedSourceSignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
         ForensicLogger.logEvent(
@@ -882,9 +864,9 @@ public class ContentsFragment extends Fragment {
                             .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
                             .apply();
                     if ("aesolator".equals(selectedSourceMode)) {
-                        String hubPayload = payloadByUrl.getOrDefault(ContentsManager.REMOTE_PROFILES, "[]");
-                        String overlayPayload = payloadByUrl.getOrDefault(ContentsManager.REMOTE_WINE_PROTON_OVERLAY, "[]");
-                        manager.setCompositeRemoteProfiles(hubPayload, overlayPayload, false);
+                        manager.setArchiveRemoteProfiles(merged);
+                    } else if ("wcphub".equals(selectedSourceMode)) {
+                        manager.setHubRemoteProfiles(merged);
                     } else {
                         manager.setRemoteProfiles(merged);
                     }
@@ -936,7 +918,6 @@ public class ContentsFragment extends Fragment {
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
         if ("aesolator".equals(selectedSourceMode)) {
-            urls.add(ContentsManager.REMOTE_PROFILES);
             urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
             return urls;
         }
@@ -953,7 +934,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private String buildSourceSignature(String selectedSourceMode) {
-        String normalized = selectedSourceMode == null ? "aesolator" : selectedSourceMode.trim().toLowerCase(Locale.US);
+        String normalized = selectedSourceMode == null ? "wcphub" : selectedSourceMode.trim().toLowerCase(Locale.US);
         return normalized;
     }
 

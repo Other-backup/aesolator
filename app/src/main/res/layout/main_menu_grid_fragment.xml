@@ -47,13 +47,11 @@
             android:textStyle="bold"
             android:tag="theme_badge" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/RVMainMenuCards"
+        <LinearLayout
+            android:id="@+id/LLMainMenuRows"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:nestedScrollingEnabled="false"
-            android:overScrollMode="never"
-            android:scrollbars="vertical" />
+            android:orientation="vertical" />
     </LinearLayout>
 </ScrollView>

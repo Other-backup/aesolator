@@ -92,27 +92,33 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
 
     public static HashMap<String, String> parseGraphicsDriverConfig(String graphicsDriverConfig) {
         HashMap<String, String> mappedConfig = new HashMap<>();
+        if (graphicsDriverConfig == null || graphicsDriverConfig.trim().isEmpty()) {
+            return mappedConfig;
+        }
         String[] configElements = graphicsDriverConfig.split(";");
         for (String element : configElements) {
-            String key;
-            String value;
-            String[] splittedElement = element.split("=");
-            key = splittedElement[0];
-            if (splittedElement.length > 1)
-                value = element.split("=")[1];
-            else
-                value = "";
+            if (element == null) continue;
+            String trimmedElement = element.trim();
+            if (trimmedElement.isEmpty()) continue;
+            String[] splittedElement = trimmedElement.split("=", 2);
+            String key = splittedElement[0].trim();
+            if (key.isEmpty()) continue;
+            String value = splittedElement.length > 1 ? splittedElement[1].trim() : "";
             mappedConfig.put(key, value);
         }
         return mappedConfig;
     }
 
     public static String toGraphicsDriverConfig(HashMap<String, String> config) {
-        String graphicsDriverConfig = "";
+        if (config == null || config.isEmpty()) return "";
+        StringBuilder graphicsDriverConfig = new StringBuilder();
         for (Map.Entry<String, String> entry : config.entrySet()) {
-            graphicsDriverConfig += entry.getKey() + "=" + entry.getValue() + ";";
+            String key = entry.getKey() == null ? "" : entry.getKey().trim();
+            if (key.isEmpty()) continue;
+            if (graphicsDriverConfig.length() > 0) graphicsDriverConfig.append(';');
+            graphicsDriverConfig.append(key).append("=").append(entry.getValue() == null ? "" : entry.getValue());
         }
-        return graphicsDriverConfig.substring(0, graphicsDriverConfig.length() - 1);
+        return graphicsDriverConfig.toString();
     }
 
     public static String getVersion(String graphicsDriverConfig) {

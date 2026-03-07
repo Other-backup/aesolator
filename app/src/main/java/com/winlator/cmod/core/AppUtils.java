@@ -201,7 +201,16 @@ public abstract class AppUtils {
         popupWindow.setOutsideTouchable(true);
 
         popupWindow.update();
-        popupWindow.showAsDropDown(anchor);
+        int[] location = new int[2];
+        anchor.getLocationOnScreen(location);
+        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        int popupHeight = popupWindow.getHeight();
+        int availableBelow = screenHeight - (location[1] + anchor.getHeight());
+        if (popupHeight > availableBelow && location[1] > popupHeight) {
+            popupWindow.showAsDropDown(anchor, 0, -(anchor.getHeight() + popupHeight));
+        } else {
+            popupWindow.showAsDropDown(anchor);
+        }
 
         popupWindow.setFocusable(true);
         popupWindow.update();
