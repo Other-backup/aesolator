@@ -38,7 +38,8 @@ public final class ThemeAssetPainter {
         applyTaggedSurface(view, isDarkMode);
 
         if (view instanceof ImageButton) {
-            tint((ImageButton) view, buttonTint);
+            ImageButton imageButton = (ImageButton) view;
+            tint(imageButton, shouldUseLightButtonTint(imageButton) ? buttonDrawableTint : buttonTint);
         } else if (view instanceof EditText) {
             EditText editText = (EditText) view;
             editText.setTextColor(primaryTextColor);
@@ -64,14 +65,7 @@ public final class ThemeAssetPainter {
     private static boolean shouldTintImageView(ImageView imageView) {
         if (hasTagFlag(imageView, "no_theme_tint")) return false;
 
-        int viewId = imageView.getId();
-        if (viewId == View.NO_ID) return false;
-
-        String idName = "";
-        try {
-            idName = imageView.getResources().getResourceEntryName(viewId).toLowerCase(Locale.US);
-        } catch (Exception ignored) {
-        }
+        String idName = getViewIdName(imageView);
         if (idName.isEmpty()) return false;
 
         if (idName.contains("coverart")
@@ -104,6 +98,24 @@ public final class ThemeAssetPainter {
         int width = drawable.getIntrinsicWidth();
         int height = drawable.getIntrinsicHeight();
         return width > 0 && height > 0 && width <= 96 && height <= 96;
+    }
+
+    private static boolean shouldUseLightButtonTint(ImageButton imageButton) {
+        if (hasTagFlag(imageButton, "no_theme_tint")) return false;
+        String idName = getViewIdName(imageButton);
+        if (idName.contains("confirm")) return true;
+        String className = imageButton.getClass().getSimpleName().toLowerCase(Locale.US);
+        return className.contains("floatingactionbutton");
+    }
+
+    private static String getViewIdName(View view) {
+        int viewId = view.getId();
+        if (viewId == View.NO_ID) return "";
+        try {
+            return view.getResources().getResourceEntryName(viewId).toLowerCase(Locale.US);
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private static void applyTaggedSurface(View view, boolean isDarkMode) {

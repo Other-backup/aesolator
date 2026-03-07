@@ -31,19 +31,11 @@ public class ContainerManager {
     private final File homeDir;
     private final Context context;
 
-    private boolean isInitialized = false; // New flag to track initialization
-
     public ContainerManager(Context context) {
         this.context = context;
         File rootDir = ImageFs.find(context).getRootDir();
         homeDir = new File(rootDir, "home");
         loadContainers();
-        isInitialized = true;
-    }
-
-    // Check if the ContainerManager is fully initialized
-    public boolean isInitialized() {
-        return isInitialized;
     }
 
     public ArrayList<Container> getContainers() {
@@ -297,12 +289,4 @@ public class ContainerManager {
         }
         return null;  // Return null if no matching container is found
     }
-
-    // Utility method to run on UI thread
-    private void runOnUiThread(Runnable action) {
-        new Handler(Looper.getMainLooper()).post(action);
-    }
-
-
-
 }

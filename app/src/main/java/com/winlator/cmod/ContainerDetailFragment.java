@@ -186,6 +186,19 @@ public class ContainerDetailFragment extends Fragment {
         return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 
+    private static String getSelectedText(@Nullable Spinner spinner, @NonNull String fallback) {
+        if (spinner == null) return fallback;
+        Object selected = spinner.getSelectedItem();
+        if (selected == null) return fallback;
+        String value = selected.toString();
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
+    }
+
+    private static String getSelectedIdentifier(@Nullable Spinner spinner, @NonNull String fallback) {
+        String selectedText = getSelectedText(spinner, fallback);
+        return selectedText.isEmpty() ? fallback : StringUtils.parseIdentifier(selectedText);
+    }
+
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
         SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
@@ -439,7 +452,7 @@ public class ContainerDetailFragment extends Fragment {
         final Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         FEXCorePresetManager.loadSpinner(sFEXCorePreset, isEditMode() ? container.getFEXCorePreset() : preferences.getString("fexcore_preset", FEXCorePreset.INTERMEDIATE));
 
-        String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
+        String selectedDriver = getSelectedText(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
         List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
         sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), sGraphicsItemsList));
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
@@ -486,7 +499,7 @@ public class ContainerDetailFragment extends Fragment {
                 String name = etName.getText().toString();
                 String screenSize = getScreenSize(view);
                 String envVars = envVarsView.getEnvVars();
-                String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
+                String graphicsDriver = getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
                 String graphicsDriverConfig = vGraphicsDriverConfig.getTag() instanceof String
                         ? (String) vGraphicsDriverConfig.getTag()
                         : "";
@@ -496,7 +509,7 @@ public class ContainerDetailFragment extends Fragment {
                     config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
-                String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
+                String dxwrapper = getSelectedIdentifier(sDXWrapper, Container.DEFAULT_DXWRAPPER);
                 String dxwrapperConfig = vDXWrapperConfig.getTag() instanceof String
                         ? (String) vDXWrapperConfig.getTag()
                         : "";
@@ -509,7 +522,7 @@ public class ContainerDetailFragment extends Fragment {
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 String cpuListWoW64 = cpuListViewWoW64.getCheckedCPUListAsString();
                 byte startupSelection = (byte) sStartupSelection.getSelectedItemPosition();
-                String selectedWineVersion = sWineVersion.getSelectedItem() != null ? sWineVersion.getSelectedItem().toString() : "";
+                String selectedWineVersion = getSelectedText(sWineVersion, "");
                 if (AppUtils.isMissingComponentValue(selectedWineVersion)) {
                     if (isEditMode() && container != null && !AppUtils.isMissingComponentValue(container.getWineVersion())) {
                         selectedWineVersion = container.getWineVersion();
@@ -534,12 +547,12 @@ public class ContainerDetailFragment extends Fragment {
                 String containerUpscalerFramegen = cbContainerFgEnable.isChecked() ? "1" : "0";
                 String containerUpscalerThermalGuard = cbContainerFgThermalGuard.isChecked() ? "1" : "0";
 
-                String box64Version = sBox64Version.getSelectedItem() != null ? sBox64Version.getSelectedItem().toString() : "";
+                String box64Version = getSelectedText(sBox64Version, "");
                 if (AppUtils.isMissingComponentValue(box64Version)) {
                     box64Version = isEditMode() ? container.getBox64Version() : "";
                 }
 
-                String fexcoreVersion = sFEXCoreVersion.getSelectedItem() != null ? sFEXCoreVersion.getSelectedItem().toString() : "";
+                String fexcoreVersion = getSelectedText(sFEXCoreVersion, "");
                 if (AppUtils.isMissingComponentValue(fexcoreVersion)) {
                     fexcoreVersion = isEditMode() ? container.getFEXCoreVersion() : "";
                 }
@@ -547,7 +560,9 @@ public class ContainerDetailFragment extends Fragment {
                 String box64Preset = Box64PresetManager.getSpinnerSelectedId(sBox64Preset);
                 String desktopTheme = getDesktopTheme(view);
                 // Capture missing properties
-                String midiSoundFont = sMIDISoundFont.getSelectedItemPosition() == 0 ? "" : sMIDISoundFont.getSelectedItem().toString();
+                String midiSoundFont = sMIDISoundFont.getSelectedItemPosition() == 0
+                        ? ""
+                        : getSelectedText(sMIDISoundFont, "");
                 String lc_all = etLC_ALL.getText().toString();
                 int primaryController = sPrimaryController.getSelectedItemPosition();
                 String controllerMapping = getControllerMapping(view);
@@ -678,7 +693,11 @@ public class ContainerDetailFragment extends Fragment {
         File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            registryEditor.setStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", sMouseWarpOverride.getSelectedItem().toString().toLowerCase(Locale.ENGLISH));
+            registryEditor.setStringValue(
+                    "Software\\Wine\\DirectInput",
+                    "MouseWarpOverride",
+                    getSelectedText(sMouseWarpOverride, "disable").toLowerCase(Locale.ENGLISH)
+            );
         }
     }
 
@@ -713,15 +732,26 @@ public class ContainerDetailFragment extends Fragment {
         });
         sDesktopBackgroundType.setSelection(desktopTheme.backgroundType.ordinal());
 
-        File containerDir = isEditMode() ? container.getRootDir() : null;
-        File userRegFile = new File(containerDir, ".wine/user.reg");
+        List<String> mouseWarpOverrideList = Arrays.asList(
+                context.getString(R.string.disable),
+                context.getString(R.string.enable),
+                context.getString(R.string.force)
+        );
+        Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
+        sMouseWarpOverride.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), mouseWarpOverrideList));
 
-        try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
-            List<String> mouseWarpOverrideList = Arrays.asList(context.getString(R.string.disable), context.getString(R.string.enable), context.getString(R.string.force));
-            Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            sMouseWarpOverride.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), mouseWarpOverrideList));
-            AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride, registryEditor.getStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", "disable"));
+        String mouseWarpOverride = "disable";
+        if (isEditMode()) {
+            File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
+            try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
+                mouseWarpOverride = registryEditor.getStringValue(
+                        "Software\\Wine\\DirectInput",
+                        "MouseWarpOverride",
+                        "disable"
+                );
+            }
         }
+        AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride, mouseWarpOverride);
     }
 
     private void loadGPUNameSpinner(Spinner spinner, int selectedDeviceID) {
@@ -743,7 +773,7 @@ public class ContainerDetailFragment extends Fragment {
 
     public static String getScreenSize(View view) {
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-        String value = sScreenSize.getSelectedItem().toString();
+        String value = getSelectedText(sScreenSize, Container.DEFAULT_SCREEN_SIZE);
         if (value.equalsIgnoreCase("custom")) {
             value = Container.DEFAULT_SCREEN_SIZE;
             String strWidth = ((EditText)view.findViewById(R.id.ETScreenWidth)).getText().toString().trim();
@@ -797,7 +827,6 @@ public class ContainerDetailFragment extends Fragment {
         }
     }
 
-    // New method: Adds support for the GraphicsDriverConfigDialog
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
 
@@ -805,7 +834,7 @@ public class ContainerDetailFragment extends Fragment {
         updateGraphicsDriverSpinner(context, sGraphicsDriver);
 
         Runnable update = () -> {
-            String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
+            String graphicsDriver = getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
 
             // Update the DXWrapper spinner
             ArrayList<String> items = new ArrayList<>();
@@ -841,7 +870,7 @@ public class ContainerDetailFragment extends Fragment {
         AdapterView.OnItemSelectedListener listener = new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
+                String dxwrapper = getSelectedIdentifier(sDXWrapper, Container.DEFAULT_DXWRAPPER);
                 if (dxwrapper.contains("dxvk")) {
                     vDXWrapperConfig.setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
                 } else if (dxwrapper.contains("dgvoodoo")) {
@@ -1059,7 +1088,7 @@ public class ContainerDetailFragment extends Fragment {
                 View vDXWrapperConfig = view.findViewById(R.id.BTDXWrapperConfig);
                 sEmulator64.setEnabled(false);
 
-                String wineVersion = sWineVersion.getSelectedItem() != null ? sWineVersion.getSelectedItem().toString() : "";
+                String wineVersion = getSelectedText(sWineVersion, "");
                 if (AppUtils.isMissingComponentValue(wineVersion)) {
                     fexcoreFL.setVisibility(View.GONE);
                     sEmulator.setEnabled(false);

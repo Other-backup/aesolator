@@ -40,16 +40,6 @@
         <item>DXVK+VKD3D</item>
         <item>dgVoodoo</item>
     </string-array>
-    <string-array name="contents_source_entries">
-        <item>Ae.solator mainline (Recommended)</item>
-        <item>WCPHub feed</item>
-        <item>Fallback feed</item>
-    </string-array>
-    <string-array name="contents_source_values">
-        <item>aesolator</item>
-        <item>wcphub</item>
-        <item>fallback</item>
-    </string-array>
     <string-array name="graphics_feed_source_entries">
         <item>Ae.solator Archive (Recommended)</item>
         <item>StevenMXZ Turnip CI</item>

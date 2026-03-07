@@ -28,7 +28,6 @@ import java.util.UUID;
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
-    public static final String REMOTE_PROFILES_FALLBACK = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
     public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/wcp-graphics-lanes/main/contents/contents.json";
     public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
@@ -121,15 +120,6 @@ public class ContentsManager {
     public void setArchiveRemoteProfiles(String json) {
         remoteProfiles = new ArrayList<>();
         appendRemoteProfiles(json, false, false, true, true);
-        syncContents();
-    }
-
-    public void setCompositeRemoteProfiles(String hubJson, String repoOverlayJson, boolean showNightlyOnly) {
-        remoteProfiles = new ArrayList<>();
-        // Hub feed: keep all channels available in-memory, UI can filter by toggles.
-        appendRemoteProfiles(hubJson, showNightlyOnly, true, false, true);
-        // Overlay feed: repo-managed lanes only.
-        appendRemoteProfiles(repoOverlayJson, false, false, true, false);
         syncContents();
     }
 

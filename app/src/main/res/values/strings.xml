@@ -847,7 +847,6 @@
     <string name="contents_source_aesolator_mainline">WCP Archive</string>
     <string name="contents_source_wcphub_feed">WCPHub feed</string>
     <string name="contents_source_wcphub">WCPHub</string>
-    <string name="contents_source_fallback">Fallback feed</string>
     <string name="contents_source_aesolator">WCP Archive</string>
     <string name="contents_source_unknown">Unknown source</string>
     <string name="contents_source_installed_local">Installed locally</string>

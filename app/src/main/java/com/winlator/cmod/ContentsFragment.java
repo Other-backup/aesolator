@@ -408,7 +408,6 @@ public class ContentsFragment extends Fragment {
         String profileMode = resolveProfileSourceMode(profile);
         if ("aesolator".equals(profileMode)) return 300;
         if ("wcphub".equals(profileMode)) return 200;
-        if ("fallback".equals(profileMode)) return 100;
         return 50;
     }
 
@@ -433,7 +432,6 @@ public class ContentsFragment extends Fragment {
         if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany") || joined.contains("winlatorwcphub")) {
             return "wcphub";
         }
-        if (joined.contains("winlator-contents") || joined.contains("stevenmxz") || joined.contains("fallback")) return "fallback";
         return "remote";
     }
 
@@ -651,7 +649,6 @@ public class ContentsFragment extends Fragment {
     private String getSourceEntryLabel(String sourceValue) {
         if ("aesolator".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
         if ("wcphub".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
-        if ("fallback".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_fallback);
         return getString(R.string.contents_source_unknown);
     }
 
@@ -925,10 +922,6 @@ public class ContentsFragment extends Fragment {
             urls.add(ContentsManager.REMOTE_PROFILES);
             return urls;
         }
-        if ("fallback".equals(selectedSourceMode)) {
-            urls.add(ContentsManager.REMOTE_PROFILES_FALLBACK);
-            return urls;
-        }
         urls.add(ContentsManager.REMOTE_PROFILES);
         return urls;
     }
@@ -983,7 +976,6 @@ public class ContentsFragment extends Fragment {
         String sourceId = deriveFeedSourceId(feedUrl);
         if ("aesolator".equals(sourceId)) return getString(R.string.contents_source_aesolator);
         if ("wcphub".equals(sourceId)) return getString(R.string.contents_source_wcphub);
-        if ("fallback".equals(sourceId)) return getString(R.string.contents_source_fallback);
         try {
             URI uri = new URI(feedUrl);
             String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
@@ -1003,7 +995,6 @@ public class ContentsFragment extends Fragment {
     private String deriveFeedSourceId(String feedUrl) {
         String lower = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
         if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return "wcphub";
-        if (lower.contains("stevenmxz/winlator-contents")) return "fallback";
         if (lower.contains("kosoymiki/wcp-runtime-lanes")
                 || lower.contains("kosoymiki/wcp-graphics-lanes")
                 || lower.contains("ae.solator")
@@ -1353,7 +1344,6 @@ public class ContentsFragment extends Fragment {
         String sourceMode = resolveProfileSourceMode(profile);
         if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
         if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
-        if ("fallback".equals(sourceMode)) return getString(R.string.contents_source_fallback);
         try {
             Uri uri = Uri.parse(profile.remoteUrl);
             String host = uri.getHost();
@@ -1420,7 +1410,6 @@ public class ContentsFragment extends Fragment {
         if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_runtime_lanes);
         if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_graphics_lanes);
         if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub);
-        if (lowerRepo.contains("winlator-contents") || lowerRepo.contains("stevenmxz")) return getString(R.string.contents_source_fallback);
         return repo;
     }
 
