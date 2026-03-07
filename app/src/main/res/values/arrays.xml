@@ -65,14 +65,12 @@
         <item>mrpurple</item>
     </string-array>
     <string-array name="contents_channel_entries">
-        <item>Mainline release</item>
+        <item>Mainline</item>
         <item>Nightly</item>
-        <item>Mainline + Nightly</item>
     </string-array>
     <string-array name="contents_channel_values">
         <item>stable</item>
         <item>nightly</item>
-        <item>all</item>
     </string-array>
     <string-array name="contents_arch_entries">
         <item>All architectures</item>

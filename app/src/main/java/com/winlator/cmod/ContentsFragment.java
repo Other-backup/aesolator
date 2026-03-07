@@ -119,6 +119,11 @@ public class ContentsFragment extends Fragment {
         }
         channelMode = sharedPreferences.getString("contents_channel_mode", "stable");
         if (channelMode == null || channelMode.trim().isEmpty()) channelMode = "stable";
+        boolean migratedChannelMode = false;
+        if ("all".equalsIgnoreCase(channelMode)) {
+            channelMode = "stable";
+            migratedChannelMode = true;
+        }
         archMode = sharedPreferences.getString("contents_arch_mode", "all");
         if (archMode == null || archMode.trim().isEmpty()) archMode = "all";
         boolean migratedArchMode = false;
@@ -126,9 +131,10 @@ public class ContentsFragment extends Fragment {
             archMode = "all";
             migratedArchMode = true;
         }
-        if (migratedSourceMode || migratedArchMode) {
+        if (migratedSourceMode || migratedChannelMode || migratedArchMode) {
             SharedPreferences.Editor migrationEditor = sharedPreferences.edit();
             if (migratedSourceMode) migrationEditor.putString("contents_source_mode", sourceMode);
+            if (migratedChannelMode) migrationEditor.putString("contents_channel_mode", channelMode);
             if (migratedArchMode) migrationEditor.putString("contents_arch_mode", archMode);
             migrationEditor.apply();
         }
