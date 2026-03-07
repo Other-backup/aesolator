@@ -513,8 +513,8 @@ public class ContainerDetailFragment extends Fragment {
                 String dxwrapperConfig = vDXWrapperConfig.getTag() instanceof String
                         ? (String) vDXWrapperConfig.getTag()
                         : "";
-                String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
-                String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
+                String audioDriver = getSelectedIdentifier(sAudioDriver, Container.DEFAULT_AUDIO_DRIVER);
+                String emulator = getSelectedIdentifier(sEmulator, Container.DEFAULT_EMULATOR);
                 String wincomponents = getWinComponents(view);
                 String drives = getDrives(view);
                 boolean showFPS = cbShowFPS.isChecked();
@@ -539,10 +539,10 @@ public class ContainerDetailFragment extends Fragment {
                     return;
                 }
                 String containerUpscalerPreset = UpscalerProfileStore.normalizePreset(
-                        StringUtils.parseIdentifier(sContainerFgPreset.getSelectedItem())
+                        getSelectedText(sContainerFgPreset, "auto")
                 );
                 String containerUpscalerFramegenMode = UpscalerProfileStore.normalizeFramegenMode(
-                        StringUtils.parseIdentifier(sContainerFgMode.getSelectedItem())
+                        getSelectedText(sContainerFgMode, "balanced")
                 );
                 String containerUpscalerFramegen = cbContainerFgEnable.isChecked() ? "1" : "0";
                 String containerUpscalerThermalGuard = cbContainerFgThermalGuard.isChecked() ? "1" : "0";
@@ -565,13 +565,16 @@ public class ContainerDetailFragment extends Fragment {
                         : getSelectedText(sMIDISoundFont, "");
                 String lc_all = etLC_ALL.getText().toString();
                 int primaryController = sPrimaryController.getSelectedItemPosition();
+                if (primaryController < 0) primaryController = 1;
                 String controllerMapping = getControllerMapping(view);
 
                 // Define final input type
                 int finalInputType = 0;
+                int selectedInputMapper = SDInputType.getSelectedItemPosition();
+                if (selectedInputMapper < 0) selectedInputMapper = 0;
                 finalInputType |= cbEnableXInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_XINPUT : 0;
                 finalInputType |= cbEnableDInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_DINPUT : 0;
-                finalInputType |= SDInputType.getSelectedItemPosition() == 0 ? WinHandler.FLAG_DINPUT_MAPPER_STANDARD : WinHandler.FLAG_DINPUT_MAPPER_XINPUT;
+                finalInputType |= selectedInputMapper == 0 ? WinHandler.FLAG_DINPUT_MAPPER_STANDARD : WinHandler.FLAG_DINPUT_MAPPER_XINPUT;
 
                 // Handle SDL2 environment variables based on the toggle state
                 if (cbSdl2Toggle.isChecked()) {
