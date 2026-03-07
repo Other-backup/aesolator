@@ -22,6 +22,8 @@ public class ContentProfile {
     public static final String MARK_DELIVERY = "delivery";
     public static final String MARK_DISPLAY_CATEGORY = "displayCategory";
     public static final String MARK_SOURCE_REPO = "sourceRepo";
+    public static final String MARK_SOURCE_FEED = "sourceFeed";
+    public static final String MARK_SOURCE_LABEL = "sourceLabel";
     public static final String MARK_RELEASE_TAG = "releaseTag";
     public static final String MARK_SHA256 = "sha256";
     public static final String MARK_VULKAN_API_MIN = "vulkanApiMin";
@@ -106,6 +108,8 @@ public class ContentProfile {
     public String delivery = "";
     public String displayCategory = "";
     public String sourceRepo = "";
+    public String sourceFeed = "";
+    public String sourceLabel = "";
     public String releaseTag = "";
     public int vulkanApiMin = 0;
     public int vulkanApiMax = 0;
@@ -199,6 +203,12 @@ public class ContentProfile {
         }
         if ((sourceRepo == null || sourceRepo.trim().isEmpty()) && remoteProfile.sourceRepo != null) {
             sourceRepo = remoteProfile.sourceRepo;
+        }
+        if ((sourceFeed == null || sourceFeed.trim().isEmpty()) && remoteProfile.sourceFeed != null) {
+            sourceFeed = remoteProfile.sourceFeed;
+        }
+        if ((sourceLabel == null || sourceLabel.trim().isEmpty()) && remoteProfile.sourceLabel != null) {
+            sourceLabel = remoteProfile.sourceLabel;
         }
         if ((releaseTag == null || releaseTag.trim().isEmpty()) && remoteProfile.releaseTag != null) {
             releaseTag = remoteProfile.releaseTag;

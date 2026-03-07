@@ -53,6 +53,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,6 +102,7 @@ public class ContentsFragment extends Fragment {
     private String[] sourceValues;
     private String[] channelValues;
     private String[] archValues;
+    private boolean suppressFilterCallbacks;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -178,10 +180,15 @@ public class ContentsFragment extends Fragment {
                     preselectedDisplayCategory = "";
                 }
                 updateLaneScopeLabel();
+                boolean sourceModeChanged = refreshSourceSpinnerForType();
                 refreshTypeScopedFilterSpinners();
                 updateFilterControlsVisibility();
                 if (emptyText != null && recyclerView != null) {
-                    loadContentList();
+                    if (sourceModeChanged) {
+                        reloadRemoteContents();
+                    } else {
+                        loadContentList();
+                    }
                 }
             }
 
@@ -197,16 +204,8 @@ public class ContentsFragment extends Fragment {
         sContentsChannelMode = layout.findViewById(R.id.SContentsChannelMode);
         sContentsArchMode = layout.findViewById(R.id.SContentsArchMode);
 
-        sourceValues = getResources().getStringArray(R.array.contents_source_values);
         channelValues = getResources().getStringArray(R.array.contents_channel_values);
         archValues = getResources().getStringArray(R.array.contents_arch_values);
-
-        sContentsSourceMode.setAdapter(SpinnerAdapters.create(
-                requireContext(),
-                isDarkMode,
-                getResources().getStringArray(R.array.contents_source_entries)
-        ));
-        sContentsSourceMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
 
         sContentsChannelMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
@@ -223,12 +222,13 @@ public class ContentsFragment extends Fragment {
         sContentsArchMode.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         applyFilterSpinnerTheme();
 
-        setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
+        refreshSourceSpinnerForType();
         refreshTypeScopedFilterSpinners();
 
         sContentsSourceMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressFilterCallbacks) return;
                 updateFilterPreferencesFromUi();
                 reloadRemoteContents();
             }
@@ -240,6 +240,7 @@ public class ContentsFragment extends Fragment {
         sContentsChannelMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressFilterCallbacks) return;
                 updateFilterPreferencesFromUi();
                 loadContentList();
             }
@@ -251,6 +252,7 @@ public class ContentsFragment extends Fragment {
         sContentsArchMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressFilterCallbacks) return;
                 updateFilterPreferencesFromUi();
                 loadContentList();
             }
@@ -370,35 +372,70 @@ public class ContentsFragment extends Fragment {
             }
             filtered.add(profile);
         }
+        sortVisibleProfiles(filtered);
         return filtered;
     }
 
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
         if (profile == null) return false;
         String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        String profileMode = resolveProfileSourceMode(profile);
+        if ("aesolator".equals(mode)) return "aesolator".equals(profileMode) || "wcphub".equals(profileMode);
+        return mode.equals(profileMode);
+    }
 
-        if ("aesolator".equals(mode)) {
-            // Mainline source is a curated composite: Ae overlay lanes + WCPHub runtime lanes.
-            return true;
-        }
+    private void sortVisibleProfiles(List<ContentProfile> profiles) {
+        Collections.sort(profiles, (left, right) -> {
+            boolean leftInstalled = isRuntimeInstalled(left);
+            boolean rightInstalled = isRuntimeInstalled(right);
+            if (leftInstalled != rightInstalled) {
+                return leftInstalled ? -1 : 1;
+            }
+
+            int verCodeCompare = Integer.compare(right.verCode, left.verCode);
+            if (verCodeCompare != 0) return verCodeCompare;
+
+            int sourceCompare = Integer.compare(resolveProfileSourcePriority(right), resolveProfileSourcePriority(left));
+            if (sourceCompare != 0) return sourceCompare;
+
+            int channelCompare = Integer.compare(resolveProfileChannelPriority(right), resolveProfileChannelPriority(left));
+            if (channelCompare != 0) return channelCompare;
+
+            return buildProfileTitleLine(left).compareToIgnoreCase(buildProfileTitleLine(right));
+        });
+    }
+
+    private int resolveProfileSourcePriority(ContentProfile profile) {
+        String profileMode = resolveProfileSourceMode(profile);
+        if ("aesolator".equals(profileMode)) return 300;
+        if ("wcphub".equals(profileMode)) return 200;
+        if ("fallback".equals(profileMode)) return 100;
+        return 50;
+    }
+
+    private int resolveProfileChannelPriority(ContentProfile profile) {
+        String channel = profile == null ? "" : profile.getChannel();
+        if (ContentProfile.CHANNEL_STABLE.equalsIgnoreCase(channel)) return 30;
+        if (ContentProfile.CHANNEL_BETA.equalsIgnoreCase(channel)) return 20;
+        if (ContentProfile.CHANNEL_NIGHTLY.equalsIgnoreCase(channel)) return 10;
+        return 0;
+    }
+
+    private String resolveProfileSourceMode(ContentProfile profile) {
+        if (profile == null) return "remote";
+        String sourceFeed = profile.sourceFeed == null ? "" : profile.sourceFeed.trim().toLowerCase(Locale.US);
+        if (!sourceFeed.isEmpty()) return sourceFeed;
 
         String joined = (
                 (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
                         (profile.remoteUrl == null ? "" : profile.remoteUrl)
         ).toLowerCase(Locale.US);
-
-        if ("wcphub".equals(mode)) {
-            return joined.contains("open-wine-components")
-                    || joined.contains("wcphub")
-                    || joined.contains("arihany")
-                    || joined.contains("winlatorwcphub");
+        if (joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator")) return "aesolator";
+        if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany") || joined.contains("winlatorwcphub")) {
+            return "wcphub";
         }
-        if ("fallback".equals(mode)) {
-            return joined.contains("winlator-contents")
-                    || joined.contains("stevenmxz")
-                    || joined.contains("fallback");
-        }
-        return true;
+        if (joined.contains("winlator-contents") || joined.contains("stevenmxz") || joined.contains("fallback")) return "fallback";
+        return "remote";
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -472,6 +509,32 @@ public class ContentsFragment extends Fragment {
                 || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
     }
 
+    private boolean refreshSourceSpinnerForType() {
+        if (getContext() == null || sContentsSourceMode == null) return false;
+        String previousSourceMode = sourceMode == null ? "" : sourceMode;
+
+        sourceValues = getSourceValuesForType(currentContentType);
+        String[] sourceEntries = getSourceEntriesForType(currentContentType);
+
+        suppressFilterCallbacks = true;
+        try {
+            sContentsSourceMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, sourceEntries));
+            sContentsSourceMode.setPopupBackgroundResource(
+                    isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
+            );
+            applyFilterSpinnerTheme();
+
+            if (!containsIgnoreCase(sourceValues, sourceMode)) {
+                sourceMode = sourceValues.length > 0 ? sourceValues[0] : "aesolator";
+            }
+            setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
+            sharedPreferences.edit().putString("contents_source_mode", sourceMode).apply();
+        } finally {
+            suppressFilterCallbacks = false;
+        }
+        return !previousSourceMode.equalsIgnoreCase(sourceMode);
+    }
+
     private void updateFilterControlsVisibility() {
         if (!isAdded()) return;
         boolean showArchFilters = supportsArchitectureFilters(currentContentType) && currentSourceHasMultipleArchitectureCandidates();
@@ -500,23 +563,28 @@ public class ContentsFragment extends Fragment {
         String[] channelEntries = getChannelEntriesForType(currentContentType);
         String[] archEntries = getArchEntriesForType(currentContentType);
 
-        sContentsChannelMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, channelEntries));
-        sContentsArchMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, archEntries));
+        suppressFilterCallbacks = true;
+        try {
+            sContentsChannelMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, channelEntries));
+            sContentsArchMode.setAdapter(SpinnerAdapters.create(requireContext(), isDarkMode, archEntries));
 
-        int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
-        sContentsChannelMode.setPopupBackgroundResource(popupBackground);
-        sContentsArchMode.setPopupBackgroundResource(popupBackground);
-        applyFilterSpinnerTheme();
+            int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
+            sContentsChannelMode.setPopupBackgroundResource(popupBackground);
+            sContentsArchMode.setPopupBackgroundResource(popupBackground);
+            applyFilterSpinnerTheme();
 
-        if (!containsIgnoreCase(channelValues, channelMode)) channelMode = channelValues.length > 0 ? channelValues[0] : "stable";
-        if (!containsIgnoreCase(archValues, archMode)) archMode = archValues.length > 0 ? archValues[0] : "all";
+            if (!containsIgnoreCase(channelValues, channelMode)) channelMode = channelValues.length > 0 ? channelValues[0] : "stable";
+            if (!containsIgnoreCase(archValues, archMode)) archMode = archValues.length > 0 ? archValues[0] : "all";
 
-        setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
-        setSpinnerSelectionByValue(sContentsArchMode, archValues, archMode, 0);
-        sharedPreferences.edit()
-                .putString("contents_channel_mode", channelMode)
-                .putString("contents_arch_mode", archMode)
-                .apply();
+            setSpinnerSelectionByValue(sContentsChannelMode, channelValues, channelMode, 0);
+            setSpinnerSelectionByValue(sContentsArchMode, archValues, archMode, 0);
+            sharedPreferences.edit()
+                    .putString("contents_channel_mode", channelMode)
+                    .putString("contents_arch_mode", archMode)
+                    .apply();
+        } finally {
+            suppressFilterCallbacks = false;
+        }
     }
 
     private boolean containsIgnoreCase(String[] values, String value) {
@@ -529,7 +597,7 @@ public class ContentsFragment extends Fragment {
 
     private String[] getChannelEntriesForType(ContentProfile.ContentType type) {
         if (!supportsChannelFilter(type) || !currentSourceHasNightlyCandidates()) {
-            return new String[]{"Mainline release"};
+            return new String[]{getString(R.string.contents_channel_mainline_release)};
         }
         return getResources().getStringArray(R.array.contents_channel_entries);
     }
@@ -543,7 +611,7 @@ public class ContentsFragment extends Fragment {
 
     private String[] getArchEntriesForType(ContentProfile.ContentType type) {
         if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
-            return new String[]{"All lanes"};
+            return new String[]{getString(R.string.contents_arch_all_lanes)};
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
@@ -554,6 +622,45 @@ public class ContentsFragment extends Fragment {
             return getResources().getStringArray(R.array.contents_arch_entries_wine_proton);
         }
         return getResources().getStringArray(R.array.contents_arch_entries);
+    }
+
+    private String[] getSourceEntriesForType(ContentProfile.ContentType type) {
+        ArrayList<String> entries = new ArrayList<>();
+        entries.add(getString(R.string.contents_source_aesolator_mainline));
+        if (supportsSourceModeForType(type, "wcphub")) {
+            entries.add(getString(R.string.contents_source_wcphub_feed));
+        }
+        if (supportsSourceModeForType(type, "fallback")) {
+            entries.add(getString(R.string.contents_source_fallback));
+        }
+        return entries.toArray(new String[0]);
+    }
+
+    private String[] getSourceValuesForType(ContentProfile.ContentType type) {
+        ArrayList<String> values = new ArrayList<>();
+        values.add("aesolator");
+        if (supportsSourceModeForType(type, "wcphub")) {
+            values.add("wcphub");
+        }
+        if (supportsSourceModeForType(type, "fallback")) {
+            values.add("fallback");
+        }
+        return values.toArray(new String[0]);
+    }
+
+    private boolean supportsSourceModeForType(ContentProfile.ContentType type, String mode) {
+        String normalizedMode = mode == null ? "" : mode.trim().toLowerCase(Locale.US);
+        if ("aesolator".equals(normalizedMode)) return true;
+        if ("wcphub".equals(normalizedMode) || "fallback".equals(normalizedMode)) {
+            return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                    || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
+        }
+        return false;
     }
 
     private String[] getArchValuesForType(ContentProfile.ContentType type) {
@@ -659,6 +766,34 @@ public class ContentsFragment extends Fragment {
             if (profile.isBetaLike()) return true;
         }
         return false;
+    }
+
+    private boolean isRuntimeInstalled(ContentProfile profile) {
+        if (profile == null) return false;
+        if (profile.isInstalledLocally()) return true;
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            DgVoodooManager dgVoodooManager = new DgVoodooManager(requireContext());
+            if (!dgVoodooManager.isInstalled()) return false;
+            String profileArch = resolveProfileArchTag(profile);
+            if ("generic".equalsIgnoreCase(profileArch)) return true;
+            for (String installedArch : dgVoodooManager.getInstalledArchitectures()) {
+                if (matchesDgVoodooArchitecture(profileArch, installedArch)) return true;
+            }
+            return false;
+        }
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            return isVulkanSdkRuntimePresent();
+        }
+        return false;
+    }
+
+    private boolean matchesDgVoodooArchitecture(String profileArch, String installedArch) {
+        String normalizedProfile = profileArch == null ? "" : profileArch.trim().toLowerCase(Locale.US);
+        String normalizedInstalled = installedArch == null ? "" : installedArch.trim().toLowerCase(Locale.US);
+        if ("x86_64".equals(normalizedProfile)) {
+            return "x64".equals(normalizedInstalled) || "x86_64".equals(normalizedInstalled);
+        }
+        return normalizedProfile.equals(normalizedInstalled);
     }
 
     private boolean isVulkanSdkRuntimePresent() {
@@ -829,12 +964,19 @@ public class ContentsFragment extends Fragment {
     private String injectFeedSourceMetadata(String json, String feedUrl) {
         try {
             JSONArray array = new JSONArray(json);
+            String sourceId = deriveFeedSourceId(feedUrl);
             String sourceLabel = deriveFeedSourceLabel(feedUrl);
             for (int i = 0; i < array.length(); i++) {
                 JSONObject object = array.optJSONObject(i);
                 if (object == null) continue;
                 if (object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim().isEmpty()) {
                     object.put(ContentProfile.MARK_SOURCE_REPO, sourceLabel);
+                }
+                if (object.optString(ContentProfile.MARK_SOURCE_FEED, "").trim().isEmpty()) {
+                    object.put(ContentProfile.MARK_SOURCE_FEED, sourceId);
+                }
+                if (object.optString(ContentProfile.MARK_SOURCE_LABEL, "").trim().isEmpty()) {
+                    object.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
                 }
                 if (object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim().isEmpty()) {
                     object.put(ContentProfile.MARK_RELEASE_TAG, deriveFeedReleaseTag(feedUrl));
@@ -847,6 +989,10 @@ public class ContentsFragment extends Fragment {
     }
 
     private String deriveFeedSourceLabel(String feedUrl) {
+        String sourceId = deriveFeedSourceId(feedUrl);
+        if ("aesolator".equals(sourceId)) return getString(R.string.contents_source_aesolator);
+        if ("wcphub".equals(sourceId)) return getString(R.string.contents_source_wcphub);
+        if ("fallback".equals(sourceId)) return getString(R.string.contents_source_fallback);
         try {
             URI uri = new URI(feedUrl);
             String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
@@ -861,6 +1007,19 @@ public class ContentsFragment extends Fragment {
         } catch (Exception ignored) {
         }
         return "remote-feed";
+    }
+
+    private String deriveFeedSourceId(String feedUrl) {
+        String lower = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
+        if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return "wcphub";
+        if (lower.contains("stevenmxz/winlator-contents")) return "fallback";
+        if (lower.contains("kosoymiki/wcp-runtime-lanes")
+                || lower.contains("kosoymiki/wcp-graphics-lanes")
+                || lower.contains("ae.solator")
+                || lower.contains("aesolator")) {
+            return "aesolator";
+        }
+        return "remote";
     }
 
     private String deriveFeedReleaseTag(String feedUrl) {
@@ -957,9 +1116,10 @@ public class ContentsFragment extends Fragment {
     }
 
     private int resolveRemoteSourcePriority(JSONObject object) {
+        String sourceFeed = object.optString(ContentProfile.MARK_SOURCE_FEED, "").toLowerCase(Locale.US);
         String sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").toLowerCase(Locale.US);
         String remoteUrl = object.optString("remoteUrl", "").toLowerCase(Locale.US);
-        String joined = sourceRepo + " " + remoteUrl;
+        String joined = sourceFeed + " " + sourceRepo + " " + remoteUrl;
         if (joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator")) return 300;
         if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany")) return 200;
         if (joined.contains("stevenmxz") || joined.contains("winlator-contents")) return 100;
@@ -982,7 +1142,7 @@ public class ContentsFragment extends Fragment {
                         + object.optString("remoteUrl", "") + " "
                         + object.optString(ContentProfile.MARK_RELEASE_TAG, "")
         ).toLowerCase(Locale.US);
-        if (("dxvk".equals(normalizedType) || "vkd3d".equals(normalizedType)) && combined.contains("native")) return "native";
+        if (("dxvk".equals(normalizedType) || "vkd3d".equals(normalizedType)) && combined.contains("native")) return "x86_64";
         if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
         if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
         if (combined.contains("arm64")) return "arm64";
@@ -1192,9 +1352,17 @@ public class ContentsFragment extends Fragment {
     }
 
     private String getSourceLabel(ContentProfile profile) {
+        if (profile == null) return getString(R.string.contents_package_remote_generic);
         if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) {
             return getString(R.string.contents_package_local);
         }
+        if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
+            return profile.sourceLabel.trim();
+        }
+        String sourceMode = resolveProfileSourceMode(profile);
+        if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
+        if ("fallback".equals(sourceMode)) return getString(R.string.contents_source_fallback);
         try {
             Uri uri = Uri.parse(profile.remoteUrl);
             String host = uri.getHost();
@@ -1216,33 +1384,32 @@ public class ContentsFragment extends Fragment {
         StringBuilder meta = new StringBuilder(getString(R.string.version_code) + ": " + profile.verCode);
         String archTag = resolveProfileArchTag(profile);
         if (!"generic".equals(archTag)) {
-            meta.append(" • ").append(archTag);
+            meta.append(" • ").append(resolveArchLabel(archTag));
         }
-        boolean runtimeInstalled = profile.isInstalledLocally();
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
             DgVoodooManager dgVoodooManager = new DgVoodooManager(requireContext());
-            runtimeInstalled = runtimeInstalled || dgVoodooManager.isInstalled();
             String dgArch = dgVoodooManager.getInstalledArchitectureSummary();
             if (dgArch != null && !dgArch.trim().isEmpty() && !"-".equals(dgArch)) {
-                meta.append(" • arch=").append(dgArch.trim().toLowerCase(Locale.US));
+                meta.append(" • ")
+                        .append(getString(R.string.contents_package_dgvoodoo_arch, dgArch.trim().toLowerCase(Locale.US)));
             }
-        } else if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            runtimeInstalled = runtimeInstalled || isVulkanSdkRuntimePresent();
         }
+        boolean runtimeInstalled = isRuntimeInstalled(profile);
         if (runtimeInstalled) meta.append(" • ").append(getString(R.string.graphics_center_installed_action).toLowerCase(Locale.US));
         return meta.toString();
     }
 
     private String buildProfileSourceLine(ContentProfile profile) {
         StringBuilder line = new StringBuilder(resolveChannelLabel(profile));
-        String repo = profile.sourceRepo != null ? profile.sourceRepo.trim() : "";
-        String tag = profile.releaseTag != null ? profile.releaseTag.trim() : "";
         String sourceLabel = getSourceLabel(profile);
+        String sourceDetail = getSourceDetailLabel(profile);
+        String tag = profile.releaseTag != null ? profile.releaseTag.trim() : "";
 
-        if (!repo.isEmpty()) {
-            line.append(" • ").append(repo);
-        } else if (!sourceLabel.isEmpty()) {
+        if (!sourceLabel.isEmpty()) {
             line.append(" • ").append(sourceLabel);
+        }
+        if (!sourceDetail.isEmpty() && !sourceDetail.equalsIgnoreCase(sourceLabel)) {
+            line.append(" • ").append(sourceDetail);
         }
 
         if (!tag.isEmpty()
@@ -1252,6 +1419,18 @@ public class ContentsFragment extends Fragment {
             line.append(" • ").append(tag);
         }
         return line.toString();
+    }
+
+    private String getSourceDetailLabel(ContentProfile profile) {
+        if (profile == null || profile.sourceRepo == null) return "";
+        String repo = profile.sourceRepo.trim();
+        if (repo.isEmpty()) return "";
+        String lowerRepo = repo.toLowerCase(Locale.US);
+        if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_runtime_lanes);
+        if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_graphics_lanes);
+        if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub);
+        if (lowerRepo.contains("winlator-contents") || lowerRepo.contains("stevenmxz")) return getString(R.string.contents_source_fallback);
+        return repo;
     }
 
     private String resolveChannelLabel(ContentProfile profile) {
@@ -1264,6 +1443,12 @@ public class ContentsFragment extends Fragment {
 
     private String getDisplayTypeLabel(ContentProfile.ContentType type) {
         return getTypeLabel(type);
+    }
+
+    private String resolveArchLabel(String archTag) {
+        if ("arm64ec".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_arm64ec_runtime);
+        if ("x86_64".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_x64_runtime);
+        return archTag;
     }
 
     private String resolveImportFileName(@Nullable Uri uri) {

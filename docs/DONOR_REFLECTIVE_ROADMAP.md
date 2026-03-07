@@ -42,6 +42,16 @@ Closed in tree:
 - `TaskManagerDialog` list rows and telemetry side-panels were moved to card surfaces, and process rows now render in the same visual language as the rest of the app.
 - Theme asset painting now understands tagged `theme_card` / `theme_badge` surfaces and excludes launcher/app-brand icons from automatic tinting.
 - Launcher icon assets were rolled back to the pre-upscale baseline so adaptive icon masking no longer inherits the accidental accent-fill variant.
+- `Contents` source logic was re-based from raw URL heuristics to explicit feed provenance (`sourceFeed`, `sourceLabel`) so source filtering, labels and source-priority merges stay deterministic across package types.
+- `Contents` source selector is now type-aware:
+  - `DgVoodoo` / `Vulkan SDK` stay on `Ae.solator mainline` only,
+  - `Wine / Proton / DXVK / VKD3D / Box64 / WoWBox64 / FEXCore` keep only the sources that actually provide those lanes.
+- `Contents` package ordering is now stable and semantic:
+  - installed/runtime-active packages first,
+  - then newest `verCode`,
+  - then source priority (`Ae.solator > WCPHub > fallback`),
+  - then channel priority.
+- `Contents` installed-state reporting for `dgVoodoo` is now architecture-aware instead of treating any installed runtime as “all package lanes installed”.
 
 Still open (UI tail queue):
 - Monitor-only queue: future dialogs introduced by new feature lanes must keep the same card/badge language and dialog-root back action.

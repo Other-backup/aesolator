@@ -839,15 +839,24 @@
     <string name="contents_source_selector">Source lane</string>
     <string name="contents_channel_selector">Channel</string>
     <string name="contents_arch_selector">Architecture</string>
+    <string name="contents_source_aesolator_mainline">Ae.solator mainline (Recommended)</string>
+    <string name="contents_source_wcphub_feed">WCPHub feed</string>
     <string name="contents_source_wcphub">WCPHub</string>
     <string name="contents_source_fallback">Fallback feed</string>
-    <string name="contents_source_aesolator">Ae.solator feed</string>
+    <string name="contents_source_aesolator">Ae.solator Archive</string>
     <string name="contents_filters">Filters</string>
     <string name="contents_channel_mainline">Mainline</string>
     <string name="contents_channel_nightly">Nightly</string>
+    <string name="contents_channel_mainline_release">Mainline release</string>
     <string name="contents_package_local">Installed locally</string>
     <string name="contents_package_remote_host">Remote: %1$s</string>
     <string name="contents_package_remote_generic">Remote package</string>
+    <string name="contents_package_dgvoodoo_arch">dgVoodoo=%1$s</string>
+    <string name="contents_arch_all_lanes">All lanes</string>
+    <string name="contents_arch_x64_runtime">x86_64 runtime lane</string>
+    <string name="contents_arch_arm64ec_runtime">ARM64EC runtime lane</string>
+    <string name="contents_source_runtime_lanes">WCP Runtime Lanes</string>
+    <string name="contents_source_graphics_lanes">WCP Graphics Lanes</string>
     <string name="contents_filter_arm64ec">ARM64EC lanes</string>
     <string name="contents_filter_x64">x86_64 lanes</string>
     <string name="contents_filter_beta">Beta/Nightly lanes</string>
