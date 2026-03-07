@@ -126,7 +126,7 @@
     <string name="about_project_url">github.com/kosoymiki/aesolator</string>
     <string name="about_version_format">Version %1$s</string>
     <string name="default_metric_zero">0</string>
-    <string name="credits_and_third_party_apps">Credits and upstream</string>
+    <string name="credits_and_third_party_apps">Credits, authors, upstream</string>
     <string name="external_controllers">External Controllers</string>
     <string name="graphics_driver">Graphics Driver</string>
     <string name="audio_driver">Audio Driver</string>

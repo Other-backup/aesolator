@@ -678,7 +678,10 @@ public class ContainerDetailFragment extends Fragment {
                         }
                         this.container = container;
                         saveWineRegistryKeys(view);
-                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                        Activity activity = getActivity();
+                        if (activity != null) {
+                            activity.getOnBackPressedDispatcher().onBackPressed();
+                        }
                     });
                 }
             } catch (JSONException e) {

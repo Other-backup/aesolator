@@ -68,14 +68,26 @@
                 android:src="@mipmap/ic_launcher" />
         </LinearLayout>
 
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/surface_card_background"
-            android:orientation="vertical"
-            android:padding="14dp"
-            android:tag="theme_card">
+            android:layout_marginTop="12dp">
+
+            <LinearLayout
+                android:id="@+id/LLAboutCreditsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/surface_card_background"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:paddingTop="24dp"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVCreditsAndThirdPartyApps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/TVAboutCreditsLabel"
@@ -84,29 +96,28 @@
                 android:tag="theme_badge"
                 android:text="@string/credits_and_third_party_apps"
                 android:textStyle="bold" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp">
 
             <LinearLayout
-                android:id="@+id/LLAboutCreditsCard"
+                android:id="@+id/LLAboutRuntimeCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@drawable/surface_card_background"
                 android:orientation="vertical"
-                android:layout_marginTop="10dp">
+                android:padding="14dp"
+                android:paddingTop="24dp"
+                android:tag="theme_card">
 
                 <TextView
-                    android:id="@+id/TVCreditsAndThirdPartyApps"
+                    android:id="@+id/TVGlibcExpVersionFork"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/surface_card_background"
-            android:orientation="vertical"
-            android:padding="14dp"
-            android:tag="theme_card">
 
             <TextView
                 android:id="@+id/TVAboutRuntimeLabel"
@@ -115,19 +126,6 @@
                 android:tag="theme_badge"
                 android:text="@string/glibc_exp_edition"
                 android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/LLAboutRuntimeCard"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginTop="10dp">
-
-                <TextView
-                    android:id="@+id/TVGlibcExpVersionFork"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-        </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 </ScrollView>
