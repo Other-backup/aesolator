@@ -12,9 +12,7 @@
         <item name="android:windowBackground">@color/window_background_color</item>
         <item name="android:colorBackground">@color/window_background_color</item>
         <item name="android:textColorPrimary">@color/surface_body_text</item>
-        <item name="textColorPrimary">@color/surface_body_text</item>
         <item name="android:textColorSecondary">@color/fieldset_label_text_light</item>
-        <item name="textColorSecondary">@color/fieldset_label_text_light</item>
         <item name="android:textColorHint">@color/fieldset_label_text_light</item>
         <item name="aePrimaryTextColor">@color/surface_body_text</item>
         <item name="aeHintTextColor">@color/fieldset_label_text_light</item>
@@ -48,9 +46,7 @@
         <item name="android:windowBackground">@color/window_background_color_dark</item>
         <item name="android:colorBackground">@color/window_background_color_dark</item>
         <item name="android:textColorPrimary">@color/surface_body_text_dark</item>
-        <item name="textColorPrimary">@color/surface_body_text_dark</item>
         <item name="android:textColorSecondary">@color/fieldset_label_text_dark</item>
-        <item name="textColorSecondary">@color/fieldset_label_text_dark</item>
         <item name="android:textColorHint">@color/fieldset_label_text_dark</item>
         <item name="aePrimaryTextColor">@color/surface_body_text_dark</item>
         <item name="aeHintTextColor">@color/fieldset_label_text_dark</item>
