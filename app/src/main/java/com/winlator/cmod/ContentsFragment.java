@@ -1430,9 +1430,9 @@ public class ContentsFragment extends Fragment {
         String repo = profile.sourceRepo.trim();
         if (repo.isEmpty()) return "";
         String lowerRepo = repo.toLowerCase(Locale.US);
-        if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_runtime_lanes);
-        if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_graphics_lanes);
-        if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub);
+        if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
+        if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_archive_graphics_lane);
+        if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub_lane);
         return repo;
     }
 

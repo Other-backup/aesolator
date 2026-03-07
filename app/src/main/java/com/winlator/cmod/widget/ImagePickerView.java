@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,7 +13,6 @@ import android.widget.ImageView;
 import android.widget.PopupWindow;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.content.res.AppCompatResources;
 
 import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
@@ -26,8 +24,6 @@ import com.winlator.cmod.core.WineThemeManager;
 import java.io.File;
 
 public class ImagePickerView extends View implements View.OnClickListener {
-    private final Drawable icon;
-
     public ImagePickerView(Context context) {
         this(context, null);
     }
@@ -38,8 +34,6 @@ public class ImagePickerView extends View implements View.OnClickListener {
 
     public ImagePickerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-
-        icon = AppCompatResources.getDrawable(context, R.drawable.ae_icon_image_picker);
 
         setBackgroundResource(R.drawable.combo_box);
         setClickable(true);
@@ -58,19 +52,6 @@ public class ImagePickerView extends View implements View.OnClickListener {
         float rectSize = height - UnitUtils.dpToPx(12);
         float startX = (width - rectSize) * 0.5f - UnitUtils.dpToPx(16);
         float startY = (height - rectSize) * 0.5f;
-        if (icon != null) {
-            try {
-                icon.setBounds(
-                        Math.round(startX),
-                        Math.round(startY),
-                        Math.round(startX + rectSize),
-                        Math.round(startY + rectSize)
-                );
-                icon.draw(canvas);
-                return;
-            } catch (Throwable ignored) {
-            }
-        }
         drawFallbackGlyph(canvas, startX, startY, rectSize);
     }
 

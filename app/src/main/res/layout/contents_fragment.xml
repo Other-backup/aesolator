@@ -12,58 +12,53 @@
         android:baselineAligned="false"
         android:orientation="horizontal">
 
-        <FrameLayout
+        <LinearLayout
+            style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="96dp"
-            android:layout_weight="1">
-
-            <LinearLayout
-                style="@style/FieldSetCompact"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:tag="theme_card">
-
-                <Spinner
-                    android:id="@+id/SContentType"
-                    style="@style/ComboBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="0dp"
+            android:layout_weight="1"
+            android:minHeight="92dp"
+            android:tag="theme_card">
 
             <TextView
                 style="@style/FieldSetLabel"
+                android:layout_marginStart="0dp"
                 android:tag="theme_badge"
                 android:text="@string/content_type"
                 android:textStyle="bold" />
-        </FrameLayout>
 
-        <FrameLayout
+            <Spinner
+                android:id="@+id/SContentType"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="96dp"
+            android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:layout_weight="1">
 
-            <LinearLayout
-                style="@style/FieldSetCompact"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:tag="theme_card">
-
-                <Button
-                    android:id="@+id/BTInstallContent"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingEnd="12dp"
-                    android:text="@string/install_content" />
-            </LinearLayout>
-
             <TextView
                 style="@style/FieldSetLabel"
+                android:layout_marginStart="0dp"
                 android:tag="theme_badge"
                 android:text="@string/install_content"
                 android:textStyle="bold" />
-        </FrameLayout>
+
+            <Button
+                android:id="@+id/BTInstallContent"
+                style="@style/ButtonNeutral"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:paddingEnd="12dp"
+                android:text="@string/install_content" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
