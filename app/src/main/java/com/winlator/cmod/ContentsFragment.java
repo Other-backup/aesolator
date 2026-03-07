@@ -94,7 +94,6 @@ public class ContentsFragment extends Fragment {
     private View llContentsFilters;
     private boolean isDarkMode;
     private TextView tvContentsLaneScope;
-    private TextView tvContentsFiltersLabel;
     private String sourceMode;
     private String channelMode;
     private String archMode;
@@ -187,7 +186,6 @@ public class ContentsFragment extends Fragment {
         applyPreferredContentTypeSelection();
 
         tvContentsLaneScope = layout.findViewById(R.id.TVContentsLaneScope);
-        tvContentsFiltersLabel = layout.findViewById(R.id.TVContentsFiltersLabel);
         llContentsFilters = layout.findViewById(R.id.LLContentsFilters);
         sContentsSourceMode = layout.findViewById(R.id.SContentsSourceMode);
         sContentsChannelMode = layout.findViewById(R.id.SContentsChannelMode);
@@ -480,7 +478,6 @@ public class ContentsFragment extends Fragment {
         if (sContentsChannelMode != null) sContentsChannelMode.setVisibility(showChannelFilter ? View.VISIBLE : View.GONE);
 
         boolean showFiltersCard = showArchFilters || showChannelFilter;
-        if (tvContentsFiltersLabel != null) tvContentsFiltersLabel.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
         if (llContentsFilters != null) llContentsFilters.setVisibility(showFiltersCard ? View.VISIBLE : View.GONE);
     }
 

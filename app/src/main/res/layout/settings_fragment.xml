@@ -411,6 +411,7 @@
 
                             <EditText
                                 android:id="@+id/ETCustomApiKey"
+                                style="@style/EditText"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
@@ -639,6 +640,7 @@
                             android:text="@string/downloadable_contents_url" />
 
                         <EditText
+                            style="@style/EditText"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_gravity="start|center_vertical"

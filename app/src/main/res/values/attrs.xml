@@ -22,4 +22,10 @@
     <attr name="extraKeysButtonActiveTextColor" format="reference" />
     <attr name="extraKeysButtonBackgroundColor" format="reference" />
     <attr name="extraKeysButtonActiveBackgroundColor" format="reference" />
+    <attr name="aePrimaryTextColor" format="reference|color" />
+    <attr name="aeHintTextColor" format="reference|color" />
+    <attr name="aeEditTextBackground" format="reference" />
+    <attr name="aeComboBoxBackground" format="reference" />
+    <attr name="aePopupBackground" format="reference" />
+    <attr name="aeListChoiceBackground" format="reference" />
 </resources>

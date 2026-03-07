@@ -3,6 +3,7 @@ package com.winlator.cmod.core;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.TextUtils;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Spinner;
@@ -30,7 +31,11 @@ public final class SpinnerAdapters {
 
     public static ArrayAdapter<String> create(Context context, boolean isDarkMode, List<String> values) {
         final int textColor = resolvePrimaryTextColor(context, isDarkMode);
-        final int dropdownBackground = isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent;
+        final int dropdownBackground = resolveThemeResource(
+                context,
+                R.attr.aeListChoiceBackground,
+                isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent
+        );
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
             @NonNull
             @Override
@@ -63,7 +68,11 @@ public final class SpinnerAdapters {
 
     public static <T> ArrayAdapter<T> createGeneric(Context context, boolean isDarkMode, List<T> values) {
         final int textColor = resolvePrimaryTextColor(context, isDarkMode);
-        final int dropdownBackground = isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent;
+        final int dropdownBackground = resolveThemeResource(
+                context,
+                R.attr.aeListChoiceBackground,
+                isDarkMode ? R.drawable.list_selector_dark_accent : R.drawable.list_selector_light_accent
+        );
         ArrayAdapter<T> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
             @NonNull
             @Override
@@ -104,8 +113,16 @@ public final class SpinnerAdapters {
 
     public static void applySurface(Spinner spinner, boolean isDarkMode) {
         if (spinner == null) return;
-        spinner.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
-        spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+        spinner.setBackgroundResource(resolveThemeResource(
+                spinner.getContext(),
+                R.attr.aeComboBoxBackground,
+                isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box
+        ));
+        spinner.setPopupBackgroundResource(resolveThemeResource(
+                spinner.getContext(),
+                R.attr.aePopupBackground,
+                isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
+        ));
     }
 
     public static void applySurface(MultiSelectionComboBox comboBox, boolean isDarkMode) {
@@ -142,9 +159,22 @@ public final class SpinnerAdapters {
 
     private static int resolvePrimaryTextColor(Context context, boolean isDarkMode) {
         if (context == null) return isDarkMode ? Color.WHITE : Color.BLACK;
-        return ContextCompat.getColor(
-                context,
-                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
-        );
+        TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(R.attr.aePrimaryTextColor, typedValue, true)) {
+            if (typedValue.resourceId != 0) return ContextCompat.getColor(context, typedValue.resourceId);
+            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                return typedValue.data;
+            }
+        }
+        return ContextCompat.getColor(context, isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
+    }
+
+    private static int resolveThemeResource(Context context, int attrRes, int fallbackRes) {
+        if (context == null) return fallbackRes;
+        TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(attrRes, typedValue, true) && typedValue.resourceId != 0) {
+            return typedValue.resourceId;
+        }
+        return fallbackRes;
     }
 }

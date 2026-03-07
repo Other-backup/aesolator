@@ -77,8 +77,14 @@ public class MainMenuGridFragment extends Fragment {
         sectionLabel.setTextColor(titleColor);
 
         int spanCount = resolveSpanCount();
-        recyclerView.setLayoutManager(new GridLayoutManager(requireContext(), spanCount));
-        recyclerView.setHasFixedSize(true);
+        GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), spanCount) {
+            @Override
+            public boolean isAutoMeasureEnabled() {
+                return true;
+            }
+        };
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setHasFixedSize(false);
         recyclerView.setItemAnimator(null);
         if (recyclerView.getItemDecorationCount() == 0) {
             recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, dpToPx(4f)));

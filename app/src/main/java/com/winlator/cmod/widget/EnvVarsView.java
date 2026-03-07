@@ -136,47 +136,57 @@ public class EnvVarsView extends FrameLayout {
 
     // Method to apply dark theme styles
     private void applyDarkTheme(View view) {
-        int primaryTextColor = ContextCompat.getColor(
-                getContext(),
-                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+        int primaryTextColor = resolveThemeColor(
+                R.attr.aePrimaryTextColor,
+                ContextCompat.getColor(getContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text)
         );
-        int hintTextColor = ContextCompat.getColor(
-                getContext(),
-                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+        int hintTextColor = resolveThemeColor(
+                R.attr.aeHintTextColor,
+                ContextCompat.getColor(getContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text)
         );
-        if (isDarkMode) {
-            if (view instanceof TextView) {
-                ((TextView) view).setTextColor(primaryTextColor);
-            } else if (view instanceof EditText) {
-                view.setBackgroundResource(R.drawable.edit_text_dark);
-                ((EditText) view).setTextColor(primaryTextColor);
-                ((EditText) view).setHintTextColor(hintTextColor);
-            } else if (view instanceof Spinner) {
-                Spinner spinner = (Spinner) view;
-                SpinnerAdapters.applySurface(spinner, true);
-                spinner.setPopupBackgroundResource(R.drawable.surface_dialog_background_dark);
-            } else if (view instanceof ToggleButton) {
-                ToggleButton toggle = (ToggleButton) view;
-                toggle.setTextColor(primaryTextColor);
-                toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.surface_toggle_off_dark)));
-            }
-        } else {
-            if (view instanceof TextView) {
-                ((TextView) view).setTextColor(primaryTextColor);
-            } else if (view instanceof EditText) {
-                view.setBackgroundResource(R.drawable.edit_text);
-                ((EditText) view).setTextColor(primaryTextColor);
-                ((EditText) view).setHintTextColor(hintTextColor);
-            } else if (view instanceof Spinner) {
-                Spinner spinner = (Spinner) view;
-                SpinnerAdapters.applySurface(spinner, false);
-                spinner.setPopupBackgroundResource(R.drawable.surface_dialog_background);
-            } else if (view instanceof ToggleButton) {
-                ToggleButton toggle = (ToggleButton) view;
-                toggle.setTextColor(primaryTextColor);
-                toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.surface_toggle_off)));
-            }
+        if (view instanceof EditText) {
+            view.setBackgroundResource(resolveThemeDrawable(
+                    R.attr.aeEditTextBackground,
+                    isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text
+            ));
+            ((EditText) view).setTextColor(primaryTextColor);
+            ((EditText) view).setHintTextColor(hintTextColor);
+        } else if (view instanceof Spinner) {
+            Spinner spinner = (Spinner) view;
+            SpinnerAdapters.applySurface(spinner, isDarkMode);
+            spinner.setPopupBackgroundResource(resolveThemeDrawable(
+                    R.attr.aePopupBackground,
+                    isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
+            ));
+        } else if (view instanceof ToggleButton) {
+            ToggleButton toggle = (ToggleButton) view;
+            toggle.setTextColor(primaryTextColor);
+            toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(
+                    getContext(),
+                    isDarkMode ? R.color.surface_toggle_off_dark : R.color.surface_toggle_off
+            )));
+        } else if (view instanceof TextView) {
+            ((TextView) view).setTextColor(primaryTextColor);
         }
+    }
+
+    private int resolveThemeColor(int attrId, int fallbackColor) {
+        TypedValue typedValue = new TypedValue();
+        if (getContext().getTheme().resolveAttribute(attrId, typedValue, true)) {
+            if (typedValue.resourceId != 0) {
+                return ContextCompat.getColor(getContext(), typedValue.resourceId);
+            }
+            return typedValue.data;
+        }
+        return fallbackColor;
+    }
+
+    private int resolveThemeDrawable(int attrId, int fallbackDrawable) {
+        TypedValue typedValue = new TypedValue();
+        if (getContext().getTheme().resolveAttribute(attrId, typedValue, true) && typedValue.resourceId != 0) {
+            return typedValue.resourceId;
+        }
+        return fallbackDrawable;
     }
 
     // Method to get environment variables as a string
@@ -292,8 +302,6 @@ public class EnvVarsView extends FrameLayout {
     }
 
 }
-
-
 
 
 
