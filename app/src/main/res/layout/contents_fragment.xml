@@ -15,7 +15,7 @@
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="92dp"
+            android:layout_height="96dp"
             android:layout_marginTop="0dp"
             android:layout_weight="1"
             android:tag="theme_card">
@@ -38,7 +38,7 @@
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="92dp"
+            android:layout_height="96dp"
             android:layout_marginStart="6dp"
             android:layout_marginTop="0dp"
             android:layout_weight="1"
@@ -57,6 +57,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="10dp"
+                android:gravity="start|center_vertical"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:text="@string/install_content" />
         </LinearLayout>

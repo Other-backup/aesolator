@@ -288,8 +288,8 @@ public class ContainerDetailFragment extends Fragment {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         final View view = inflater.inflate(R.layout.container_detail_fragment, root, false);
 
-        // Determine if dark mode is enabled
-        isDarkMode = preferences.getBoolean("dark_mode", true); // Adjust this based on how you store theme info
+        // Keep the fragment theme in sync with the current app preference.
+        isDarkMode = preferences.getBoolean("dark_mode", false);
 
         // Apply dynamic styles
         applyDynamicStyles(view, isDarkMode);
@@ -486,7 +486,7 @@ public class ContainerDetailFragment extends Fragment {
 
         TabLayout tabLayout = view.findViewById(R.id.TabLayout);
 
-        if (isDarkMode) {
+        if (resolveDarkMode(context)) {
             tabLayout.setBackgroundResource(R.drawable.tab_layout_background_dark);
         } else {
             tabLayout.setBackgroundResource(R.drawable.tab_layout_background);
@@ -933,7 +933,9 @@ public class ContainerDetailFragment extends Fragment {
             spinner.setTag(wincomponent[0]);
 
             // Set the background color of the spinners dynamically based on the current theme
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark: R.drawable.surface_dialog_background);
+            spinner.setPopupBackgroundResource(resolveDarkMode(context)
+                    ? R.drawable.surface_dialog_background_dark
+                    : R.drawable.surface_dialog_background);
 
             parent.addView(itemView);
 
@@ -970,7 +972,7 @@ public class ContainerDetailFragment extends Fragment {
         final EnvVarsView envVarsView = view.findViewById(R.id.EnvVarsView);
 
         // Apply dark mode setting to the existing instance
-        envVarsView.setDarkMode(isDarkMode); // New setter method
+        envVarsView.setDarkMode(resolveDarkMode(context));
 
         envVarsView.setEnvVars(new EnvVars(isEditMode() ? container.getEnvVars() : Container.DEFAULT_ENV_VARS));
         view.findViewById(R.id.BTAddEnvVar).setOnClickListener((v) -> (new AddEnvVarDialog(context, envVarsView)).show());
@@ -1010,7 +1012,9 @@ public class ContainerDetailFragment extends Fragment {
             AppUtils.setSpinnerSelectionFromValue(spinner, drive[0]+":");
 
             // Apply dark theme to the spinner popup background
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
+            spinner.setPopupBackgroundResource(resolveDarkMode(context)
+                    ? R.drawable.surface_dialog_background_dark
+                    : R.drawable.surface_dialog_background);
 
             final EditText editText = itemView.findViewById(R.id.EditText);
             editText.setText(drive[1]);
@@ -1063,17 +1067,18 @@ public class ContainerDetailFragment extends Fragment {
 
     // Helper method to apply dark theme to EditText
     private static void applyDarkThemeToEditText(EditText editText) {
+        boolean darkMode = resolveDarkMode(editText.getContext());
         int textColor = ContextCompat.getColor(
                 editText.getContext(),
-                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+                darkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
         );
         int hintColor = ContextCompat.getColor(
                 editText.getContext(),
-                isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+                darkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
         );
         editText.setTextColor(textColor);
         editText.setHintTextColor(hintColor);
-        editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
+        editText.setBackgroundResource(darkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
     }
 
     // Helper method to apply dark theme to buttons or other clickable views

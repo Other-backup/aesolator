@@ -179,8 +179,8 @@ public class ContentsFragment extends Fragment {
                         && !preselectedDisplayCategory.trim().isEmpty()) {
                     preselectedDisplayCategory = "";
                 }
-                updateLaneScopeLabel();
                 boolean sourceModeChanged = refreshSourceSpinnerForType();
+                updateLaneScopeLabel();
                 refreshTypeScopedFilterSpinners();
                 updateFilterControlsVisibility();
                 if (emptyText != null && recyclerView != null) {
@@ -230,6 +230,7 @@ public class ContentsFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (suppressFilterCallbacks) return;
                 updateFilterPreferencesFromUi();
+                updateLaneScopeLabel();
                 reloadRemoteContents();
             }
 
@@ -479,14 +480,15 @@ public class ContentsFragment extends Fragment {
     private void updateLaneScopeLabel() {
         if (tvContentsLaneScope == null) return;
         String lane = preselectedDisplayCategory == null ? "" : preselectedDisplayCategory.trim();
+        String sourceLabel = getSourceEntryLabel(sourceMode);
         String sourceScope = "aesolator".equalsIgnoreCase(sourceMode)
                 ? getString(R.string.contents_lane_scope_archive)
                 : getString(R.string.contents_lane_scope_wcphub);
         if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && !lane.isEmpty()) {
-            tvContentsLaneScope.setText(sourceScope + " • " + getString(R.string.contents_lane_scope_format, lane));
+            tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope + " • " + getString(R.string.contents_lane_scope_format, lane));
         }
         else {
-            tvContentsLaneScope.setText(sourceScope);
+            tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope);
         }
         tvContentsLaneScope.setVisibility(View.VISIBLE);
     }
@@ -543,6 +545,8 @@ public class ContentsFragment extends Fragment {
                 sourceMode = sourceValues.length > 0 ? sourceValues[0] : "wcphub";
             }
             setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
+            sContentsSourceMode.setEnabled(sourceValues.length > 1);
+            sContentsSourceMode.setAlpha(sourceValues.length > 1 ? 1.0f : 0.92f);
             sharedPreferences.edit().putString("contents_source_mode", sourceMode).apply();
         } finally {
             suppressFilterCallbacks = false;
@@ -654,6 +658,12 @@ public class ContentsFragment extends Fragment {
 
     private ArrayList<String> getAvailableSourceModesForType(ContentProfile.ContentType type) {
         ArrayList<String> ordered = new ArrayList<>();
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
+            ordered.add("wcphub");
+            ordered.add("aesolator");
+            return ordered;
+        }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
             ordered.add("aesolator");
@@ -932,7 +942,11 @@ public class ContentsFragment extends Fragment {
 
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
-        if ("aesolator".equals(selectedSourceMode)) {
+        if ("aesolator".equals(selectedSourceMode)
+                && (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO)) {
             urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
             return urls;
         }
