@@ -126,7 +126,7 @@
     <string name="about_project_url">github.com/kosoymiki/aesolator</string>
     <string name="about_version_format">Version %1$s</string>
     <string name="default_metric_zero">0</string>
-    <string name="credits_and_third_party_apps">Credits, authors and upstream projects</string>
+    <string name="credits_and_third_party_apps">Credits and upstream</string>
     <string name="external_controllers">External Controllers</string>
     <string name="graphics_driver">Graphics Driver</string>
     <string name="audio_driver">Audio Driver</string>
@@ -868,6 +868,8 @@
     <string name="contents_filter_x64">x86_64 lanes</string>
     <string name="contents_filter_beta">Beta/Nightly lanes</string>
     <string name="contents_lane_scope_format">Lane scope: %1$s</string>
+    <string name="contents_lane_scope_archive">WCP Archive packages maintained by Ae.solator</string>
+    <string name="contents_lane_scope_wcphub">WCPHub community runtime packages</string>
     <string name="dri3_mode_title">DRI3 mode</string>
     <string name="dri3_mode_hint">Auto follows the runtime policy. Off forces the safer software WSI fallback.</string>
     <string name="dri3_mode_auto">Auto (recommended)</string>

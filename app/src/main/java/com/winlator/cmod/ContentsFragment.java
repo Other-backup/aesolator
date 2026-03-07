@@ -385,9 +385,11 @@ public class ContentsFragment extends Fragment {
 
     private boolean shouldBypassSourceFilter(ContentProfile profile) {
         if (profile == null || !profile.locallyInstalled) return false;
+        if (getAvailableSourceModesForType(currentContentType).size() > 1) return false;
         String resolvedSource = resolveProfileSourceMode(profile);
         return "remote".equalsIgnoreCase(resolvedSource)
-                && (profile.sourceFeed == null || profile.sourceFeed.trim().isEmpty());
+                && (profile.sourceFeed == null || profile.sourceFeed.trim().isEmpty())
+                && (profile.sourceRepo == null || profile.sourceRepo.trim().isEmpty());
     }
 
     private void sortVisibleProfiles(List<ContentProfile> profiles) {
@@ -439,6 +441,13 @@ public class ContentsFragment extends Fragment {
         if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany") || joined.contains("winlatorwcphub")) {
             return "wcphub";
         }
+        if (profile.locallyInstalled) {
+            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+                return "aesolator";
+            }
+            return "wcphub";
+        }
         return "remote";
     }
 
@@ -470,14 +479,16 @@ public class ContentsFragment extends Fragment {
     private void updateLaneScopeLabel() {
         if (tvContentsLaneScope == null) return;
         String lane = preselectedDisplayCategory == null ? "" : preselectedDisplayCategory.trim();
-        boolean showLaneScope = currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                && !lane.isEmpty();
-        if (showLaneScope) {
-            tvContentsLaneScope.setText(getString(R.string.contents_lane_scope_format, lane));
-            tvContentsLaneScope.setVisibility(View.VISIBLE);
-        } else {
-            tvContentsLaneScope.setVisibility(View.GONE);
+        String sourceScope = "aesolator".equalsIgnoreCase(sourceMode)
+                ? getString(R.string.contents_lane_scope_archive)
+                : getString(R.string.contents_lane_scope_wcphub);
+        if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && !lane.isEmpty()) {
+            tvContentsLaneScope.setText(sourceScope + " • " + getString(R.string.contents_lane_scope_format, lane));
         }
+        else {
+            tvContentsLaneScope.setText(sourceScope);
+        }
+        tvContentsLaneScope.setVisibility(View.VISIBLE);
     }
 
     private boolean matchesPreselectedDisplayCategory(ContentProfile profile) {
@@ -1342,15 +1353,20 @@ public class ContentsFragment extends Fragment {
 
     private String getSourceLabel(ContentProfile profile) {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
-        if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) {
-            return getString(R.string.contents_package_local);
-        }
         if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
             return profile.sourceLabel.trim();
+        }
+        if (profile.sourceRepo != null && !profile.sourceRepo.trim().isEmpty()) {
+            String repo = profile.sourceRepo.trim().toLowerCase(Locale.US);
+            if (repo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_runtime_lanes);
+            if (repo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_graphics_lanes);
         }
         String sourceMode = resolveProfileSourceMode(profile);
         if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
         if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
+        if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) {
+            return getString(R.string.contents_package_local);
+        }
         try {
             Uri uri = Uri.parse(profile.remoteUrl);
             String host = uri.getHost();
