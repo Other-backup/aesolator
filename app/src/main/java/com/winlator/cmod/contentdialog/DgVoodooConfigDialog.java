@@ -187,7 +187,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
     private LinearLayout createCard(Context context, int padding) {
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(padding, padding + (padding / 2), padding, padding);
+        card.setPadding(padding, padding + dp(context, 16), padding, padding);
         card.setTag("theme_card");
         return card;
     }
@@ -220,6 +220,7 @@ public class DgVoodooConfigDialog extends ContentDialog {
         badge.setLayoutParams(badgeParams);
         badge.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 4));
         badge.setTranslationX(dp(context, 10));
+        badge.setTranslationY(dp(context, 6));
         badge.setTag("theme_badge");
         badge.setText(badgeTextResId);
         badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);

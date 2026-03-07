@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.UnitUtils;
 
@@ -121,7 +122,11 @@ public class MultiSelectionComboBox extends AppCompatTextView {
         ListPopupWindow popupWindow = new ListPopupWindow(getContext());
         popupWindow.setAdapter(adapter);
         popupWindow.setAnchorView(this);
-        popupWindow.setWidth((int)UnitUtils.dpToPx(260));
+        int popupWidth = Math.max(
+                getWidth(),
+                AppUtils.getPreferredDialogWidth(getContext()) - (int) UnitUtils.dpToPx(32)
+        );
+        popupWindow.setWidth(popupWidth);
         popupWindow.setModal(true);
         popupWindow.setBackgroundDrawable(ContextCompat.getDrawable(
                 getContext(),

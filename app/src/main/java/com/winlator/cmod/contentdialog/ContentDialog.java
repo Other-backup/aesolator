@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.CheckedTextView;
 import android.widget.EditText;
@@ -101,6 +102,17 @@ public class ContentDialog extends Dialog {
 
     public void setOnCancelCallback(Runnable onCancelCallback) {
         this.onCancelCallback = onCancelCallback;
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setLayout(
+                    AppUtils.getPreferredDialogWidth(getContext()),
+                    WindowManager.LayoutParams.WRAP_CONTENT
+            );
+        }
     }
 
     @Override
