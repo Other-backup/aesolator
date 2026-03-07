@@ -1164,17 +1164,17 @@ public class ContentsFragment extends Fragment {
 
     private String getSourceLabel(ContentProfile profile) {
         if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) {
-            return "Local package";
+            return getString(R.string.contents_package_local);
         }
         try {
             Uri uri = Uri.parse(profile.remoteUrl);
             String host = uri.getHost();
             if (host != null && !host.isEmpty()) {
-                return "Remote: " + host;
+                return getString(R.string.contents_package_remote_host, host);
             }
         } catch (Exception ignored) {
         }
-        return "Remote package";
+        return getString(R.string.contents_package_remote_generic);
     }
 
     private String buildProfileTitleLine(ContentProfile profile) {
@@ -1200,22 +1200,37 @@ public class ContentsFragment extends Fragment {
         } else if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
             runtimeInstalled = runtimeInstalled || isVulkanSdkRuntimePresent();
         }
-        String channel = profile.getChannel();
-        if (channel != null && !channel.trim().isEmpty() && !ContentProfile.CHANNEL_STABLE.equalsIgnoreCase(channel)) {
-            meta.append(" • ").append(channel.trim().toLowerCase(Locale.US));
-        }
-        if (runtimeInstalled) meta.append(" • installed");
+        if (runtimeInstalled) meta.append(" • ").append(getString(R.string.graphics_center_installed_action).toLowerCase(Locale.US));
         return meta.toString();
     }
 
     private String buildProfileSourceLine(ContentProfile profile) {
-        String sourceLabel = getSourceLabel(profile);
+        StringBuilder line = new StringBuilder(resolveChannelLabel(profile));
         String repo = profile.sourceRepo != null ? profile.sourceRepo.trim() : "";
         String tag = profile.releaseTag != null ? profile.releaseTag.trim() : "";
-        if (!repo.isEmpty() && !tag.isEmpty()) return sourceLabel + " • " + repo + "@" + tag;
-        if (!repo.isEmpty()) return sourceLabel + " • " + repo;
-        if (!tag.isEmpty()) return sourceLabel + " • " + tag;
-        return sourceLabel;
+        String sourceLabel = getSourceLabel(profile);
+
+        if (!repo.isEmpty()) {
+            line.append(" • ").append(repo);
+        } else if (!sourceLabel.isEmpty()) {
+            line.append(" • ").append(sourceLabel);
+        }
+
+        if (!tag.isEmpty()
+                && !tag.equalsIgnoreCase(profile.getChannel())
+                && !tag.equalsIgnoreCase(ContentProfile.CHANNEL_STABLE)
+                && !tag.equalsIgnoreCase(ContentProfile.CHANNEL_NIGHTLY)) {
+            line.append(" • ").append(tag);
+        }
+        return line.toString();
+    }
+
+    private String resolveChannelLabel(ContentProfile profile) {
+        String channel = profile.getChannel();
+        if (ContentProfile.CHANNEL_NIGHTLY.equalsIgnoreCase(channel)) {
+            return getString(R.string.contents_channel_nightly);
+        }
+        return getString(R.string.contents_channel_mainline);
     }
 
     private String getDisplayTypeLabel(ContentProfile.ContentType type) {

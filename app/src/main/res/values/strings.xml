@@ -843,6 +843,11 @@
     <string name="contents_source_fallback">Fallback feed</string>
     <string name="contents_source_aesolator">Ae.solator feed</string>
     <string name="contents_filters">Filters</string>
+    <string name="contents_channel_mainline">Mainline</string>
+    <string name="contents_channel_nightly">Nightly</string>
+    <string name="contents_package_local">Installed locally</string>
+    <string name="contents_package_remote_host">Remote: %1$s</string>
+    <string name="contents_package_remote_generic">Remote package</string>
     <string name="contents_filter_arm64ec">ARM64EC lanes</string>
     <string name="contents_filter_x64">x86_64 lanes</string>
     <string name="contents_filter_beta">Beta/Nightly lanes</string>
