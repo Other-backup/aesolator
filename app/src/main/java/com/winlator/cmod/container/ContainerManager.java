@@ -87,7 +87,14 @@ public class ContainerManager {
     public void createContainerAsync(final JSONObject data, ContentsManager contentsManager, Callback<Container> callback) {
         final Handler handler = new Handler(Looper.getMainLooper());
         Executors.newSingleThreadExecutor().execute(() -> {
-            final Container container = createContainer(data, contentsManager);
+            final Container container;
+            try {
+                container = createContainer(data, contentsManager);
+            } catch (Throwable t) {
+                Log.e("ContainerManager", "Container creation failed", t);
+                handler.post(() -> callback.call(null));
+                return;
+            }
             handler.post(() -> callback.call(container));
         });
     }
@@ -138,8 +145,8 @@ public class ContainerManager {
             maxContainerId++;
             containers.add(container);
             return container;
-        } catch (JSONException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            Log.e("ContainerManager", "Failed to create container", e);
         }
         return null;
     }

@@ -83,7 +83,7 @@
                 android:paddingBottom="14dp"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:paddingTop="30dp">
+                android:paddingTop="40dp">
 
                 <TextView
                     android:id="@+id/TVCreditsAndThirdPartyApps"
@@ -122,7 +122,7 @@
                 android:paddingBottom="14dp"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:paddingTop="30dp">
+                android:paddingTop="40dp">
 
                 <TextView
                     android:id="@+id/TVGlibcExpVersionFork"

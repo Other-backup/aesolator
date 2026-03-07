@@ -346,7 +346,7 @@ public class ContentsFragment extends Fragment {
                 continue;
             }
             boolean locallyInstalled = profile != null && profile.locallyInstalled;
-            if (!locallyInstalled && !matchesSelectedSourceMode(profile)) {
+            if (!matchesSelectedSourceMode(profile) && !shouldBypassSourceFilter(profile)) {
                 continue;
             }
             if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && profile.isBetaLike()) {
@@ -381,6 +381,13 @@ public class ContentsFragment extends Fragment {
         String mode = sourceMode == null ? "wcphub" : sourceMode.trim().toLowerCase(Locale.US);
         String profileMode = resolveProfileSourceMode(profile);
         return mode.equals(profileMode);
+    }
+
+    private boolean shouldBypassSourceFilter(ContentProfile profile) {
+        if (profile == null || !profile.locallyInstalled) return false;
+        String resolvedSource = resolveProfileSourceMode(profile);
+        return "remote".equalsIgnoreCase(resolvedSource)
+                && (profile.sourceFeed == null || profile.sourceFeed.trim().isEmpty());
     }
 
     private void sortVisibleProfiles(List<ContentProfile> profiles) {

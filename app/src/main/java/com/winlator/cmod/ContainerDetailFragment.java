@@ -691,6 +691,7 @@ public class ContainerDetailFragment extends Fragment {
 
     private void saveWineRegistryKeys(View view) {
         File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
+        if (!userRegFile.isFile()) return;
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
             registryEditor.setStringValue(
@@ -698,6 +699,8 @@ public class ContainerDetailFragment extends Fragment {
                     "MouseWarpOverride",
                     getSelectedText(sMouseWarpOverride, "disable").toLowerCase(Locale.ENGLISH)
             );
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to persist Wine registry keys for container", e);
         }
     }
 

@@ -12,8 +12,6 @@ import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
 import android.telecom.Call;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -103,7 +101,6 @@ public class SettingsFragment extends Fragment {
     private static final int REQUEST_CODE_INSTALL_SOUNDFONT = 1001;
     private static final int REQUEST_CODE_IMPORT_BOX64_PRESET = 1004;
     private static final int REQUEST_CODE_IMPORT_FEXCORE_PRESET = 1005;
-    private static final String PREF_THEME_TRANSITION_PENDING = "theme_transition_pending";
     private boolean themeSwitchInProgress = false;
 
     @Override
@@ -118,11 +115,6 @@ public class SettingsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         // Apply dynamic styles to all labels
         applyDynamicStylesRecursively(view);
-        if (preferences != null && preferences.getBoolean(PREF_THEME_TRANSITION_PENDING, false)) {
-            view.setAlpha(0f);
-            view.animate().alpha(1f).setDuration(220L).start();
-            preferences.edit().putBoolean(PREF_THEME_TRANSITION_PENDING, false).apply();
-        }
         ((AppCompatActivity)getActivity()).getSupportActionBar().setTitle(R.string.settings);
     }
 
@@ -391,30 +383,20 @@ public class SettingsFragment extends Fragment {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         themeSwitchInProgress = true;
         if (cbDarkMode != null) cbDarkMode.setEnabled(false);
-        preferences.edit().putBoolean(PREF_THEME_TRANSITION_PENDING, true).apply();
-        View decor = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
-        final boolean[] recreateDispatched = new boolean[]{false};
-        Runnable recreateAction = () -> {
-            if (recreateDispatched[0]) return;
-            recreateDispatched[0] = true;
-            if (!isAdded() || getActivity() == null) return;
-            Activity current = getActivity();
-            if (current.isFinishing() || current.isDestroyed()) return;
-            if (decor != null) decor.setAlpha(1f);
-            current.recreate();
-        };
-        if (decor != null) {
-            decor.animate().cancel();
-            decor.setAlpha(1f);
-            decor.animate()
-                    .alpha(0.92f)
-                    .setDuration(140L)
-                    .withEndAction(recreateAction)
-                    .start();
-            // Fallback if animation callback is skipped by activity lifecycle changes.
-            new Handler(Looper.getMainLooper()).postDelayed(recreateAction, 220L);
-        } else {
-            recreateAction.run();
+        try {
+            if (activity instanceof MainActivity) {
+                ((MainActivity) activity).applyThemeModeLive(isDarkMode);
+            } else {
+                View root = activity.findViewById(android.R.id.content);
+                if (root != null) {
+                    root.animate().cancel();
+                    root.setAlpha(0.94f);
+                    root.animate().alpha(1f).setDuration(180L).start();
+                }
+            }
+        } finally {
+            themeSwitchInProgress = false;
+            if (cbDarkMode != null) cbDarkMode.setEnabled(true);
         }
     }
 

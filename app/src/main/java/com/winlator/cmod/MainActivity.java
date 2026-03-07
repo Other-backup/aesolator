@@ -23,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -110,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         updateActionBarNavigationState();
+        applyThemeChrome();
         applyThemeAssetTintPass();
     }
 
@@ -274,6 +276,7 @@ public class MainActivity extends AppCompatActivity {
         if (contentRoot != null) {
             contentRoot.post(() -> {
                 updateActionBarNavigationState();
+                applyThemeChrome();
                 applyThemeAssetTintPass();
             });
         }
@@ -287,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
         View decor = getWindow() != null ? getWindow().getDecorView() : null;
         if (decor != null && decor.getAlpha() != 1f) decor.setAlpha(1f);
         updateActionBarNavigationState();
+        applyThemeChrome();
         applyThemeAssetTintPass();
     }
 
@@ -309,6 +313,76 @@ public class MainActivity extends AppCompatActivity {
         View contentRoot = findViewById(android.R.id.content);
         if (contentRoot != null) {
             ThemeAssetPainter.apply(this, contentRoot, isDarkMode);
+        }
+    }
+
+    private void applyThemeChrome() {
+        Toolbar toolbar = findViewById(R.id.Toolbar);
+        if (toolbar != null) {
+            toolbar.setBackgroundColor(ContextCompat.getColor(this, isDarkMode ? R.color.colorPrimaryDarkMode : R.color.colorPrimary));
+            toolbar.setTitleTextColor(ContextCompat.getColor(this, R.color.surface_table_head_text));
+        }
+
+        View contentRoot = findViewById(android.R.id.content);
+        if (contentRoot != null) {
+            contentRoot.setBackgroundColor(ContextCompat.getColor(this, isDarkMode ? R.color.window_background_color_dark : R.color.window_background_color));
+        }
+
+        if (getWindow() != null) {
+            getWindow().setStatusBarColor(ContextCompat.getColor(this, isDarkMode ? R.color.colorPrimaryDarkModeDark : R.color.colorPrimaryDark));
+            getWindow().setNavigationBarColor(ContextCompat.getColor(this, isDarkMode ? R.color.window_background_color_dark : R.color.window_background_color));
+        }
+    }
+
+    @Nullable
+    private Fragment createFreshInstanceForCurrentFragment(@Nullable Fragment current) {
+        if (current instanceof MainMenuGridFragment) return new MainMenuGridFragment();
+        if (current instanceof ShortcutsFragment) return new ShortcutsFragment();
+        if (current instanceof ContainersFragment) return new ContainersFragment();
+        if (current instanceof InputControlsFragment) return new InputControlsFragment(selectedProfileId);
+        if (current instanceof ContentsFragment) return new ContentsFragment();
+        if (current instanceof AdrenotoolsFragment) return new AdrenotoolsFragment();
+        if (current instanceof ForensicCenterFragment) return new ForensicCenterFragment();
+        if (current instanceof SettingsFragment) return new SettingsFragment();
+        return null;
+    }
+
+    public void applyThemeModeLive(boolean darkMode) {
+        isDarkMode = darkMode;
+        if (sharedPreferences != null) {
+            sharedPreferences.edit().putBoolean("dark_mode", darkMode).apply();
+        }
+        setTheme(darkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
+
+        View contentRoot = findViewById(android.R.id.content);
+        if (contentRoot != null) {
+            contentRoot.animate().cancel();
+            contentRoot.setAlpha(0.94f);
+        }
+
+        applyThemeChrome();
+
+        Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
+        Fragment replacement = createFreshInstanceForCurrentFragment(current);
+        if (replacement != null) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.FLFragmentContainer, replacement)
+                    .commit();
+        }
+
+        Runnable finishThemeApply = () -> {
+            updateActionBarNavigationState();
+            applyThemeAssetTintPass();
+            if (contentRoot != null) {
+                contentRoot.animate().alpha(1f).setDuration(180L).start();
+            }
+        };
+
+        if (contentRoot != null) {
+            contentRoot.post(finishThemeApply);
+        } else {
+            finishThemeApply.run();
         }
     }
 
@@ -359,6 +433,11 @@ public class MainActivity extends AppCompatActivity {
                     "<b>Ae.solator</b> by Ae team",
                     "<b>Stack:</b> FreeWine 11 + lane-based graphics stack + package lanes",
                     "<b>Runtime donor lines:</b> FreeWine 11 baseline, driver archives, wrapper lanes and Android container integration",
+                    "---",
+                    "<b>Winlator donor bases</b>",
+                    "BrunoSX / Winlator (<a href=\"https://github.com/brunodev85/winlator\">github.com/brunodev85/winlator</a>)",
+                    "coffincolors / winlator (<a href=\"https://github.com/coffincolors/winlator\">github.com/coffincolors/winlator</a>)",
+                    "StevenMXZ / Winlator-Ludashi (<a href=\"https://github.com/StevenMXZ/Winlator-Ludashi\">github.com/StevenMXZ/Winlator-Ludashi</a>)",
                     "---",
                     "FreeWine 11 baseline research: AndreRH + upstream Wine / Valve work",
                     "Termux Package (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
