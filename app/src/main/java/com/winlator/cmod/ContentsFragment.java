@@ -1170,7 +1170,6 @@ public class ContentsFragment extends Fragment {
                 final String importFileName = resolveImportFileName(importUri);
                 final ContentProfile.ContentType expectedType = detectExpectedTypeFromName(importFileName);
                 final ImportArchHint expectedArch = detectExpectedArchFromName(importFileName);
-                final boolean glibcTaggedArchive = detectGlibcTaggedArchive(importFileName);
                 ContentsManager.OnInstallFinishedCallback callback = new ContentsManager.OnInstallFinishedCallback() {
                     private boolean isExtracting = true;
 
@@ -1241,33 +1240,6 @@ public class ContentsFragment extends Fragment {
                                                 + getString(R.string.content_type_mismatch_import,
                                                 getTypeLabel(expectedType),
                                                 getTypeLabel(profile.type)),
-                                        null
-                                ));
-                                return;
-                            }
-
-                            if (glibcTaggedArchive
-                                    && (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON)) {
-                                ForensicLogger.logEvent(
-                                        getContext(),
-                                        "warn",
-                                        "CONTENTS_IMPORT_REJECTED",
-                                        null,
-                                        "contents_import",
-                                        "import_rejected",
-                                        ForensicLogger.fields(
-                                                "reason", "glibc_variant_unsupported",
-                                                "file_name", importFileName,
-                                                "detected_type", profile.type.toString(),
-                                                "expected_arch", getImportArchLabel(expectedArch)
-                                        )
-                                );
-                                preloaderDialog.closeOnUiThread();
-                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
-                                        getContext(),
-                                        getString(R.string.install_failed) + ": "
-                                                + getString(R.string.content_glibc_import_unsupported),
                                         null
                                 ));
                                 return;
@@ -1353,6 +1325,9 @@ public class ContentsFragment extends Fragment {
 
     private String getSourceLabel(ContentProfile profile) {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
+        String sourceMode = resolveProfileSourceMode(profile);
+        if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
         if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
             return profile.sourceLabel.trim();
         }
@@ -1361,9 +1336,6 @@ public class ContentsFragment extends Fragment {
             if (repo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_runtime_lanes);
             if (repo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_graphics_lanes);
         }
-        String sourceMode = resolveProfileSourceMode(profile);
-        if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
-        if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
         if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) {
             return getString(R.string.contents_package_local);
         }
@@ -1426,7 +1398,15 @@ public class ContentsFragment extends Fragment {
     }
 
     private String getSourceDetailLabel(ContentProfile profile) {
-        if (profile == null || profile.sourceRepo == null) return "";
+        if (profile == null) return "";
+        String sourceMode = resolveProfileSourceMode(profile);
+        if ("wcphub".equals(sourceMode)) return "";
+        if ("aesolator".equals(sourceMode) && profile.sourceRepo != null) {
+            String repo = profile.sourceRepo.trim().toLowerCase(Locale.US);
+            if (repo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
+            if (repo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_archive_graphics_lane);
+        }
+        if (profile.sourceRepo == null) return "";
         String repo = profile.sourceRepo.trim();
         if (repo.isEmpty()) return "";
         String lowerRepo = repo.toLowerCase(Locale.US);
@@ -1481,11 +1461,6 @@ public class ContentsFragment extends Fragment {
         if (containsProton && !containsWine) return ContentProfile.ContentType.CONTENT_TYPE_PROTON;
         if (containsWine && !containsProton) return ContentProfile.ContentType.CONTENT_TYPE_WINE;
         return null;
-    }
-
-    private boolean detectGlibcTaggedArchive(String fileName) {
-        if (fileName == null) return false;
-        return fileName.trim().toLowerCase(Locale.US).contains("glibc");
     }
 
     private ImportArchHint detectExpectedArchFromName(String fileName) {

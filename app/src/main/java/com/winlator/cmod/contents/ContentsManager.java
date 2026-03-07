@@ -15,8 +15,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -24,6 +28,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
@@ -241,8 +247,15 @@ public class ContentsManager {
 
         File file = getTmpDir(context);
 
-        boolean ret;
-        ret = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, uri, file);
+        boolean ret = extractZipSafely(uri, file);
+        if (!ret) {
+            FileUtils.delete(file);
+            if (!file.exists() && !file.mkdirs()) {
+                callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
+                return;
+            }
+        }
+        if (!ret) ret = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, uri, file);
         if (!ret)
             ret = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, uri, file);
         if (!ret) {
@@ -289,6 +302,58 @@ public class ContentsManager {
         }
 
         callback.onSucceed(profile);
+    }
+
+    private boolean extractZipSafely(Uri uri, File destination) {
+        if (uri == null || destination == null) return false;
+        if (destination.exists() && !FileUtils.clear(destination)) {
+            FileUtils.delete(destination);
+        }
+        if (!destination.exists() && !destination.mkdirs()) return false;
+
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             ZipInputStream zis = inputStream == null ? null : new ZipInputStream(inputStream)) {
+            if (zis == null) return false;
+            ZipEntry entry;
+            boolean extractedAnything = false;
+            while ((entry = zis.getNextEntry()) != null) {
+                File target = getSafeZipEntryFile(destination, entry);
+                if (target == null) {
+                    FileUtils.delete(destination);
+                    return false;
+                }
+                if (entry.isDirectory()) {
+                    if (!target.exists() && !target.mkdirs()) {
+                        FileUtils.delete(destination);
+                        return false;
+                    }
+                    continue;
+                }
+
+                File parent = target.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    FileUtils.delete(destination);
+                    return false;
+                }
+                Files.copy(zis, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                extractedAnything = true;
+            }
+            if (!extractedAnything) {
+                FileUtils.delete(destination);
+            }
+            return extractedAnything;
+        } catch (IOException e) {
+            FileUtils.delete(destination);
+            return false;
+        }
+    }
+
+    private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
+        File dstFile = new File(rootDir, entry.getName());
+        String rootPath = rootDir.getCanonicalPath() + File.separator;
+        String dstPath = dstFile.getCanonicalPath();
+        if (!dstPath.startsWith(rootPath)) return null;
+        return dstFile;
     }
 
     public void finishInstallContent(ContentProfile profile, OnInstallFinishedCallback callback) {

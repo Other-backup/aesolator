@@ -42,6 +42,7 @@ public class ColorPickerView extends View implements View.OnClickListener {
 
         colorFrame = BitmapFactory.decodeResource(context.getResources(), R.drawable.color_frame);
 
+        setTag("theme_combo_box");
         setBackgroundResource(R.drawable.combo_box);
         setClickable(true);
         setFocusable(true);

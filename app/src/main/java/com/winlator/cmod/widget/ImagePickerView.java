@@ -35,6 +35,7 @@ public class ImagePickerView extends View implements View.OnClickListener {
     public ImagePickerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
+        setTag("theme_combo_box");
         setBackgroundResource(R.drawable.combo_box);
         setClickable(true);
         setFocusable(true);

@@ -42,9 +42,9 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:layout_marginTop="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
             android:minHeight="92dp"
-            android:tag="theme_card"
+            android:tag="theme_card">
 
             <TextView
                 style="@style/FieldSetLabel"

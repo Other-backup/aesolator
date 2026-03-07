@@ -408,8 +408,6 @@ public class MainActivity extends AppCompatActivity {
         TextView tvAboutCreditsLabel = dialog.findViewById(R.id.TVAboutCreditsLabel);
         TextView tvAboutRuntimeLabel = dialog.findViewById(R.id.TVAboutRuntimeLabel);
         if (llAboutHeaderCard != null) llAboutHeaderCard.setBackgroundResource(panelBackground);
-        if (llAboutCreditsCard != null) llAboutCreditsCard.setBackgroundResource(panelBackground);
-        if (llAboutRuntimeCard != null) llAboutRuntimeCard.setBackgroundResource(panelBackground);
         if (tvAboutAppSummary != null) tvAboutAppSummary.setTextColor(bodyTextColor);
         if (tvAboutCreditsLabel != null) {
             tvAboutCreditsLabel.setBackgroundResource(badgeBackground);

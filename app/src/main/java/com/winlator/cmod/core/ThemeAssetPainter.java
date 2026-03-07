@@ -136,6 +136,12 @@ public final class ThemeAssetPainter {
                 ));
             }
         }
+
+        if (hasTagFlag(view, "theme_combo_box")) {
+            view.setBackgroundResource(isDarkMode
+                    ? R.drawable.combo_box_dark
+                    : R.drawable.combo_box);
+        }
     }
 
     private static boolean hasTagFlag(View view, String flag) {
