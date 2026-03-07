@@ -489,14 +489,18 @@ public class ContainerDetailFragment extends Fragment {
                 String screenSize = getScreenSize(view);
                 String envVars = envVarsView.getEnvVars();
                 String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
-                String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
+                String graphicsDriverConfig = vGraphicsDriverConfig.getTag() instanceof String
+                        ? (String) vGraphicsDriverConfig.getTag()
+                        : "";
                 HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
                 if (config.get("version").isEmpty()) {
                     config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                String dxwrapperConfig = vDXWrapperConfig.getTag().toString();
+                String dxwrapperConfig = vDXWrapperConfig.getTag() instanceof String
+                        ? (String) vDXWrapperConfig.getTag()
+                        : "";
                 String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
                 String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
                 String wincomponents = getWinComponents(view);
@@ -642,12 +646,15 @@ public class ContainerDetailFragment extends Fragment {
 
 
                     manager.createContainerAsync(data, contentsManager, (container) -> {
-                        if (container != null) {
-                            this.container = container;
-                            saveWineRegistryKeys(view);
-                        }
+                        if (!isAdded()) return;
                         preloaderDialog.close();
-                        getActivity().onBackPressed();
+                        if (container == null) {
+                            AppUtils.showToast(context, R.string.unable_to_create_container);
+                            return;
+                        }
+                        this.container = container;
+                        saveWineRegistryKeys(view);
+                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
                     });
                 }
             } catch (JSONException e) {

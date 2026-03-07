@@ -276,6 +276,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <Button
@@ -284,6 +286,9 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:minHeight="52dp"
                         android:text="@string/diagnostics_forensic_run_root_capture" />
 
                     <Space
@@ -296,6 +301,9 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:minHeight="52dp"
                         android:text="@string/copy_capture_command" />
                 </LinearLayout>
 

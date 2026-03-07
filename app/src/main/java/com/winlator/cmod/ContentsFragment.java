@@ -112,11 +112,11 @@ public class ContentsFragment extends Fragment {
         manager.syncContents();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireActivity());
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
-        sourceMode = sharedPreferences.getString("contents_source_mode", "aesolator");
-        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "aesolator";
+        sourceMode = sharedPreferences.getString("contents_source_mode", "wcphub");
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "wcphub";
         boolean migratedSourceMode = false;
         if ("all".equalsIgnoreCase(sourceMode) || "custom".equalsIgnoreCase(sourceMode)) {
-            sourceMode = "aesolator";
+            sourceMode = "wcphub";
             migratedSourceMode = true;
         }
         channelMode = sharedPreferences.getString("contents_channel_mode", "stable");
@@ -378,9 +378,8 @@ public class ContentsFragment extends Fragment {
 
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
         if (profile == null) return false;
-        String mode = sourceMode == null ? "aesolator" : sourceMode.trim().toLowerCase(Locale.US);
+        String mode = sourceMode == null ? "wcphub" : sourceMode.trim().toLowerCase(Locale.US);
         String profileMode = resolveProfileSourceMode(profile);
-        if ("aesolator".equals(mode)) return "aesolator".equals(profileMode) || "wcphub".equals(profileMode);
         return mode.equals(profileMode);
     }
 
@@ -525,7 +524,7 @@ public class ContentsFragment extends Fragment {
             applyFilterSpinnerTheme();
 
             if (!containsIgnoreCase(sourceValues, sourceMode)) {
-                sourceMode = sourceValues.length > 0 ? sourceValues[0] : "aesolator";
+                sourceMode = sourceValues.length > 0 ? sourceValues[0] : "wcphub";
             }
             setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
             sharedPreferences.edit().putString("contents_source_mode", sourceMode).apply();
@@ -626,41 +625,52 @@ public class ContentsFragment extends Fragment {
 
     private String[] getSourceEntriesForType(ContentProfile.ContentType type) {
         ArrayList<String> entries = new ArrayList<>();
-        entries.add(getString(R.string.contents_source_aesolator_mainline));
-        if (supportsSourceModeForType(type, "wcphub")) {
-            entries.add(getString(R.string.contents_source_wcphub_feed));
-        }
-        if (supportsSourceModeForType(type, "fallback")) {
-            entries.add(getString(R.string.contents_source_fallback));
+        for (String sourceValue : getAvailableSourceModesForType(type)) {
+            entries.add(getSourceEntryLabel(sourceValue));
         }
         return entries.toArray(new String[0]);
     }
 
     private String[] getSourceValuesForType(ContentProfile.ContentType type) {
-        ArrayList<String> values = new ArrayList<>();
-        values.add("aesolator");
-        if (supportsSourceModeForType(type, "wcphub")) {
-            values.add("wcphub");
-        }
-        if (supportsSourceModeForType(type, "fallback")) {
-            values.add("fallback");
-        }
+        ArrayList<String> values = getAvailableSourceModesForType(type);
         return values.toArray(new String[0]);
     }
 
-    private boolean supportsSourceModeForType(ContentProfile.ContentType type, String mode) {
-        String normalizedMode = mode == null ? "" : mode.trim().toLowerCase(Locale.US);
-        if ("aesolator".equals(normalizedMode)) return true;
-        if ("wcphub".equals(normalizedMode) || "fallback".equals(normalizedMode)) {
-            return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
-                    || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
+    private ArrayList<String> getAvailableSourceModesForType(ContentProfile.ContentType type) {
+        LinkedHashMap<String, Boolean> available = new LinkedHashMap<>();
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            available.put("aesolator", Boolean.TRUE);
+        } else if (type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
+            available.put("wcphub", Boolean.TRUE);
+        } else {
+            List<ContentProfile> profiles = manager.getProfiles(type);
+            if (profiles != null) {
+                for (ContentProfile profile : profiles) {
+                    if (profile == null || profile.locallyInstalled) continue;
+                    String profileMode = resolveProfileSourceMode(profile);
+                    if ("wcphub".equals(profileMode) || "aesolator".equals(profileMode) || "fallback".equals(profileMode)) {
+                        available.put(profileMode, Boolean.TRUE);
+                    }
+                }
+            }
+            if (available.isEmpty()) available.put("wcphub", Boolean.TRUE);
         }
-        return false;
+
+        ArrayList<String> ordered = new ArrayList<>();
+        for (String candidate : Arrays.asList("wcphub", "aesolator", "fallback")) {
+            if (available.containsKey(candidate)) ordered.add(candidate);
+        }
+        return ordered;
+    }
+
+    private String getSourceEntryLabel(String sourceValue) {
+        if ("aesolator".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
+        if ("wcphub".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
+        if ("fallback".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_fallback);
+        return getString(R.string.contents_source_unknown);
     }
 
     private String[] getArchValuesForType(ContentProfile.ContentType type) {

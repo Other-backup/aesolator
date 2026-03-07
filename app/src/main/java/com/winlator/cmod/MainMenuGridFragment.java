@@ -87,7 +87,7 @@ public class MainMenuGridFragment extends Fragment {
         recyclerView.setHasFixedSize(false);
         recyclerView.setItemAnimator(null);
         if (recyclerView.getItemDecorationCount() == 0) {
-            recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, dpToPx(4f)));
+            recyclerView.addItemDecoration(new GridSpacingItemDecoration(spanCount, dpToPx(3f)));
         }
         recyclerView.setAdapter(new MainMenuCardAdapter(MENU_ENTRIES));
         return view;

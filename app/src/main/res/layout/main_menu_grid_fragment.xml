@@ -15,9 +15,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/surface_card_background"
-            android:minHeight="116dp"
+            android:minHeight="92dp"
             android:orientation="vertical"
-            android:padding="14dp"
+            android:padding="12dp"
             android:tag="theme_card">
 
             <TextView
@@ -25,16 +25,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
-                android:textSize="24sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/TVMainMenuHeroSubtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:text="@string/main_menu_home_subtitle"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
@@ -42,7 +42,7 @@
             style="@style/FieldSetLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:text="@string/main_menu_home_section"
             android:textStyle="bold"
             android:tag="theme_badge" />
@@ -51,7 +51,7 @@
             android:id="@+id/RVMainMenuCards"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:nestedScrollingEnabled="false"
             android:overScrollMode="never"
             android:scrollbars="vertical" />

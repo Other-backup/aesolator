@@ -11,6 +11,8 @@
         android:id="@+id/TVForensicLogFile"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:textColor="@color/forensic_badge_text_dark"
         android:textStyle="bold" />
 
@@ -27,6 +29,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:baselineAligned="false"
         android:gravity="center_horizontal"
         android:orientation="horizontal">
 
@@ -36,6 +39,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:gravity="center"
+            android:maxLines="2"
+            android:minHeight="52dp"
             android:text="@string/diagnostics_forensic_log_copy" />
 
         <Button
@@ -45,6 +51,9 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
+            android:gravity="center"
+            android:maxLines="2"
+            android:minHeight="52dp"
             android:text="@string/diagnostics_forensic_log_export" />
     </LinearLayout>
 
