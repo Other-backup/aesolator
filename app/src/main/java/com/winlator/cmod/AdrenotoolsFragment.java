@@ -62,6 +62,11 @@ public class AdrenotoolsFragment extends Fragment {
     private static final String UPSCALER_BACKEND_OFF = "off";
     private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
     private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String GRAPHICS_SOURCE_AE_ARCHIVE = "ae_archive";
+    private static final String GRAPHICS_SOURCE_STEVENMXZ = "stevenmxz";
+    private static final String GRAPHICS_SOURCE_GAMENATIVE = "gamenative";
+    private static final String GRAPHICS_SOURCE_WHITEBELYASH = "whitebelyash";
+    private static final String GRAPHICS_SOURCE_MRPURPLE = "mrpurple";
 
     private AdrenotoolsManager adrenotoolsManager;
     private SharedPreferences sharedPreferences;
@@ -76,7 +81,7 @@ public class AdrenotoolsFragment extends Fragment {
     private int selectedLaneButtonId = R.id.BTLaneTurnip;
     private String selectedLane = LANE_TURNIP;
     private String sourceMode = "ae_archive";
-    private String branchMode = "all";
+    private String branchMode = "";
     private String[] sourceEntries;
     private String[] sourceValues;
     private final ArrayList<String> activeSourceEntries = new ArrayList<>();
@@ -96,10 +101,11 @@ public class AdrenotoolsFragment extends Fragment {
         super.onCreate(savedInstanceState);
         this.adrenotoolsManager = new AdrenotoolsManager(getActivity());
         this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext());
-        sourceMode = sharedPreferences.getString(PREF_GRAPHICS_SOURCE_MODE, "ae_archive");
-        branchMode = sharedPreferences.getString(PREF_GRAPHICS_BRANCH_MODE, "all");
-        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "ae_archive";
-        if (branchMode == null || branchMode.trim().isEmpty()) branchMode = "all";
+        sourceMode = sharedPreferences.getString(PREF_GRAPHICS_SOURCE_MODE, GRAPHICS_SOURCE_AE_ARCHIVE);
+        branchMode = sharedPreferences.getString(PREF_GRAPHICS_BRANCH_MODE, "");
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = GRAPHICS_SOURCE_AE_ARCHIVE;
+        if ("all".equalsIgnoreCase(branchMode)) branchMode = "";
+        if (branchMode == null) branchMode = "";
     }
 
     @Override
@@ -127,16 +133,14 @@ public class AdrenotoolsFragment extends Fragment {
         sGraphicsFeedBranchMode.setAdapter(SpinnerAdapters.create(
                 requireContext(),
                 isDarkMode,
-                new ArrayList<>(Collections.singletonList(getString(R.string.graphics_center_branch_all)))
+                new ArrayList<>(Collections.singletonList(getString(R.string.graphics_center_driver_feed_loading)))
         ));
         int popupBackground = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         sGraphicsFeedSourceMode.setPopupBackgroundResource(popupBackground);
         sGraphicsFeedBranchMode.setPopupBackgroundResource(popupBackground);
         applyFeedSpinnerTheme(isDarkMode);
         branchEntries.clear();
-        branchEntries.add(getString(R.string.graphics_center_branch_all));
         branchValues.clear();
-        branchValues.add("all");
         updateSourceSelector();
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
 
@@ -199,8 +203,9 @@ public class AdrenotoolsFragment extends Fragment {
         super.onResume();
         sourceMode = sharedPreferences.getString(PREF_GRAPHICS_SOURCE_MODE, sourceMode);
         branchMode = sharedPreferences.getString(PREF_GRAPHICS_BRANCH_MODE, branchMode);
-        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "ae_archive";
-        if (branchMode == null || branchMode.trim().isEmpty()) branchMode = "all";
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = GRAPHICS_SOURCE_AE_ARCHIVE;
+        if ("all".equalsIgnoreCase(branchMode)) branchMode = "";
+        if (branchMode == null) branchMode = "";
         updateSourceSelector();
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
         if (driversAdapter != null) driversAdapter.replaceItems(adrenotoolsManager.enumarateInstalledDrivers());
@@ -949,15 +954,15 @@ public class AdrenotoolsFragment extends Fragment {
 
     private List<ContentProfile> collectSourceProfiles(String lane, String selectedSourceMode) {
         ArrayList<ContentProfile> profiles = new ArrayList<>();
-        String source = selectedSourceMode == null ? "ae_archive" : selectedSourceMode.trim().toLowerCase(Locale.US);
+        String source = selectedSourceMode == null ? GRAPHICS_SOURCE_AE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
 
-        if ("stevenmxz".equals(source)) {
+        if (GRAPHICS_SOURCE_STEVENMXZ.equals(source)) {
             profiles.addAll(fetchGitHubReleaseZipProfiles("StevenMXZ/freedreno_turnip-CI", lane, source));
-        } else if ("gamenative".equals(source)) {
+        } else if (GRAPHICS_SOURCE_GAMENATIVE.equals(source)) {
             profiles.addAll(fetchGameNativeZipProfiles(lane));
-        } else if ("whitebelyash".equals(source)) {
+        } else if (GRAPHICS_SOURCE_WHITEBELYASH.equals(source)) {
             profiles.addAll(fetchGitHubReleaseZipProfiles("whitebelyash/freedreno_turnip-CI", lane, source));
-        } else if ("mrpurple".equals(source)) {
+        } else if (GRAPHICS_SOURCE_MRPURPLE.equals(source)) {
             profiles.addAll(fetchGitHubReleaseZipProfiles("MrPurple666/purple-turnip", lane, source));
         } else {
             profiles.addAll(fetchGitHubReleaseZipProfiles("kosoymiki/wcp-graphics-lanes", lane, source));
@@ -968,11 +973,24 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         Collections.sort(profiles, (left, right) -> {
-            int codeCmp = Integer.compare(right.verCode, left.verCode);
+            int installCmp = Boolean.compare(right != null && right.locallyInstalled, left != null && left.locallyInstalled);
+            if (installCmp != 0) return installCmp;
+
+            int sourceCmp = Integer.compare(resolveGraphicsSourcePriority(left), resolveGraphicsSourcePriority(right));
+            if (sourceCmp != 0) return sourceCmp;
+
+            int branchCmp = Integer.compare(resolveGraphicsBranchPriority(left), resolveGraphicsBranchPriority(right));
+            if (branchCmp != 0) return branchCmp;
+
+            int channelCmp = Integer.compare(resolveGraphicsChannelPriority(left), resolveGraphicsChannelPriority(right));
+            if (channelCmp != 0) return channelCmp;
+
+            int codeCmp = Integer.compare(right == null ? 0 : right.verCode, left == null ? 0 : left.verCode);
             if (codeCmp != 0) return codeCmp;
-            String rv = right.verName == null ? "" : right.verName;
-            String lv = left.verName == null ? "" : left.verName;
-            return rv.compareToIgnoreCase(lv);
+
+            String leftName = left == null || left.verName == null ? "" : left.verName;
+            String rightName = right == null || right.verName == null ? "" : right.verName;
+            return leftName.compareToIgnoreCase(rightName);
         });
         return profiles;
     }
@@ -1015,10 +1033,12 @@ public class AdrenotoolsFragment extends Fragment {
                     profile.desc = releaseName.isEmpty() ? assetName : releaseName;
                     profile.remoteUrl = assetUrl;
                     profile.sourceRepo = repo;
+                    profile.sourceFeed = sourceKey;
+                    profile.sourceLabel = resolveGraphicsSourceLabel(sourceKey);
                     profile.releaseTag = tag;
                     profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                     profile.delivery = resolveAssetBranch(sourceKey, lowerName, tag, releaseName);
-                    profile.channel = ContentProfile.CHANNEL_STABLE;
+                    profile.channel = resolveGraphicsChannel(lowerName, tag, releaseName);
                     profile.locallyInstalled = isLikelyInstalledDriver(profile);
                     profiles.add(profile);
                 }
@@ -1068,10 +1088,12 @@ public class AdrenotoolsFragment extends Fragment {
                 profile.desc = (candidate.hint == null || candidate.hint.trim().isEmpty()) ? fileName : candidate.hint.trim();
                 profile.remoteUrl = candidate.url;
                 profile.sourceRepo = "gamenative.app/drivers";
+                profile.sourceFeed = GRAPHICS_SOURCE_GAMENATIVE;
+                profile.sourceLabel = resolveGraphicsSourceLabel(GRAPHICS_SOURCE_GAMENATIVE);
                 profile.releaseTag = branch;
                 profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                 profile.delivery = branch;
-                profile.channel = ContentProfile.CHANNEL_STABLE;
+                profile.channel = resolveGraphicsChannel(laneHint, branch, candidate.hint);
                 profile.locallyInstalled = isLikelyInstalledDriver(profile);
                 profiles.add(profile);
             }
@@ -1270,11 +1292,12 @@ public class AdrenotoolsFragment extends Fragment {
     private List<ContentProfile> buildStaticFallbackProfiles(String sourceKey, String lane) {
         ArrayList<ContentProfile> profiles = new ArrayList<>();
         String source = sourceKey == null ? "" : sourceKey.trim().toLowerCase(Locale.US);
-        if (LANE_TURNIP.equals(lane) && ("stevenmxz".equals(source) || "ae_archive".equals(source))) {
-            String sourceRepo = "stevenmxz".equals(source)
+        if (LANE_TURNIP.equals(lane) && (GRAPHICS_SOURCE_STEVENMXZ.equals(source) || GRAPHICS_SOURCE_AE_ARCHIVE.equals(source))) {
+            String sourceRepo = GRAPHICS_SOURCE_STEVENMXZ.equals(source)
                     ? "StevenMXZ/freedreno_turnip-CI"
                     : "Ae.solator archive";
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "Turnip Gen8 V26",
                     "https://github.com/StevenMXZ/freedreno_turnip-CI/releases/download/v26.1.2/Turnip_Gen8_V26.zip",
@@ -1284,6 +1307,7 @@ public class AdrenotoolsFragment extends Fragment {
                     261200
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "Turnip v26.1.0 R4",
                     "https://github.com/StevenMXZ/freedreno_turnip-CI/releases/download/v26.1.0-R4/Turnip_v26.1.0_R4.zip",
@@ -1293,9 +1317,10 @@ public class AdrenotoolsFragment extends Fragment {
                     261004
             ));
         }
-        if (LANE_TURNIP.equals(lane) && "whitebelyash".equals(source)) {
+        if (LANE_TURNIP.equals(lane) && GRAPHICS_SOURCE_WHITEBELYASH.equals(source)) {
             String sourceRepo = "whitebelyash/freedreno_turnip-CI";
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "mesa-turnip-main-V26.1.0-git_3",
                     "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git_3/mesa-turnip-main-V26.1.0-git_3.zip",
@@ -1305,6 +1330,7 @@ public class AdrenotoolsFragment extends Fragment {
                     261003
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "mesa-turnip-main-flushall-V26.1.0-git-hotfix",
                     "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git-hotfix/mesa-turnip-main-flushall-V26.1.0-git-hotfix.zip",
@@ -1314,6 +1340,7 @@ public class AdrenotoolsFragment extends Fragment {
                     261002
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "mesa-turnip-main-noflushall-V26.1.0-git-hotfix",
                     "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/mesa_v26.1.0-git-hotfix/mesa-turnip-main-noflushall-V26.1.0-git-hotfix.zip",
@@ -1323,6 +1350,7 @@ public class AdrenotoolsFragment extends Fragment {
                     261001
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "a8xx-gen8-V23",
                     "https://github.com/whitebelyash/freedreno_turnip-CI/releases/download/tu_v23/a8xx-gen8-V23.zip",
@@ -1332,9 +1360,10 @@ public class AdrenotoolsFragment extends Fragment {
                     260923
             ));
         }
-        if (LANE_TURNIP.equals(lane) && "mrpurple".equals(source)) {
+        if (LANE_TURNIP.equals(lane) && GRAPHICS_SOURCE_MRPURPLE.equals(source)) {
             String sourceRepo = "MrPurple666/purple-turnip";
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "turnip_mrpurple_T24-toasted",
                     "https://github.com/MrPurple666/purple-turnip/releases/download/vturnip_mrpurple_T24-toasted.adpkg/turnip_mrpurple_T24-toasted.adpkg.zip",
@@ -1344,6 +1373,7 @@ public class AdrenotoolsFragment extends Fragment {
                     240024
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "turnip_mrpurple_T21-AYANEO",
                     "https://github.com/MrPurple666/purple-turnip/releases/download/vturnip_mrpurple_T21-AYANEO.adpkg/turnip_mrpurple_T21-AYANEO.adpkg.zip",
@@ -1353,9 +1383,10 @@ public class AdrenotoolsFragment extends Fragment {
                     240021
             ));
         }
-        if (LANE_OPENGL.equals(lane) && "gamenative".equals(source)) {
+        if (LANE_OPENGL.equals(lane) && GRAPHICS_SOURCE_GAMENATIVE.equals(source)) {
             String sourceRepo = "gamenative.app/drivers";
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "qcom-849",
                     "https://downloads.gamenative.app/drivers/qcom-849.zip",
@@ -1365,6 +1396,7 @@ public class AdrenotoolsFragment extends Fragment {
                     849000
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "8Elite2-842.6",
                     "https://downloads.gamenative.app/drivers/8Elite2-842.6.zip",
@@ -1374,6 +1406,7 @@ public class AdrenotoolsFragment extends Fragment {
                     842006
             ));
             profiles.add(buildStaticProfile(
+                    source,
                     lane,
                     "Adreno_819",
                     "https://downloads.gamenative.app/drivers/Adreno_819.zip",
@@ -1386,7 +1419,8 @@ public class AdrenotoolsFragment extends Fragment {
         return profiles;
     }
 
-    private ContentProfile buildStaticProfile(String lane,
+    private ContentProfile buildStaticProfile(String sourceKey,
+                                              String lane,
                                               String verName,
                                               String remoteUrl,
                                               String sourceRepo,
@@ -1402,9 +1436,11 @@ public class AdrenotoolsFragment extends Fragment {
         profile.desc = verName + " (fallback mirror)";
         profile.remoteUrl = remoteUrl;
         profile.sourceRepo = sourceRepo;
+        profile.sourceFeed = sourceKey == null ? "" : sourceKey;
+        profile.sourceLabel = resolveGraphicsSourceLabel(sourceKey);
         profile.releaseTag = releaseTag;
         profile.delivery = delivery;
-        profile.channel = ContentProfile.CHANNEL_STABLE;
+        profile.channel = resolveGraphicsChannel(verName, releaseTag, delivery);
         profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
         profile.locallyInstalled = isLikelyInstalledDriver(profile);
         return profile;
@@ -1508,7 +1544,7 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         if (activeSourceValues.isEmpty()) {
-            activeSourceValues.add("ae_archive");
+            activeSourceValues.add(GRAPHICS_SOURCE_AE_ARCHIVE);
             activeSourceEntries.add(getString(R.string.graphics_feed_source_ae_archive));
         }
         if (!activeSourceValues.contains(sourceMode)) {
@@ -1531,7 +1567,7 @@ public class AdrenotoolsFragment extends Fragment {
     }
 
     private boolean supportsOpenGlFeedSource(String source) {
-        return "ae_archive".equals(source) || "gamenative".equals(source);
+        return GRAPHICS_SOURCE_AE_ARCHIVE.equals(source) || GRAPHICS_SOURCE_GAMENATIVE.equals(source);
     }
 
     private void updateBranchSelector(List<ContentProfile> profiles) {
@@ -1539,18 +1575,22 @@ public class AdrenotoolsFragment extends Fragment {
         LinkedHashSet<String> uniqueBranches = new LinkedHashSet<>();
         for (ContentProfile profile : profiles) {
             if (profile == null) continue;
-            String key = profile.delivery == null ? "" : profile.delivery.trim().toLowerCase(Locale.US);
-            if (key.isEmpty()) key = "main";
+            String key = resolveGraphicsBranchKey(profile);
             uniqueBranches.add(key);
         }
 
+        ArrayList<String> sortedBranches = new ArrayList<>(uniqueBranches);
+        Collections.sort(sortedBranches, (left, right) -> {
+            int priorityCmp = Integer.compare(resolveGraphicsBranchPriority(sourceMode, left), resolveGraphicsBranchPriority(sourceMode, right));
+            if (priorityCmp != 0) return priorityCmp;
+            return formatReleaseLineLabel(left).compareToIgnoreCase(formatReleaseLineLabel(right));
+        });
+
         LinkedHashMap<String, String> options = new LinkedHashMap<>();
-        if (uniqueBranches.size() <= 1) {
-            String onlyBranch = uniqueBranches.isEmpty() ? "main" : uniqueBranches.iterator().next();
-            options.put(onlyBranch, formatReleaseLineLabel(onlyBranch));
+        if (sortedBranches.isEmpty()) {
+            options.put(resolveGraphicsDefaultBranchKey(sourceMode), formatReleaseLineLabel(resolveGraphicsDefaultBranchKey(sourceMode)));
         } else {
-            options.put("all", getString(R.string.graphics_center_branch_all));
-            for (String key : uniqueBranches) {
+            for (String key : sortedBranches) {
                 if (!options.containsKey(key)) options.put(key, formatReleaseLineLabel(key));
             }
         }
@@ -1562,6 +1602,7 @@ public class AdrenotoolsFragment extends Fragment {
             branchEntries.add(option.getValue());
         }
 
+        if ("all".equalsIgnoreCase(branchMode)) branchMode = "";
         if (!branchValues.contains(branchMode)) {
             branchMode = branchValues.get(0);
             sharedPreferences.edit().putString(PREF_GRAPHICS_BRANCH_MODE, branchMode).apply();
@@ -1579,8 +1620,7 @@ public class AdrenotoolsFragment extends Fragment {
             ));
         }
         setSpinnerSelectionByValue(sGraphicsFeedBranchMode, branchValues.toArray(new String[0]), branchMode, 0);
-        boolean hasSyntheticAllOption = !branchValues.isEmpty() && "all".equals(branchValues.get(0));
-        sGraphicsFeedBranchMode.setEnabled(hasSyntheticAllOption ? branchValues.size() > 2 : branchValues.size() > 1);
+        sGraphicsFeedBranchMode.setEnabled(branchValues.size() > 1);
         ViewGroup.LayoutParams layoutParams = sGraphicsFeedBranchMode.getLayoutParams();
         if (layoutParams != null) {
             layoutParams.width = uniqueBranches.size() <= 1 ? ViewGroup.LayoutParams.WRAP_CONTENT : ViewGroup.LayoutParams.MATCH_PARENT;
@@ -1593,7 +1633,7 @@ public class AdrenotoolsFragment extends Fragment {
     private void updateBranchLabel(int uniqueBranchCount) {
         if (tvGraphicsFeedBranchLabel == null) return;
         int labelRes;
-        if ("gamenative".equals(sourceMode)) {
+        if (GRAPHICS_SOURCE_GAMENATIVE.equals(sourceMode)) {
             labelRes = uniqueBranchCount <= 1
                     ? R.string.graphics_center_driver_line_single
                     : R.string.graphics_center_driver_line_selector;
@@ -1607,14 +1647,13 @@ public class AdrenotoolsFragment extends Fragment {
 
     private List<ContentProfile> applyBranchFilter(List<ContentProfile> profiles, String selectedBranch) {
         if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
-        String normalized = selectedBranch == null ? "all" : selectedBranch.trim().toLowerCase(Locale.US);
-        if ("all".equals(normalized)) return profiles;
+        String normalized = selectedBranch == null ? "" : selectedBranch.trim().toLowerCase(Locale.US);
+        if (normalized.isEmpty()) normalized = resolveGraphicsDefaultBranchKey(sourceMode);
 
         ArrayList<ContentProfile> filtered = new ArrayList<>();
         for (ContentProfile profile : profiles) {
             if (profile == null) continue;
-            String branch = profile.delivery == null ? "" : profile.delivery.trim().toLowerCase(Locale.US);
-            if (branch.isEmpty()) branch = "main";
+            String branch = resolveGraphicsBranchKey(profile);
             if (normalized.equals(branch)) filtered.add(profile);
         }
         return filtered;
@@ -1663,6 +1702,134 @@ public class AdrenotoolsFragment extends Fragment {
         return out.toString();
     }
 
+    private String resolveGraphicsSourceLabel(String sourceKey) {
+        if (sourceKey == null || sourceKey.trim().isEmpty()) return "";
+        return switch (sourceKey.trim().toLowerCase(Locale.US)) {
+            case GRAPHICS_SOURCE_AE_ARCHIVE -> getString(R.string.graphics_feed_source_ae_archive);
+            case GRAPHICS_SOURCE_STEVENMXZ -> getString(R.string.graphics_feed_source_stevenmxz);
+            case GRAPHICS_SOURCE_GAMENATIVE -> getString(R.string.graphics_feed_source_gamenative);
+            case GRAPHICS_SOURCE_WHITEBELYASH -> getString(R.string.graphics_feed_source_whitebelyash);
+            case GRAPHICS_SOURCE_MRPURPLE -> getString(R.string.graphics_feed_source_mrpurple);
+            default -> toTitleCase(sourceKey.replace('-', ' ').replace('_', ' '));
+        };
+    }
+
+    private String resolveGraphicsBranchKey(ContentProfile profile) {
+        if (profile == null || profile.delivery == null || profile.delivery.trim().isEmpty()) {
+            return resolveGraphicsDefaultBranchKey(sourceMode);
+        }
+        return profile.delivery.trim().toLowerCase(Locale.US);
+    }
+
+    private String resolveGraphicsDefaultBranchKey(String sourceKey) {
+        if (GRAPHICS_SOURCE_GAMENATIVE.equalsIgnoreCase(sourceKey)) {
+            return LANE_OPENGL.equals(selectedLane) ? "qcom-opengl" : "gen8-turnip";
+        }
+        return "mainline";
+    }
+
+    private int resolveGraphicsSourcePriority(ContentProfile profile) {
+        if (profile == null) return Integer.MAX_VALUE;
+        return resolveGraphicsSourcePriority(profile.sourceFeed);
+    }
+
+    private int resolveGraphicsSourcePriority(String sourceKey) {
+        if (sourceKey == null) return Integer.MAX_VALUE;
+        return switch (sourceKey.trim().toLowerCase(Locale.US)) {
+            case GRAPHICS_SOURCE_AE_ARCHIVE -> 0;
+            case GRAPHICS_SOURCE_STEVENMXZ -> 1;
+            case GRAPHICS_SOURCE_GAMENATIVE -> 2;
+            case GRAPHICS_SOURCE_WHITEBELYASH -> 3;
+            case GRAPHICS_SOURCE_MRPURPLE -> 4;
+            default -> 10;
+        };
+    }
+
+    private int resolveGraphicsBranchPriority(ContentProfile profile) {
+        if (profile == null) return Integer.MAX_VALUE;
+        String sourceKey = profile.sourceFeed == null || profile.sourceFeed.trim().isEmpty() ? sourceMode : profile.sourceFeed;
+        return resolveGraphicsBranchPriority(sourceKey, resolveGraphicsBranchKey(profile));
+    }
+
+    private int resolveGraphicsBranchPriority(String sourceKey, String branchKey) {
+        String source = sourceKey == null ? "" : sourceKey.trim().toLowerCase(Locale.US);
+        String branch = branchKey == null ? "" : branchKey.trim().toLowerCase(Locale.US);
+        if (branch.isEmpty()) return 100;
+        if (GRAPHICS_SOURCE_STEVENMXZ.equals(source)) {
+            return switch (branch) {
+                case "gen8" -> 0;
+                case "r-series" -> 1;
+                case "mainline" -> 2;
+                case "autotuner" -> 3;
+                case "a6xx-fix" -> 4;
+                default -> 20;
+            };
+        }
+        if (GRAPHICS_SOURCE_GAMENATIVE.equals(source)) {
+            return switch (branch) {
+                case "qcom-opengl" -> 0;
+                case "adreno-opengl" -> 1;
+                case "8elite2-opengl" -> 2;
+                case "8elite-opengl" -> 3;
+                case "8egen5-opengl" -> 4;
+                case "gen8-turnip" -> 5;
+                case "turnip-rseries" -> 6;
+                case "turnip-mem" -> 7;
+                case "turnip-oneui7" -> 8;
+                case "turnip-a32" -> 9;
+                case "main" -> 10;
+                default -> 20;
+            };
+        }
+        if (GRAPHICS_SOURCE_WHITEBELYASH.equals(source)) {
+            return switch (branch) {
+                case "a8xx-gen8" -> 0;
+                case "mainline" -> 1;
+                case "flushall" -> 2;
+                case "noflushall" -> 3;
+                case "turnip-ci" -> 4;
+                default -> 20;
+            };
+        }
+        if (GRAPHICS_SOURCE_MRPURPLE.equals(source)) {
+            return switch (branch) {
+                case "toasted" -> 0;
+                case "ayaneo" -> 1;
+                case "purple" -> 2;
+                default -> 20;
+            };
+        }
+        return switch (branch) {
+            case "mainline" -> 0;
+            case "experimental" -> 1;
+            default -> 20;
+        };
+    }
+
+    private int resolveGraphicsChannelPriority(ContentProfile profile) {
+        if (profile == null || profile.channel == null) return 0;
+        String channel = profile.channel.trim().toLowerCase(Locale.US);
+        return switch (channel) {
+            case ContentProfile.CHANNEL_STABLE -> 0;
+            case ContentProfile.CHANNEL_BETA -> 1;
+            case ContentProfile.CHANNEL_NIGHTLY -> 2;
+            default -> 3;
+        };
+    }
+
+    private String resolveGraphicsChannel(String... values) {
+        if (values != null) {
+            for (String value : values) {
+                String lower = value == null ? "" : value.toLowerCase(Locale.US);
+                if (lower.contains("nightly") || lower.contains("canary")) return ContentProfile.CHANNEL_NIGHTLY;
+                if (lower.contains("beta") || lower.contains("preview") || lower.contains("experimental")) {
+                    return ContentProfile.CHANNEL_BETA;
+                }
+            }
+        }
+        return ContentProfile.CHANNEL_STABLE;
+    }
+
     private int resolveFeedAccentColor(ContentProfile profile) {
         if (profile == null) return ContextCompat.getColor(requireContext(), R.color.colorAccent);
         int colorRes;
@@ -1691,25 +1858,20 @@ public class AdrenotoolsFragment extends Fragment {
     }
 
     private String buildFeedSourceLabel(ContentProfile profile) {
-        if (profile == null) return "unknown";
+        if (profile == null) return getString(R.string.contents_source_unknown);
+        if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) return profile.sourceLabel.trim();
+        String sourceLabel = resolveGraphicsSourceLabel(profile.sourceFeed);
+        if (!sourceLabel.isEmpty()) return sourceLabel;
         String repo = profile.sourceRepo == null ? "" : profile.sourceRepo.trim();
-        if (!repo.isEmpty()) {
-            String lower = repo.toLowerCase(Locale.US);
-            if (lower.contains("stevenmxz")) return "StevenMXZ";
-            if (lower.contains("whitebelyash")) return "whitebelyash";
-            if (lower.contains("mrpurple")) return "MrPurple";
-            if (lower.contains("gamenative")) return "GameNative";
-            if (lower.contains("kosoymiki")) return "Ae Archive";
-            return repo;
-        }
-        if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) return "local package";
+        if (!repo.isEmpty()) return repo;
+        if (profile.remoteUrl == null || profile.remoteUrl.trim().isEmpty()) return getString(R.string.contents_source_installed_local);
         try {
             Uri uri = Uri.parse(profile.remoteUrl);
             String host = uri.getHost();
             if (host != null && !host.trim().isEmpty()) return host.trim();
         } catch (Exception ignored) {
         }
-        return "remote package";
+        return getString(R.string.contents_source_remote_package);
     }
 
     private String buildFeedMetaLine(ContentProfile profile) {
@@ -1719,13 +1881,21 @@ public class AdrenotoolsFragment extends Fragment {
         } else if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) {
             meta.append(" • Turnip Vulkan");
         }
-        String branch = profile.delivery == null ? "" : profile.delivery.trim();
+        String branch = resolveGraphicsBranchKey(profile);
         if (!branch.isEmpty()) meta.append(" • ").append(formatReleaseLineLabel(branch));
-        if (profile.releaseTag != null && !profile.releaseTag.trim().isEmpty()) {
+        if (profile.channel != null && ContentProfile.CHANNEL_NIGHTLY.equalsIgnoreCase(profile.channel)) {
+            meta.append(" • ").append(getString(R.string.contents_channel_nightly));
+        }
+        String releaseTag = profile.releaseTag == null ? "" : profile.releaseTag.trim();
+        String normalizedBranchLabel = formatReleaseLineLabel(branch).trim();
+        if (!releaseTag.isEmpty()
+                && !releaseTag.equalsIgnoreCase(branch)
+                && !releaseTag.equalsIgnoreCase(normalizedBranchLabel)
+                && !(profile.verName != null && profile.verName.equalsIgnoreCase(releaseTag))) {
             meta.append(" • ").append(profile.releaseTag.trim());
         }
-        meta.append(" • ").append("verCode=").append(profile.verCode);
-        if (profile.locallyInstalled) meta.append(" • installed");
+        if (profile.verCode > 0) meta.append(" • ").append("verCode=").append(profile.verCode);
+        if (profile.locallyInstalled) meta.append(" • ").append(getString(R.string.content_installed));
         return meta.toString();
     }
 
