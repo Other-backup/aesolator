@@ -212,7 +212,9 @@ public class EnvVarsView extends FrameLayout {
     public void add(String name, String value) {
         final Context context = getContext();
         final View itemView = inflater.inflate(R.layout.env_vars_list_item, container, false);
-        ((TextView) itemView.findViewById(R.id.TextView)).setText(name);
+        TextView nameTextView = itemView.findViewById(R.id.TextView);
+        nameTextView.setText(name);
+        nameTextView.setSelected(true);
         int accent = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
         itemView.setBackground(buildInlineCardBackground(accent));
 
@@ -301,4 +303,3 @@ public class EnvVarsView extends FrameLayout {
     }
 
 }
-

@@ -24,8 +24,7 @@
             android:marqueeRepeatLimit="marquee_forever"
             android:maxLines="1"
             android:paddingEnd="22dp"
-            android:scrollHorizontally="true"
-            android:selected="true" />
+            android:scrollHorizontally="true" />
 
         <ImageView
             android:id="@+id/BTHelp"

@@ -18,8 +18,7 @@
         android:fadingEdge="horizontal"
         android:marqueeRepeatLimit="marquee_forever"
         android:maxLines="1"
-        android:scrollHorizontally="true"
-        android:selected="true" />
+        android:scrollHorizontally="true" />
 
     <LinearLayout
         android:layout_width="0dp"
