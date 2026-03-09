@@ -1,7 +1,6 @@
 package com.winlator.cmod.widget;
 
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.util.AttributeSet;
@@ -161,10 +160,7 @@ public class EnvVarsView extends FrameLayout {
         } else if (view instanceof ToggleButton) {
             ToggleButton toggle = (ToggleButton) view;
             toggle.setTextColor(primaryTextColor);
-            toggle.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(
-                    getContext(),
-                    isDarkMode ? R.color.surface_toggle_off_dark : R.color.surface_toggle_off
-            )));
+            toggle.setBackgroundResource(R.drawable.toggle_button_selector);
         } else if (view instanceof TextView) {
             ((TextView) view).setTextColor(primaryTextColor);
         }
@@ -231,6 +227,9 @@ public class EnvVarsView extends FrameLayout {
                 toggleButton.setVisibility(VISIBLE);
                 toggleButton.setChecked(value.equals("1") || value.equals("true"));
                 applyDarkTheme(toggleButton); // Apply dark theme
+                toggleButton.jumpDrawablesToCurrentState();
+                toggleButton.refreshDrawableState();
+                toggleButton.invalidate();
                 getValueCallback = () -> toggleButton.isChecked() ? knownEnvVar[3] : knownEnvVar[2];
                 break;
             case "SELECT":
@@ -302,6 +301,4 @@ public class EnvVarsView extends FrameLayout {
     }
 
 }
-
-
 

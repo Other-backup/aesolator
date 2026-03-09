@@ -128,8 +128,14 @@ public abstract class AppUtils {
 
     public static int getPreferredDialogWidth(Context context) {
         int orientation = context.getResources().getConfiguration().orientation;
-        float scale = orientation == Configuration.ORIENTATION_PORTRAIT ? 0.8f : 0.5f;
+        float scale = orientation == Configuration.ORIENTATION_PORTRAIT ? 0.9f : 0.62f;
         return (int)UnitUtils.dpToPx(UnitUtils.pxToDp(AppUtils.getScreenWidth()) * scale);
+    }
+
+    public static int getPreferredWideDialogWidth(Context context) {
+        int orientation = context.getResources().getConfiguration().orientation;
+        float scale = orientation == Configuration.ORIENTATION_PORTRAIT ? 0.95f : 0.72f;
+        return (int) UnitUtils.dpToPx(UnitUtils.pxToDp(AppUtils.getScreenWidth()) * scale);
     }
 
     public static Toast showToast(Context context, int textResId) {

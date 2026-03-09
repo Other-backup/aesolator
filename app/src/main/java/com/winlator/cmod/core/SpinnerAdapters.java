@@ -2,7 +2,6 @@ package com.winlator.cmod.core;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.View;
@@ -42,7 +41,7 @@ public final class SpinnerAdapters {
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                styleText(view, textColor);
+                styleText(view, textColor, true);
                 return view;
             }
 
@@ -50,7 +49,7 @@ public final class SpinnerAdapters {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                styleText(view, textColor);
+                styleText(view, textColor, false);
                 view.setBackgroundResource(dropdownBackground);
                 return view;
             }
@@ -79,7 +78,7 @@ public final class SpinnerAdapters {
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                styleText(view, textColor);
+                styleText(view, textColor, true);
                 return view;
             }
 
@@ -87,7 +86,7 @@ public final class SpinnerAdapters {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                styleText(view, textColor);
+                styleText(view, textColor, false);
                 view.setBackgroundResource(dropdownBackground);
                 return view;
             }
@@ -130,16 +129,13 @@ public final class SpinnerAdapters {
         if (comboBox == null) return;
         comboBox.setBackgroundResource(isDarkMode ? R.drawable.combo_box_dark : R.drawable.combo_box);
         comboBox.setTextColor(resolvePrimaryTextColor(comboBox.getContext(), isDarkMode));
-        Drawable chevron = ContextCompat.getDrawable(
-                comboBox.getContext(),
-                isDarkMode ? R.drawable.ae_icon_spinner_chevron_dark : R.drawable.ae_icon_spinner_chevron
-        );
-        comboBox.setCompoundDrawablePadding((int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                8,
-                comboBox.getResources().getDisplayMetrics()
-        ));
-        comboBox.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, chevron, null);
+        comboBox.setSingleLine(true);
+        comboBox.setMaxLines(1);
+        comboBox.setHorizontallyScrolling(true);
+        comboBox.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        comboBox.setMarqueeRepeatLimit(-1);
+        comboBox.setSelected(true);
+        comboBox.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, null, null);
     }
 
     public static void applySurface(Spinner spinner) {
@@ -160,12 +156,16 @@ public final class SpinnerAdapters {
         }
     }
 
-    private static void styleText(View view, int textColor) {
+    private static void styleText(View view, int textColor, boolean marquee) {
         if (!(view instanceof TextView)) return;
         TextView textView = (TextView) view;
         textView.setTextColor(textColor);
-        textView.setSingleLine(false);
-        textView.setEllipsize(TextUtils.TruncateAt.END);
+        textView.setSingleLine(true);
+        textView.setMaxLines(1);
+        textView.setHorizontallyScrolling(true);
+        textView.setEllipsize(marquee ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
+        textView.setMarqueeRepeatLimit(-1);
+        textView.setSelected(marquee);
     }
 
     private static int resolvePrimaryTextColor(Context context, boolean isDarkMode) {

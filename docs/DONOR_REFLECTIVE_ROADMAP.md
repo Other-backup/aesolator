@@ -2,6 +2,23 @@
 
 Generated: `2026-03-05`
 
+## UI Tail Closure (2026-03-10)
+
+Closed in this pass:
+
+- `About` card sections no longer use overlay badge geometry; badges now sit above cards with explicit spacing, which removes the remaining title/text collisions.
+- Global selector contract was tightened to a single-line marquee surface for active controls:
+  - compact spinner rows,
+  - `MultiSelectionComboBox`,
+  - contents/source/channel selectors,
+  - graphics/config selectors.
+- `Contents` top cards (`Content type`, `Install content`) were re-balanced so the card shell stays aligned without pushing inner controls below the card surface.
+- `Contents` source split stays explicit between `WCP Archive` and `WCPHub`, and installed-profile provenance is preserved in local metadata so source lanes no longer collapse back into a mixed state.
+- `Graphics Driver Config` and `DXVK/VKD3D` dialogs now open on a wider dialog contract instead of the generic content width, to keep long selectors (`Available Extensions`, memory/present/resource selectors, feature levels) on the same visual width as the rest of the app.
+- `DXVK/VKD3D` no longer carries a fake empty `Advanced` card; async controls remain folded into the real configuration section.
+- `Env Vars` rows in container creation were widened again and toggle buttons now explicitly refresh their checked drawable state after bind, addressing invisible/static enable switches.
+- `Drives` header contrast and column sizing were normalized so the drive letter/path headers stay visible against the themed card background.
+
 ## Documentation Sync (2026-03-10)
 
 Repository documentation was normalized to the actual split model:

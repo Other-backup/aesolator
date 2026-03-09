@@ -98,7 +98,10 @@
         <item name="android:paddingTop">0dp</item>
         <item name="android:paddingBottom">0dp</item>
         <item name="android:maxLines">1</item>
-        <item name="android:ellipsize">end</item>
+        <item name="android:ellipsize">marquee</item>
+        <item name="android:marqueeRepeatLimit">marquee_forever</item>
+        <item name="android:scrollHorizontally">true</item>
+        <item name="android:fadingEdge">horizontal</item>
         <item name="android:spinnerMode">dropdown</item>
         <item name="android:background">?attr/aeComboBoxBackground</item>
         <item name="android:popupBackground">?attr/aePopupBackground</item>
@@ -328,7 +331,7 @@
         <item name="android:paddingStart">12dp</item>
         <item name="android:paddingEnd">12dp</item>
         <item name="android:paddingBottom">12dp</item>
-        <item name="android:paddingTop">42dp</item>
+        <item name="android:paddingTop">46dp</item>
         <item name="android:layout_marginTop">6dp</item>
     </style>
 
@@ -340,7 +343,7 @@
         <item name="android:paddingStart">10dp</item>
         <item name="android:paddingEnd">10dp</item>
         <item name="android:paddingBottom">10dp</item>
-        <item name="android:paddingTop">34dp</item>
+        <item name="android:paddingTop">38dp</item>
         <item name="android:layout_marginTop">4dp</item>
     </style>
 
@@ -353,14 +356,14 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/surface_badge_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingStart">7dp</item>
-        <item name="android:paddingEnd">7dp</item>
-        <item name="android:paddingTop">1dp</item>
-        <item name="android:paddingBottom">1dp</item>
-        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:layout_marginStart">12dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:textSize">9sp</item>
+        <item name="android:textSize">10sp</item>
         <item name="android:textColor">@color/surface_badge_text</item>
     </style>
 

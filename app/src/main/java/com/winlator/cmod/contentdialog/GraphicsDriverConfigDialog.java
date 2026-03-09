@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.CheckBox;
 import android.widget.Spinner;
@@ -155,6 +156,17 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
         super(anchor.getContext(), R.layout.graphics_driver_config_dialog);
         initializeDialog(anchor, graphicsDriver, graphicsDriverVersionView);
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setLayout(
+                    AppUtils.getPreferredWideDialogWidth(getContext()),
+                    WindowManager.LayoutParams.WRAP_CONTENT
+            );
+        }
     }
 
     private void initializeDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {

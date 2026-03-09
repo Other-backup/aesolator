@@ -447,8 +447,10 @@ public class ContentsFragment extends Fragment {
         );
         if (!resolved.isEmpty()) return resolved;
         if (profile.locallyInstalled) {
-            if (SUPPORTED_CONTENT_TYPES.contains(profile.type)) return SOURCE_MODE_ARCHIVE;
-            return SOURCE_MODE_WCPHUB;
+            ArrayList<String> availableSourceModes = getAvailableSourceModesForType(profile.type);
+            if (availableSourceModes.size() == 1) return availableSourceModes.get(0);
+            if (availableSourceModes.contains(SOURCE_MODE_ARCHIVE)) return SOURCE_MODE_ARCHIVE;
+            if (availableSourceModes.contains(SOURCE_MODE_WCPHUB)) return SOURCE_MODE_WCPHUB;
         }
         return "remote";
     }
@@ -684,13 +686,29 @@ public class ContentsFragment extends Fragment {
 
     private ArrayList<String> getAvailableSourceModesForType(ContentProfile.ContentType type) {
         ArrayList<String> ordered = new ArrayList<>();
-        if (SUPPORTED_CONTENT_TYPES.contains(type)) {
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             ordered.add(SOURCE_MODE_ARCHIVE);
             ordered.add(SOURCE_MODE_WCPHUB);
             return ordered;
         }
 
-        ordered.add(SOURCE_MODE_WCPHUB);
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            ordered.add(SOURCE_MODE_ARCHIVE);
+            return ordered;
+        }
+
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
+            ordered.add(SOURCE_MODE_WCPHUB);
+            return ordered;
+        }
+
+        ordered.add(SOURCE_MODE_ARCHIVE);
         return ordered;
     }
 

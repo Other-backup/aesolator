@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
@@ -204,6 +205,17 @@ public class DXVKConfigDialog extends ContentDialog {
                     )
             );
         });
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setLayout(
+                    AppUtils.getPreferredWideDialogWidth(getContext()),
+                    WindowManager.LayoutParams.WRAP_CONTENT
+            );
+        }
     }
 
     private void updateConfigVisibility(int dxvkType) {
