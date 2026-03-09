@@ -15,8 +15,9 @@
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="96dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="0dp"
+            android:minHeight="96dp"
             android:layout_weight="1"
             android:tag="theme_card">
 
@@ -32,15 +33,16 @@
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp" />
+                android:layout_marginTop="4dp" />
         </LinearLayout>
 
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="96dp"
+            android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:layout_marginTop="0dp"
+            android:minHeight="96dp"
             android:layout_weight="1"
             android:tag="theme_card">
 
@@ -56,7 +58,7 @@
                 style="@style/ButtonNeutral"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="4dp"
                 android:gravity="start|center_vertical"
                 android:minHeight="44dp"
                 android:paddingStart="12dp"

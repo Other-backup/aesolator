@@ -2,15 +2,19 @@ package com.winlator.cmod;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import com.winlator.cmod.R;
 
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -23,6 +27,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
@@ -415,6 +420,11 @@ public class AdrenotoolsFragment extends Fragment {
         final SeekBar sbDenoise = dialog.findViewById(R.id.SBSharpnessDenoise);
         final TextView tvDenoise = dialog.findViewById(R.id.TVSharpnessDenoise);
         final TextView tvProfileInfo = dialog.findViewById(R.id.TVUpscalerProfileInfo);
+        final Button btProfileAdd = dialog.findViewById(R.id.BTUpscalerProfileAdd);
+        final Button btProfileDuplicate = dialog.findViewById(R.id.BTUpscalerProfileDuplicate);
+        final Button btProfileRename = dialog.findViewById(R.id.BTUpscalerProfileRename);
+        final Button btProfileRemove = dialog.findViewById(R.id.BTUpscalerProfileRemove);
+        final Button btConfirm = dialog.findViewById(R.id.BTConfirm);
 
         int panelBackground = isDarkMode ? R.drawable.surface_card_background_dark : R.drawable.surface_card_background;
         int commandBackground = isDarkMode ? R.drawable.surface_command_background_dark : R.drawable.surface_command_background;
@@ -445,6 +455,15 @@ public class AdrenotoolsFragment extends Fragment {
         for (Spinner spinner : allSpinners) {
             spinner.setPopupBackgroundResource(popupBackground);
             spinner.setBackgroundResource(spinnerBackground);
+        }
+
+        styleUpscalerActionButton(btProfileAdd, R.drawable.ae_icon_add);
+        styleUpscalerActionButton(btProfileDuplicate, R.drawable.ae_icon_duplicate);
+        styleUpscalerActionButton(btProfileRename, R.drawable.ae_icon_edit);
+        styleUpscalerActionButton(btProfileRemove, R.drawable.ae_icon_remove);
+        if (btConfirm != null) {
+            btConfirm.setText(R.string.save);
+            styleUpscalerActionButton(btConfirm, R.drawable.ae_icon_save);
         }
 
         final ArrayList<UpscalerProfileStore.Profile> profiles = new ArrayList<>(UpscalerProfileStore.loadProfiles(sharedPreferences));
@@ -616,7 +635,7 @@ public class AdrenotoolsFragment extends Fragment {
                 tvDenoise.setText(sbDenoise.getProgress() + "%")
         ));
 
-        dialog.findViewById(R.id.BTUpscalerProfileAdd).setOnClickListener(v -> {
+        btProfileAdd.setOnClickListener(v -> {
             ContentDialog.prompt(requireContext(), R.string.upscaler_profile_name_prompt, "", name -> {
                 UpscalerProfileStore.Profile base = readControlsToProfile.get();
                 base.id = makeUniqueProfileId(name, profiles);
@@ -627,7 +646,7 @@ public class AdrenotoolsFragment extends Fragment {
             });
         });
 
-        dialog.findViewById(R.id.BTUpscalerProfileDuplicate).setOnClickListener(v -> {
+        btProfileDuplicate.setOnClickListener(v -> {
             if (profiles.isEmpty()) return;
             int index = sProfile.getSelectedItemPosition();
             if (index < 0 || index >= profiles.size()) index = 0;
@@ -647,7 +666,7 @@ public class AdrenotoolsFragment extends Fragment {
             );
         });
 
-        dialog.findViewById(R.id.BTUpscalerProfileRename).setOnClickListener(v -> {
+        btProfileRename.setOnClickListener(v -> {
             if (profiles.isEmpty()) return;
             int index = sProfile.getSelectedItemPosition();
             if (index < 0 || index >= profiles.size()) index = 0;
@@ -660,7 +679,7 @@ public class AdrenotoolsFragment extends Fragment {
             });
         });
 
-        dialog.findViewById(R.id.BTUpscalerProfileRemove).setOnClickListener(v -> {
+        btProfileRemove.setOnClickListener(v -> {
             if (profiles.isEmpty()) return;
             int index = sProfile.getSelectedItemPosition();
             if (index < 0 || index >= profiles.size()) index = 0;
@@ -680,6 +699,15 @@ public class AdrenotoolsFragment extends Fragment {
 
         dialog.setOnConfirmCallback(saveCurrentProfile);
         dialog.show();
+        if (dialog.getWindow() != null) {
+            int orientation = requireContext().getResources().getConfiguration().orientation;
+            float widthScale = orientation == Configuration.ORIENTATION_LANDSCAPE ? 0.74f : 0.94f;
+            int dialogWidth = Math.max(
+                    AppUtils.getPreferredDialogWidth(requireContext()),
+                    Math.round(AppUtils.getScreenWidth() * widthScale)
+            );
+            dialog.getWindow().setLayout(dialogWidth, WindowManager.LayoutParams.WRAP_CONTENT);
+        }
     }
 
     private String makeUniqueProfileId(String name, List<UpscalerProfileStore.Profile> profiles) {
@@ -883,6 +911,23 @@ public class AdrenotoolsFragment extends Fragment {
 
     private int dpToPx(float dp) {
         return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
+    }
+
+    private void styleUpscalerActionButton(Button button, int iconResId) {
+        if (button == null) return;
+        Drawable icon = ContextCompat.getDrawable(requireContext(), iconResId);
+        if (icon == null) return;
+        Drawable wrapped = DrawableCompat.wrap(icon.mutate());
+        DrawableCompat.setTint(wrapped, button.getCurrentTextColor());
+        button.setCompoundDrawablesRelativeWithIntrinsicBounds(wrapped, null, null, null);
+        button.setCompoundDrawablePadding(dpToPx(8f));
+        button.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+        button.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        button.setMinHeight(dpToPx(44f));
+        button.setPadding(dpToPx(12f), button.getPaddingTop(), dpToPx(12f), button.getPaddingBottom());
+        button.setMaxLines(1);
+        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
     }
 
     private int withAlpha(int color, int alpha) {

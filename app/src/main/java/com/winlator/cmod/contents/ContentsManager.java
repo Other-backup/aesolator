@@ -207,6 +207,7 @@ public class ContentsManager {
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             List<ContentProfile> profiles = profilesMap.get(type);
             HashMap<String, ContentProfile> profileByEntry = new HashMap<>();
+            HashMap<ContentProfile, File> profileFileByProfile = new HashMap<>();
 
             File typeFile = getContentTypeDir(context, type);
             File[] fileList = typeFile.listFiles();
@@ -219,6 +220,7 @@ public class ContentsManager {
                             profile.locallyInstalled = true;
                             profiles.add(profile);
                             profileByEntry.put(getEntryName(profile), profile);
+                            profileFileByProfile.put(profile, proFile);
                         }
                     }
                 }
@@ -233,6 +235,7 @@ public class ContentsManager {
                     }
                     if (existing != null) {
                         existing.mergeRemoteMetadata(remote);
+                        persistProfileMetadata(profileFileByProfile.get(existing), existing);
                     } else {
                         profiles.add(remote);
                         profileByEntry.put(getEntryName(remote), remote);
@@ -414,8 +417,53 @@ public class ContentsManager {
             FileUtils.delete(backupPath);
         }
         clearInstallStageMarker(stageMarker);
+        persistProfileMetadata(new File(installPath, PROFILE_NAME), profile);
 
         callback.onSucceed(profile);
+    }
+
+    private void persistProfileMetadata(File profileFile, ContentProfile profile) {
+        if (profileFile == null || profile == null || !profileFile.isFile()) return;
+        try {
+            JSONObject object = new JSONObject(FileUtils.readString(profileFile));
+            boolean changed = false;
+
+            changed |= putProfileField(object, ContentProfile.MARK_CHANNEL, profile.getChannel());
+            changed |= putProfileField(object, ContentProfile.MARK_DELIVERY, profile.getDelivery());
+            changed |= putProfileField(object, ContentProfile.MARK_DISPLAY_CATEGORY, profile.getDisplayCategory());
+            changed |= putProfileField(object, ContentProfile.MARK_SOURCE_REPO, profile.sourceRepo);
+            changed |= putProfileField(object, ContentProfile.MARK_SOURCE_FEED, profile.sourceFeed);
+            changed |= putProfileField(object, ContentProfile.MARK_SOURCE_LABEL, profile.sourceLabel);
+            changed |= putProfileField(object, ContentProfile.MARK_RELEASE_TAG, profile.releaseTag);
+            changed |= putProfileField(object, ContentProfile.MARK_SHA256, profile.remoteSha256);
+
+            if (profile.vulkanApiMin > 0 && object.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0) != profile.vulkanApiMin) {
+                object.put(ContentProfile.MARK_VULKAN_API_MIN, profile.vulkanApiMin);
+                changed = true;
+            }
+            if (profile.vulkanApiMax > 0 && object.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0) != profile.vulkanApiMax) {
+                object.put(ContentProfile.MARK_VULKAN_API_MAX, profile.vulkanApiMax);
+                changed = true;
+            }
+            if (profile.vulkanSdkVersion != null && !profile.vulkanSdkVersion.trim().isEmpty()
+                    && !profile.vulkanSdkVersion.equals(object.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, ""))) {
+                object.put(ContentProfile.MARK_VULKAN_SDK_VERSION, profile.vulkanSdkVersion.trim());
+                changed = true;
+            }
+
+            if (changed) {
+                FileUtils.writeString(profileFile, object.toString());
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private boolean putProfileField(JSONObject object, String key, String value) throws JSONException {
+        String normalized = value == null ? "" : value.trim();
+        String current = object.optString(key, "");
+        if (normalized.isEmpty() || normalized.equals(current)) return false;
+        object.put(key, normalized);
+        return true;
     }
 
     private File getInstallStageMarker(File typeDir, File installPath) {

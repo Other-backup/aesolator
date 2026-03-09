@@ -105,6 +105,23 @@ try {
     aeroVersionCode = 20
 }
 def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9c+").toString()
+def aeSigningStoreFileRaw = project.findProperty("ae.signing.storeFile")
+        ?: System.getenv("AEO_ANDROID_KEYSTORE")
+        ?: "${project.projectDir}/testkey_untrusted.jks"
+def aeSigningStorePassword = (project.findProperty("ae.signing.storePassword")
+        ?: System.getenv("AEO_ANDROID_KEYSTORE_PASSWORD")
+        ?: "android").toString()
+def aeSigningKeyAlias = (project.findProperty("ae.signing.keyAlias")
+        ?: System.getenv("AEO_ANDROID_KEY_ALIAS")
+        ?: "androiddebugkey").toString()
+def aeSigningKeyPassword = (project.findProperty("ae.signing.keyPassword")
+        ?: System.getenv("AEO_ANDROID_KEY_PASSWORD")
+        ?: aeSigningStorePassword).toString()
+File aeSigningStoreFile = file(aeSigningStoreFileRaw.toString())
+
+if (!aeSigningStoreFile.exists()) {
+    throw new GradleException("Stable signing keystore is missing: ${aeSigningStoreFile}")
+}
 
 android {
     namespace 'com.winlator.cmod'
@@ -142,10 +159,20 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        stableDebug {
+            storeFile aeSigningStoreFile
+            storePassword aeSigningStorePassword
+            keyAlias aeSigningKeyAlias
+            keyPassword aeSigningKeyPassword
+        }
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
             minifyEnabled false
+            signingConfig signingConfigs.stableDebug
         }
         // If you have a release build type, add it here
     }

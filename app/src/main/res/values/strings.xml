@@ -872,6 +872,8 @@
     <string name="contents_filter_beta">Beta/Nightly lanes</string>
     <string name="contents_lane_scope_format">Lane scope: %1$s</string>
     <string name="contents_lane_scope_archive">WCP Archive packages maintained by Ae.solator</string>
+    <string name="contents_lane_scope_runtime">Runtime packages maintained in WCP Runtime Lanes</string>
+    <string name="contents_lane_scope_graphics">Graphics packages maintained in WCP Graphics Lanes</string>
     <string name="contents_lane_scope_wcphub">WCPHub community runtime packages</string>
     <string name="dri3_mode_title">DRI3 mode</string>
     <string name="dri3_mode_hint">Auto follows the runtime policy. Off forces the safer software WSI fallback.</string>

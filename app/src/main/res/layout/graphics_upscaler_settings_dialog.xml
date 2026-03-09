@@ -52,51 +52,86 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
-                <Button
-                    android:id="@+id/BTUpscalerProfileAdd"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/add" />
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                <Space
-                    android:layout_width="8dp"
-                    android:layout_height="0dp" />
+                    <Button
+                        android:id="@+id/BTUpscalerProfileAdd"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="start|center_vertical"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/add" />
 
-                <Button
-                    android:id="@+id/BTUpscalerProfileDuplicate"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="0dp"
+                    <Space
+                        android:layout_width="8dp"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/BTUpscalerProfileDuplicate"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="start|center_vertical"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/duplicate" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/duplicate" />
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                <Space
-                    android:layout_width="8dp"
-                    android:layout_height="0dp" />
+                    <Button
+                        android:id="@+id/BTUpscalerProfileRename"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="start|center_vertical"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/edit" />
 
-                <Button
-                    android:id="@+id/BTUpscalerProfileRename"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/edit" />
+                    <Space
+                        android:layout_width="8dp"
+                        android:layout_height="0dp" />
 
-                <Space
-                    android:layout_width="8dp"
-                    android:layout_height="0dp" />
-
-                <Button
-                    android:id="@+id/BTUpscalerProfileRemove"
-                    style="@style/ButtonNeutral"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/remove" />
+                    <Button
+                        android:id="@+id/BTUpscalerProfileRemove"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="start|center_vertical"
+                        android:maxLines="1"
+                        android:minWidth="0dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:text="@string/remove" />
+                </LinearLayout>
             </LinearLayout>
 
             <TextView

@@ -62,6 +62,9 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ContentsFragment extends Fragment {
+    private static final String SOURCE_MODE_WCPHUB = "wcphub";
+    private static final String SOURCE_MODE_ARCHIVE = "archive";
+
     private enum ImportArchHint {
         UNKNOWN,
         ARM64EC,
@@ -112,11 +115,16 @@ public class ContentsFragment extends Fragment {
         manager.syncContents();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireActivity());
         isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
-        sourceMode = sharedPreferences.getString("contents_source_mode", "wcphub");
-        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = "wcphub";
+        sourceMode = sharedPreferences.getString("contents_source_mode", SOURCE_MODE_ARCHIVE);
+        if (sourceMode == null || sourceMode.trim().isEmpty()) sourceMode = SOURCE_MODE_ARCHIVE;
         boolean migratedSourceMode = false;
         if ("all".equalsIgnoreCase(sourceMode) || "custom".equalsIgnoreCase(sourceMode)) {
-            sourceMode = "wcphub";
+            sourceMode = SOURCE_MODE_ARCHIVE;
+            migratedSourceMode = true;
+        } else if ("aesolator".equalsIgnoreCase(sourceMode)
+                || "runtime".equalsIgnoreCase(sourceMode)
+                || "graphics".equalsIgnoreCase(sourceMode)) {
+            sourceMode = SOURCE_MODE_ARCHIVE;
             migratedSourceMode = true;
         }
         channelMode = sharedPreferences.getString("contents_channel_mode", "stable");
@@ -379,7 +387,7 @@ public class ContentsFragment extends Fragment {
 
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
         if (profile == null) return false;
-        String mode = sourceMode == null ? "wcphub" : sourceMode.trim().toLowerCase(Locale.US);
+        String mode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
         String profileMode = resolveProfileSourceMode(profile);
         return mode.equals(profileMode);
     }
@@ -416,8 +424,8 @@ public class ContentsFragment extends Fragment {
 
     private int resolveProfileSourcePriority(ContentProfile profile) {
         String profileMode = resolveProfileSourceMode(profile);
-        if ("aesolator".equals(profileMode)) return 300;
-        if ("wcphub".equals(profileMode)) return 200;
+        if (SOURCE_MODE_ARCHIVE.equals(profileMode)) return 300;
+        if (SOURCE_MODE_WCPHUB.equals(profileMode)) return 200;
         return 50;
     }
 
@@ -431,25 +439,40 @@ public class ContentsFragment extends Fragment {
 
     private String resolveProfileSourceMode(ContentProfile profile) {
         if (profile == null) return "remote";
-        String sourceFeed = profile.sourceFeed == null ? "" : profile.sourceFeed.trim().toLowerCase(Locale.US);
-        if (!sourceFeed.isEmpty()) return sourceFeed;
-
-        String joined = (
-                (profile.sourceRepo == null ? "" : profile.sourceRepo) + " " +
-                        (profile.remoteUrl == null ? "" : profile.remoteUrl)
-        ).toLowerCase(Locale.US);
-        if (joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator")) return "aesolator";
-        if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany") || joined.contains("winlatorwcphub")) {
-            return "wcphub";
-        }
+        String resolved = classifySourceMode(
+                profile.sourceFeed,
+                profile.sourceRepo,
+                profile.sourceLabel,
+                profile.remoteUrl
+        );
+        if (!resolved.isEmpty()) return resolved;
         if (profile.locallyInstalled) {
-            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
-                return "aesolator";
-            }
-            return "wcphub";
+            if (SUPPORTED_CONTENT_TYPES.contains(profile.type)) return SOURCE_MODE_ARCHIVE;
+            return SOURCE_MODE_WCPHUB;
         }
         return "remote";
+    }
+
+    private String classifySourceMode(String sourceFeed, String sourceRepo, String sourceLabel, String remoteUrl) {
+        String joined = (
+                (sourceFeed == null ? "" : sourceFeed) + " " +
+                        (sourceRepo == null ? "" : sourceRepo) + " " +
+                        (sourceLabel == null ? "" : sourceLabel) + " " +
+                        (remoteUrl == null ? "" : remoteUrl)
+        ).toLowerCase(Locale.US);
+
+        if (joined.contains("wcp-graphics-lanes") || joined.contains("wcp graphics lanes")
+                || joined.contains("wcp-runtime-lanes") || joined.contains("wcp runtime lanes")
+                || joined.contains("ae.solator") || joined.contains("aesolator")) {
+            return SOURCE_MODE_ARCHIVE;
+        }
+        if (joined.contains("open-wine-components")
+                || joined.contains("wcphub")
+                || joined.contains("arihany")
+                || joined.contains("winlatorwcphub")) {
+            return SOURCE_MODE_WCPHUB;
+        }
+        return "";
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -481,9 +504,12 @@ public class ContentsFragment extends Fragment {
         if (tvContentsLaneScope == null) return;
         String lane = preselectedDisplayCategory == null ? "" : preselectedDisplayCategory.trim();
         String sourceLabel = getSourceEntryLabel(sourceMode);
-        String sourceScope = "aesolator".equalsIgnoreCase(sourceMode)
-                ? getString(R.string.contents_lane_scope_archive)
-                : getString(R.string.contents_lane_scope_wcphub);
+        String sourceScope;
+        if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceMode)) {
+            sourceScope = getString(R.string.contents_lane_scope_archive);
+        } else {
+            sourceScope = getString(R.string.contents_lane_scope_wcphub);
+        }
         if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && !lane.isEmpty()) {
             tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope + " • " + getString(R.string.contents_lane_scope_format, lane));
         }
@@ -542,7 +568,7 @@ public class ContentsFragment extends Fragment {
             applyFilterSpinnerTheme();
 
             if (!containsIgnoreCase(sourceValues, sourceMode)) {
-                sourceMode = sourceValues.length > 0 ? sourceValues[0] : "wcphub";
+                sourceMode = sourceValues.length > 0 ? sourceValues[0] : SOURCE_MODE_ARCHIVE;
             }
             setSpinnerSelectionByValue(sContentsSourceMode, sourceValues, sourceMode, 0);
             sContentsSourceMode.setEnabled(true);
@@ -658,25 +684,19 @@ public class ContentsFragment extends Fragment {
 
     private ArrayList<String> getAvailableSourceModesForType(ContentProfile.ContentType type) {
         ArrayList<String> ordered = new ArrayList<>();
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
-            ordered.add("wcphub");
-            ordered.add("aesolator");
-            return ordered;
-        }
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
-            ordered.add("aesolator");
+        if (SUPPORTED_CONTENT_TYPES.contains(type)) {
+            ordered.add(SOURCE_MODE_ARCHIVE);
+            ordered.add(SOURCE_MODE_WCPHUB);
             return ordered;
         }
 
-        ordered.add("wcphub");
+        ordered.add(SOURCE_MODE_WCPHUB);
         return ordered;
     }
 
     private String getSourceEntryLabel(String sourceValue) {
-        if ("aesolator".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
-        if ("wcphub".equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
+        if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
+        if (SOURCE_MODE_WCPHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
         return getString(R.string.contents_source_unknown);
     }
 
@@ -827,7 +847,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private void reloadRemoteContents() {
-        final String selectedSourceMode = sourceMode == null ? "wcphub" : sourceMode.trim().toLowerCase(Locale.US);
+        final String selectedSourceMode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
         final String sourceSignature = buildSourceSignature(selectedSourceMode);
         final String cachedSourceSignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
         ForensicLogger.logEvent(
@@ -861,7 +881,7 @@ public class ContentsFragment extends Fragment {
                         String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
                         boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
                         boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                        manager.setRemoteProfiles(useCached ? cached : "[]");
+                        applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
                         ForensicLogger.logEvent(
                                 getContext(),
                                 useCached ? "warn" : "warn",
@@ -888,13 +908,7 @@ public class ContentsFragment extends Fragment {
                             .putString(PREF_REMOTE_CACHE_JSON, merged)
                             .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
                             .apply();
-                    if ("aesolator".equals(selectedSourceMode)) {
-                        manager.setArchiveRemoteProfiles(merged);
-                    } else if ("wcphub".equals(selectedSourceMode)) {
-                        manager.setHubRemoteProfiles(merged);
-                    } else {
-                        manager.setRemoteProfiles(merged);
-                    }
+                    applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, merged);
                     ForensicLogger.logEvent(
                             getContext(),
                             "info",
@@ -919,7 +933,7 @@ public class ContentsFragment extends Fragment {
                     String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
                     boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
                     boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                    manager.setRemoteProfiles(useCached ? cached : "[]");
+                    applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
                     ForensicLogger.logEvent(
                             getContext(),
                             "warn",
@@ -940,26 +954,32 @@ public class ContentsFragment extends Fragment {
         }).start();
     }
 
+    private void applyRemoteProfilesForSelectedSourceMode(String selectedSourceMode, String json) {
+        if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
+            manager.setArchiveRemoteProfiles(json);
+        } else if (SOURCE_MODE_WCPHUB.equals(selectedSourceMode)) {
+            manager.setHubRemoteProfiles(json);
+        } else {
+            manager.setRemoteProfiles(json);
+        }
+    }
+
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
-        if ("aesolator".equals(selectedSourceMode)
-                && (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || currentContentType == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO)) {
+        if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
             urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
             return urls;
         }
-        if ("wcphub".equals(selectedSourceMode)) {
+        if (SOURCE_MODE_WCPHUB.equals(selectedSourceMode)) {
             urls.add(ContentsManager.REMOTE_PROFILES);
             return urls;
         }
-        urls.add(ContentsManager.REMOTE_PROFILES);
+        urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
         return urls;
     }
 
     private String buildSourceSignature(String selectedSourceMode) {
-        String normalized = selectedSourceMode == null ? "wcphub" : selectedSourceMode.trim().toLowerCase(Locale.US);
+        String normalized = selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
         return normalized;
     }
 
@@ -1006,8 +1026,8 @@ public class ContentsFragment extends Fragment {
 
     private String deriveFeedSourceLabel(String feedUrl) {
         String sourceId = deriveFeedSourceId(feedUrl);
-        if ("aesolator".equals(sourceId)) return getString(R.string.contents_source_aesolator);
-        if ("wcphub".equals(sourceId)) return getString(R.string.contents_source_wcphub);
+        if (SOURCE_MODE_ARCHIVE.equals(sourceId)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_WCPHUB.equals(sourceId)) return getString(R.string.contents_source_wcphub);
         try {
             URI uri = new URI(feedUrl);
             String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
@@ -1026,13 +1046,13 @@ public class ContentsFragment extends Fragment {
 
     private String deriveFeedSourceId(String feedUrl) {
         String lower = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
-        if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return "wcphub";
-        if (lower.contains("kosoymiki/wcp-runtime-lanes")
-                || lower.contains("kosoymiki/wcp-graphics-lanes")
+        if (lower.contains("kosoymiki/wcp-graphics-lanes")
+                || lower.contains("kosoymiki/wcp-runtime-lanes")
                 || lower.contains("ae.solator")
                 || lower.contains("aesolator")) {
-            return "aesolator";
+            return SOURCE_MODE_ARCHIVE;
         }
+        if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return SOURCE_MODE_WCPHUB;
         return "remote";
     }
 
@@ -1130,12 +1150,18 @@ public class ContentsFragment extends Fragment {
     }
 
     private int resolveRemoteSourcePriority(JSONObject object) {
-        String sourceFeed = object.optString(ContentProfile.MARK_SOURCE_FEED, "").toLowerCase(Locale.US);
-        String sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").toLowerCase(Locale.US);
-        String remoteUrl = object.optString("remoteUrl", "").toLowerCase(Locale.US);
-        String joined = sourceFeed + " " + sourceRepo + " " + remoteUrl;
-        if (joined.contains("kosoymiki") || joined.contains("ae.solator") || joined.contains("aesolator")) return 300;
-        if (joined.contains("open-wine-components") || joined.contains("wcphub") || joined.contains("arihany")) return 200;
+        String sourceMode = classifySourceMode(
+                object.optString(ContentProfile.MARK_SOURCE_FEED, ""),
+                object.optString(ContentProfile.MARK_SOURCE_REPO, ""),
+                object.optString(ContentProfile.MARK_SOURCE_LABEL, ""),
+                object.optString("remoteUrl", "")
+        );
+        if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return 300;
+        if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return 200;
+        String joined = (
+                object.optString(ContentProfile.MARK_SOURCE_REPO, "") + " " +
+                        object.optString("remoteUrl", "")
+        ).toLowerCase(Locale.US);
         if (joined.contains("stevenmxz") || joined.contains("winlator-contents")) return 100;
         return 50;
     }
@@ -1340,8 +1366,8 @@ public class ContentsFragment extends Fragment {
     private String getSourceLabel(ContentProfile profile) {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
         String sourceMode = resolveProfileSourceMode(profile);
-        if ("aesolator".equals(sourceMode)) return getString(R.string.contents_source_aesolator);
-        if ("wcphub".equals(sourceMode)) return getString(R.string.contents_source_wcphub);
+        if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return getString(R.string.contents_source_wcphub);
         if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
             return profile.sourceLabel.trim();
         }
@@ -1414,8 +1440,8 @@ public class ContentsFragment extends Fragment {
     private String getSourceDetailLabel(ContentProfile profile) {
         if (profile == null) return "";
         String sourceMode = resolveProfileSourceMode(profile);
-        if ("wcphub".equals(sourceMode)) return "";
-        if ("aesolator".equals(sourceMode) && profile.sourceRepo != null) {
+        if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return "";
+        if (SOURCE_MODE_ARCHIVE.equals(sourceMode) && profile.sourceRepo != null) {
             String repo = profile.sourceRepo.trim().toLowerCase(Locale.US);
             if (repo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
             if (repo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_archive_graphics_lane);
