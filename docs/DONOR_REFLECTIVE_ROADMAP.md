@@ -2,6 +2,18 @@
 
 Generated: `2026-03-05`
 
+## Documentation Sync (2026-03-10)
+
+Repository documentation was normalized to the actual split model:
+
+- `aeolator` is the app source-of-truth
+- `freewine11` is the runtime source-of-truth
+- `wcp-runtime-lanes` is the archive/release host
+- `wcp-graphics-lanes` owns graphics/provider package lanes
+
+This is important because UI and contents work now depends on explicit source
+provenance (`WCP Archive` vs `WCPHub`) rather than legacy mixed-source language.
+
 ## Scope
 
 This roadmap tracks exhaustive donor analysis coverage (pre/during/post) and controlled extraction into Aeolator runtime layers:

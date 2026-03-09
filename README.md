@@ -15,6 +15,15 @@ Android application repository for Ae.solator (`by.aero.so.benchmark`).
 - Contents integration and package provenance UX.
 - Forensic collection and runtime diagnostics sync for issue bundles.
 
+## Current Mainline State
+
+- App source-of-truth stays in this repository.
+- Runtime source-of-truth is `kosoymiki/freewine11`.
+- Archive/release orchestration lives in `kosoymiki/wcp-runtime-lanes`.
+- Graphics/provider package lanes live in `kosoymiki/wcp-graphics-lanes`.
+- `Contents` is expected to expose distinct source provenance (`WCP Archive` vs
+  `WCPHub`) instead of collapsing them into one lane.
+
 ## Split Model
 
 - `kosoymiki/aesolator`: app source-of-truth.
@@ -52,3 +61,5 @@ bash ci/winlator/ci-build-winlator-ludashi.sh
 - `docs/CONTENTS_QA_CHECKLIST.md`
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md`
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`
+- `docs/README.md`
+- `docs/DONOR_REFLECTIVE_ROADMAP.md`

@@ -2,6 +2,14 @@
 
 This repo stores only application-layer documentation.
 
+## Current State
+
+- App source-of-truth: `aeolator`
+- Runtime source-of-truth: `freewine11`
+- Archive/release host: `wcp-runtime-lanes`
+- Graphics/provider lane host: `wcp-graphics-lanes`
+- User-facing package provenance must stay explicit (`WCP Archive` vs `WCPHub`)
+
 ## Source Of Truth
 
 - `docs/REPO_SPLIT_TOPOLOGY.md` - split repository contract and ownership.
