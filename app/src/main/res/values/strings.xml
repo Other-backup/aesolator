@@ -750,9 +750,15 @@
     <string name="fexcore_preset">FEXCore Preset</string>
     <string name="box64_profile_s8g1_balanced">Snapdragon 8+ Gen1 (Balanced)</string>
     <string name="box64_profile_s8g1_super">Snapdragon 8+ Gen1 (Super)</string>
+    <string name="box64_profile_sd662_safe">Snapdragon 662 (Safe)</string>
+    <string name="box64_profile_sd662_balanced">Snapdragon 662 (Balanced)</string>
     <string name="fexcore_profile_s8g1_balanced">Snapdragon 8+ Gen1 (Balanced)</string>
     <string name="fexcore_profile_s8g1_super">Snapdragon 8+ Gen1 (Super)</string>
+    <string name="fexcore_profile_sd662_safe">Snapdragon 662 (Safe)</string>
+    <string name="fexcore_profile_sd662_balanced">Snapdragon 662 (Balanced)</string>
     <string name="runtime_profile_global">Global Runtime Profile</string>
+    <string name="runtime_profile_sd662_safe">Snapdragon 662 (Safe)</string>
+    <string name="runtime_profile_sd662_balanced">Snapdragon 662 (Balanced)</string>
     <string name="adrenotools_gpu_drivers">Graphics Center</string>
     <string name="diagnostics">Forensic Center</string>
     <string name="diagnostics_hint">One forensic workspace for launch traces, driver lanes, wrapper routing, root or non-root capture and issue-ready runtime bundles.</string>
@@ -840,6 +846,7 @@
     <string name="upscaler_profile_saved">Upscaler profile saved.</string>
     <string name="upscaler_profile_removed">Upscaler profile removed.</string>
     <string name="upscaler_profile_remove_default">Default profile cannot be removed.</string>
+    <string name="upscaler_profile_read_only_builtin">Built-in Snapdragon 662 profiles are read-only. Duplicate one to customize it.</string>
     <string name="contents_sources">Contents Sources</string>
     <string name="contents_source_selector">Source lane</string>
     <string name="contents_channel_selector">Channel</string>

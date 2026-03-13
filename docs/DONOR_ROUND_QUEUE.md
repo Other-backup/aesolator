@@ -50,6 +50,26 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 14 | `optiscaler/OptiScaler` | `gate_hold` | FG source/output routing lane integrated; closure deferred by owner override to next donor |
 | 15 | `Eden-Android-9d2341eaea-standard.apk` | `closed` | Vulkan validation lane integrated; env-layer merge + VulkanSDK guard hardened; app-tree closure completed |
 
+## R10-R14 Normalized Status (2026-03-13)
+
+This queue entry alone is not enough to explain current state, because `gate_hold`
+here means:
+- app-side transfer is already integrated;
+- donor closure is still incomplete.
+
+Normalized interpretation:
+- `R10`: app-side closed, donor round still open on package/runtime consumption + closure gates.
+- `R11`: app-side closed, donor round still open on package-side pacing validation + closure gates.
+- `R12`: app-side closed, donor round still open on wrapper-side `DLSSGTOFSR3_*` validation + closure gates.
+- `R13`: app-side closed, donor round still open on mode/thermal consumer validation + device gates.
+- `R14`: app-side closed, donor round still open on FG source/output wrapper validation + closure gates.
+- Ownership split for the remaining closure work:
+  - app-side continuation in `aeolator` -> app owner
+  - runtime/archive/wrapper closure gates -> runtime owner
+
+Reference:
+- `docs/R10_R14_STATUS_SNAPSHOT.md`
+
 ## Round 6 (termux-x11-fork) Historical Workset (Completed)
 
 1. Rebuilt strict file inventory for `termux-x11-fork` and locked module buckets (`app/java`, `app/cpp`, `shell-loader`, `res`).

@@ -8,6 +8,8 @@ public final class RuntimeProfile {
     public static final String MID_2026 = "MID_2026";
     public static final String UPPER_MID_2026 = "UPPER_MID_2026";
     public static final String FLAGSHIP_2026 = "FLAGSHIP_2026";
+    public static final String SD662_SAFE = "SD662_SAFE";
+    public static final String SD662_BALANCED = "SD662_BALANCED";
     public static final String S8G1_BALANCED = "S8G1_BALANCED";
     public static final String S8G1_SUPER = "S8G1_SUPER";
 

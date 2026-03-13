@@ -25,6 +25,8 @@ public final class RuntimeProfileManager {
         profiles.add(new RuntimeProfile(RuntimeProfile.AUTO, "Auto (Balanced)"));
         profiles.add(new RuntimeProfile(RuntimeProfile.LEGACY_LOW_2026, "Legacy / Low-end 2026"));
         profiles.add(new RuntimeProfile(RuntimeProfile.MID_2026, "Mid-range 2026"));
+        profiles.add(new RuntimeProfile(RuntimeProfile.SD662_SAFE, context.getString(com.winlator.cmod.R.string.runtime_profile_sd662_safe)));
+        profiles.add(new RuntimeProfile(RuntimeProfile.SD662_BALANCED, context.getString(com.winlator.cmod.R.string.runtime_profile_sd662_balanced)));
         profiles.add(new RuntimeProfile(RuntimeProfile.UPPER_MID_2026, "Upper-mid 2026"));
         profiles.add(new RuntimeProfile(RuntimeProfile.FLAGSHIP_2026, "Flagship 2026"));
         profiles.add(new RuntimeProfile(RuntimeProfile.S8G1_BALANCED, "Snapdragon 8+ Gen1 (Balanced)"));
@@ -64,6 +66,26 @@ public final class RuntimeProfileManager {
                 envVars.put("AERO_RUNTIME_DRI3_POLICY", "off");
                 envVars.put("BOX64_DYNAREC_BIGBLOCK", "0");
                 envVars.put("BOX64_DYNAREC_STRONGMEM", "2");
+            }
+            case RuntimeProfile.SD662_SAFE -> {
+                envVars.put("mesa_glthread", "false");
+                envVars.put("MESA_NO_ERROR", "0");
+                envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "256M");
+                envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "conservative");
+                envVars.put("AERO_RUNTIME_DRI3_POLICY", "off");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "0");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "2");
+            }
+            case RuntimeProfile.SD662_BALANCED -> {
+                envVars.put("mesa_glthread", "true");
+                envVars.put("MESA_NO_ERROR", "0");
+                envVars.put("MESA_SHADER_CACHE_MAX_SIZE", "384M");
+                envVars.put("DXVK_ASYNC", "0");
+                envVars.put("AERO_RUNTIME_OOM_CLASS", "balanced");
+                envVars.put("AERO_RUNTIME_DRI3_POLICY", "auto");
+                envVars.put("BOX64_DYNAREC_BIGBLOCK", "1");
+                envVars.put("BOX64_DYNAREC_STRONGMEM", "1");
             }
             case RuntimeProfile.MID_2026 -> {
                 envVars.put("mesa_glthread", "true");

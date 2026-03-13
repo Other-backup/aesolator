@@ -2,6 +2,49 @@
 
 Generated: `2026-03-05`
 
+## Dual-Dev + Snapdragon 662 Baseline (2026-03-13)
+
+Closed in this pass:
+
+- Mixed-mode two-Codex operating model is now explicit in app docs and AGENTS.
+- Ownership is split cleanly:
+  - runtime owner -> `freewine11` + `wcp-runtime-lanes`
+  - app owner -> `aeolator`
+- `Ae.solator` now carries a shipped manual `Snapdragon 662` preset pack for:
+  - global runtime profile
+  - Box64
+  - FEXCore
+  - AE Upscaler / Frame Generation
+- These presets are manual user-visible entries only:
+  - no auto-detection
+  - no silent migration of existing users
+  - no silent rewrite of `AUTO`
+
+Reference:
+- `docs/DUAL_DEV_OPERATING_MODEL.md`
+- `docs/ACTIVE_OWNERSHIP_MAP.md`
+
+## R10-R14 Status Snapshot (2026-03-13)
+
+Current normalized state:
+- `R10-R14` are all `integrated in tree` at the app/runtime-binding level.
+- `R10-R14` are all still `gate_hold`; none of these donor rounds is fully closed.
+- The open work is no longer app-side UI/env emission. The remaining work sits in:
+  - runtime/archive package-side consumption,
+  - wrapper-side consumption,
+  - regression gates,
+  - device/thermal validation.
+
+Round-by-round:
+- `R10 Mob-FGSR`: app-side preset + SoC-aware MobFGSR contract is landed; open on runtime package consumption, per-game preset policy, and closure gates.
+- `R11 linux-fg`: app-side pacing contract is landed; open on package-side raw/effective pacing consumption and closure gates.
+- `R12 dlssg-to-fsr3`: app-side debug/interposer bridge is landed; open on downstream wrapper consumption and DX route validation.
+- `R13 Frame-generation-`: app-side mode/thermal policy lane is landed; open on runtime consumer validation and sustained thermal/device gates.
+- `R14 OptiScaler`: app-side FG source/output routing is landed; open on wrapper consumption and FG-route validation.
+
+Reference:
+- `docs/R10_R14_STATUS_SNAPSHOT.md`
+
 ## UI Tail Closure (2026-03-10)
 
 Closed in this pass:

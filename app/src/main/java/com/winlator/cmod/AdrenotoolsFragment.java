@@ -570,6 +570,10 @@ public class AdrenotoolsFragment extends Fragment {
             int index = sProfile.getSelectedItemPosition();
             if (index < 0 || index >= profiles.size()) index = 0;
             UpscalerProfileStore.Profile current = profiles.get(index);
+            if (UpscalerProfileStore.isBuiltInProfileId(current.id)) {
+                AppUtils.showToast(getContext(), R.string.upscaler_profile_read_only_builtin);
+                return;
+            }
             UpscalerProfileStore.Profile edited = readControlsToProfile.get();
             edited.id = current.id;
             edited.name = current.name;
@@ -672,6 +676,10 @@ public class AdrenotoolsFragment extends Fragment {
             if (index < 0 || index >= profiles.size()) index = 0;
             final int selectedIndex = index;
             UpscalerProfileStore.Profile profile = profiles.get(index);
+            if (UpscalerProfileStore.isBuiltInProfileId(profile.id)) {
+                AppUtils.showToast(getContext(), R.string.upscaler_profile_read_only_builtin);
+                return;
+            }
             ContentDialog.prompt(requireContext(), R.string.upscaler_profile_name_prompt, profile.name, name -> {
                 profile.name = name.trim();
                 profiles.set(selectedIndex, UpscalerProfileStore.normalize(profile));
@@ -684,6 +692,10 @@ public class AdrenotoolsFragment extends Fragment {
             int index = sProfile.getSelectedItemPosition();
             if (index < 0 || index >= profiles.size()) index = 0;
             UpscalerProfileStore.Profile profile = profiles.get(index);
+            if (UpscalerProfileStore.isBuiltInProfileId(profile.id)) {
+                AppUtils.showToast(getContext(), R.string.upscaler_profile_read_only_builtin);
+                return;
+            }
             if (UpscalerProfileStore.DEFAULT_PROFILE_ID.equals(profile.id)) {
                 AppUtils.showToast(getContext(), R.string.upscaler_profile_remove_default);
                 return;
