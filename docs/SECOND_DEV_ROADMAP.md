@@ -57,6 +57,10 @@ Second autonomous developer lane for `aesolator`:
 
 - `Contents` layout changes are now build-validated and installed locally, but
   screen-level behavioral QA still needs explicit in-app review.
+- native runtime loading for container-adjacent flows now has an explicit
+  `libc++_shared.so` packaging path in the APK, but the actual create-container
+  and graphics-driver dialog path still needs one fresh device retest after the
+  native packaging fix.
 - Termux local build currently depends on local-only SDK/NDK compatibility
   shims; this is an environment workaround, not a committed repository fix.
 - `llvm-strip` from the desktop NDK host bundle is still incompatible with

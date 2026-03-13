@@ -250,3 +250,24 @@
   the relocated version.
 - Next step: rebuild, reinstall, and inspect the dashboard plus container entry
   flow on-device from the new main-menu positions.
+
+### Entry 17: Native runtime packaging closure
+
+- Goal: eliminate the remaining container-path crash caused by missing native
+  runtime dependencies at APK load time.
+- Context: fresh device `logcat` showed the current crash was no longer the
+  earlier UI/theme problem; it was `UnsatisfiedLinkError` for
+  `libc++_shared.so`, which then cascaded into `NoClassDefFoundError` on
+  `GPUInformation` while opening container-related graphics-driver flows.
+- Decision: add an explicit Gradle packaging step that copies
+  `libc++_shared.so` from the configured NDK into generated `jniLibs` for
+  `arm64-v8a`, then include that generated directory in the app source set.
+- Tradeoff: the APK now carries one more native runtime artifact directly, but
+  the load path is deterministic instead of relying on AGP/NDK implicit
+  behavior that had already failed in this Termux-hosted build environment.
+- Verification: rebuilt APK now contains `lib/arm64-v8a/libc++_shared.so`,
+  reinstalled successfully on-device, and a fresh startup smoke-pass no longer
+  emits the previous `UnsatisfiedLinkError`/`NoClassDefFoundError` signature.
+- Next step: re-run the exact create-container and graphics-driver interaction
+  on-device once more to confirm there is no second downstream crash behind the
+  native loader failure.
