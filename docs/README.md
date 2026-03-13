@@ -16,6 +16,7 @@ This repo stores only application-layer documentation.
 - `docs/CONTENTS_QA_CHECKLIST.md` - active Contents/UI closure checklist.
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md` - device forensic runbook.
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md` - forensic sync contract for app/runtime diagnostics.
+- `docs/TERMUX_LOCAL_BUILD.md` - verified Termux ARM64 local build and Wi-Fi ADB install runbook.
 - `docs/DONOR_REFLECTIVE_ROADMAP.md` - donor extraction roadmap with pre/during/post reflective gates.
 - `docs/DONOR_ROUND_QUEUE.md` - strict donor execution queue (`1 round = 1 donor`) and closure checklist.
 - `docs/rounds/R1_GAMENATIVE_MATRIX.md` - Round 1 donor transfer matrix (`GameNative`) currently in `gate_hold`.

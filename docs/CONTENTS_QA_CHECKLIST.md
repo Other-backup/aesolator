@@ -30,6 +30,7 @@
 
 ## Contents source and schema
 - [x] `ContentsManager.REMOTE_WINE_PROTON_OVERLAY` points to this repo `contents/contents.json`
+- [x] APK ships a bundled fallback snapshot of `contents/contents.json` for `WCP Archive` when the canonical raw feed is unavailable at runtime
 - [x] `ContentsManager.REMOTE_PROFILES` remains WCP Hub source (`pack.json`) for non-Wine packages
 - [x] `ci/contents/validate-contents-json.py contents/contents.json` passes
 - [x] `FreeWine` entry points to runtime release repo (`wcp-runtime-lanes`) with rolling tag (`freewine11-arm64ec-latest`)

@@ -4,19 +4,20 @@
     android:layout_height="wrap_content"
     android:layout_marginTop="4dp"
     android:layout_marginBottom="4dp"
-    android:gravity="center_vertical"
-    android:minHeight="80dp"
+    android:gravity="top"
+    android:minHeight="92dp"
     android:orientation="horizontal"
-    android:paddingStart="12dp"
-    android:paddingTop="10dp"
-    android:paddingEnd="12dp"
-    android:paddingBottom="10dp">
+    android:paddingStart="14dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="14dp">
 
     <ImageView
         android:id="@+id/IVIcon"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginEnd="10dp"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="14dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ae_icon_open" />
 
@@ -31,6 +32,8 @@
             android:id="@+id/TVVersionName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="2"
             android:textStyle="bold" />
 
@@ -38,8 +41,8 @@
             android:id="@+id/TVCategoryBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="2dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
             android:paddingStart="8dp"
             android:paddingTop="2dp"
             android:paddingEnd="8dp"
@@ -52,13 +55,17 @@
             android:id="@+id/TVVersionCode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1" />
 
         <TextView
             android:id="@+id/TVDescription"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="1"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="2"
             android:textColor="?attr/colorControlNormal"
             android:textSize="12sp" />
 
@@ -66,6 +73,9 @@
             android:id="@+id/TVSource"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1"
             android:textSize="11sp" />
     </LinearLayout>
@@ -73,23 +83,26 @@
     <ImageButton
         android:id="@+id/BTMenu"
         style="@style/ListMenuButton"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_gravity="top"
         android:layout_marginStart="6dp"
         android:src="@drawable/ae_icon_menu" />
 
     <ImageButton
         android:id="@+id/BTDownload"
         style="@style/ListMenuButton"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_gravity="top"
         android:layout_marginStart="6dp"
         android:src="@drawable/ae_icon_download" />
     <ProgressBar
         android:id="@+id/Progress"
         style="?android:attr/progressBarStyleSmall"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_gravity="top"
         android:layout_marginStart="6dp"
         android:visibility="gone" />
 </LinearLayout>

@@ -129,6 +129,12 @@ android {
     compileSdk 34
     buildToolsVersion "35.0.0"
 
+    sourceSets {
+        main {
+            assets.srcDirs += [new File(rootProject.projectDir, "contents").absolutePath]
+        }
+    }
+
     defaultConfig {
         applicationId "com.winlator.cmod"
         minSdkVersion 26

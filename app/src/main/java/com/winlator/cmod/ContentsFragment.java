@@ -74,6 +74,7 @@ public class ContentsFragment extends Fragment {
 
     private static final String PREF_REMOTE_CACHE_JSON = "contents_remote_cache_json";
     private static final String PREF_REMOTE_CACHE_SOURCE_SIGNATURE = "contents_remote_cache_source_signature";
+    private static final String BUNDLED_ARCHIVE_FEED_ASSET = "contents.json";
     private static final List<ContentProfile.ContentType> SUPPORTED_CONTENT_TYPES = Arrays.asList(
             ContentProfile.ContentType.CONTENT_TYPE_WINE,
             ContentProfile.ContentType.CONTENT_TYPE_PROTON,
@@ -700,8 +701,13 @@ public class ContentsFragment extends Fragment {
         }
 
         if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
-                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            ordered.add(SOURCE_MODE_ARCHIVE);
+            ordered.add(SOURCE_MODE_WCPHUB);
+            return ordered;
+        }
+
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
             ordered.add(SOURCE_MODE_WCPHUB);
@@ -885,11 +891,17 @@ public class ContentsFragment extends Fragment {
             try {
                 ArrayList<String> payloads = new ArrayList<>();
                 HashSet<String> sources = new HashSet<>();
-                LinkedHashMap<String, String> payloadByUrl = new LinkedHashMap<>();
                 for (String sourceUrl : resolveSelectedSourceUrls(selectedSourceMode)) {
                     String payload = addRemoteFeed(payloads, sources, sourceUrl);
-                    if (payload != null && !payload.trim().isEmpty()) {
-                        payloadByUrl.put(sourceUrl, payload);
+                }
+
+                boolean usedBundledArchiveFallback = false;
+                if (payloads.isEmpty()) {
+                    String bundledPayload = loadBundledArchiveFeed(selectedSourceMode);
+                    if (bundledPayload != null && !bundledPayload.trim().isEmpty()) {
+                        payloads.add(bundledPayload);
+                        sources.add("asset://" + BUNDLED_ARCHIVE_FEED_ASSET);
+                        usedBundledArchiveFallback = true;
                     }
                 }
 
@@ -921,6 +933,7 @@ public class ContentsFragment extends Fragment {
                 }
 
                 String merged = mergeJsonArrays(payloads);
+                final boolean finalUsedBundledArchiveFallback = usedBundledArchiveFallback;
                 getActivity().runOnUiThread(() -> {
                     sharedPreferences.edit()
                             .putString(PREF_REMOTE_CACHE_JSON, merged)
@@ -938,7 +951,8 @@ public class ContentsFragment extends Fragment {
                                     "source_mode", selectedSourceMode,
                                     "sources_polled", sources.size(),
                                     "payloads_received", payloads.size(),
-                                    "merged_size", merged.length()
+                                    "merged_size", merged.length(),
+                                    "bundled_fallback", finalUsedBundledArchiveFallback
                             )
                     );
                     refreshTypeScopedFilterSpinners();
@@ -1013,6 +1027,15 @@ public class ContentsFragment extends Fragment {
             return enriched;
         }
         return null;
+    }
+
+    @Nullable
+    private String loadBundledArchiveFeed(String selectedSourceMode) {
+        if (!SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) return null;
+        if (getContext() == null) return null;
+        String bundled = FileUtils.readAssetsFile(getContext(), BUNDLED_ARCHIVE_FEED_ASSET);
+        if (bundled == null || bundled.trim().isEmpty()) return null;
+        return injectFeedSourceMetadata(bundled, ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
     }
 
     private String injectFeedSourceMetadata(String json, String feedUrl) {

@@ -49,6 +49,9 @@ Legacy CI patch-overlay stack has been removed; this repository stays native sou
 bash ci/winlator/ci-build-winlator-ludashi.sh
 ```
 
+For verified on-device Termux ARM64 local build and Wi-Fi ADB install notes,
+see `docs/TERMUX_LOCAL_BUILD.md`.
+
 ## Runtime/Graphics Matrix
 
 <p align="center">
@@ -61,5 +64,6 @@ bash ci/winlator/ci-build-winlator-ludashi.sh
 - `docs/CONTENTS_QA_CHECKLIST.md`
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md`
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`
+- `docs/TERMUX_LOCAL_BUILD.md`
 - `docs/README.md`
 - `docs/DONOR_REFLECTIVE_ROADMAP.md`
