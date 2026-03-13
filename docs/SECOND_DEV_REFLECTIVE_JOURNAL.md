@@ -231,3 +231,22 @@
   completed successfully after the pass.
 - Next step: install the rebuilt APK on-device, inspect the new cards live, and
   continue the crash retest from the clearer `Containers` surface.
+
+### Entry 16: Dashboard relocation for container actions
+
+- Goal: move `New Container` and `Big Picture` onto the same card grid as the
+  rest of the app so their size and style match the existing dashboard system.
+- Context: after the in-screen `Containers` card pass, the user correctly
+  called out that those new cards were now a separate surface with a different
+  scale from the normal main-menu cards.
+- Decision: remove the extra action row from `containers_fragment.xml`, add two
+  new entries to the main dashboard grid, and route them through `MainActivity`
+  so `New Container` still opens `ContainerDetailFragment` and `Big Picture`
+  still launches `BigPictureActivity`.
+- Tradeoff: the actions are now one step earlier in the navigation hierarchy,
+  but the visual language is cleaner because all entry points share the same
+  `main_menu_card_item` sizing and styling.
+- Verification: code and resources updated; build and device re-test pending on
+  the relocated version.
+- Next step: rebuild, reinstall, and inspect the dashboard plus container entry
+  flow on-device from the new main-menu positions.

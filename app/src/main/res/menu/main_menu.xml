@@ -10,9 +10,17 @@
             android:icon="@drawable/ae_icon_package"
             android:title="@string/containers" />
         <item
+            android:id="@+id/main_menu_new_container"
+            android:icon="@drawable/ae_icon_add"
+            android:title="@string/new_container" />
+        <item
             android:id="@+id/main_menu_input_controls"
             android:icon="@drawable/ae_icon_gamepad"
             android:title="@string/input_controls" />
+        <item
+            android:id="@+id/main_menu_big_picture"
+            android:icon="@drawable/ic_big_picture_mode"
+            android:title="@string/big_picture_mode" />
         <item
             android:id="@+id/main_menu_contents"
             android:icon="@drawable/ae_icon_open"

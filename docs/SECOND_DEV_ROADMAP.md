@@ -19,8 +19,9 @@ Second autonomous developer lane for `aesolator`:
    - source provenance clarity (`WCP Archive` vs `WCPHub`)
    - install/update/remove UX checks
 2. `Containers` action-surface cleanup
-   - replace toolbar-only entry points for `New Container` and `Big Picture`
-     with explicit cards inside the screen
+   - expose `New Container` and `Big Picture` as first-class dashboard cards
+     in the main menu grid
+   - keep the `Containers` screen focused on the container list itself
    - keep container creation on the canonical `ContainerDetailFragment` path
    - reduce icon-only ambiguity before further crash/device passes
 3. `Contents` source-of-truth enforcement

@@ -19,7 +19,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -75,7 +74,6 @@ public class ContainersFragment extends Fragment {
         recyclerView = frameLayout.findViewById(R.id.RecyclerView);
         emptyTextView = frameLayout.findViewById(R.id.TVEmptyText);
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-        bindPrimaryActions(frameLayout);
         return frameLayout;
     }
 
@@ -83,77 +81,6 @@ public class ContainersFragment extends Fragment {
         ArrayList<Container> containers = manager.getContainers();
         recyclerView.setAdapter(new ContainersAdapter(containers));
         emptyTextView.setVisibility(containers.isEmpty() ? View.VISIBLE : View.GONE);
-    }
-
-    private void bindPrimaryActions(View root) {
-        boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(requireContext()).getBoolean("dark_mode", false);
-        bindActionCard(
-                root.findViewById(R.id.LLCreateContainerCard),
-                root.findViewById(R.id.FLCreateContainerIconBadge),
-                root.findViewById(R.id.IVCreateContainerIcon),
-                root.findViewById(R.id.TVCreateContainerEyebrow),
-                root.findViewById(R.id.TVCreateContainerTitle),
-                root.findViewById(R.id.TVCreateContainerHint),
-                isDarkMode,
-                R.color.contents_lane_wine,
-                R.color.contents_lane_wine_dark,
-                this::openNewContainer
-        );
-        bindActionCard(
-                root.findViewById(R.id.LLBigPictureCard),
-                root.findViewById(R.id.FLBigPictureIconBadge),
-                root.findViewById(R.id.IVBigPictureIcon),
-                root.findViewById(R.id.TVBigPictureEyebrow),
-                root.findViewById(R.id.TVBigPictureTitle),
-                root.findViewById(R.id.TVBigPictureHint),
-                isDarkMode,
-                R.color.contents_lane_opengl,
-                R.color.contents_lane_opengl_dark,
-                this::openBigPictureMode
-        );
-    }
-
-    private void bindActionCard(
-            View card,
-            View badge,
-            ImageView icon,
-            TextView eyebrow,
-            TextView title,
-            TextView hint,
-            boolean isDarkMode,
-            int lightColorRes,
-            int darkColorRes,
-            Runnable action
-    ) {
-        int accent = ContextCompat.getColor(requireContext(), isDarkMode ? darkColorRes : lightColorRes);
-        int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
-        int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
-
-        card.setBackground(buildActionCardBackground(accent, isDarkMode));
-        badge.setBackground(buildActionBadgeBackground(accent, isDarkMode));
-        icon.clearColorFilter();
-        icon.setColorFilter(accent);
-        eyebrow.setTextColor(withAlpha(titleColor, isDarkMode ? 210 : 190));
-        title.setTextColor(titleColor);
-        hint.setTextColor(bodyColor);
-        card.setOnClickListener(v -> action.run());
-    }
-
-    private void openNewContainer() {
-        Context context = getContext();
-        if (context == null || !ImageFs.find(context).isValid()) return;
-        FragmentManager fragmentManager = getParentFragmentManager();
-        fragmentManager.beginTransaction()
-                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
-                .addToBackStack(null)
-                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
-                .commit();
-    }
-
-    private void openBigPictureMode() {
-        Intent intent = new Intent(getContext(), BigPictureActivity.class);
-        startActivity(intent);
-        getActivity().overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
     }
 
 
@@ -283,27 +210,6 @@ public class ContainersFragment extends Fragment {
         background.setColor(withAlpha(accent, isDarkMode ? 50 : 20));
         background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 130));
         return background;
-    }
-
-    private GradientDrawable buildActionCardBackground(int accent, boolean isDarkMode) {
-        GradientDrawable background = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{
-                        withAlpha(accent, isDarkMode ? 78 : 34),
-                        withAlpha(accent, isDarkMode ? 28 : 10)
-                }
-        );
-        background.setCornerRadius(UnitUtils.dpToPx(18));
-        background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 230 : 150));
-        return background;
-    }
-
-    private GradientDrawable buildActionBadgeBackground(int accent, boolean isDarkMode) {
-        GradientDrawable badge = new GradientDrawable();
-        badge.setShape(GradientDrawable.OVAL);
-        badge.setColor(withAlpha(accent, isDarkMode ? 64 : 28));
-        badge.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 145));
-        return badge;
     }
 
     private int withAlpha(int color, int alpha) {

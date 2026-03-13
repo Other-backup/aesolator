@@ -15,10 +15,8 @@
     <string name="main_menu_hint_settings">Theme, global profiles and platform behavior</string>
     <string name="main_menu_hint_input">Touch, gamepad and gesture profiles</string>
     <string name="main_menu_hint_about">Credits, versions and stack overview</string>
-    <string name="containers_quick_action_runtime">Fresh Runtime</string>
-    <string name="containers_quick_action_library">Shortcut Library</string>
-    <string name="containers_quick_action_new_hint">Start a clean container with the current Wine or Proton defaults.</string>
-    <string name="containers_quick_action_big_picture_hint">Open the poster wall for shortcuts, cover art and couch-style launch flow.</string>
+    <string name="main_menu_hint_new_container">Start a clean container with the current Wine or Proton defaults</string>
+    <string name="main_menu_hint_big_picture">Open the shortcut wall with cover art and couch-style launch flow</string>
     <string name="run">Run</string>
     <string name="edit">Edit</string>
     <string name="remove">Remove</string>

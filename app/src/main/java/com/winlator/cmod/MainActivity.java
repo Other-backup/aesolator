@@ -36,6 +36,7 @@ import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.io.File;
@@ -230,8 +231,14 @@ public class MainActivity extends AppCompatActivity {
             case R.id.main_menu_containers:
                 show(new ContainersFragment(), reverse);
                 break;
+            case R.id.main_menu_new_container:
+                openNewContainerFlow();
+                break;
             case R.id.main_menu_input_controls:
                 show(new InputControlsFragment(selectedProfileId), reverse);
+                break;
+            case R.id.main_menu_big_picture:
+                openBigPictureMode();
                 break;
             case R.id.main_menu_contents:
                 show(new ContentsFragment(), reverse);
@@ -252,6 +259,27 @@ public class MainActivity extends AppCompatActivity {
                 showHomeDashboard(reverse);
                 return;
         }
+    }
+
+    private void openNewContainerFlow() {
+        if (!ImageFs.find(this).isValid()) return;
+        getSupportFragmentManager().beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
+                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
+                .commit();
+        View contentRoot = findViewById(android.R.id.content);
+        if (contentRoot != null) {
+            contentRoot.post(() -> {
+                updateActionBarNavigationState();
+                applyThemeChrome();
+                applyThemeAssetTintPass();
+            });
+        }
+    }
+
+    private void openBigPictureMode() {
+        startActivity(new Intent(this, BigPictureActivity.class));
+        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
     }
 
     public void showHomeDashboard(boolean reverse) {
