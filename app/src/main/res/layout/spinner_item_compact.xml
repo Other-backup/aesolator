@@ -9,8 +9,8 @@
     android:maxLines="1"
     android:paddingStart="12dp"
     android:paddingTop="8dp"
-    android:paddingEnd="40dp"
+    android:paddingEnd="28dp"
     android:paddingBottom="8dp"
     android:scrollHorizontally="false"
     android:textColor="?attr/aePrimaryTextColor"
-    android:textSize="14sp" />
+    android:textSize="13sp" />

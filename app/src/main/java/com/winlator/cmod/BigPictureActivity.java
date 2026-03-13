@@ -136,8 +136,12 @@ public class BigPictureActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
+        setTheme(isDarkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
         super.onCreate(savedInstanceState);
-        getSupportActionBar().hide();  // Hide the action bar for full-screen mode
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
         setContentView(R.layout.big_picture_activity);
         TiledBackgroundView backgroundView = findViewById(R.id.parallaxBackgroundView);
 

@@ -19,9 +19,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="0dp"
             android:layout_gravity="top"
-            android:minHeight="100dp"
+            android:minHeight="96dp"
             android:layout_weight="1"
-            android:paddingTop="28dp"
+            android:paddingTop="26dp"
             android:tag="theme_card">
 
             <TextView
@@ -46,9 +46,9 @@
             android:layout_gravity="top"
             android:layout_marginStart="6dp"
             android:layout_marginTop="0dp"
-            android:minHeight="100dp"
+            android:minHeight="96dp"
             android:layout_weight="1"
-            android:paddingTop="28dp"
+            android:paddingTop="26dp"
             android:tag="theme_card">
 
             <TextView
@@ -69,13 +69,14 @@
                 android:hyphenationFrequency="none"
                 android:lineSpacingExtra="0dp"
                 android:maxLines="2"
-                android:minHeight="44dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
+                android:minHeight="40dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
                 android:singleLine="false"
                 android:textAlignment="viewStart"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
+                android:textSize="14sp"
                 android:text="@string/install_content" />
         </LinearLayout>
     </LinearLayout>
@@ -87,7 +88,7 @@
 
         <LinearLayout
             style="@style/FieldSetCompact"
-            android:paddingTop="28dp"
+            android:paddingTop="26dp"
             android:tag="theme_card">
 
             <TextView

@@ -38,6 +38,7 @@ target_link_libraries(winlator
         android
         jnigraphics
         openxr_loader
+        c++_shared
         aaudio
         EGL
         GLESv2

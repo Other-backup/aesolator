@@ -161,3 +161,73 @@
 - Verification: layout XML updated; rebuild/visual verification still pending.
 - Next step: rebuild or reopen the installed screen and check whether the new
   size rhythm finally matches the intended `Contents` surface.
+
+### Entry 12: Device-led top-card fit correction
+
+- Goal: correct the remaining top-card sizing issues from a real device view,
+  not from XML-only inference.
+- Context: live `Contents` screenshots showed that equal-width cards were now
+  structurally correct, but `Content Type` labels clipped too aggressively
+  while `Install Content` still read slightly heavier than the adjacent
+  selector.
+- Decision: preserve equal card width, reduce the top-card vertical mass
+  slightly, tighten the install button padding, and reclaim more text width in
+  compact spinner rows by shrinking end padding and text size.
+- Tradeoff: spinner text becomes a bit smaller, but more of the actual content
+  type remains visible within the fixed half-width card.
+- Verification: device screenshot reviewed first; XML updated second; rebuild
+  and re-install still pending.
+- Next step: rebuild, re-install, and capture one more stable `Contents`
+  screenshot to validate the fit.
+
+### Entry 13: Install-card control mass alignment
+
+- Goal: remove the last visual mismatch inside the equal-width top cards.
+- Context: after the device-led size pass, the card shells aligned better, but
+  the `Install Content` control still carried more visual mass than the
+  adjacent spinner because its internal typography and vertical padding remained
+  heavier.
+- Decision: keep the card size unchanged and lighten only the button internals:
+  smaller text and tighter vertical padding/min-height.
+- Tradeoff: the install action becomes visually calmer, while still retaining
+  two-line word wrapping if the label ever needs it.
+- Verification: XML updated; rebuild/device validation pending.
+- Next step: rebuild, reinstall, and compare the top row again on-device.
+
+### Entry 14: Dual-crash forensic split
+
+- Goal: distinguish repeated crash noise from unique root causes during
+  container-create testing.
+- Context: the user triggered a burst of crashes that looked like many
+  failures, but `logcat` separated them into one primary container-path crash
+  and one repeated startup crash-loop.
+- Decision: harden `DefaultVersion` so container defaults no longer depend on a
+  brittle native class-init path, explicitly link `c++_shared` for the native
+  OpenXR dependency chain, and switch `BigPictureActivity` onto the same app
+  theme family as the rest of the app before inflation.
+- Tradeoff: `DXVK` default detection now falls back to a generic safe default
+  if GPU probing is unavailable, preferring app stability over eager renderer
+  specialization.
+- Verification: forensic traces captured; code patched; rebuild and device
+  re-test pending.
+- Next step: rebuild, reinstall, and re-run both crash paths to verify the
+  container screen opens and Big Picture no longer loops on startup.
+
+### Entry 15: Containers action-card replacement
+
+- Goal: remove the weak toolbar-icon affordance for the two most important
+  `Containers` actions and replace it with explicit in-surface entry cards.
+- Context: the user called out the existing `+` and `Big Picture` icons as too
+  weak visually, while these two paths were also the current focus of crash and
+  device testing.
+- Decision: drop the toolbar menu for those actions, add two top-of-screen
+  cards inside `containers_fragment.xml`, and wire them to the same canonical
+  navigation paths already used by the old actions (`ContainerDetailFragment`
+  for new container creation and `BigPictureActivity` for library mode).
+- Tradeoff: the fragment gains more vertical chrome at the top, but the action
+  surface is now explicit, readable, and easier to validate on-device than two
+  small toolbar icons.
+- Verification: layout and fragment wiring updated; `:app:assembleDebug`
+  completed successfully after the pass.
+- Next step: install the rebuilt APK on-device, inspect the new cards live, and
+  continue the crash retest from the clearer `Containers` surface.

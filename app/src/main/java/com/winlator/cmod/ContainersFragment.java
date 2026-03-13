@@ -1,28 +1,20 @@
 package com.winlator.cmod;
 
-import static com.winlator.cmod.core.AppUtils.showToast;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -41,7 +33,6 @@ import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.StorageInfoDialog;
-import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
@@ -65,7 +56,7 @@ public class ContainersFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
+        setHasOptionsMenu(false);
         preloaderDialog = new PreloaderDialog(getActivity());
     }
 
@@ -84,56 +75,82 @@ public class ContainersFragment extends Fragment {
         recyclerView = frameLayout.findViewById(R.id.RecyclerView);
         emptyTextView = frameLayout.findViewById(R.id.TVEmptyText);
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
+        bindPrimaryActions(frameLayout);
         return frameLayout;
     }
 
     private void loadContainersList() {
         ArrayList<Container> containers = manager.getContainers();
         recyclerView.setAdapter(new ContainersAdapter(containers));
-        if (containers.isEmpty()) emptyTextView.setVisibility(View.VISIBLE);
+        emptyTextView.setVisibility(containers.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater menuInflater) {
-        // Clear any existing menu items to prevent duplication
-        menu.clear();
-        menuInflater.inflate(R.menu.containers_menu, menu);
-        MenuItem bigPictureItem = menu.findItem(R.id.action_big_picture_mode);
-        Drawable icon = bigPictureItem.getIcon();
-        if (icon != null) {
-            boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(requireContext()).getBoolean("dark_mode", false);
-            icon.mutate(); // Ensure we don't modify other instances of this drawable
-            icon.setColorFilter(ContextCompat.getColor(
-                    requireContext(),
-                    isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
-            ), PorterDuff.Mode.SRC_IN);
-        }
+    private void bindPrimaryActions(View root) {
+        boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(requireContext()).getBoolean("dark_mode", false);
+        bindActionCard(
+                root.findViewById(R.id.LLCreateContainerCard),
+                root.findViewById(R.id.FLCreateContainerIconBadge),
+                root.findViewById(R.id.IVCreateContainerIcon),
+                root.findViewById(R.id.TVCreateContainerEyebrow),
+                root.findViewById(R.id.TVCreateContainerTitle),
+                root.findViewById(R.id.TVCreateContainerHint),
+                isDarkMode,
+                R.color.contents_lane_wine,
+                R.color.contents_lane_wine_dark,
+                this::openNewContainer
+        );
+        bindActionCard(
+                root.findViewById(R.id.LLBigPictureCard),
+                root.findViewById(R.id.FLBigPictureIconBadge),
+                root.findViewById(R.id.IVBigPictureIcon),
+                root.findViewById(R.id.TVBigPictureEyebrow),
+                root.findViewById(R.id.TVBigPictureTitle),
+                root.findViewById(R.id.TVBigPictureHint),
+                isDarkMode,
+                R.color.contents_lane_opengl,
+                R.color.contents_lane_opengl_dark,
+                this::openBigPictureMode
+        );
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem menuItem) {
-        switch (menuItem.getItemId()) {
-            case R.id.containers_menu_add:
-                if (!ImageFs.find(getContext()).isValid()) return false;
-                FragmentManager fragmentManager = getParentFragmentManager();
-                fragmentManager.beginTransaction()
-                        .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
-                        .addToBackStack(null)
-                        .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
-                        .commit();
-                return true;
+    private void bindActionCard(
+            View card,
+            View badge,
+            ImageView icon,
+            TextView eyebrow,
+            TextView title,
+            TextView hint,
+            boolean isDarkMode,
+            int lightColorRes,
+            int darkColorRes,
+            Runnable action
+    ) {
+        int accent = ContextCompat.getColor(requireContext(), isDarkMode ? darkColorRes : lightColorRes);
+        int titleColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text);
+        int bodyColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
 
-            case R.id.action_big_picture_mode:
-                toggleBigPictureMode();
-                return true;
-
-            default:
-                return super.onOptionsItemSelected(menuItem);
-        }
+        card.setBackground(buildActionCardBackground(accent, isDarkMode));
+        badge.setBackground(buildActionBadgeBackground(accent, isDarkMode));
+        icon.clearColorFilter();
+        icon.setColorFilter(accent);
+        eyebrow.setTextColor(withAlpha(titleColor, isDarkMode ? 210 : 190));
+        title.setTextColor(titleColor);
+        hint.setTextColor(bodyColor);
+        card.setOnClickListener(v -> action.run());
     }
 
-    private void toggleBigPictureMode() {
-        // Start BigPictureActivity without passing shortcut data explicitly
+    private void openNewContainer() {
+        Context context = getContext();
+        if (context == null || !ImageFs.find(context).isValid()) return;
+        FragmentManager fragmentManager = getParentFragmentManager();
+        fragmentManager.beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                .addToBackStack(null)
+                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
+                .commit();
+    }
+
+    private void openBigPictureMode() {
         Intent intent = new Intent(getContext(), BigPictureActivity.class);
         startActivity(intent);
         getActivity().overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
@@ -268,11 +285,29 @@ public class ContainersFragment extends Fragment {
         return background;
     }
 
+    private GradientDrawable buildActionCardBackground(int accent, boolean isDarkMode) {
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{
+                        withAlpha(accent, isDarkMode ? 78 : 34),
+                        withAlpha(accent, isDarkMode ? 28 : 10)
+                }
+        );
+        background.setCornerRadius(UnitUtils.dpToPx(18));
+        background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 230 : 150));
+        return background;
+    }
+
+    private GradientDrawable buildActionBadgeBackground(int accent, boolean isDarkMode) {
+        GradientDrawable badge = new GradientDrawable();
+        badge.setShape(GradientDrawable.OVAL);
+        badge.setColor(withAlpha(accent, isDarkMode ? 64 : 28));
+        badge.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 145));
+        return badge;
+    }
+
     private int withAlpha(int color, int alpha) {
         int clamped = Math.max(0, Math.min(255, alpha));
         return (color & 0x00ffffff) | (clamped << 24);
     }
-
-
-
 }

@@ -18,13 +18,18 @@ Second autonomous developer lane for `aesolator`:
    - selector readability and lane visibility
    - source provenance clarity (`WCP Archive` vs `WCPHub`)
    - install/update/remove UX checks
-2. `Contents` source-of-truth enforcement
+2. `Containers` action-surface cleanup
+   - replace toolbar-only entry points for `New Container` and `Big Picture`
+     with explicit cards inside the screen
+   - keep container creation on the canonical `ContainerDetailFragment` path
+   - reduce icon-only ambiguity before further crash/device passes
+3. `Contents` source-of-truth enforcement
    - `REMOTE_WINE_PROTON_OVERLAY` must track `aesolator/contents/contents.json`
    - `Wine` lane must expose archive-managed `freewine11`
-3. Documentation sync
+4. Documentation sync
    - keep `AGENTS.md`, roadmap, and reflective journal current
    - keep implementation notes aligned with repo contracts
-4. Handoff/reporting discipline
+5. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
 
