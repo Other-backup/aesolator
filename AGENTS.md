@@ -95,6 +95,8 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`
 - `docs/CONTENTS_QA_CHECKLIST.md`
 - `docs/DONOR_BANNERS_COMPONENT_INJECTOR_AUDIT.md`
+- `docs/DONOR_THE412BANNER_REPO_MAP.md`
+- `docs/FREEWINE_BUILD_AGENT_HANDOFF.md`
 - `docs/IMAGEFS_REVERSE_MAP.md`
 - `docs/SECOND_DEV_ROADMAP.md`
 - `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`

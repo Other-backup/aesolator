@@ -658,3 +658,72 @@
 - Next step: continue the queued donor/package task from a clean committed
   state and only then return to deeper debugging if something still blocks the
   next feature lane.
+
+### Entry 36: Runtime-install route realignment
+
+- Goal: make the `New Container -> Install Runtime` route land on the correct
+  runtime package view instead of whatever stale `Contents` filters happened to
+  be left in shared preferences.
+- Context: the user reported that nothing showed in `Contents`, and the dark
+  theme looked underpainted on the transition from container creation into the
+  runtime install flow. The route previously opened `ContentsFragment`
+  directly, bypassing `MainActivity`'s normal themed navigation path and
+  keeping old `Contents` source/type prefs alive.
+- Decision: route the action through `MainActivity.openMainMenuItem(...)`,
+  force `Contents` preselection to `Wine` + `WCP Archive` + stable/all lanes
+  for the runtime install scenario, and give both `container_detail_fragment`
+  and `contents_fragment` explicit root backgrounds from the active theme.
+- Tradeoff: the runtime-install path is now opinionated toward the app's own
+  runtime packages first, but that is the correct default for container
+  creation and still leaves the user free to switch lanes afterward.
+- Verification: `assembleDebug` completed successfully, the rebuilt APK was
+  reinstalled on `10.0.0.1:42363`, and a post-launch device screenshot now
+  shows `Contents` in dark theme with `Wine` selected, `WCP Archive` selected,
+  and the `11-arm64ec` runtime card visible.
+- Next step: continue live source-switch validation for `WCPHub` and donor
+  feeds from this corrected route instead of debugging the old empty-state path.
+
+### Entry 37: FreeWine upstream handoff capture
+
+- Goal: keep `freewine11` build-side upstream signals from getting lost while
+  app/UI work continues in `aesolator`.
+- Context: the user explicitly pointed to one Valve Wine commit and then to the
+  full compare between `ValveSoftware/wine:proton_10.0` and
+  `GameNative/proton-wine:proton_10.0`, with the instruction to route it to the
+  second build agent working on `freewine`.
+- Decision: capture the compare as a formal cross-repo handoff in
+  `docs/FREEWINE_BUILD_AGENT_HANDOFF.md`, including the exact compare link,
+  the three downstream commits, changed-area breakdown, and the warning that it
+  is a bundled Android/Winlator integration layer rather than a single
+  cherry-pick.
+- Tradeoff: this does not patch `freewine11` directly because that repository
+  is not checked out in the local workspace, but it prevents the upstream
+  signal from disappearing into chat history.
+- Verification: GitHub compare API reviewed on `2026-03-14`; the compare is
+  `ahead_by=3`, `behind_by=0`, with `70` changed files concentrated in
+  `android/patches`, `android/android_sysvshm`, workflow automation, and
+  build-step scripts.
+- Next step: when the `freewine11` build lane is active locally, assess the
+  three-commit stack as one downstream patch layer and only then decide whether
+  to cherry-pick, port selectively, or reject pieces.
+
+### Entry 38: Nightlies Proton confirmation
+
+- Goal: close the donor-runtime ambiguity around whether `The412Banner/Nightlies`
+  actually carries installable `Proton` payloads.
+- Context: the user supplied the concrete `Nightlies` Proton release after the
+  earlier donor audit had already marked `Nightlies` as the likely source for
+  missing nightly runtimes.
+- Decision: record the exact release and assets in the dedicated
+  `freewine11` handoff note and upgrade the repo-map/roadmap language from
+  “likely source” to confirmed donor source for packaged ARM64EC Proton
+  artifacts.
+- Tradeoff: this is still a reporting pass rather than live `Contents`
+  integration, but it removes uncertainty for the build/runtime agent and for
+  the future donor-lane implementation.
+- Verification: GitHub release API for
+  `proton-bleeding-edge-20260312-b310f0c-run23` reviewed on `2026-03-14`;
+  assets confirmed as `.wcp` and `.wcp.xz` ARM64EC Proton packages plus
+  matching `.sha256` sidecars.
+- Next step: keep `Nightlies` at the top of the donor integration backlog for
+  a future first-class `Contents` source lane and package-install pass.

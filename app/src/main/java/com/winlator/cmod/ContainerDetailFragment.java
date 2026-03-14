@@ -228,6 +228,24 @@ public class ContainerDetailFragment extends Fragment {
     }
 
     private void openContentsForRuntimeInstall() {
+        Context context = getContext();
+        if (context != null) {
+            SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+            preferences.edit()
+                    .putString("contents_preselected_type", ContentProfile.ContentType.CONTENT_TYPE_WINE.toString())
+                    .putString("contents_source_mode", "archive")
+                    .putString("contents_channel_mode", "stable")
+                    .putString("contents_arch_mode", "all")
+                    .remove("contents_preselected_display_category")
+                    .apply();
+        }
+
+        AppCompatActivity activity = (AppCompatActivity) getActivity();
+        if (activity instanceof MainActivity mainActivity) {
+            mainActivity.openMainMenuItem(R.id.main_menu_contents, false);
+            return;
+        }
+
         getParentFragmentManager().beginTransaction()
                 .setCustomAnimations(
                         R.anim.slide_in_up,

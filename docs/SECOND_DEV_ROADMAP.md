@@ -129,14 +129,23 @@ Second autonomous developer lane for `aesolator`:
   surface on the target phone.
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
-  across source switching and install actions.
+  across source switching and install actions. The `Install Runtime` path now
+  lands on a populated `WCP Archive` / `Wine` view again.
 - GameHub feed ingestion now includes paginated release polling and stronger
   visible ordering, but it still needs a live `Contents` device pass to confirm
   that nightly/stable and architecture variants render as intended in the UI.
 - `BannersComponentInjector` has not yet been fully harvested into a local
   donor-integration pass, so there is still a risk of missing a first-class
   `Nightlies by The412Banner` lane or other package-link paths already solved
-  there.
+  there. `Nightlies` is now explicitly confirmed to carry packaged ARM64EC
+  `Proton` artifacts, not just graphics or Box64 builds.
+- A cross-repo handoff is now open for the `freewine11` build lane:
+  review Valve Wine commit
+  `6ccff11d0e7d620cd958b56b0904fcbd9a9bfb26` in the dedicated handoff note
+  before the next runtime build churn.
+- That handoff has widened into a full upstream compare task:
+  `ValveSoftware/wine:proton_10.0...GameNative/proton-wine:proton_10.0`
+  is a 3-commit Android/Winlator downstream layer, not just one isolated fix.
 - `WCPHub` source parsing no longer drops overlapping families at ingest time,
   but the integrated device pass still needs one more live confirmation for
   list rendering and install actions after the parser fix.
