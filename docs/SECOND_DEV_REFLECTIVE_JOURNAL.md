@@ -312,3 +312,28 @@
   while entering `New Container`.
 - Next step: run a full top-to-bottom create flow and then return to
   `Contents` source-switch/install QA from the same installed build.
+
+### Entry 20: Startup routing and prompt deferral cleanup
+
+- Goal: stop cold-start navigation from competing with system prompts and
+  restored foreground state.
+- Context: direct `selected_menu_item_id` launches were fragile in practice
+  because `MainActivity` mixed immediate fragment routing with startup prompts
+  (`All Files Access`, `POST_NOTIFICATIONS`) and had no explicit `onNewIntent`
+  handling for a later re-entry into the same activity instance.
+- Decision: defer the intrusive startup prompts until the dashboard is actually
+  visible, add `onNewIntent()` routing for `selected_menu_item_id` and
+  `edit_input_controls`, and fall back to the dashboard when `New Container`
+  is requested before `ImageFs` is ready instead of leaving the activity in an
+  ambiguous startup state.
+- Tradeoff: the storage/notification prompts may appear slightly later in the
+  session, but direct entry into `New Container` or `Contents` no longer has to
+  compete with them during cold start.
+- Verification: `MainActivity` patched, debug build completed successfully, and
+  the APK was reinstalled via `push + pm install`. Device-side crash buffer
+  remained empty; however, final visual proof of the direct-start route is
+  still partial because the shared phone kept reasserting another foreground
+  app during ADB capture.
+- Next step: re-run the direct-start `New Container`/`Contents` path on a
+  stable foreground session, then continue the full create-flow and contents
+  behavioral QA.

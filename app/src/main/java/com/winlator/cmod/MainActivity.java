@@ -55,6 +55,8 @@ public class MainActivity extends AppCompatActivity {
     private int selectedProfileId;
     private SharedPreferences sharedPreferences;
     private boolean isDarkMode;
+    private boolean pendingAllFilesAccessPrompt = false;
+    private boolean pendingNotificationPermissionPrompt = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,14 +97,12 @@ public class MainActivity extends AppCompatActivity {
                 ImageFsInstaller.installIfNeeded(this);
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                showAllFilesAccessDialog();
-            }
-
-            if (Build.VERSION.SDK_INT >= 33
-                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
-            }
+            pendingAllFilesAccessPrompt =
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager();
+            pendingNotificationPermissionPrompt =
+                    Build.VERSION.SDK_INT >= 33
+                            && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED;
 
             if (selectedMenuItemId > 0) {
                 openMainMenuItem(selectedMenuItemId, false);
@@ -262,7 +262,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openNewContainerFlow() {
-        if (!ImageFs.find(this).isValid()) return;
+        if (!ImageFs.find(this).isValid()) {
+            showHomeDashboard(false);
+            return;
+        }
         getSupportFragmentManager().beginTransaction()
                 .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
                 .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
@@ -320,11 +323,50 @@ public class MainActivity extends AppCompatActivity {
         updateActionBarNavigationState();
         applyThemeChrome();
         applyThemeAssetTintPass();
+        showDeferredStartupPromptsIfNeeded();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        editInputControls = intent.getBooleanExtra("edit_input_controls", false);
+        if (editInputControls) {
+            selectedProfileId = intent.getIntExtra("selected_profile_id", 0);
+            openMainMenuItem(R.id.main_menu_input_controls, false);
+        } else {
+            int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
+            if (selectedMenuItemId > 0) {
+                openMainMenuItem(selectedMenuItemId, false);
+            } else {
+                showHomeDashboard(false);
+            }
+        }
+
+        updateActionBarNavigationState();
+        applyThemeChrome();
+        applyThemeAssetTintPass();
     }
 
     private boolean isHomeDashboardVisible() {
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
         return current instanceof MainMenuGridFragment;
+    }
+
+    private void showDeferredStartupPromptsIfNeeded() {
+        if (editInputControls || !isHomeDashboardVisible()) return;
+
+        if (pendingAllFilesAccessPrompt) {
+            pendingAllFilesAccessPrompt = false;
+            showAllFilesAccessDialog();
+            return;
+        }
+
+        if (pendingNotificationPermissionPrompt) {
+            pendingNotificationPermissionPrompt = false;
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
+        }
     }
 
     private void updateActionBarNavigationState() {

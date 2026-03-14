@@ -56,6 +56,9 @@ Second autonomous developer lane for `aesolator`:
 - `New Container` now opens on-device after the XR lazy-load split, but the
   entire create flow still needs end-to-end QA beyond initial screen entry and
   footer/layout checks.
+- Direct cold-start validation for `selected_menu_item_id` flows is now coded
+  more defensively in `MainActivity`, but shared-device foreground contention
+  still limits clean screenshot proof for those routes.
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
   across source switching and install actions.
