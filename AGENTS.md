@@ -35,6 +35,32 @@ runtime-binding, documentation alignment, and repository contract integrity.
   goal, context, decision, tradeoff, verification status, and next step.
 - Prefer reflective, contract-first integration over blind donor copying or
   cosmetic-only edits without documentation sync.
+- Treat donor repositories such as `Gamehub-Components` and
+  `BannersComponentInjector` as audited input, not as automatic source-of-truth:
+  borrow feed logic, UX patterns, and package-link discovery only after
+  verifying they fit `Ae.solator` provenance and install contracts.
+- When a donor repo appears to expose more package links than the current app,
+  document the delta first, then integrate it behind explicit source labeling
+  and install verification instead of silently reshaping existing lanes.
+
+## Execution Priority
+
+- When the user sends many goals in one burst, normalize them into an ordered
+  backlog in `docs/SECOND_DEV_ROADMAP.md` instead of switching reactively
+  between unrelated tasks.
+- Default execution order:
+  1. close requested product/UI/content tasks,
+  2. close documentation and handoff tails,
+  3. run debugging/forensics after the current list pass is closed.
+- Exception: if a crash, build failure, or runtime defect directly blocks the
+  next listed task, fix that blocker first, then return to the list.
+- Do not lose deferred work:
+  every context switch must leave a written note in the reflective journal with
+  the blocked item, why it was deferred, and what resumes next.
+- Keep one active implementation lane at a time and explicitly mark the rest as
+  queued, not forgotten.
+- Before ending a pass, ensure the working tree, roadmap, and reflective
+  journal all agree on what is done, what is open, and what is next.
 
 ## Mobile UI / Device Pass
 
@@ -68,5 +94,6 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - `docs/REPO_SPLIT_TOPOLOGY.md`
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`
 - `docs/CONTENTS_QA_CHECKLIST.md`
+- `docs/DONOR_BANNERS_COMPONENT_INJECTOR_AUDIT.md`
 - `docs/SECOND_DEV_ROADMAP.md`
 - `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`

@@ -551,3 +551,69 @@
 - Next step: when the device session is quieter, capture the advanced/env tabs
   directly and verify the new switch rows and env-var cards visually end to
   end.
+
+### Entry 31: Donor-source expansion contract
+
+- Goal: widen the package-source investigation without losing control of
+  provenance and install safety.
+- Context: the user added `The412Banner/BannersComponentInjector` as a second
+  donor source for package links and release UX. The donor README indicates a
+  broader online-source model, release-tag browsing, search/sort controls, and
+  richer release metadata than the current `Contents` surface.
+- Decision: record the donor as an audited-input repository rather than a new
+  source-of-truth, create a dedicated donor audit note, and fold its safe ideas
+  into the roadmap before porting code. Prioritize three concrete transfers:
+  full donor release pagination, stronger visible ordering by lane/channel/arch,
+  and better package-link normalization.
+- Tradeoff: this adds an explicit analysis step before code-porting, but it
+  avoids blindly inheriting donor assumptions about which raw payloads are
+  complete runtimes.
+- Verification: roadmap, agent contract, and donor audit note updated locally.
+- Next step: finish the `ContentsFragment` release-placement patch, rebuild,
+  then continue donor-by-donor package-family verification.
+
+### Entry 32: Paginated donor release placement pass
+
+- Goal: stop donor-backed packages from disappearing behind shallow feed
+  polling and weak list ordering.
+- Context: `GameHub` integration already normalized release assets and raw XML
+  components, but the feed still depended on a single GitHub releases page and
+  the visible list did not yet rank items by lane, channel, architecture, and
+  package format. That made it too easy to lose nightlies, arch variants, or
+  `Proton`/`Wine` visibility behind source noise.
+- Decision: paginate GameHub release polling across multiple GitHub pages,
+  promote release-lane packages above raw-feed packages within the donor
+  source, widen nightly-channel filtering to `Wine`, `Proton`, `DXVK`, and
+  `VKD3D`, sort visible rows by source lane/channel/version/arch/format, and
+  remove `GameHub` as an exposed `Wine`/`Proton` source until complete packaged
+  runtimes are verified there.
+- Tradeoff: donor-backed `Wine`/`Proton` discovery becomes stricter in the
+  short term, but the user-facing source model becomes more honest because raw
+  skeleton payloads are no longer presented as full runtimes.
+- Verification: `assembleDebug` completed successfully, the rebuilt APK was
+  reinstalled on `10.0.0.1:42363`, `adb shell monkey -p com.winlator.cmod 1`
+  succeeded, and no fresh crash output appeared in the crash buffer during the
+  smoke pass.
+- Next step: run a live `Contents` device pass focused on `GameHub`,
+  `WCPHub`, and `WCP Archive` source switching, then start harvesting concrete
+  package-link improvements from `BannersComponentInjector`.
+
+### Entry 33: Multi-goal execution order contract
+
+- Goal: stop losing context when the user sends many parallel goals and set a
+  stable order for execution and debugging.
+- Context: the active task stream now mixes UI polish, donor integration,
+  package ingestion, install verification, and later deep debugging. Without an
+  explicit order, it is too easy to jump into forensics before the current task
+  list is actually closed.
+- Decision: add an execution-priority contract to `AGENTS.md` and the roadmap:
+  turn multi-goal prompts into one ordered backlog, close requested
+  product/UI/content work first, sync documentation second, and leave
+  debugging/forensics for after the current list pass unless a crash or build
+  defect directly blocks the next task.
+- Tradeoff: some debugging gets deferred slightly, but context retention and
+  finish-rate improve because every switch now requires an explicit logged
+  reason and return point.
+- Verification: `AGENTS.md` and `SECOND_DEV_ROADMAP.md` updated locally.
+- Next step: keep the current lane on feature/UX/package closure, then return
+  to deeper debugging only after the list pass is explicitly marked closed.

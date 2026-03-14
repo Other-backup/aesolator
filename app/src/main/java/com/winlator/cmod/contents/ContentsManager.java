@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
@@ -35,6 +36,8 @@ public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
     public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/aesolator/main/contents/contents.json";
+    public static final String REMOTE_GAMEHUB_RELEASES = "https://api.github.com/repos/The412Banner/Gamehub-Components/releases?per_page=100";
+    public static final String REMOTE_GAMEHUB_COMPONENTS = "https://raw.githubusercontent.com/The412Banner/Gamehub-Components/main/sp_winemu_all_components12.xml";
     public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
@@ -46,7 +49,7 @@ public class ContentsManager {
     public static final String[] FEXCORE_TRUST_FILES = {"${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll"};
     public static final String[] VULKAN_SDK_TRUST_PREFIXES = {"${sharedir}/vulkan", "${sharedir}/vulkan-sdk"};
     private static final String[] CONTENT_ARCHIVE_SUFFIXES = {
-            ".wcp", ".zip", ".tar", ".txz", ".tzst", ".tar.xz", ".tar.zst"
+            ".wcp", ".wcp.xz", ".wcp.zst", ".zip", ".tar", ".txz", ".tzst", ".tar.xz", ".tar.zst"
     };
     private static final String INSTALL_STAGE_MARKER_SUFFIX = ".install-stage.json";
     private Map<String, String> dirTemplateMap;
@@ -248,6 +251,10 @@ public class ContentsManager {
     }
 
     public void extraContentFile(Uri uri, OnInstallFinishedCallback callback) {
+        extraContentFile(uri, null, callback);
+    }
+
+    public void extraContentFile(Uri uri, @Nullable ContentProfile remoteHint, OnInstallFinishedCallback callback) {
         cleanTmpDir(context);
 
         File file = getTmpDir(context);
@@ -269,6 +276,12 @@ public class ContentsManager {
         }
 
         File proFile = new File(file, PROFILE_NAME);
+        if (!proFile.exists() && remoteHint != null) {
+            ContentProfile synthesizedProfile = synthesizeProfileFromExtractedPayload(file, remoteHint);
+            if (synthesizedProfile != null && writeSyntheticProfile(file, synthesizedProfile)) {
+                proFile = new File(file, PROFILE_NAME);
+            }
+        }
         if (!proFile.exists()) {
             callback.onFailed(InstallFailedReason.ERROR_NOPROFILE, null);
             return;
@@ -544,23 +557,21 @@ public class ContentsManager {
             profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
             profile.locallyInstalled = true;
 
+            List<ContentProfile.ContentFile> fileList = new ArrayList<>();
             JSONArray fileJSONArray = profileJSONObject.optJSONArray(ContentProfile.MARK_FILE_LIST);
             if (fileJSONArray == null) {
                 fileJSONArray = profileJSONObject.optJSONArray("fileList");
             }
-            if (fileJSONArray == null) {
-                return null;
+            if (fileJSONArray != null) {
+                for (int i = 0; i < fileJSONArray.length(); i++) {
+                    JSONObject contentFileJSONObject = fileJSONArray.getJSONObject(i);
+                    ContentProfile.ContentFile contentFile = new ContentProfile.ContentFile();
+                    contentFile.source = contentFileJSONObject.optString(ContentProfile.MARK_FILE_SOURCE, contentFileJSONObject.optString("src", ""));
+                    contentFile.target = contentFileJSONObject.optString(ContentProfile.MARK_FILE_TARGET, contentFileJSONObject.optString("dst", ""));
+                    if (contentFile.source.isEmpty() || contentFile.target.isEmpty()) continue;
+                    fileList.add(contentFile);
+                }
             }
-            List<ContentProfile.ContentFile> fileList = new ArrayList<>();
-            for (int i = 0; i < fileJSONArray.length(); i++) {
-                JSONObject contentFileJSONObject = fileJSONArray.getJSONObject(i);
-                ContentProfile.ContentFile contentFile = new ContentProfile.ContentFile();
-                contentFile.source = contentFileJSONObject.optString(ContentProfile.MARK_FILE_SOURCE, contentFileJSONObject.optString("src", ""));
-                contentFile.target = contentFileJSONObject.optString(ContentProfile.MARK_FILE_TARGET, contentFileJSONObject.optString("dst", ""));
-                if (contentFile.source.isEmpty() || contentFile.target.isEmpty()) continue;
-                fileList.add(contentFile);
-            }
-            if (fileList.isEmpty()) return null;
             profile.fileList = fileList;
 
             if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
@@ -574,6 +585,11 @@ public class ContentsManager {
                     profile.wineBinPath = wineJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, "");
                     profile.winePrefixPack = wineJSONObject.optString(ContentProfile.MARK_WINE_PREFIX_PACK, "");
                 }
+                if (profile.wineLibPath.isEmpty() || profile.wineBinPath.isEmpty() || profile.winePrefixPack.isEmpty()) {
+                    return null;
+                }
+            } else if (fileList.isEmpty()) {
+                return null;
             }
             return profile;
         } catch (Exception e) {
@@ -822,7 +838,7 @@ public class ContentsManager {
         String path = remoteUrl.trim();
         int slash = path.lastIndexOf('/');
         String fileName = slash >= 0 ? path.substring(slash + 1) : path;
-        return fileName.replaceAll("\\.(wcp|zip|tar|txz|tzst)$", "");
+        return fileName.replaceAll("(?i)\\.(wcp\\.xz|wcp\\.zst|wcp|zip|tar|txz|tzst)$", "");
     }
 
     private String deriveLegacyChannel(JSONObject object, String verName, String remoteUrl) {
@@ -888,6 +904,252 @@ public class ContentsManager {
             }
         }
         return null;
+    }
+
+    @Nullable
+    private ContentProfile synthesizeProfileFromExtractedPayload(File rootDir, ContentProfile remoteHint) {
+        if (rootDir == null || remoteHint == null || remoteHint.type == null) return null;
+
+        ContentProfile profile = new ContentProfile();
+        profile.type = remoteHint.type;
+        profile.verName = remoteHint.verName;
+        profile.verCode = remoteHint.verCode;
+        profile.desc = remoteHint.desc;
+        profile.remoteUrl = remoteHint.remoteUrl;
+        profile.remoteSha256 = remoteHint.remoteSha256;
+        profile.channel = remoteHint.getChannel();
+        profile.delivery = remoteHint.getDelivery().isEmpty() ? ContentProfile.DELIVERY_REMOTE : remoteHint.getDelivery();
+        profile.displayCategory = remoteHint.getDisplayCategory();
+        profile.sourceRepo = remoteHint.sourceRepo;
+        profile.sourceFeed = remoteHint.sourceFeed;
+        profile.sourceLabel = remoteHint.sourceLabel;
+        profile.releaseTag = remoteHint.releaseTag;
+        profile.vulkanApiMin = remoteHint.vulkanApiMin;
+        profile.vulkanApiMax = remoteHint.vulkanApiMax;
+        profile.vulkanSdkVersion = remoteHint.vulkanSdkVersion;
+
+        switch (remoteHint.type) {
+            case CONTENT_TYPE_DXVK -> profile.fileList = synthesizeDxvkFiles(rootDir);
+            case CONTENT_TYPE_VKD3D -> profile.fileList = synthesizeVkd3dFiles(rootDir);
+            case CONTENT_TYPE_BOX64 -> profile.fileList = synthesizeSingleFile(rootDir, "box64", "${bindir}/box64");
+            case CONTENT_TYPE_WOWBOX64 -> profile.fileList = synthesizeWowBox64Files(rootDir);
+            case CONTENT_TYPE_FEXCORE -> profile.fileList = synthesizeFexCoreFiles(rootDir);
+            case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> synthesizeWineFamilyProfile(rootDir, profile);
+            default -> {
+                return null;
+            }
+        }
+
+        boolean hasPayloadFiles = profile.fileList != null && !profile.fileList.isEmpty();
+        if (!hasPayloadFiles && !profile.isWineProtonFamily()) return null;
+        if (profile.verName == null || profile.verName.trim().isEmpty()) {
+            profile.verName = deriveVersionNameFromUrl(profile.remoteUrl);
+        }
+        return profile;
+    }
+
+    private boolean writeSyntheticProfile(File rootDir, ContentProfile profile) {
+        if (rootDir == null || profile == null) return false;
+        boolean hasPayloadFiles = profile.fileList != null && !profile.fileList.isEmpty();
+        if (!hasPayloadFiles && !profile.isWineProtonFamily()) return false;
+        try {
+            JSONObject object = new JSONObject();
+            object.put(ContentProfile.MARK_TYPE, profile.type.toString());
+            object.put(ContentProfile.MARK_VERSION_NAME, profile.verName == null ? "" : profile.verName);
+            object.put(ContentProfile.MARK_VERSION_CODE, profile.verCode);
+            object.put(ContentProfile.MARK_DESC, profile.desc == null ? "" : profile.desc);
+            object.put(ContentProfile.MARK_CHANNEL, profile.getChannel());
+            object.put(ContentProfile.MARK_DELIVERY, profile.getDelivery().isEmpty() ? ContentProfile.DELIVERY_REMOTE : profile.getDelivery());
+            object.put(ContentProfile.MARK_DISPLAY_CATEGORY, profile.getDisplayCategory());
+            object.put(ContentProfile.MARK_SOURCE_REPO, profile.sourceRepo == null ? "" : profile.sourceRepo);
+            object.put(ContentProfile.MARK_SOURCE_FEED, profile.sourceFeed == null ? "" : profile.sourceFeed);
+            object.put(ContentProfile.MARK_SOURCE_LABEL, profile.sourceLabel == null ? "" : profile.sourceLabel);
+            object.put(ContentProfile.MARK_RELEASE_TAG, profile.releaseTag == null ? "" : profile.releaseTag);
+            if (profile.remoteSha256 != null && !profile.remoteSha256.trim().isEmpty()) {
+                object.put(ContentProfile.MARK_SHA256, profile.remoteSha256.trim());
+            }
+            if (profile.vulkanApiMin > 0) object.put(ContentProfile.MARK_VULKAN_API_MIN, profile.vulkanApiMin);
+            if (profile.vulkanApiMax > 0) object.put(ContentProfile.MARK_VULKAN_API_MAX, profile.vulkanApiMax);
+            if (profile.vulkanSdkVersion != null && !profile.vulkanSdkVersion.trim().isEmpty()) {
+                object.put(ContentProfile.MARK_VULKAN_SDK_VERSION, profile.vulkanSdkVersion.trim());
+            }
+
+            JSONArray files = new JSONArray();
+            if (profile.fileList != null) {
+                for (ContentProfile.ContentFile contentFile : profile.fileList) {
+                    JSONObject fileObject = new JSONObject();
+                    fileObject.put(ContentProfile.MARK_FILE_SOURCE, contentFile.source);
+                    fileObject.put(ContentProfile.MARK_FILE_TARGET, contentFile.target);
+                    files.put(fileObject);
+                }
+            }
+            object.put(ContentProfile.MARK_FILE_LIST, files);
+
+            if (profile.isWineProtonFamily()) {
+                JSONObject wineObject = new JSONObject();
+                wineObject.put(ContentProfile.MARK_WINE_BINPATH, profile.wineBinPath);
+                wineObject.put(ContentProfile.MARK_WINE_LIBPATH, profile.wineLibPath);
+                wineObject.put(ContentProfile.MARK_WINE_PREFIX_PACK, profile.winePrefixPack);
+                object.put(profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                        ? ContentProfile.MARK_PROTON
+                        : ContentProfile.MARK_WINE, wineObject);
+            }
+            return FileUtils.writeString(new File(rootDir, PROFILE_NAME), object.toString());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void synthesizeWineFamilyProfile(File rootDir, ContentProfile profile) {
+        String binPath = findRelativeDirectory(rootDir, "bin");
+        String libPath = findRelativeDirectory(rootDir, "lib");
+        String prefixPackPath = findRelativeFile(rootDir, "prefixPack.txz");
+        if (binPath == null || libPath == null || prefixPackPath == null) return;
+
+        profile.wineBinPath = binPath;
+        profile.wineLibPath = libPath;
+        profile.winePrefixPack = prefixPackPath;
+        profile.fileList = new ArrayList<>();
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeDxvkFiles(File rootDir) {
+        String[][] mappings = {
+                {"system32/d3d8.dll", "${system32}/d3d8.dll"},
+                {"system32/d3d9.dll", "${system32}/d3d9.dll"},
+                {"system32/d3d10.dll", "${system32}/d3d10.dll"},
+                {"system32/d3d10_1.dll", "${system32}/d3d10_1.dll"},
+                {"system32/d3d10core.dll", "${system32}/d3d10core.dll"},
+                {"system32/d3d11.dll", "${system32}/d3d11.dll"},
+                {"system32/dxgi.dll", "${system32}/dxgi.dll"},
+                {"syswow64/d3d8.dll", "${syswow64}/d3d8.dll"},
+                {"syswow64/d3d9.dll", "${syswow64}/d3d9.dll"},
+                {"syswow64/d3d10.dll", "${syswow64}/d3d10.dll"},
+                {"syswow64/d3d10_1.dll", "${syswow64}/d3d10_1.dll"},
+                {"syswow64/d3d10core.dll", "${syswow64}/d3d10core.dll"},
+                {"syswow64/d3d11.dll", "${syswow64}/d3d11.dll"},
+                {"syswow64/dxgi.dll", "${syswow64}/dxgi.dll"}
+        };
+        return synthesizeMappedFiles(rootDir, mappings);
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeVkd3dFiles(File rootDir) {
+        String[][] mappings = {
+                {"system32/d3d12.dll", "${system32}/d3d12.dll"},
+                {"system32/d3d12core.dll", "${system32}/d3d12core.dll"},
+                {"syswow64/d3d12.dll", "${syswow64}/d3d12.dll"},
+                {"syswow64/d3d12core.dll", "${syswow64}/d3d12core.dll"}
+        };
+        return synthesizeMappedFiles(rootDir, mappings);
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeWowBox64Files(File rootDir) {
+        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
+        String relative = findRelativeFile(rootDir, "wowbox64.dll");
+        if (relative == null) return files;
+        ContentProfile.ContentFile item = new ContentProfile.ContentFile();
+        item.source = relative;
+        item.target = "${system32}/wowbox64.dll";
+        files.add(item);
+        return files;
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeFexCoreFiles(File rootDir) {
+        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
+        String arm64ec = findRelativeFile(rootDir, "libarm64ecfex.dll");
+        String wow64 = findRelativeFile(rootDir, "libwow64fex.dll");
+        if (arm64ec == null || wow64 == null) return files;
+
+        ContentProfile.ContentFile arm64ecFile = new ContentProfile.ContentFile();
+        arm64ecFile.source = arm64ec;
+        arm64ecFile.target = "${system32}/libarm64ecfex.dll";
+        files.add(arm64ecFile);
+
+        ContentProfile.ContentFile wow64File = new ContentProfile.ContentFile();
+        wow64File.source = wow64;
+        wow64File.target = "${system32}/libwow64fex.dll";
+        files.add(wow64File);
+        return files;
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeSingleFile(File rootDir, String fileName, String targetPath) {
+        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
+        String relative = findRelativeFile(rootDir, fileName);
+        if (relative == null) return files;
+        ContentProfile.ContentFile item = new ContentProfile.ContentFile();
+        item.source = relative;
+        item.target = targetPath;
+        files.add(item);
+        return files;
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeMappedFiles(File rootDir, String[][] mappings) {
+        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
+        for (String[] mapping : mappings) {
+            File file = new File(rootDir, mapping[0]);
+            if (!file.isFile()) continue;
+            ContentProfile.ContentFile item = new ContentProfile.ContentFile();
+            item.source = mapping[0];
+            item.target = mapping[1];
+            files.add(item);
+        }
+        return files;
+    }
+
+    @Nullable
+    private String findRelativeDirectory(File rootDir, String dirName) {
+        if (rootDir == null || dirName == null || dirName.trim().isEmpty()) return null;
+        File candidate = new File(rootDir, dirName);
+        if (candidate.isDirectory()) return dirName;
+        return findRelativeDirectoryRecursive(rootDir, rootDir, dirName.trim().toLowerCase(Locale.US));
+    }
+
+    @Nullable
+    private String findRelativeDirectoryRecursive(File rootDir, File current, String normalizedName) {
+        File[] children = current.listFiles();
+        if (children == null) return null;
+        for (File child : children) {
+            if (!child.isDirectory()) continue;
+            if (child.getName().trim().toLowerCase(Locale.US).equals(normalizedName)) {
+                return relativizePath(rootDir, child);
+            }
+            String nested = findRelativeDirectoryRecursive(rootDir, child, normalizedName);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    @Nullable
+    private String findRelativeFile(File rootDir, String fileName) {
+        if (rootDir == null || fileName == null || fileName.trim().isEmpty()) return null;
+        File candidate = new File(rootDir, fileName);
+        if (candidate.isFile()) return fileName;
+        return findRelativeFileRecursive(rootDir, rootDir, fileName.trim().toLowerCase(Locale.US));
+    }
+
+    @Nullable
+    private String findRelativeFileRecursive(File rootDir, File current, String normalizedName) {
+        File[] children = current.listFiles();
+        if (children == null) return null;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                String nested = findRelativeFileRecursive(rootDir, child, normalizedName);
+                if (nested != null) return nested;
+                continue;
+            }
+            if (child.getName().trim().toLowerCase(Locale.US).equals(normalizedName)) {
+                return relativizePath(rootDir, child);
+            }
+        }
+        return null;
+    }
+
+    private String relativizePath(File rootDir, File file) {
+        String rootPath = rootDir.getAbsolutePath();
+        String filePath = file.getAbsolutePath();
+        if (!filePath.startsWith(rootPath)) return file.getName();
+        String relative = filePath.substring(rootPath.length()).replace('\\', '/');
+        while (relative.startsWith("/")) relative = relative.substring(1);
+        return relative;
     }
 
     private String resolveArchHint(ContentProfile profile) {

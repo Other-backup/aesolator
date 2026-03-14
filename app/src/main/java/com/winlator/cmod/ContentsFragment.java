@@ -40,6 +40,7 @@ import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.contents.Downloader;
+import com.winlator.cmod.contents.GamehubFeedNormalizer;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
@@ -64,6 +65,8 @@ import java.util.concurrent.Executors;
 public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_WCPHUB = "wcphub";
     private static final String SOURCE_MODE_ARCHIVE = "archive";
+    private static final String SOURCE_MODE_GAMEHUB = "gamehub";
+    private static final int MAX_GAMEHUB_RELEASE_PAGES = 16;
 
     private enum ImportArchHint {
         UNKNOWN,
@@ -107,6 +110,8 @@ public class ContentsFragment extends Fragment {
     private String[] channelValues;
     private String[] archValues;
     private boolean suppressFilterCallbacks;
+    @Nullable
+    private ContentProfile pendingRemoteInstallProfile;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -283,6 +288,7 @@ public class ContentsFragment extends Fragment {
                         + getString(R.string.pls_make_sure_content_trustworthy) + " "
                         + getString(R.string.content_suffix_is_wcp_packed_xz_zst),
                 () -> {
+                    pendingRemoteInstallProfile = null;
                     Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType("*/*");
@@ -410,14 +416,20 @@ public class ContentsFragment extends Fragment {
                 return leftInstalled ? -1 : 1;
             }
 
-            int verCodeCompare = Integer.compare(right.verCode, left.verCode);
-            if (verCodeCompare != 0) return verCodeCompare;
-
             int sourceCompare = Integer.compare(resolveProfileSourcePriority(right), resolveProfileSourcePriority(left));
             if (sourceCompare != 0) return sourceCompare;
 
             int channelCompare = Integer.compare(resolveProfileChannelPriority(right), resolveProfileChannelPriority(left));
             if (channelCompare != 0) return channelCompare;
+
+            int verCodeCompare = Integer.compare(right.verCode, left.verCode);
+            if (verCodeCompare != 0) return verCodeCompare;
+
+            int archCompare = Integer.compare(resolveProfileArchPriority(right), resolveProfileArchPriority(left));
+            if (archCompare != 0) return archCompare;
+
+            int formatCompare = Integer.compare(resolveProfileFormatPriority(right), resolveProfileFormatPriority(left));
+            if (formatCompare != 0) return formatCompare;
 
             return buildProfileTitleLine(left).compareToIgnoreCase(buildProfileTitleLine(right));
         });
@@ -426,6 +438,12 @@ public class ContentsFragment extends Fragment {
     private int resolveProfileSourcePriority(ContentProfile profile) {
         String profileMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_ARCHIVE.equals(profileMode)) return 300;
+        if (SOURCE_MODE_GAMEHUB.equals(profileMode)) {
+            String sourceRepo = profile == null || profile.sourceRepo == null ? "" : profile.sourceRepo.trim().toLowerCase(Locale.US);
+            if (sourceRepo.contains("releases")) return 255;
+            if (sourceRepo.contains("raw")) return 245;
+            return 250;
+        }
         if (SOURCE_MODE_WCPHUB.equals(profileMode)) return 200;
         return 50;
     }
@@ -436,6 +454,20 @@ public class ContentsFragment extends Fragment {
         if (ContentProfile.CHANNEL_BETA.equalsIgnoreCase(channel)) return 20;
         if (ContentProfile.CHANNEL_NIGHTLY.equalsIgnoreCase(channel)) return 10;
         return 0;
+    }
+
+    private int resolveProfileArchPriority(ContentProfile profile) {
+        String archTag = resolveProfileArchTag(profile);
+        if ("x86_64".equalsIgnoreCase(archTag)) return 40;
+        if ("arm64ec".equalsIgnoreCase(archTag)) return 30;
+        if ("arm64".equalsIgnoreCase(archTag)) return 20;
+        if ("generic".equalsIgnoreCase(archTag)) return 10;
+        return 0;
+    }
+
+    private int resolveProfileFormatPriority(ContentProfile profile) {
+        if (profile == null) return 0;
+        return resolveRemotePackageFormatPriority(profile.remoteUrl);
     }
 
     private String resolveProfileSourceMode(ContentProfile profile) {
@@ -451,6 +483,7 @@ public class ContentsFragment extends Fragment {
             ArrayList<String> availableSourceModes = getAvailableSourceModesForType(profile.type);
             if (availableSourceModes.size() == 1) return availableSourceModes.get(0);
             if (availableSourceModes.contains(SOURCE_MODE_ARCHIVE)) return SOURCE_MODE_ARCHIVE;
+            if (availableSourceModes.contains(SOURCE_MODE_GAMEHUB)) return SOURCE_MODE_GAMEHUB;
             if (availableSourceModes.contains(SOURCE_MODE_WCPHUB)) return SOURCE_MODE_WCPHUB;
         }
         return "remote";
@@ -468,6 +501,11 @@ public class ContentsFragment extends Fragment {
                 || joined.contains("wcp-runtime-lanes") || joined.contains("wcp runtime lanes")
                 || joined.contains("ae.solator") || joined.contains("aesolator")) {
             return SOURCE_MODE_ARCHIVE;
+        }
+        if (joined.contains("gamehub-components")
+                || joined.contains("the412banner")
+                || joined.contains("gamehub")) {
+            return SOURCE_MODE_GAMEHUB;
         }
         if (joined.contains("open-wine-components")
                 || joined.contains("wcphub")
@@ -510,6 +548,8 @@ public class ContentsFragment extends Fragment {
         String sourceScope;
         if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceMode)) {
             sourceScope = getString(R.string.contents_lane_scope_archive);
+        } else if (SOURCE_MODE_GAMEHUB.equalsIgnoreCase(sourceMode)) {
+            sourceScope = getString(R.string.contents_lane_scope_gamehub);
         } else {
             sourceScope = getString(R.string.contents_lane_scope_wcphub);
         }
@@ -550,7 +590,11 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean supportsChannelFilter(ContentProfile.ContentType type) {
-        return type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+        return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
+                || type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
     }
@@ -690,6 +734,7 @@ public class ContentsFragment extends Fragment {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             ordered.add(SOURCE_MODE_ARCHIVE);
+            ordered.add(SOURCE_MODE_GAMEHUB);
             ordered.add(SOURCE_MODE_WCPHUB);
             return ordered;
         }
@@ -710,6 +755,7 @@ public class ContentsFragment extends Fragment {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
                 || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
+            ordered.add(SOURCE_MODE_GAMEHUB);
             ordered.add(SOURCE_MODE_WCPHUB);
             return ordered;
         }
@@ -720,6 +766,7 @@ public class ContentsFragment extends Fragment {
 
     private String getSourceEntryLabel(String sourceValue) {
         if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
+        if (SOURCE_MODE_GAMEHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_gamehub_feed);
         if (SOURCE_MODE_WCPHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
         return getString(R.string.contents_source_unknown);
     }
@@ -891,9 +938,7 @@ public class ContentsFragment extends Fragment {
             try {
                 ArrayList<String> payloads = new ArrayList<>();
                 HashSet<String> sources = new HashSet<>();
-                for (String sourceUrl : resolveSelectedSourceUrls(selectedSourceMode)) {
-                    String payload = addRemoteFeed(payloads, sources, sourceUrl);
-                }
+                appendSourceFeeds(payloads, sources, selectedSourceMode);
 
                 boolean usedBundledArchiveFallback = false;
                 if (payloads.isEmpty()) {
@@ -989,6 +1034,8 @@ public class ContentsFragment extends Fragment {
     private void applyRemoteProfilesForSelectedSourceMode(String selectedSourceMode, String json) {
         if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
             manager.setArchiveRemoteProfiles(json);
+        } else if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
+            manager.setRemoteProfiles(json);
         } else if (SOURCE_MODE_WCPHUB.equals(selectedSourceMode)) {
             manager.setHubRemoteProfiles(json);
         } else {
@@ -996,10 +1043,53 @@ public class ContentsFragment extends Fragment {
         }
     }
 
+    private void appendSourceFeeds(List<String> payloads, HashSet<String> seenSources, String selectedSourceMode) {
+        if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
+            appendGamehubReleaseFeeds(payloads, seenSources);
+            addRemoteFeed(payloads, seenSources, ContentsManager.REMOTE_GAMEHUB_COMPONENTS);
+            return;
+        }
+        for (String sourceUrl : resolveSelectedSourceUrls(selectedSourceMode)) {
+            addRemoteFeed(payloads, seenSources, sourceUrl);
+        }
+    }
+
+    private void appendGamehubReleaseFeeds(List<String> payloads, HashSet<String> seenSources) {
+        int emptyPages = 0;
+        for (int page = 1; page <= MAX_GAMEHUB_RELEASE_PAGES && emptyPages < 2; page++) {
+            String payload = addRemoteFeed(payloads, seenSources, buildGamehubReleasePageUrl(page));
+            if (isEmptyRemotePayload(payload)) {
+                emptyPages++;
+            } else {
+                emptyPages = 0;
+            }
+        }
+    }
+
+    private String buildGamehubReleasePageUrl(int page) {
+        int normalizedPage = Math.max(1, page);
+        return ContentsManager.REMOTE_GAMEHUB_RELEASES + "&page=" + normalizedPage;
+    }
+
+    private boolean isEmptyRemotePayload(@Nullable String payload) {
+        if (payload == null) return true;
+        String normalized = payload.trim();
+        if (normalized.isEmpty() || "[]".equals(normalized)) return true;
+        try {
+            return new JSONArray(normalized).length() == 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
         if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
             urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
+            return urls;
+        }
+        if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
+            urls.add(ContentsManager.REMOTE_GAMEHUB_COMPONENTS);
             return urls;
         }
         if (SOURCE_MODE_WCPHUB.equals(selectedSourceMode)) {
@@ -1022,11 +1112,22 @@ public class ContentsFragment extends Fragment {
         seenSources.add(normalized);
         String json = Downloader.downloadString(normalized);
         if (json != null && !json.trim().isEmpty()) {
-            String enriched = injectFeedSourceMetadata(json, normalized);
+            String enriched = normalizeRemoteFeedPayload(json, normalized);
             payloads.add(enriched);
             return enriched;
         }
         return null;
+    }
+
+    private String normalizeRemoteFeedPayload(String payload, String feedUrl) {
+        String normalizedFeedUrl = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
+        String normalizedPayload = payload;
+        if (normalizedFeedUrl.contains("gamehub-components/main/sp_winemu_all_components12.xml")) {
+            normalizedPayload = GamehubFeedNormalizer.normalizeComponentXml(payload);
+        } else if (normalizedFeedUrl.contains("api.github.com/repos/the412banner/gamehub-components/releases")) {
+            normalizedPayload = GamehubFeedNormalizer.normalizeReleaseFeed(payload);
+        }
+        return injectFeedSourceMetadata(normalizedPayload, feedUrl);
     }
 
     @Nullable
@@ -1068,6 +1169,7 @@ public class ContentsFragment extends Fragment {
     private String deriveFeedSourceLabel(String feedUrl) {
         String sourceId = deriveFeedSourceId(feedUrl);
         if (SOURCE_MODE_ARCHIVE.equals(sourceId)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_GAMEHUB.equals(sourceId)) return getString(R.string.contents_source_gamehub);
         if (SOURCE_MODE_WCPHUB.equals(sourceId)) return getString(R.string.contents_source_wcphub);
         try {
             URI uri = new URI(feedUrl);
@@ -1092,6 +1194,11 @@ public class ContentsFragment extends Fragment {
                 || lower.contains("ae.solator")
                 || lower.contains("aesolator")) {
             return SOURCE_MODE_ARCHIVE;
+        }
+        if (lower.contains("the412banner/gamehub-components")
+                || lower.contains("api.github.com/repos/the412banner/gamehub-components/releases")
+                || lower.contains("gamehub-components")) {
+            return SOURCE_MODE_GAMEHUB;
         }
         if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return SOURCE_MODE_WCPHUB;
         return "remote";
@@ -1172,6 +1279,10 @@ public class ContentsFragment extends Fragment {
         int currentChannelPriority = resolveChannelPriority(currentBest.optString(ContentProfile.MARK_CHANNEL, ""));
         if (candidateChannelPriority != currentChannelPriority) return candidateChannelPriority > currentChannelPriority;
 
+        int candidateFormatPriority = resolveRemotePackageFormatPriority(candidate.optString("remoteUrl", ""));
+        int currentFormatPriority = resolveRemotePackageFormatPriority(currentBest.optString("remoteUrl", ""));
+        if (candidateFormatPriority != currentFormatPriority) return candidateFormatPriority > currentFormatPriority;
+
         // Stable tie-breaker to avoid flicker.
         String candidateUrl = candidate.optString("remoteUrl", "");
         String currentUrl = currentBest.optString("remoteUrl", "");
@@ -1198,6 +1309,12 @@ public class ContentsFragment extends Fragment {
                 object.optString("remoteUrl", "")
         );
         if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return 300;
+        if (SOURCE_MODE_GAMEHUB.equals(sourceMode)) {
+            String sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim().toLowerCase(Locale.US);
+            if (sourceRepo.contains("releases")) return 255;
+            if (sourceRepo.contains("raw")) return 245;
+            return 250;
+        }
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return 200;
         String joined = (
                 object.optString(ContentProfile.MARK_SOURCE_REPO, "") + " " +
@@ -1243,6 +1360,8 @@ public class ContentsFragment extends Fragment {
             preloaderDialog.showOnUiThread(R.string.installing_content);
             try {
                 final Uri importUri = data.getData();
+                final ContentProfile remoteHint = pendingRemoteInstallProfile;
+                pendingRemoteInstallProfile = null;
                 if (importUri == null) {
                     preloaderDialog.closeOnUiThread();
                     AppUtils.showToast(getContext(), R.string.unable_to_import_profile);
@@ -1384,7 +1503,7 @@ public class ContentsFragment extends Fragment {
                         }
                     }
                 };
-                Executors.newSingleThreadExecutor().execute(() -> manager.extraContentFile(importUri, callback));
+                Executors.newSingleThreadExecutor().execute(() -> manager.extraContentFile(importUri, remoteHint, callback));
             } catch (Exception e) {
                 preloaderDialog.closeOnUiThread();
                 AppUtils.showToast(getContext(), R.string.unable_to_import_profile);
@@ -1408,6 +1527,7 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
         String sourceMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_GAMEHUB.equals(sourceMode)) return getString(R.string.contents_source_gamehub);
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return getString(R.string.contents_source_wcphub);
         if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
             return profile.sourceLabel.trim();
@@ -1482,6 +1602,11 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return "";
         String sourceMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return "";
+        if (SOURCE_MODE_GAMEHUB.equals(sourceMode) && profile.sourceRepo != null) {
+            String repo = profile.sourceRepo.trim().toLowerCase(Locale.US);
+            if (repo.contains("releases")) return getString(R.string.contents_source_gamehub_release_lane);
+            if (repo.contains("raw")) return getString(R.string.contents_source_gamehub_raw_lane);
+        }
         if (SOURCE_MODE_ARCHIVE.equals(sourceMode) && profile.sourceRepo != null) {
             String repo = profile.sourceRepo.trim().toLowerCase(Locale.US);
             if (repo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
@@ -1494,6 +1619,8 @@ public class ContentsFragment extends Fragment {
         if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
         if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_archive_graphics_lane);
         if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub_lane);
+        if (lowerRepo.contains("gamehub-components") && lowerRepo.contains("releases")) return getString(R.string.contents_source_gamehub_release_lane);
+        if (lowerRepo.contains("gamehub-components") && lowerRepo.contains("raw")) return getString(R.string.contents_source_gamehub_raw_lane);
         return repo;
     }
 
@@ -1537,6 +1664,13 @@ public class ContentsFragment extends Fragment {
         if (fileName == null) return null;
         String lower = fileName.trim().toLowerCase(Locale.US);
         if (lower.isEmpty()) return null;
+        if (lower.contains("vkd3d")) return ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
+        if (lower.contains("dxvk")) return ContentProfile.ContentType.CONTENT_TYPE_DXVK;
+        if (lower.contains("wowbox64") || (lower.contains("wow64") && lower.contains("box64"))) {
+            return ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64;
+        }
+        if (lower.contains("box64")) return ContentProfile.ContentType.CONTENT_TYPE_BOX64;
+        if (lower.contains("fex")) return ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
         boolean containsWine = lower.contains("wine");
         boolean containsProton = lower.contains("proton");
         if (containsProton && !containsWine) return ContentProfile.ContentType.CONTENT_TYPE_PROTON;
@@ -1625,6 +1759,15 @@ public class ContentsFragment extends Fragment {
     private int withAlpha(int color, int alpha) {
         int clampedAlpha = Math.max(0, Math.min(255, alpha));
         return (color & 0x00ffffff) | (clampedAlpha << 24);
+    }
+
+    private int resolveRemotePackageFormatPriority(String remoteUrl) {
+        String lower = remoteUrl == null ? "" : remoteUrl.trim().toLowerCase(Locale.US);
+        if (lower.endsWith(".wcp") || lower.endsWith(".wcp.xz") || lower.endsWith(".wcp.zst")) return 40;
+        if (lower.endsWith(".zip")) return 30;
+        if (lower.endsWith(".txz") || lower.endsWith(".tar.xz")) return 20;
+        if (lower.endsWith(".tzst") || lower.endsWith(".tar.zst")) return 10;
+        return 0;
     }
 
     private int dpToPx(float dp) {
@@ -1848,6 +1991,7 @@ public class ContentsFragment extends Fragment {
                                         "sha256_verified", !checksumRequired || finalChecksumVerified
                                 )
                         );
+                        pendingRemoteInstallProfile = profile;
                         Intent intent = new Intent();
                         intent.setData(Uri.parse(output.getAbsolutePath()));
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);

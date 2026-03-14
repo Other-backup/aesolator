@@ -11,6 +11,18 @@ Second autonomous developer lane for `aesolator`:
 - close remaining `Contents` UX and device-validation gaps,
 - report deltas clearly to the first developer.
 
+## Execution Policy
+
+- Convert multi-goal user messages into one ordered backlog and keep that order
+  visible instead of bouncing between fresh requests ad hoc.
+- Default lane order for this repo:
+  requested product/UI/content work first, documentation sync second,
+  debugging/forensics third.
+- Break the order only when a blocker crash/build/runtime defect prevents the
+  next planned task from moving.
+- Every forced reorder must be logged in the reflective journal with:
+  blocker, reason, scope impact, and explicit return point.
+
 ## Current Priorities
 
 1. `New Container` device-led UX closure
@@ -30,6 +42,14 @@ Second autonomous developer lane for `aesolator`:
     the source selector is explicitly switched away from archive
   - keep content badges semantically aligned with the selected family instead
     of leaking `Proton` naming into non-Wine package rows like `VKD3D`
+  - expand GameHub release ingestion beyond a single page and sort the visible
+    releases by source lane, channel, version, architecture, and package format
+  - keep `Proton` and `Wine` routed through verified runtime sources only until
+    a donor feed exposes complete packaged runtimes instead of raw skeleton
+    payloads
+  - audit `BannersComponentInjector` as a donor for full package-link harvest,
+    release-tag browsing, search/sort UX, and release-notes surfaces without
+    collapsing `Ae.solator` provenance rules
 3. Dashboard adaptive polish
    - verify the new landscape density pass on a stable device session
    - keep the main menu readable as a control surface, not a stretched portrait
@@ -51,6 +71,11 @@ Second autonomous developer lane for `aesolator`:
 7. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
+8. Donor and runtime reverse-engineering
+   - inspect `The412Banner/BannersComponentInjector` for safe source/feed
+     improvements and document every borrowed behavior before integration
+   - map `imagefs` structure, libraries, overlays, and runtime patch points in
+     detail before changing rootfs-related install logic
 
 ## Phase Plan
 
@@ -71,6 +96,23 @@ Second autonomous developer lane for `aesolator`:
 - prepare ADB-oriented verification checklist from existing docs
 - identify which items remain code-only vs device-only
 
+### Phase 4: Donor Source Harvest
+
+- audit `BannersComponentInjector` source/release UX and package-feed model
+- port only contract-safe improvements:
+  full release pagination, better search/sort, richer release metadata, and
+  stronger package-link normalization
+- verify any donor runtime package assumptions against actual extractable
+  payload structure before exposing them in `Contents`
+
+### Phase 5: ImageFS Reverse Map
+
+- document base `imagefs` layout, shipped libraries, runtime overlays, and
+  patch application points
+- separate base rootfs facts from container-time prefix/runtime mutation
+- identify which parts of `imagefs` are safe to optimize in-app versus those
+  owned by runtime-lane artifacts
+
 ## Current Open Risks
 
 - `New Container` now opens on-device after the XR lazy-load split, but the
@@ -85,6 +127,12 @@ Second autonomous developer lane for `aesolator`:
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
   across source switching and install actions.
+- GameHub feed ingestion now includes paginated release polling and stronger
+  visible ordering, but it still needs a live `Contents` device pass to confirm
+  that nightly/stable and architecture variants render as intended in the UI.
+- `BannersComponentInjector` has not yet been fully harvested into a local
+  donor-notes contract, so there is still a risk of missing better package-link
+  sources or richer release browsing behavior already solved there.
 - `WCPHub` source parsing no longer drops overlapping families at ingest time,
   but the integrated device pass still needs one more live confirmation for
   list rendering and install actions after the parser fix.
