@@ -976,7 +976,24 @@ public class ContainerDetailFragment extends Fragment {
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
-                new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, null).show();
+                try {
+                    new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, null).show();
+                } catch (Throwable t) {
+                    Log.e(TAG, "Failed to open graphics driver config dialog", t);
+                    ForensicLogger.error(
+                            context,
+                            "GRAPHICS_DRIVER_CONFIG_OPEN_FAIL",
+                            null,
+                            "graphics_config",
+                            "graphics_driver_config_open_failed",
+                            t,
+                            ForensicLogger.fields(
+                                    "graphics_driver", graphicsDriver,
+                                    "config_tag", String.valueOf(vGraphicsDriverConfig.getTag())
+                            )
+                    );
+                    AppUtils.showToast(context, R.string.unable_to_open_graphics_driver_configuration);
+                }
             });
             vGraphicsDriverConfig.setVisibility(View.VISIBLE);
         };

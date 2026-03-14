@@ -938,6 +938,7 @@
     <string name="enable_shizuku_capture">Enable Shizuku forensic capture (when available)</string>
     <string name="copy_capture_command">Copy ADB capture</string>
     <string name="unable_to_create_container">Unable to create container.</string>
+    <string name="unable_to_open_graphics_driver_configuration">Unable to open graphics driver configuration.</string>
     <string name="install_runtime_before_container">Install a Wine or Proton runtime before creating a container.</string>
     <string name="install_runtime">Install Runtime</string>
     <string name="diagnostics_forensic_report_privacy_warning">A forensic issue draft will open on GitHub. The report body includes summary only; full logs stay in bundle files.</string>

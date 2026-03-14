@@ -172,11 +172,11 @@ Second autonomous developer lane for `aesolator`:
 - The shared selector/switch/preference geometry pass is now built and
   installed, but many secondary dialogs still have only code-level validation
   rather than screenshot proof on the target device.
-- `Graphics Driver Configuration` had its extension probe stubbed to an empty
-  array, which forced the UI to `0` extensions. The runtime probe path is now
-  restored through `GPUInformation.enumerateExtensions()`, but it still needs a
-  fresh on-device confirmation once the current install overlay/activity churn
-  settles down.
+- `Graphics Driver Configuration` no longer crashes on open and no longer
+  renders an empty extensions line: it now uses a safe catalog-backed
+  extension source on device instead of the old native probe path that could
+  crash inside `libwinlator.so`. Remaining risk is quality of the extension
+  catalog itself, not dialog stability or selector presence.
 - The `New Container` boolean-control/env-var cleanup is build-complete and
   installed, but stable screenshot proof of the deeper tabs is still limited by
   shared-device foreground hijacking during ADB capture.

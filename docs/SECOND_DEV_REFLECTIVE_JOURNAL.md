@@ -947,3 +947,33 @@
 - Next step: keep the richer forensic pair for future runtime regressions, and
   continue the same device-led closure pattern for donor `DXVK`, `VKD3D`,
   `Vulkan SDK`, and `dgVoodoo` install-to-consumer flows.
+
+### Entry 47: Graphics-driver dialog crash removal and fallback extension catalog
+
+- Goal: stop `Graphics Driver Configuration` from crashing on open and restore
+  a usable extensions selector instead of the empty `0 extensions` state.
+- Context: live device forensics on March 14, 2026 showed a native `SIGSEGV`
+  while opening the dialog. The crash stack led through
+  `GraphicsDriverConfigDialog.queryAvailableExtensions()` into
+  `GPUInformation.<clinit>()`, which loads `libwinlator.so`. That made the
+  dialog structurally unsafe: simply rendering the extensions row could crash
+  the process before the user interacted with anything.
+- Decision: remove the native extension probe from the dialog open path and
+  replace it with a catalog-backed fallback (`VulkanExtensionCatalog`) built
+  from shipped Vulkan extension names. Keep saved blacklist entries merged into
+  the available set, harden config parsing against missing tags/defaults, and
+  log a dedicated `GRAPHICS_DRIVER_EXTENSION_CATALOG` forensic event so the UI
+  data source is explicit on-device.
+- Tradeoff: the dialog now shows a stable, broad fallback catalog rather than a
+  runtime-specific extension probe. That sacrifices exact per-driver fidelity
+  for reliability, but it is the correct short-term contract because a config
+  dialog must not crash merely to enumerate optional extensions.
+- Verification: rebuilt and reinstalled the APK, opened `New Container` on the
+  device, tapped `Graphics Driver -> Configure`, and captured a live screenshot
+  showing `Available Extensions` populated with `316 Extensions`. `adb logcat
+  -b crash` remained empty for that interaction, while app logs recorded
+  `GRAPHICS_DRIVER_CONFIG_OPEN` and `GRAPHICS_DRIVER_EXTENSION_CATALOG` with
+  `catalog_source:"fallback_catalog"` and `extension_count:316`.
+- Next step: keep the dialog on the safe catalog path, and later improve the
+  catalog quality only if a non-crashing, off-path probe can provide verified
+  driver-specific filtering without reintroducing a native open-path tail.

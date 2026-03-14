@@ -89,6 +89,10 @@ runtime-binding, documentation alignment, and repository contract integrity.
   before changing code:
   `logcat`, in-app forensic jsonl, current screenshot/UI dump, and a
   `run-as` snapshot of `files/contents` / relevant app-private state.
+- Configuration dialogs must not depend on crash-prone native probes during
+  open/render. If runtime/native discovery is unstable, move the heavy probe
+  out of the dialog path, use a safe cached or catalog-backed fallback, and
+  log which data source populated the UI.
 - When simulating a device flow such as `Contents -> install -> New Container`,
   do not stop at the first symptom; carry the pass through until the expected
   local package root, UI state, and downstream consumer (`SWineVersion`,

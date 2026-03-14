@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -22,9 +23,9 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
-import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.VulkanExtensionCatalog;
 import com.winlator.cmod.widget.MultiSelectionComboBox;
 
 import org.json.JSONArray;
@@ -32,7 +33,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
@@ -149,36 +149,34 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         return graphicsDriverConfig;
     }
 
-    private String[] queryAvailableExtensions(String driver, Context context) {
-        if (context == null || driver == null) return new String[0];
+    private String[] queryAvailableExtensions(String driver, @Nullable String blacklistedCsv) {
+        if (driver == null) return new String[0];
         String normalizedDriver = driver.trim();
         if (normalizedDriver.isEmpty() || AppUtils.isMissingComponentValue(normalizedDriver)) {
             return new String[0];
         }
 
-        try {
-            // Ensure built-in driver bundles are materialized before the native
-            // probe asks the wrapper for the extension list.
-            AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(context);
-            adrenotoolsManager.getDriverPackageInfo(normalizedDriver);
+        TreeSet<String> orderedExtensions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        mergeExtensions(orderedExtensions, VulkanExtensionCatalog.all());
+        mergeExtensions(orderedExtensions, splitExtensions(blacklistedCsv));
+        return orderedExtensions.toArray(new String[0]);
+    }
 
-            String[] rawExtensions = GPUInformation.enumerateExtensions(normalizedDriver, context);
-            if (rawExtensions == null || rawExtensions.length == 0) {
-                return new String[0];
-            }
+    private void mergeExtensions(TreeSet<String> orderedExtensions, String[] extensions) {
+        if (orderedExtensions == null || extensions == null) return;
+        for (String extension : extensions) {
+            if (extension == null) continue;
+            String trimmed = extension.trim();
+            if (trimmed.isEmpty() || !trimmed.startsWith("VK_")) continue;
+            orderedExtensions.add(trimmed);
+        }
+    }
 
-            TreeSet<String> orderedExtensions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (String extension : rawExtensions) {
-                if (extension == null) continue;
-                String trimmed = extension.trim();
-                if (trimmed.isEmpty() || !trimmed.startsWith("VK_")) continue;
-                orderedExtensions.add(trimmed);
-            }
-            return orderedExtensions.toArray(new String[0]);
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to enumerate driver extensions for " + normalizedDriver, t);
+    private String[] splitExtensions(@Nullable String extensionsCsv) {
+        if (extensionsCsv == null || extensionsCsv.trim().isEmpty()) {
             return new String[0];
         }
+        return extensionsCsv.split("\\s*,\\s*");
     }
 
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
@@ -201,7 +199,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         setIcon(R.drawable.ae_icon_settings);
         setTitle(anchor.getContext().getString(R.string.graphics_driver_configuration));
 
-        String graphicsDriverConfig = anchor.getTag().toString();
+        Object anchorTag = anchor.getTag();
+        String graphicsDriverConfig = anchorTag instanceof String
+                ? (String) anchorTag
+                : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
 
         sVersion = findViewById(R.id.SGraphicsDriverVersion);
         sVulkanVersion = findViewById(R.id.SGraphicsDriverVulkanVersion);
@@ -217,20 +218,46 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
         applyPopupTheme(anchor.getContext());
 
-        HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
+        HashMap<String, String> config = parseGraphicsDriverConfigWithDefaults(graphicsDriverConfig);
 
-        String vulkanVersion = config.get("vulkanVersion");
-        String initialVersion = config.get("version");
-        String blExtensions = config.get("blacklistedExtensions");
-        String gpuName = config.get("gpuName");
-        String maxDeviceMemory = config.get("maxDeviceMemory");
-        String syncFrame = config.get("syncFrame");
-        String disablePresentWait = config.get("disablePresentWait");
-        String presentMode = config.get("presentMode");
-        String resourceType = config.get("resourceType");
-        String bcnEmulation = config.get("bcnEmulation");
-        String bcnEmulationType = config.get("bcnEmulationType");
-        String bcnEmulationCache = config.get("bcnEmulationCache");
+        String vulkanVersion = getConfigValue(config, "vulkanVersion", "1.4");
+        String initialVersion = getConfigValue(config, "version", DefaultVersion.WRAPPER);
+        String blExtensions = getConfigValue(config, "blacklistedExtensions", "");
+        String gpuName = getConfigValue(config, "gpuName", "Device");
+        String maxDeviceMemory = getConfigValue(config, "maxDeviceMemory", "0");
+        String syncFrame = getConfigValue(config, "syncFrame", "0");
+        String disablePresentWait = getConfigValue(config, "disablePresentWait", "0");
+        String presentMode = getConfigValue(config, "presentMode", "mailbox");
+        String resourceType = getConfigValue(config, "resourceType", "auto");
+        String bcnEmulation = getConfigValue(config, "bcnEmulation", "auto");
+        String bcnEmulationType = getConfigValue(config, "bcnEmulationType", "compute");
+        String bcnEmulationCache = getConfigValue(config, "bcnEmulationCache", "0");
+        selectedVersion = initialVersion;
+        selectedVulkanVersion = vulkanVersion;
+        selectedGPUName = gpuName;
+        selectedDeviceMemory = maxDeviceMemory;
+        selectedPresentMode = presentMode;
+        selectedResourceType = resourceType;
+        selectedBCnEmulation = bcnEmulation;
+        selectedBCnEmulationType = bcnEmulationType;
+        isBCnCacheEnabled = bcnEmulationCache;
+        isSyncFrame = syncFrame;
+        isDisablePresentWait = disablePresentWait;
+
+        ForensicLogger.logEvent(
+                anchor.getContext(),
+                "info",
+                "GRAPHICS_DRIVER_CONFIG_OPEN",
+                null,
+                "graphics_config",
+                "graphics_driver_config_open",
+                ForensicLogger.fields(
+                        "graphics_driver", graphicsDriver,
+                        "config_tag_present", anchorTag != null,
+                        "initial_version", initialVersion,
+                        "vulkan_api", vulkanVersion
+                )
+        );
 
         // Update the selectedVersion whenever the user selects a different version
         sVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -241,18 +268,27 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                     mscAvailableExtensions.setItems(new String[0], "Extensions");
                     return;
                 }
-                String[] availableExtensions = queryAvailableExtensions(selectedVersion, anchor.getContext());
-                String blacklistedExtensions = "";
+                String initialBlacklist = selectedVersion.equals(initialVersion) ? blExtensions : "";
+                String[] availableExtensions = queryAvailableExtensions(selectedVersion, initialBlacklist);
+                ForensicLogger.logEvent(
+                        anchor.getContext(),
+                        "info",
+                        "GRAPHICS_DRIVER_EXTENSION_CATALOG",
+                        null,
+                        "graphics_config",
+                        "graphics_driver_extension_catalog",
+                        ForensicLogger.fields(
+                                "graphics_driver", graphicsDriver,
+                                "driver_version", selectedVersion,
+                                "catalog_source", "fallback_catalog",
+                                "extension_count", availableExtensions.length
+                        )
+                );
 
                 mscAvailableExtensions.setItems(availableExtensions, "Extensions");
                 mscAvailableExtensions.setSelectedItems(availableExtensions);
 
-                if(selectedVersion.equals(initialVersion))
-                    blacklistedExtensions = blExtensions;
-
-                String[] bl = blacklistedExtensions.split("\\,");
-
-                for (String extension : bl) {
+                for (String extension : splitExtensions(initialBlacklist)) {
                     mscAvailableExtensions.unsetSelectedItem(extension);
                 }
             }
@@ -362,14 +398,12 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         });
 
-        isSyncFrame = syncFrame;
-        cbSyncFrame.setChecked(isSyncFrame.equals("1") ? true : false);
+        cbSyncFrame.setChecked("1".equals(isSyncFrame));
         cbSyncFrame.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isSyncFrame = isChecked ? "1" : "0";
         });
 
-        isDisablePresentWait = disablePresentWait;
-        cbDisablePresentWait.setChecked(isDisablePresentWait.equals("1") ? true : false);
+        cbDisablePresentWait.setChecked("1".equals(isDisablePresentWait));
         cbDisablePresentWait.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isDisablePresentWait = isChecked ? "1" : "0";
         });
@@ -595,6 +629,27 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private boolean isDarkMode(Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         return preferences.getBoolean("dark_mode", false);
+    }
+
+    private HashMap<String, String> parseGraphicsDriverConfigWithDefaults(@Nullable String rawConfig) {
+        HashMap<String, String> merged = parseGraphicsDriverConfig(Container.DEFAULT_GRAPHICSDRIVERCONFIG);
+        if (rawConfig == null || rawConfig.trim().isEmpty()) {
+            return merged;
+        }
+        HashMap<String, String> actual = parseGraphicsDriverConfig(rawConfig);
+        for (Map.Entry<String, String> entry : actual.entrySet()) {
+            if (entry.getKey() == null) continue;
+            merged.put(entry.getKey(), entry.getValue());
+        }
+        return merged;
+    }
+
+    private static String getConfigValue(HashMap<String, String> config, String key, String fallback) {
+        if (config == null || key == null) return fallback;
+        String value = config.get(key);
+        if (value == null) return fallback;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? fallback : normalized;
     }
 
 }

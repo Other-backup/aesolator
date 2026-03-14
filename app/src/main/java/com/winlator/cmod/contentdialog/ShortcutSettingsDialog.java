@@ -27,6 +27,7 @@ import com.winlator.cmod.ContainerDetailFragment;
 import com.winlator.cmod.R;
 import com.winlator.cmod.ShortcutsFragment;
 import com.winlator.cmod.box64.Box64PresetManager;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
@@ -149,7 +150,11 @@ public class ShortcutSettingsDialog extends ContentDialog {
         contentsManager.syncContents();
 
         final View vGraphicsDriverConfig = findViewById(R.id.BTGraphicsDriverConfig);
-        vGraphicsDriverConfig.setTag(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
+        String initialGraphicsDriverConfig = shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig());
+        if (initialGraphicsDriverConfig == null || initialGraphicsDriverConfig.trim().isEmpty()) {
+            initialGraphicsDriverConfig = Container.DEFAULT_GRAPHICSDRIVERCONFIG;
+        }
+        vGraphicsDriverConfig.setTag(initialGraphicsDriverConfig);
 
         final View vDXWrapperConfig = findViewById(R.id.BTDXWrapperConfig);
         vDXWrapperConfig.setTag(shortcut.getExtra("dxwrapperConfig", shortcut.container.getDXWrapperConfig()));
@@ -628,7 +633,10 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
             if (renamingSuccess) {
                 String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
-                String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
+                Object graphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
+                String graphicsDriverConfig = graphicsDriverConfigTag instanceof String
+                        ? (String) graphicsDriverConfigTag
+                        : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
                 String dxwrapperConfig = vDXWrapperConfig.getTag().toString();
                 String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
@@ -1227,12 +1235,33 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
         Runnable update = () -> {
             String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
-            String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
+            Object graphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
+            String graphicsDriverConfig = graphicsDriverConfigTag instanceof String
+                    ? (String) graphicsDriverConfigTag
+                    : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
 
             tvGraphicsDriverVersion.setText(GraphicsDriverConfigDialog.getVersion(graphicsDriverConfig));
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
-                new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, tvGraphicsDriverVersion).show();
+                try {
+                    new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, tvGraphicsDriverVersion).show();
+                } catch (Throwable t) {
+                    Log.e("ShortcutSettingsDialog", "Failed to open graphics driver config dialog", t);
+                    ForensicLogger.error(
+                            context,
+                            "GRAPHICS_DRIVER_CONFIG_OPEN_FAIL",
+                            null,
+                            "graphics_config",
+                            "graphics_driver_config_open_failed",
+                            t,
+                            ForensicLogger.fields(
+                                    "graphics_driver", graphicsDriver,
+                                    "config_tag", String.valueOf(vGraphicsDriverConfig.getTag()),
+                                    "scope", "shortcut"
+                            )
+                    );
+                    AppUtils.showToast(context, R.string.unable_to_open_graphics_driver_configuration);
+                }
             });
 
             ArrayList<String> items = new ArrayList<>();
