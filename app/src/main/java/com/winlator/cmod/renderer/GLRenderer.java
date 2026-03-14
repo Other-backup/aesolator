@@ -286,6 +286,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
         try (XLock lock = xServer.lock(XServer.Lockable.DRAWABLE_MANAGER)) {
             Window pointWindow = xServer.inputDeviceManager.getPointWindow();
+            if (!shouldRenderCompositorCursor(pointWindow)) return;
+
             Cursor cursor = pointWindow != null ? pointWindow.attributes.getCursor() : null;
             short x = xServer.pointer.getClampedX();
             short y = xServer.pointer.getClampedY();
@@ -293,30 +295,22 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             if (cursor != null) {
                 if (cursor.isVisible()) renderDrawable(cursor.cursorImage, x - cursor.hotSpotX, y - cursor.hotSpotY, cursorMaterial);
             }
-            else if (shouldRenderRootCursorFallback(pointWindow)) {
+            else {
                 renderDrawable(rootCursorDrawable, x, y, cursorMaterial);
             }
         }
-
-        quadVertices.disable();
+        finally {
+            quadVertices.disable();
+        }
     }
 
-    private boolean shouldRenderRootCursorFallback(Window pointWindow) {
+    private boolean shouldRenderCompositorCursor(Window pointWindow) {
         if (!desktopCursorOwnershipMode) return true;
 
         Window ownerWindow = resolveCursorOwnerWindow(pointWindow);
         if (ownerWindow == null || ownerWindow == xServer.windowManager.rootWindow) return true;
         if (!ownerWindow.isApplicationWindow()) return true;
-
-        String className = ownerWindow.getClassName();
-        String lowerClassName = className != null ? className.toLowerCase(Locale.ROOT) : "";
-        if (lowerClassName.contains("explorer.exe")
-                || lowerClassName.contains("progman")
-                || lowerClassName.contains("shell_traywnd")
-                || lowerClassName.contains("workerw")) {
-            return true;
-        }
-
+        if (isDesktopShellWindow(ownerWindow)) return true;
         return !isFullscreenLike(ownerWindow);
     }
 
@@ -335,6 +329,16 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         float widthCoverage = window.getWidth() / (float) xServer.screenInfo.width;
         float heightCoverage = window.getHeight() / (float) xServer.screenInfo.height;
         return widthCoverage >= 0.9f && heightCoverage >= 0.9f;
+    }
+
+    private boolean isDesktopShellWindow(Window window) {
+        if (window == null) return false;
+        String className = window.getClassName();
+        String lowerClassName = className != null ? className.toLowerCase(Locale.ROOT) : "";
+        return lowerClassName.contains("explorer.exe")
+                || lowerClassName.contains("progman")
+                || lowerClassName.contains("shell_traywnd")
+                || lowerClassName.contains("workerw");
     }
 
     public void toggleFullscreen() {

@@ -1205,3 +1205,60 @@
   delta-based.
 - Next step: rebuild, reinstall, and run a manual desktop pass to verify click,
   drag, and repeated interaction quality under the restored trackpad contract.
+
+### Entry 55: Trackpad move queue restored without giving up the cursor contract
+
+- Goal: keep the restored trackpad semantics while removing the `MotionEvent`
+  ANR that came back once direct pointer injection was moved onto the UI path.
+- Context: after switching back from the hybrid tap-to-hit model, the user
+  correctly reported that the desktop could freeze again under heavier cursor
+  movement. Fresh forensics showed the process in `D` state and
+  `InputDispatcher` waiting on `MotionEvent` delivery for
+  `XServerDisplayActivity`, which pointed back to the same choke point:
+  high-frequency pointer moves were again being injected synchronously on the
+  active touch path.
+- Decision: keep the no-shortcut desktop contract as `cursor_trackpad`, but
+  reintroduce a coalesced background move queue and a separate button queue in
+  `TouchpadView`. The fix preserves trackpad semantics by maintaining a
+  logical cursor position, synchronizing button presses to that logical cursor,
+  and coalescing move bursts off the UI thread instead of serializing every
+  move directly through `MotionEvent`.
+- Tradeoff: this is more stateful than the raw donor path, but it isolates the
+  UI-thread regression we actually observed. The simpler direct path had already
+  proven itself as the ANR trigger on this device, so matching it blindly was
+  no longer defensible.
+- Verification: the patched build compiles and installs cleanly, and the new
+  short stress pass no longer reproduced the old process-wide `D` state in the
+  synthetic run. Fresh screenshot proof remains contaminated by the shared
+  Termux foreground, so closure currently rests on compile/install plus input
+  and dispatcher evidence rather than clean device captures.
+- Next step: keep the coalesced queue, then verify real manual drag/repeat-click
+  quality the next time the phone can stay on `XServerDisplayActivity` long
+  enough for an uncontaminated pass.
+
+### Entry 56: Duplicate desktop cursor fix moved from fallback-only to full compositor ownership
+
+- Goal: stop the desktop from painting a second cursor layer on top of a guest
+  window that already owns its own visible pointer.
+- Context: the previous ownership split only suppressed `rootCursorDrawable`.
+  That was too narrow. A fullscreen-like guest window can still surface an X
+  cursor through `pointWindow.attributes.getCursor()`, so the user can still
+  see two cursors even after the root fallback is hidden. The report
+  "one from the container, one from x11" matched that exact blind spot.
+- Decision: move the ownership guard to the top of `GLRenderer.renderCursor()`.
+  In desktop owner mode, fullscreen-like non-shell app windows now suppress the
+  entire compositor cursor path, including both the ordinary X cursor layer and
+  the old root fallback. Desktop shell surfaces (`explorer.exe`, `progman`,
+  `shell_traywnd`, `workerw`) still keep the compositor cursor so the shell
+  remains navigable.
+- Tradeoff: owner classification is still heuristic. That is acceptable because
+  the previous behavior was deterministically wrong for guest-owned cursors.
+  The risk profile is now "maybe classify a window conservatively" instead of
+  "always draw a duplicate cursor in the bad case."
+- Verification: build/install passed. Short launch forensics confirm
+  `XServerDisplayActivity` still starts cleanly; screenshot-based visual proof
+  is currently invalidated by `Termux` retaking foreground on this shared
+  device before a clean desktop capture can be taken.
+- Next step: validate the new compositor suppression in a stable manual pass,
+  then narrow the shell/app heuristic only if a specific window class still
+  duplicates or loses its cursor.

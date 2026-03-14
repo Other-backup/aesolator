@@ -28,6 +28,9 @@ import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class TouchpadView extends View {
     private static final String PREF_STRICT_GESTURE_FSM = "touchpad_strict_gesture_fsm";
     private static final byte MAX_FINGERS = 4;
@@ -70,6 +73,14 @@ public class TouchpadView extends View {
     private short scrollStepDistance = DEFAULT_SCROLL_STEP_DISTANCE;
     private @Nullable Boolean strictGestureFsmOverride = null;
     private boolean tapToClickMovesCursor = false;
+    private final ExecutorService pointerMoveExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService pointerButtonExecutor = Executors.newSingleThreadExecutor();
+    private final Object pendingMoveLock = new Object();
+    private boolean pendingMoveScheduled = false;
+    private int pendingMoveX = 0;
+    private int pendingMoveY = 0;
+    private int logicalCursorX = 0;
+    private int logicalCursorY = 0;
 
     private enum GestureMode {
         NONE,
@@ -98,6 +109,8 @@ public class TouchpadView extends View {
         updateXform(AppUtils.getScreenWidth(), AppUtils.getScreenHeight(), xServer.screenInfo.width, xServer.screenInfo.height);
         // Initialize SharedPreferences here
         this.preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        logicalCursorX = xServer.pointer.getClampedX();
+        logicalCursorY = xServer.pointer.getClampedY();
 
         this.timeoutHandler = timeoutHandler; // Store the reference to timeout handler
         this.hideControlsRunnable = hideControlsRunnable; // Store the reference to the hide controls runnable
@@ -123,6 +136,8 @@ public class TouchpadView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
+        pointerMoveExecutor.shutdownNow();
+        pointerButtonExecutor.shutdownNow();
         super.onDetachedFromWindow();
     }
 
@@ -427,8 +442,11 @@ public class TouchpadView extends View {
     }
 
     private void clearPendingPointerMove() {
-        // The desktop pointer path now dispatches moves directly, so there is
-        // no queued move backlog to drain here.
+        synchronized (pendingMoveLock) {
+            pendingMoveScheduled = false;
+            pendingMoveX = logicalCursorX;
+            pendingMoveY = logicalCursorY;
+        }
     }
 
     private void dropMissingFinger(Finger finger) {
@@ -572,11 +590,16 @@ public class TouchpadView extends View {
         if (simTouchScreen || xServer.isRelativeMouseMovement()) return false;
         if (!pointerButtonLeftEnabled || fingerPointerButtonLeft != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) return false;
         clearPendingPointerMove();
-        if (moveCursorFirst) {
-            xServer.injectPointerMove(x, y);
-        }
-        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-        postDelayed(() -> xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT), TAP_TO_CLICK_PRESS_MS);
+        pointerButtonExecutor.execute(() -> {
+            if (moveCursorFirst) {
+                setLogicalCursorPositionInternal(x, y);
+                xServer.injectPointerMove(logicalCursorX, logicalCursorY);
+            } else {
+                syncLogicalCursorToServer();
+            }
+            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+        });
+        postDelayed(() -> dispatchPointerButtonRelease(Pointer.Button.BUTTON_LEFT), TAP_TO_CLICK_PRESS_MS);
         return true;
     }
 
@@ -722,19 +745,88 @@ public class TouchpadView extends View {
     }
 
     private void dispatchPointerMoveAbsolute(int x, int y) {
-        xServer.injectPointerMove(x, y);
+        if (simTouchScreen || xServer.isRelativeMouseMovement()) {
+            xServer.injectPointerMove(x, y);
+            setLogicalCursorPositionInternal(x, y);
+            return;
+        }
+
+        synchronized (pendingMoveLock) {
+            setLogicalCursorPositionInternal(x, y);
+            pendingMoveX = logicalCursorX;
+            pendingMoveY = logicalCursorY;
+            if (pendingMoveScheduled) return;
+            pendingMoveScheduled = true;
+        }
+        pointerMoveExecutor.execute(this::drainPendingPointerMove);
     }
 
     private void dispatchPointerMoveDelta(int dx, int dy) {
-        xServer.injectPointerMoveDelta(dx, dy);
+        if (simTouchScreen || xServer.isRelativeMouseMovement()) {
+            xServer.injectPointerMoveDelta(dx, dy);
+            setLogicalCursorPositionInternal(logicalCursorX + dx, logicalCursorY + dy);
+            return;
+        }
+
+        synchronized (pendingMoveLock) {
+            setLogicalCursorPositionInternal(logicalCursorX + dx, logicalCursorY + dy);
+            pendingMoveX = logicalCursorX;
+            pendingMoveY = logicalCursorY;
+            if (pendingMoveScheduled) return;
+            pendingMoveScheduled = true;
+        }
+        pointerMoveExecutor.execute(this::drainPendingPointerMove);
     }
 
     private void dispatchPointerButtonPress(Pointer.Button button) {
-        xServer.injectPointerButtonPress(button);
+        pointerButtonExecutor.execute(() -> {
+            if (!simTouchScreen && !xServer.isRelativeMouseMovement()) {
+                syncLogicalCursorToServer();
+            }
+            xServer.injectPointerButtonPress(button);
+        });
     }
 
     private void dispatchPointerButtonRelease(Pointer.Button button) {
-        xServer.injectPointerButtonRelease(button);
+        pointerButtonExecutor.execute(() -> xServer.injectPointerButtonRelease(button));
+    }
+
+    private void drainPendingPointerMove() {
+        while (true) {
+            final int x;
+            final int y;
+            synchronized (pendingMoveLock) {
+                x = pendingMoveX;
+                y = pendingMoveY;
+                pendingMoveScheduled = false;
+            }
+
+            xServer.injectPointerMove(x, y);
+
+            synchronized (pendingMoveLock) {
+                if (pendingMoveX == x && pendingMoveY == y) {
+                    return;
+                }
+                pendingMoveScheduled = true;
+            }
+        }
+    }
+
+    private void syncLogicalCursorToServer() {
+        xServer.injectPointerMove(logicalCursorX, logicalCursorY);
+    }
+
+    private void setLogicalCursorPositionInternal(int x, int y) {
+        logicalCursorX = Mathf.clamp(x, 0, xServer.screenInfo.width - 1);
+        logicalCursorY = Mathf.clamp(y, 0, xServer.screenInfo.height - 1);
+    }
+
+    public void setTrackpadCursorPosition(int x, int y) {
+        synchronized (pendingMoveLock) {
+            setLogicalCursorPositionInternal(x, y);
+            pendingMoveX = logicalCursorX;
+            pendingMoveY = logicalCursorY;
+        }
     }
 
     public void setSensitivity(float sensitivity) {

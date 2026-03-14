@@ -1976,7 +1976,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             touchpadView.setSimTouchScreen(false);
             renderer.setCursorVisible(true);
             renderer.setDesktopCursorOwnershipMode(true);
-            xServer.injectPointerMove(xServer.screenInfo.width / 2, xServer.screenInfo.height / 2);
+            int centerX = xServer.screenInfo.width / 2;
+            int centerY = xServer.screenInfo.height / 2;
+            xServer.injectPointerMove(centerX, centerY);
+            touchpadView.setTrackpadCursorPosition(centerX, centerY);
             touchpadView.resetGestureRuntimeTuning();
             ForensicLogger.logEvent(
                     this,

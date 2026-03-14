@@ -132,6 +132,16 @@ runtime-binding, documentation alignment, and repository contract integrity.
   Inspect at least these layers before changing behavior:
   Android/system pointer icon, `GLRenderer` root/X11 cursor fallback, and any
   guest-owned software cursor in fullscreen/non-shell application windows.
+- When a duplicate cursor appears inside a fullscreen-like guest window, do not
+  limit the fix to `rootCursorDrawable`. Audit the whole compositor cursor path
+  in `GLRenderer.renderCursor()`, including `pointWindow.attributes.getCursor()`,
+  because guest-owned software cursors can duplicate against both the root
+  fallback and the normal X cursor layer.
+- On this shared Termux device, do not treat a screenshot as ground truth for a
+  Winlator desktop pass unless `dumpsys activity top` still shows
+  `XServerDisplayActivity` in foreground at the time of capture. If `Termux`
+  or the launcher regains focus first, mark the screenshot contaminated and use
+  log/forensic evidence instead of drawing UI conclusions from the image.
 - For the default no-shortcut desktop path, treat input closure as two separate
   requirements:
   1. cursor movement remains desktop-like and does not mirror every touch point,

@@ -213,6 +213,16 @@ Second autonomous developer lane for `aesolator`:
   portrait gate, `am start -W` completes again, and live forensics confirm
   `explorer.exe` window mapping. The remaining desktop risk has moved
   downstream into post-bootstrap interaction quality and payload consumers.
+- The desktop cursor stack now has an explicit ownership split in
+  `GLRenderer`: fullscreen-like non-shell guest windows can suppress the
+  compositor cursor entirely, not just the root fallback, so duplicate cursor
+  reports are now narrowed to classification/owner detection rather than the
+  old unconditional draw path.
+- Device-led desktop screenshot proof is still partially blocked by the fact
+  that this Termux session shares the same physical phone: `am start -W`
+  succeeds, but `Termux` can immediately retake foreground and invalidate the
+  capture. That is an environment constraint, not the same thing as an app
+  crash or `MotionEvent` ANR.
 - `Graphics Driver Configuration` no longer crashes on open and no longer
   renders an empty extensions line: it now uses a safe catalog-backed
   extension source on device instead of the old native probe path that could
