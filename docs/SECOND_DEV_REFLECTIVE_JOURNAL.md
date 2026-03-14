@@ -380,3 +380,60 @@
   `check-contents-qa-contract.py` gate now passes after the workflow patch.
 - Next step: return to device-led `Contents` QA and confirm `WCPHub` plus
   `WCP Archive` coexist correctly on the installed build.
+
+### Entry 23: WCPHub overlapping-family visibility repair
+
+- Goal: restore `WCPHub` list rendering for families that also exist in
+  archive-managed lanes, without collapsing provenance.
+- Context: live device QA showed the `WCPHub` source lane loading successfully
+  but rendering an empty `Wine` list. The feed itself was healthy; the parser
+  was silently discarding overlapping families because `setHubRemoteProfiles()`
+  called `appendRemoteProfiles(..., ignoreRepoManaged=true, ...)`.
+- Decision: stop filtering out repo-managed families during explicit WCPHub
+  source ingest. The source selector already isolates archive vs WCPHub, so
+  preserving the rows is the correct place to keep both surfaces usable.
+- Tradeoff: overlapping package families can now exist in memory from either
+  source, but that is intentional and still bounded by explicit source-mode
+  filtering in `ContentsFragment`.
+- Verification: rebuilt APK installed over Wi-Fi ADB; live `Contents` pass now
+  renders the `WCPHub` `Wine` lane correctly (`9.20`) instead of an empty list.
+- Next step: continue the device pass across the rest of the overlapping
+  families and install actions.
+
+### Entry 24: VKD3D badge semantics fix
+
+- Goal: stop `Contents` cards from showing misleading family badges when a
+  package name happens to contain the word `proton`.
+- Context: after restoring `WCPHub` rows, live device QA on the `VKD3D` lane
+  showed cards badged as `Proton` because `ContentProfile.getDisplayCategory()`
+  treated any `isProtonLike()` package as a `Proton` category, even outside the
+  Wine family. `vkd3d-proton` therefore polluted the badge semantics.
+- Decision: scope the `Proton`/`Wine` fallback only to `isWineProtonFamily()`
+  profiles, then let `VKD3D`, `DXVK`, and the other non-Wine types fall back
+  to their own native family labels.
+- Tradeoff: none worth keeping; this is a straight semantic correctness fix.
+- Verification: rebuilt APK with the badge fix is installed, but clean visual
+  proof on the exact `VKD3D` path is still incomplete because the shared phone
+  repeatedly reasserted `Termux` during the re-check loop.
+- Next step: re-run the exact `VKD3D/WCPHub` path on a quieter foreground
+  session and confirm the badge now stays on the native family label.
+
+### Entry 25: Termux AAPT2 environment closure
+
+- Goal: remove the last manual build-operator step that kept local APK assembly
+  fragile in Termux.
+- Context: the `WCPHub` parser fix only rebuilt cleanly after explicitly
+  passing `-Pandroid.aapt2FromMavenOverride=...`, because AGP otherwise still
+  tried to launch the desktop `aapt2` binary from Gradle caches.
+- Decision: move the override into `tools/env-android-local.sh` via
+  `GRADLE_OPTS=-Dorg.gradle.project.android.aapt2FromMavenOverride=...`, then
+  simplify the local build runbook so the standard path is
+  `. tools/env-android-local.sh`
+  followed by `./gradlew --no-daemon assembleDebug`.
+- Tradeoff: the override remains a Termux-only environment shim, but it is now
+  explicit and reusable instead of being a fragile per-command memory step.
+- Verification: sourced helper script path now works end-to-end;
+  `assembleDebug` completed successfully without a manual
+  `-Pandroid.aapt2FromMavenOverride` flag.
+- Next step: keep the helper-script path as the default local build contract
+  and continue device-led UI closure.

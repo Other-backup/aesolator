@@ -127,8 +127,10 @@ public class ContentProfile {
 
     public String getDisplayCategory() {
         if (displayCategory != null && !displayCategory.trim().isEmpty()) return displayCategory.trim();
-        if (isProtonLike()) return "Proton";
-        if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
+        if (isWineProtonFamily()) {
+            if (isProtonLike()) return "Proton";
+            if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
+        }
         if (type == ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
         if (type == ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
         if (type == ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";

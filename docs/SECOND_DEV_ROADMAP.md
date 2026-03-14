@@ -21,9 +21,13 @@ Second autonomous developer lane for `aesolator`:
    - confirm the new cold-start routing after deferred prompts on a stable
      foreground session
 2. `Contents` integrated source closure
-   - keep `WCP Archive` and `WCPHub` visible together without provenance drift
-   - preserve top-card sizing/alignment and selector readability
-   - verify install/update/remove behavior on the current build
+  - keep `WCP Archive` and `WCPHub` visible together without provenance drift
+  - preserve top-card sizing/alignment and selector readability
+  - verify install/update/remove behavior on the current build
+  - keep overlapping `WCPHub` families (`Wine`, `DXVK`, `VKD3D`) visible when
+    the source selector is explicitly switched away from archive
+  - keep content badges semantically aligned with the selected family instead
+    of leaking `Proton` naming into non-Wine package rows like `VKD3D`
 3. Dashboard adaptive polish
    - verify the new landscape density pass on a stable device session
    - keep the main menu readable as a control surface, not a stretched portrait
@@ -32,8 +36,10 @@ Second autonomous developer lane for `aesolator`:
    - `REMOTE_WINE_PROTON_OVERLAY` must track `aesolator/contents/contents.json`
    - `Wine` lane must expose archive-managed `freewine11`
 5. Documentation sync
-   - keep `AGENTS.md`, roadmap, and reflective journal current
-   - keep implementation notes aligned with repo contracts
+  - keep `AGENTS.md`, roadmap, and reflective journal current
+  - keep implementation notes aligned with repo contracts
+  - keep the Termux local-build path self-contained instead of relying on
+    ad-hoc CLI flags for `aapt2`
 6. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
@@ -71,6 +77,9 @@ Second autonomous developer lane for `aesolator`:
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
   across source switching and install actions.
+- `WCPHub` source parsing no longer drops overlapping families at ingest time,
+  but the integrated device pass still needs one more live confirmation for
+  list rendering and install actions after the parser fix.
 - The repo-side `Contents` workflow contract is now aligned with the static
   checklist gate, so the remaining `Contents` risk is device behavior rather
   than source-of-truth drift inside `.github/workflows/ci-winlator.yml`.

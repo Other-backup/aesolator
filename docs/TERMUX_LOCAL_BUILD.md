@@ -40,14 +40,8 @@ Termux ARM64 environment on-device.
 ## Build Command
 
 ```sh
-env \
-  JAVA_HOME=/data/data/com.termux/files/usr/lib/jvm/java-17-openjdk \
-  ANDROID_SDK_ROOT=/data/data/com.termux/files/home/android-sdk \
-  ANDROID_HOME=/data/data/com.termux/files/home/android-sdk \
-  PATH=/data/data/com.termux/files/usr/lib/jvm/java-17-openjdk/bin:/data/data/com.termux/files/home/android-sdk/platform-tools:/data/data/com.termux/files/home/android-sdk/cmdline-tools/latest/bin:/data/data/com.termux/files/home/android-sdk/cmake/3.22.1/bin:/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets \
-  ./gradlew --no-daemon --stacktrace --info \
-  -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 \
-  assembleDebug
+. ./tools/env-android-local.sh
+./gradlew --no-daemon assembleDebug
 ```
 
 Run from repo root:
@@ -58,7 +52,9 @@ Run from repo root:
 - Stock SDK `cmake` host binary was not usable in Termux ARM64; local build used
   Termux-native `cmake` and `ninja`.
 - Stock AGP-hosted `aapt2` Linux binary was not usable in Termux ARM64; local
-  build required `-Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2`.
+  build now exports the Gradle property through
+  `GRADLE_OPTS=-Dorg.gradle.project.android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2`
+  in `tools/env-android-local.sh`.
 - Stock NDK host toolchain path assumed desktop `linux-x86_64` execution. Local
   Termux build required local-only host compatibility shims in the installed
   SDK/NDK runtime state so `clang`/`clang++` could use NDK Android sysroot and

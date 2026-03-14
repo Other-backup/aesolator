@@ -119,7 +119,9 @@ public class ContentsManager {
 
     public void setHubRemoteProfiles(String json) {
         remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, false, true, false, true);
+        // WCPHub must stay visible for overlapping families too; the source
+        // selector, not the parser, is what keeps archive/hub provenance apart.
+        appendRemoteProfiles(json, false, false, false, true);
         syncContents();
     }
 
