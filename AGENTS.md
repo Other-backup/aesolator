@@ -39,6 +39,10 @@ runtime-binding, documentation alignment, and repository contract integrity.
   `BannersComponentInjector` as audited input, not as automatic source-of-truth:
   borrow feed logic, UX patterns, and package-link discovery only after
   verifying they fit `Ae.solator` provenance and install contracts.
+- Treat `GameNative` as the primary donor reference for desktop cursor/input
+  semantics. If `Ae.solator` desktop taps stop hitting live shell targets,
+  compare `TouchpadView` / pointer dispatch against `GameNative` before
+  inventing new async cursor queues or touch-surrogate fallbacks.
 - When a donor repo appears to expose more package links than the current app,
   document the delta first, then integrate it behind explicit source labeling
   and install verification instead of silently reshaping existing lanes.
@@ -69,6 +73,10 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - Use an iterative ADB loop for UI work:
   capture screen, interpret layout, identify interaction target, execute the
   next action, capture the new state, then update the working hypothesis.
+- When running an unattended device pass, reserve a short exclusive device
+  window first. If foreground interference from Termux/Telegram/launcher
+  invalidates the pass, record that as test contamination in the journal
+  instead of treating it as app proof.
 - Prioritize concrete UX issues over vague styling notes:
   hierarchy, spacing rhythm, readability, tap target clarity, wording, action
   discoverability, and flow friction.
@@ -116,6 +124,20 @@ runtime-binding, documentation alignment, and repository contract integrity.
   cursor-touchpad semantics over a touch-surrogate cursor that jumps directly
   to the finger. If the user asks for desktop-style interaction, do not let the
   cursor merely duplicate the touch point.
+- For desktop cursor work, validate the transport layer separately from shell
+  readiness: a direct `xServer.injectPointer*` probe proving `Start` opens is
+  not enough. Closure requires the same hit target to open through the live
+  `TouchpadView` path as well.
+- For the default no-shortcut desktop path, treat input closure as two separate
+  requirements:
+  1. cursor movement remains desktop-like and does not mirror every touch point,
+  2. a single tap still produces a click at the intended hit target.
+  If the cursor moves but desktop controls stay inert, fix the tap-to-click
+  contract before revisiting runtime/bootstrap code.
+- If a donor comparison shows the working input path uses direct pointer
+  injection on the active UI thread, prefer matching that proven contract over
+  background move/button queues unless fresh device forensics prove the direct
+  path is the source of the freeze.
 - If a download completes but install state does not materialize, treat that as
   a first-class contract failure between intake UI and local package indexing,
   not as a cosmetic device quirk.

@@ -1044,3 +1044,107 @@
 - Next step: continue payload/runtime closure from this cursor-based desktop
   baseline, then revisit any remaining desktop UX polish only after
   `DXVK` / `VKD3D` / `Vulkan SDK` / `dgVoodoo` consumers are stable.
+
+### Entry 50: XServer bootstrap freeze was a broken orientation gate
+
+- Goal: close the hard freeze that appeared when launching a container and left
+  the app stuck on the startup splash / startup overlay.
+- Context: live device forensics finally isolated this away from the older
+  `MotionEvent` ANR path. During the failing launch, `XServerDisplayActivity`
+  owned the task, but the window handoff was inconsistent: on the old build the
+  splash could remain visible with no stable focused window, and
+  `am start -W` would stall while the activity sat inside repeated fixed
+  rotation churn.
+- Decision: remove the stale portrait bootstrap gate inside
+  `XServerDisplayActivity.onCreate()`. The old code still called
+  `setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)` when
+  `xServer.screenInfo` looked portrait-like and then deferred the whole runtime
+  bootstrap behind `configChangedCallback`. That contradicted the manifest's
+  `sensorLandscape` contract and could strand startup before the first real draw.
+  The new gate only waits if the activity is not yet in landscape, requests
+  `SCREEN_ORIENTATION_SENSOR_LANDSCAPE`, and logs
+  `XSERVER_BOOTSTRAP_ORIENTATION_GATE` for future forensic passes.
+- Tradeoff: startup is now less "wait for a later config surprise" and more
+  explicit about honoring the landscape runtime contract immediately. That is
+  the correct tradeoff, because this activity is already declared as the
+  landscape desktop host in the manifest.
+- Verification: rebuilt and reinstalled the APK, then launched
+  `XServerDisplayActivity` for `container_id=3` through a properly signed
+  intent. After the fix:
+  `adb shell am start -W` returned `Status: ok` in about 3.1s, `dumpsys input`
+  showed a real focused `XServerDisplayActivity` window instead of an empty
+  focus handoff, the startup splash regressed into the in-app `Starting up...`
+  overlay rather than a dead launcher splash, and `logcat` recorded two
+  `XSERVER_APP_WINDOW_MAPPED` events for `explorer.exe`. That proves the
+  desktop bootstrap now crosses the old splash/orientation choke point and
+  reaches the shell mapping phase.
+- Residual risk: the shared phone kept hijacking foreground back to Telegram
+  during later captures, so screenshot proof of the fully visible desktop in
+  this exact pass is incomplete even though the shell mapping forensics are
+  positive.
+- Next step: continue from this restored bootstrap path into the remaining live
+  desktop interaction tails and payload consumers, not back into startup
+  deadlock triage.
+
+### Entry 51: Desktop freeze mostly closed, pointer semantics narrowed to tap contract
+
+- Goal: convert the broad "desktop freezes / nothing reacts" report into a
+  narrower, testable input bug and record the new contract explicitly.
+- Context: after the orientation-gate and deferred-pause fixes, the no-shortcut
+  desktop no longer reliably died in the old splash/startup loop. Live ADB
+  passes showed a stable `XServerDisplayActivity`, real `explorer.exe` window
+  maps, and a held desktop surface, but the user still correctly reported that
+  the cursor path felt inert. Device-led passes then showed why: the visible
+  cursor model survived, but a simple tap still clicked at the old cursor
+  position instead of the intended hit target. Shared-device interference from
+  `Termux`/launcher also contaminated some screenshots, so unattended passes
+  now need an explicit exclusive device window instead of being treated as
+  ground truth automatically.
+- Decision: keep the desktop-style visible cursor model, but move the active
+  closure target from generic freeze hunting to a specific tap-to-click
+  contract. `TouchpadView` now exposes `setTapToClickMovesCursor(...)`, tap
+  clicks are serialized on the same input queue as pointer movement, and
+  `XServerDisplayActivity` enables that hybrid path only for the default
+  no-shortcut desktop route while leaving shortcut sessions unchanged.
+- Tradeoff: this makes the default desktop path more opinionated. That is the
+  correct tradeoff here because the user's contract is explicit:
+  no finger-mirroring cursor, but real taps must still open `Start`, `Computer`
+  and other shell targets without hidden laptop-style indirection.
+- Verification: code path updated and rebuilt locally. The remaining live proof
+  still depends on a short uncontaminated device window because several recent
+  captures were invalidated by `Termux` regaining foreground during the pass.
+- Next step: run one clean unattended ADB cycle on the new build:
+  launch desktop, wait for `explorer.exe` map, capture before/after `Start`
+  tap, then decide whether the remaining defect is click dispatch itself or a
+  deeper shell/window hit-test issue.
+
+### Entry 52: Donor-aligned cursor transport closed the `Start` hit-test gap
+
+- Goal: prove that the visible desktop cursor can hit a live shell target
+  through `TouchpadView`, not only through a direct `xServer.injectPointer*`
+  debug bypass.
+- Context: the previous probe finally opened `Start`, but it did so through a
+  direct XServer injection path. Once the same probe was moved onto the live
+  `TouchpadView` transport, `Start` stopped opening. That isolated the real
+  cursor bug to our input transport layer, not to shell readiness, window
+  maps, or the `explorer.exe` desktop itself.
+- Decision: use `GameNative` as the donor reference for cursor semantics and
+  remove the Ae.solator-specific async move/button queue from the touchpad tap
+  path. The active contract is now donor-style direct pointer injection:
+  `move -> press -> delayed release`, with `TouchpadView` also serving as the
+  transport for the desktop debug probe.
+- Tradeoff: this gives up the custom background dispatch experiment. That is
+  the correct tradeoff because the queue was no longer a theoretical cleanup;
+  it had become the live source of missed shell hits. The donor path is
+  simpler, easier to reason about, and now has device evidence behind it.
+- Verification: rebuilt and reinstalled the APK, launched the desktop with
+  `aeso_debug_probe_start_tap=true`, and captured
+  `.tmp_adb/probe_start_after_36s_v4.png`. The screenshot shows the `Start`
+  menu open on top of the desktop wallpaper, while forensic logs record
+  `DESKTOP_DEBUG_START_PROBE_DISPATCHED` with `transport:"touchpad_view"`.
+  That closes the old gap where only the direct `xserver` bypass could open
+  `Start`.
+- Next step: stop treating basic click hit-testing as open. The remaining
+  desktop cursor tail is now manual-session quality: drag behavior, repeated
+  clicks after longer interaction, and pointer-state stability once the user
+  starts actually using the desktop instead of just opening `Start`.

@@ -34,6 +34,9 @@ Second autonomous developer lane for `aesolator`:
    - run top-to-bottom behavioral QA on the full create flow
    - confirm the new cold-start routing after deferred prompts on a stable
      foreground session
+   - finish no-shortcut desktop input closure:
+     preserve the cursor-touchpad model, but make single taps hit the intended
+     target without requiring the user to fight stale cursor position
 2. `Contents` integrated source closure
   - keep `WCP Archive` and `WCPHub` visible together without provenance drift
   - preserve top-card sizing/alignment and selector readability
@@ -126,17 +129,20 @@ Second autonomous developer lane for `aesolator`:
   Remaining risk is now narrowed to follow-up desktop input UX and
   package/runtime integration, not the prior shell-collapse loop.
 - The next desktop-closure gate after shell/taskbar visibility is direct input
-  reachability on live hardware. A no-shortcut desktop session that renders
-  but stays in hidden touchpad semantics is still considered open until
-  direct-touch hit testing is verified on-device. That verification has now
-  been completed once on March 14, 2026 with a resumed `XServerDisplayActivity`
-  and a two-tap screenshot delta on the live desktop, so the remaining desktop
-  risk is follow-up package/runtime behavior rather than basic clickability.
+  reachability on live hardware. The old hidden-touchpad blocker is closed,
+  and `Start` now opens through the live `TouchpadView` transport as well as
+  the shell itself, but the current narrow tail has shifted again:
+  long-session cursor behavior, pointer-state drift, and multi-gesture/manual
+  interaction still need live validation after the tap transport fix.
 - The desktop input baseline was then refined again on March 14, 2026 from a
   touch-surrogate cursor to an explicit `cursor_touchpad` model with a visible
   centered pointer. Remaining desktop work should preserve that desktop-style
   cursor semantics unless the user explicitly asks for tablet-style direct
-  touch.
+  touch. `GameNative` is now the donor reference for that cursor path, and the
+  old async move/button queue has been retired in favor of a direct
+  `move -> press -> delayed release` tap contract. The next closure step is a
+  live manual pass for cursor drag, repeated clicks, and post-click state
+  stability, not another shell/bootstrap rewrite.
 - `New Container` now has a verified end-to-end baseline on-device: a local
   donor runtime resolves correctly, `Create` reaches `Creating Container…`,
   and a real `/files/imagefs/home/xuser-*` container root is materialized.
@@ -196,6 +202,11 @@ Second autonomous developer lane for `aesolator`:
 - The shared selector/switch/preference geometry pass is now built and
   installed, but many secondary dialogs still have only code-level validation
   rather than screenshot proof on the target device.
+- The hard container-launch freeze is no longer blocked in the old
+  splash/orientation handoff: `XServerDisplayActivity` now boots past the stale
+  portrait gate, `am start -W` completes again, and live forensics confirm
+  `explorer.exe` window mapping. The remaining desktop risk has moved
+  downstream into post-bootstrap interaction quality and payload consumers.
 - `Graphics Driver Configuration` no longer crashes on open and no longer
   renders an empty extensions line: it now uses a safe catalog-backed
   extension source on device instead of the old native probe path that could

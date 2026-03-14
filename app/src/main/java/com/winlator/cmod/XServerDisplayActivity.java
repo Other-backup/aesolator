@@ -13,6 +13,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -33,6 +34,7 @@ import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -218,6 +220,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private volatile boolean desktopShellBootstrapActive = false;
     private volatile boolean guestLauncherExited = false;
     private volatile int guestLauncherExitStatus = Integer.MIN_VALUE;
+    private boolean desktopGestureExclusionListenerAttached = false;
 
     // Inside the XServerDisplayActivity class
     private SensorManager sensorManager;
@@ -236,6 +239,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
+    private static final long DESKTOP_RUNTIME_PAUSE_GRACE_MS = 1800L;
+    private final Handler runtimePauseHandler = new Handler(Looper.getMainLooper());
+    private boolean deferredDesktopPauseScheduled = false;
+    private final Runnable deferredDesktopPauseRunnable = new Runnable() {
+        @Override
+        public void run() {
+            deferredDesktopPauseScheduled = false;
+            pauseDesktopRuntime("deferred_background_pause");
+        }
+    };
 
     private boolean isDarkMode;
 
@@ -255,6 +268,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String FG_SOURCE_OPTI_FG = "opti_fg";
     private static final String FG_OUTPUT_AUTO = "auto";
     private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
+    private boolean debugStartProbeArmed = false;
+    private boolean debugStartProbeExecuted = false;
     private static final String FRAMEGEN_MODE_BALANCED = "balanced";
     private static final String FRAMEGEN_MODE_QUALITY = "quality";
     private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
@@ -367,6 +382,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         getWindow().setAttributes(params);
 
         setContentView(R.layout.xserver_display_activity);
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleDesktopBackNavigation();
+            }
+        });
 
         preloaderDialog = new PreloaderDialog(this);
         preferences = PreferenceManager.getDefaultSharedPreferences(this);
@@ -393,6 +414,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         Intent launchIntent = getIntent();
+        debugStartProbeArmed = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                && launchIntent != null
+                && launchIntent.getBooleanExtra("aeso_debug_probe_start_tap", false);
         String launchTrustState = LaunchSecurity.getXServerLaunchTrustState(this, launchIntent);
         ForensicLogger.logEvent(
                 this,
@@ -404,6 +428,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ForensicLogger.fields(
                         "container_id", launchIntent != null ? launchIntent.getIntExtra("container_id", 0) : 0,
                         "shortcut_path", launchIntent != null ? launchIntent.getStringExtra("shortcut_path") : "",
+                        "debug_start_probe_armed", debugStartProbeArmed,
                         "requires_signature", requiresSignedLaunchIntent(launchIntent),
                         "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent),
                         "trust_state", launchTrustState
@@ -763,11 +788,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         };
 
-        if (xServer.screenInfo.height > xServer.screenInfo.width) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        boolean landscapeReady = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        boolean portraitScreenInfo = xServer.screenInfo.height > xServer.screenInfo.width;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_BOOTSTRAP_ORIENTATION_GATE",
+                null,
+                "xserver",
+                "bootstrap_orientation_gate_evaluated",
+                ForensicLogger.fields(
+                        "screen_width", xServer.screenInfo.width,
+                        "screen_height", xServer.screenInfo.height,
+                        "portrait_screen_info", portraitScreenInfo,
+                        "current_orientation", getResources().getConfiguration().orientation,
+                        "landscape_ready", landscapeReady
+                )
+        );
+
+        if (portraitScreenInfo && !landscapeReady) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             configChangedCallback = runnable;
-        } else
-              runnable.run();
+        } else {
+            runnable.run();
+        }
     }
 
     // Method to parse container_id from .desktop file
@@ -888,6 +932,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
+        cancelDeferredDesktopRuntimePause("resume");
         boolean gyroEnabled = preferences.getBoolean("gyro_enabled", true);
 
         if (gyroEnabled) {
@@ -915,17 +960,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         boolean enteringPictureInPicture = isInPictureInPictureMode();
+        boolean deferDesktopRuntimePause = !enteringPictureInPicture && shouldKeepDesktopRuntimeActiveOnPause();
 
-        if (!enteringPictureInPicture) {
-            // Only pause environment and xServerView if not in PiP mode
-            if (environment != null) {
-                environment.onPause();
-                xServerView.onPause();
-            }
-
-            savePlaytimeData();
-            handler.removeCallbacks(savePlaytimeRunnable);
-            ProcessHelper.pauseAllWineProcesses();
+        if (!enteringPictureInPicture && !deferDesktopRuntimePause) {
+            pauseDesktopRuntime("immediate_pause");
+        } else if (deferDesktopRuntimePause) {
+            scheduleDeferredDesktopRuntimePause();
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_RUNTIME_PAUSE_DELAYED",
+                    null,
+                    "xserver",
+                    "desktop_runtime_pause_delayed_for_transient_focus_loss",
+                    ForensicLogger.fields(
+                            "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                            "tracked_window_count", getTrackedApplicationWindowCount(),
+                            "runtime_drawer_visible", runtimeDrawerVisible,
+                            "exit_in_progress", exitInProgress.get(),
+                            "grace_ms", DESKTOP_RUNTIME_PAUSE_GRACE_MS
+                    )
+            );
         } else {
             ForensicLogger.logEvent(
                     this,
@@ -1073,17 +1128,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        if (deferredDesktopPauseScheduled) {
+            cancelDeferredDesktopRuntimePause("stop");
+            pauseDesktopRuntime("stop_background_pause");
+        }
         savePlaytimeData();
         handler.removeCallbacks(savePlaytimeRunnable);
     }
 
     @Override
     public void onBackPressed() {
-        if (environment != null) {
-            toggleRuntimeDrawer();
-            return;
-        }
-        super.onBackPressed();
+        handleDesktopBackNavigation();
     }
 
     private void setupRuntimeDrawer() {
@@ -1359,7 +1414,36 @@ public class XServerDisplayActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
 
-        if (hasFocus && cursorLock) {
+        if (touchpadView != null) {
+            touchpadView.resetTransientInputState();
+        }
+
+        if (hasFocus) {
+            cancelDeferredDesktopRuntimePause("window_focus_regained");
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_WINDOW_FOCUS_CHANGED",
+                null,
+                "xserver",
+                "xserver_window_focus_changed",
+                ForensicLogger.fields(
+                        "has_focus", hasFocus,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "runtime_drawer_visible", runtimeDrawerVisible,
+                        "shortcut_launch", shortcut != null
+                )
+        );
+
+        if (hasFocus) {
+            AppUtils.hideSystemUI(this);
+            updateDesktopGestureExclusionRects(touchpadView);
+        }
+
+        if (hasFocus && cursorLock && touchpadView != null) {
             touchpadView.requestPointerCapture();
             touchpadView.setOnCapturedPointerListener(new View.OnCapturedPointerListener() {
                 @Override
@@ -1369,7 +1453,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 }
             });
         }
-        else if (!hasFocus) {
+        else if (!hasFocus && touchpadView != null) {
             touchpadView.releasePointerCapture();
             touchpadView.setOnCapturedPointerListener(null);
         }
@@ -1411,6 +1495,56 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "desktop_shell_bootstrap", desktopShellBootstrapActive
                 )
         );
+        maybeRunDebugStartProbe(window, trackedCount);
+    }
+
+    private void maybeRunDebugStartProbe(Window window, int trackedCount) {
+        if (!debugStartProbeArmed || debugStartProbeExecuted) return;
+        if (shortcut != null || !desktopShellBootstrapActive) return;
+        if (window == null || !"explorer.exe".equalsIgnoreCase(window.getClassName())) return;
+        if (trackedCount < 2) return;
+
+        debugStartProbeExecuted = true;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_START_PROBE_ARMED",
+                null,
+                "xserver",
+                "desktop_debug_start_probe_armed",
+                        ForensicLogger.fields(
+                        "tracked_count", trackedCount,
+                        "target_x", 28,
+                        "target_y", xServer != null ? Math.max(0, xServer.screenInfo.height - 14) : 0
+                )
+        );
+
+        final int probeX = 28;
+        final int probeY = Math.max(0, xServer.screenInfo.height - 14);
+        handler.postDelayed(() -> {
+            boolean accepted = false;
+            if (touchpadView != null) {
+                accepted = touchpadView.debugPerformCursorTap(probeX, probeY);
+            }
+            if (!accepted && xServer != null) {
+                xServer.injectPointerMove(probeX, probeY);
+                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+            }
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_START_PROBE_DISPATCHED",
+                    null,
+                    "xserver",
+                    "desktop_debug_start_probe_dispatched",
+                    ForensicLogger.fields(
+                            "target_x", probeX,
+                            "target_y", probeY,
+                            "transport", accepted ? "touchpad_view" : "xserver_fallback"
+                    )
+            );
+        }, 180L);
     }
 
     private void noteApplicationWindowUnmapped(Window window) {
@@ -1453,10 +1587,72 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean shouldDeferGuestTermination(int status) {
-        if (!desktopShellBootstrapActive || status != 0) return false;
+        if (!desktopShellBootstrapActive) return false;
         synchronized (mappedApplicationWindowIds) {
             return !mappedApplicationWindowIds.isEmpty();
         }
+    }
+
+    private int getTrackedApplicationWindowCount() {
+        synchronized (mappedApplicationWindowIds) {
+            return mappedApplicationWindowIds.size();
+        }
+    }
+
+    private boolean shouldKeepDesktopRuntimeActiveOnPause() {
+        if (shortcut != null) return false;
+        if (isFinishing() || exitInProgress.get()) return false;
+        return desktopShellBootstrapActive || getTrackedApplicationWindowCount() > 0;
+    }
+
+    private void scheduleDeferredDesktopRuntimePause() {
+        if (deferredDesktopPauseScheduled) return;
+        deferredDesktopPauseScheduled = true;
+        runtimePauseHandler.postDelayed(deferredDesktopPauseRunnable, DESKTOP_RUNTIME_PAUSE_GRACE_MS);
+    }
+
+    private void cancelDeferredDesktopRuntimePause(String reason) {
+        if (!deferredDesktopPauseScheduled) return;
+        runtimePauseHandler.removeCallbacks(deferredDesktopPauseRunnable);
+        deferredDesktopPauseScheduled = false;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_RUNTIME_PAUSE_CANCELLED",
+                null,
+                "xserver",
+                "desktop_runtime_pause_cancelled",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "tracked_window_count", getTrackedApplicationWindowCount()
+                )
+        );
+    }
+
+    private void pauseDesktopRuntime(String reason) {
+        if (environment != null) {
+            environment.onPause();
+            xServerView.onPause();
+        }
+
+        savePlaytimeData();
+        handler.removeCallbacks(savePlaytimeRunnable);
+        ProcessHelper.pauseAllWineProcesses();
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_RUNTIME_PAUSED",
+                null,
+                "xserver",
+                "desktop_runtime_paused",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "runtime_drawer_visible", runtimeDrawerVisible
+                )
+        );
     }
 
     private void setupWineSystemFiles() {
@@ -1725,6 +1921,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setFourFingersTapCallback(this::toggleRuntimeDrawer);
         rootView.addView(touchpadView);
+        applyDesktopGestureExclusion(touchpadView);
 
         inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
         inputControlsView.setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
@@ -1768,11 +1965,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (profile != null) showInputControls(profile);
             }
 
+            touchpadView.setTapToClickMovesCursor(false);
             touchpadView.setSimTouchScreen(shortcut.getExtraBoolean("simTouchScreen", false));
             applyShortcutTouchpadGestureProfile();
         } else {
             isRelativeMouseMovement = false;
             xServer.setRelativeMouseMovement(false);
+            touchpadView.setTapToClickMovesCursor(true);
             touchpadView.setSimTouchScreen(false);
             renderer.setCursorVisible(true);
             xServer.injectPointerMove(xServer.screenInfo.width / 2, xServer.screenInfo.height / 2);
@@ -1789,6 +1988,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "simulate_touchscreen", touchpadView.isSimTouchScreen(),
                             "relative_mouse", xServer.isRelativeMouseMovement(),
                             "cursor_visible", true,
+                            "tap_to_click_moves_cursor", true,
                             "pointer_x", xServer.pointer.getClampedX(),
                             "pointer_y", xServer.pointer.getClampedY(),
                             "input_mode", "cursor_touchpad"
@@ -1797,6 +1997,70 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         AppUtils.observeSoftKeyboardVisibility(xserverRootView != null ? xserverRootView : rootView, renderer::setScreenOffsetYRelativeToCursor);
+    }
+
+    private void applyDesktopGestureExclusion(View targetView) {
+        if (targetView == null || shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+
+        targetView.post(() -> updateDesktopGestureExclusionRects(targetView));
+        if (!desktopGestureExclusionListenerAttached) {
+            targetView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                    updateDesktopGestureExclusionRects(targetView));
+            desktopGestureExclusionListenerAttached = true;
+        }
+    }
+
+    private void updateDesktopGestureExclusionRects(View targetView) {
+        if (targetView == null || shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+
+        int width = targetView.getWidth();
+        int height = targetView.getHeight();
+        if (width <= 0 || height <= 0) return;
+
+        ArrayList<Rect> exclusionRects = new ArrayList<>();
+        exclusionRects.add(new Rect(0, 0, width, height));
+        targetView.setSystemGestureExclusionRects(exclusionRects);
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_GESTURE_EXCLUSION_APPLIED",
+                null,
+                "xserver",
+                "desktop_gesture_exclusion_applied",
+                ForensicLogger.fields(
+                        "shortcut_launch", shortcut != null,
+                        "exclusion_mode", "full_view",
+                        "view_width", width,
+                        "view_height", height
+                )
+        );
+    }
+
+    private void handleDesktopBackNavigation() {
+        if (runtimeDrawerVisible) {
+            hideRuntimeDrawer();
+            return;
+        }
+
+        if (environment != null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_BACK_GESTURE_CONSUMED",
+                    null,
+                    "xserver",
+                    "desktop_back_gesture_consumed",
+                    ForensicLogger.fields(
+                            "shortcut_launch", shortcut != null,
+                            "runtime_drawer_visible", runtimeDrawerVisible,
+                            "desktop_shell_bootstrap", desktopShellBootstrapActive
+                    )
+            );
+            return;
+        }
+
+        finish();
     }
 
     private void applyShortcutTouchpadGestureProfile() {

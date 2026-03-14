@@ -54,6 +54,7 @@ public class TouchpadView extends View {
     private int lastTouchedPosX;
     private int lastTouchedPosY;
     private static final Byte CLICK_DELAYED_TIME = 50;
+    private static final int TAP_TO_CLICK_PRESS_MS = 36;
     private static final Byte EFFECTIVE_TOUCH_DISTANCE = 20;
     private float resolutionScale;
     private static final int UPDATE_FORM_DELAYED_TIME = 50;
@@ -68,6 +69,7 @@ public class TouchpadView extends View {
     private short twoFingersScrollDistance = MAX_TWO_FINGERS_SCROLL_DISTANCE;
     private short scrollStepDistance = DEFAULT_SCROLL_STEP_DISTANCE;
     private @Nullable Boolean strictGestureFsmOverride = null;
+    private boolean tapToClickMovesCursor = false;
 
     private enum GestureMode {
         NONE,
@@ -117,6 +119,11 @@ public class TouchpadView extends View {
         super.onSizeChanged(w, h, oldw, oldh);
         updateXform(w, h, xServer.screenInfo.width, xServer.screenInfo.height);
         resolutionScale = 1000.0f / Math.min(xServer.screenInfo.width, xServer.screenInfo.height);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
     }
 
     private void updateXform(int outerWidth, int outerHeight, int innerWidth, int innerHeight) {
@@ -197,7 +204,7 @@ public class TouchpadView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        boolean isTouchscreenMode = preferences.getBoolean("touchscreen_toggle", false);
+        boolean isTouchscreenMode = simTouchScreen;
 
         // Reset the timeout timer to keep controls visible
         resetTouchscreenTimeout();  // <-- Ensure the controls stay visible
@@ -398,6 +405,7 @@ public class TouchpadView extends View {
         scrollAccumY = 0;
         continueClick = false;
         gestureMode = GestureMode.NONE;
+        clearPendingPointerMove();
 
         Finger leftOwner = fingerPointerButtonLeft;
         Finger rightOwner = fingerPointerButtonRight;
@@ -416,6 +424,11 @@ public class TouchpadView extends View {
         if (rightOwner != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
         }
+    }
+
+    private void clearPendingPointerMove() {
+        // The desktop pointer path now dispatches moves directly, so there is
+        // no queued move backlog to drain here.
     }
 
     private void dropMissingFinger(Finger finger) {
@@ -526,11 +539,16 @@ public class TouchpadView extends View {
                 if (simTouchScreen) {
                     final Runnable clickDelay = () -> {
                         if (continueClick)
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                            dispatchPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
                     };
                     postDelayed(clickDelay, CLICK_DELAYED_TIME);
                 }
-                else if (finger1.isTap()) pressPointerButtonLeft(finger1);
+                else if (finger1.isTap()) {
+                    if (tapToClickMovesCursor) {
+                        dispatchPointerMoveAbsolute(finger1.x, finger1.y);
+                    }
+                    pressPointerButtonLeft(finger1);
+                }
                 break;
             case 2:
                 Finger finger2 = findSecondFinger(finger1);
@@ -548,6 +566,22 @@ public class TouchpadView extends View {
 
         releasePointerButtonLeft(finger1);
         releasePointerButtonRight(finger1);
+    }
+
+    private boolean queueCursorTapLeftClickAt(int x, int y, boolean moveCursorFirst) {
+        if (simTouchScreen || xServer.isRelativeMouseMovement()) return false;
+        if (!pointerButtonLeftEnabled || fingerPointerButtonLeft != null || xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) return false;
+        clearPendingPointerMove();
+        if (moveCursorFirst) {
+            xServer.injectPointerMove(x, y);
+        }
+        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+        postDelayed(() -> xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT), TAP_TO_CLICK_PRESS_MS);
+        return true;
+    }
+
+    public boolean debugPerformCursorTap(int x, int y) {
+        return queueCursorTapLeftClickAt(x, y, true);
     }
 
     private void handleFingerMove(Finger finger1) {
@@ -570,7 +604,7 @@ public class TouchpadView extends View {
                 if (gestureMode == GestureMode.NONE) {
                     if (currDistance < twoFingersScrollDistance) {
                         gestureMode = GestureMode.TWO_FINGER_SCROLL;
-                    } else if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)
+                    } else if (fingerPointerButtonLeft == null && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)
                             && finger2.travelDistance() < tapTravelDistance) {
                         pressPointerButtonLeft(finger1);
                         gestureMode = GestureMode.TWO_FINGER_DRAG;
@@ -583,12 +617,12 @@ public class TouchpadView extends View {
                 if (gestureMode == GestureMode.TWO_FINGER_SCROLL) {
                     scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
                     if (scrollAccumY < -scrollStepDistance) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        dispatchPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        dispatchPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                         scrollAccumY = 0;
                     } else if (scrollAccumY > scrollStepDistance) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                        dispatchPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
+                        dispatchPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
                         scrollAccumY = 0;
                     }
                     scrolling = true;
@@ -601,18 +635,18 @@ public class TouchpadView extends View {
                     scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
 
                     if (scrollAccumY < -scrollStepDistance) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        dispatchPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        dispatchPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                         scrollAccumY = 0;
                     }
                     else if (scrollAccumY > scrollStepDistance) {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                        dispatchPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
+                        dispatchPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
                         scrollAccumY = 0;
                     }
                     scrolling = true;
                 }
-                else if (currDistance >= twoFingersScrollDistance && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
+                else if (currDistance >= twoFingersScrollDistance && fingerPointerButtonLeft == null && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
                          finger2.travelDistance() < tapTravelDistance) {
                     pressPointerButtonLeft(finger1);
                     skipPointerMove = true;
@@ -626,13 +660,13 @@ public class TouchpadView extends View {
 
             if (simTouchScreen) {
                 if (System.currentTimeMillis() - finger1.touchTime > CLICK_DELAYED_TIME)
-                    xServer.injectPointerMove(finger1.x, finger1.y);
+                    dispatchPointerMoveAbsolute(finger1.x, finger1.y);
             }
             else if (xServer.isRelativeMouseMovement()) {
                 WinHandler winHandler = xServer.getWinHandler();
                 winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
             }
-            else xServer.injectPointerMoveDelta(dx, dy);
+            else dispatchPointerMoveDelta(dx, dy);
         }
     }
 
@@ -656,35 +690,51 @@ public class TouchpadView extends View {
     }
 
     private void pressPointerButtonLeft(Finger finger) {
-        if (pointerButtonLeftEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
-            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+        if (pointerButtonLeftEnabled && fingerPointerButtonLeft == null && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+            dispatchPointerButtonPress(Pointer.Button.BUTTON_LEFT);
             fingerPointerButtonLeft = finger;
         }
     }
 
     private void pressPointerButtonRight(Finger finger) {
-        if (pointerButtonRightEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
-            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+        if (pointerButtonRightEnabled && fingerPointerButtonRight == null && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+            dispatchPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
             fingerPointerButtonRight = finger;
         }
     }
 
     private void releasePointerButtonLeft(final Finger finger) {
-        if (pointerButtonLeftEnabled && finger == fingerPointerButtonLeft && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+        if (pointerButtonLeftEnabled && finger == fingerPointerButtonLeft) {
             postDelayed(() -> {
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                dispatchPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
                 fingerPointerButtonLeft = null;
             }, 30);
         }
     }
 
     private void releasePointerButtonRight(final Finger finger) {
-        if (pointerButtonRightEnabled && finger == fingerPointerButtonRight && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+        if (pointerButtonRightEnabled && finger == fingerPointerButtonRight) {
             postDelayed(() -> {
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+                dispatchPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
                 fingerPointerButtonRight = null;
             }, 30);
         }
+    }
+
+    private void dispatchPointerMoveAbsolute(int x, int y) {
+        xServer.injectPointerMove(x, y);
+    }
+
+    private void dispatchPointerMoveDelta(int dx, int dy) {
+        xServer.injectPointerMoveDelta(dx, dy);
+    }
+
+    private void dispatchPointerButtonPress(Pointer.Button button) {
+        xServer.injectPointerButtonPress(button);
+    }
+
+    private void dispatchPointerButtonRelease(Pointer.Button button) {
+        xServer.injectPointerButtonRelease(button);
     }
 
     public void setSensitivity(float sensitivity) {
@@ -825,8 +875,16 @@ public class TouchpadView extends View {
         return simTouchScreen;
     }
 
+    public void resetTransientInputState() {
+        resetTouchpadGestureState(true);
+    }
+
     public void setStrictGestureFsmOverride(@Nullable Boolean strictGestureFsmOverride) {
         this.strictGestureFsmOverride = strictGestureFsmOverride;
+    }
+
+    public void setTapToClickMovesCursor(boolean tapToClickMovesCursor) {
+        this.tapToClickMovesCursor = tapToClickMovesCursor;
     }
 
     public void setGestureRuntimeTuning(int tapTimeoutMs, int tapTravelPx, int scrollStepPx, int twoFingerScrollThresholdPx) {
