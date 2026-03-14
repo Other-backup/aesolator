@@ -36,6 +36,22 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - Prefer reflective, contract-first integration over blind donor copying or
   cosmetic-only edits without documentation sync.
 
+## Mobile UI / Device Pass
+
+- Treat real device screenshots as UI ground truth whenever polishing mobile
+  surfaces or validating a suspected visual regression.
+- Use an iterative ADB loop for UI work:
+  capture screen, interpret layout, identify interaction target, execute the
+  next action, capture the new state, then update the working hypothesis.
+- Prioritize concrete UX issues over vague styling notes:
+  hierarchy, spacing rhythm, readability, tap target clarity, wording, action
+  discoverability, and flow friction.
+- When a UI fix also touches runtime stability, close the crash tail first,
+  then return to the visual pass on the stabilized screen.
+- For meaningful device-led passes, record:
+  screen observed, issue found, code decision, verification evidence, and any
+  remaining risk for the next pass.
+
 ## Main Docs
 
 - `README.md`

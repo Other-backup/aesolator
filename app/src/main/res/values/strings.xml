@@ -165,6 +165,8 @@
     <string name="unable_to_install_wine">Unable to install Wine</string>
     <string name="unable_to_remove_this_wine_version">Unable to remove this wine version</string>
     <string name="wine_version">Wine Version</string>
+    <string name="container_runtime">Wine / Proton Runtime</string>
+    <string name="container_runtime_hint">Required. This runtime also defines the default emulator and DX wrapper for the container.</string>
     <string name="removing_wine">Removing Wine…</string>
     <string name="preparing_installation">Preparing installation…</string>
     <string name="finishing_installation">Finishing installation…</string>
@@ -619,6 +621,7 @@
     <string name="invert_x_axis_right">Invert X Axis (Right Stick)</string>
     <string name="invert_y_axis_right">Invert Y Axis (Right Stick)</string>
     <string name="save">Save</string>
+    <string name="create">Create</string>
     <string name="gyro_configuration">Gyroscope Configuration</string>
     <string name="gyro_preview_title">Stick preview</string>
     <string name="gyro_preview_hint">Check the live center point and sensitivity before saving.</string>
@@ -920,6 +923,7 @@
     <string name="copy_capture_command">Copy ADB capture</string>
     <string name="unable_to_create_container">Unable to create container.</string>
     <string name="install_runtime_before_container">Install a Wine or Proton runtime before creating a container.</string>
+    <string name="install_runtime">Install Runtime</string>
     <string name="diagnostics_forensic_report_privacy_warning">A forensic issue draft will open on GitHub. The report body includes summary only; full logs stay in bundle files.</string>
     <string name="enable_vulkan_api_dump">Enable dumping of Vulkan api calls to file.</string>
     <string name="dll_emulator">32bit Emulator</string>

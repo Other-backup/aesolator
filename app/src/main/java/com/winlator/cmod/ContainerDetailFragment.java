@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -51,7 +52,6 @@ import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
-import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
@@ -199,6 +199,60 @@ public class ContainerDetailFragment extends Fragment {
         return selectedText.isEmpty() ? fallback : StringUtils.parseIdentifier(selectedText);
     }
 
+    private boolean isRuntimeSelectionAvailable(@Nullable Spinner spinner) {
+        if (spinner == null || !spinner.isEnabled()) return false;
+        return !AppUtils.isMissingComponentValue(getSelectedText(spinner, ""));
+    }
+
+    private void updateRuntimeSelectionUi(@NonNull View view) {
+        Context context = view.getContext();
+        boolean darkMode = resolveDarkMode(context);
+        boolean runtimeReady = isRuntimeSelectionAvailable(view.findViewById(R.id.SWineVersion));
+        TextView runtimeHint = view.findViewById(R.id.TVWineVersionHint);
+        Button openContents = view.findViewById(R.id.BTOpenContents);
+        Button confirmButton = view.findViewById(R.id.BTConfirm);
+
+        runtimeHint.setText(runtimeReady
+                ? R.string.container_runtime_hint
+                : R.string.install_runtime_before_container);
+        runtimeHint.setTextColor(ContextCompat.getColor(
+                context,
+                runtimeReady
+                        ? (darkMode ? R.color.surface_body_text_dark : R.color.surface_body_text)
+                        : (darkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text)
+        ));
+
+        openContents.setVisibility(runtimeReady ? View.GONE : View.VISIBLE);
+        confirmButton.setEnabled(runtimeReady);
+        confirmButton.setAlpha(runtimeReady ? 1f : 0.55f);
+    }
+
+    private void openContentsForRuntimeInstall() {
+        getParentFragmentManager().beginTransaction()
+                .setCustomAnimations(
+                        R.anim.slide_in_up,
+                        R.anim.slide_out_down,
+                        R.anim.slide_in_down,
+                        R.anim.slide_out_up
+                )
+                .addToBackStack(null)
+                .replace(R.id.FLFragmentContainer, new ContentsFragment())
+                .commit();
+    }
+
+    private void refreshRuntimeSelectionIfNeeded(@NonNull View view) {
+        Context context = getContext();
+        if (context == null) return;
+        if (contentsManager == null) contentsManager = new ContentsManager(context);
+        contentsManager.syncContents();
+
+        Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
+        Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
+        if (sWineVersion != null && sBox64Version != null && !sWineVersion.isEnabled()) {
+            loadWineVersionSpinner(view, sWineVersion, sBox64Version);
+        }
+        updateRuntimeSelectionUi(view);
+    }
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
         SpinnerAdapters.applySurfaceRecursively(view, isDarkMode);
@@ -236,6 +290,15 @@ public class ContainerDetailFragment extends Fragment {
                 }
             }
             openDirectoryCallback = null;
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        View view = getView();
+        if (view != null) {
+            refreshRuntimeSelectionIfNeeded(view);
         }
     }
 
@@ -303,6 +366,9 @@ public class ContainerDetailFragment extends Fragment {
         contentsManager.syncContents();
 
         final EditText etName = view.findViewById(R.id.ETName);
+        final Button btConfirm = view.findViewById(R.id.BTConfirm);
+        final Button btCancel = view.findViewById(R.id.BTCancel);
+        final Button btOpenContents = view.findViewById(R.id.BTOpenContents);
 
         final Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
 
@@ -322,6 +388,18 @@ public class ContainerDetailFragment extends Fragment {
         final Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
 
         loadWineVersionSpinner(view, sWineVersion, sBox64Version);
+        btConfirm.setText(isEditMode() ? R.string.save : R.string.create);
+        btCancel.setOnClickListener((v) -> {
+            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
+                getParentFragmentManager().popBackStack();
+            } else if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).showHomeDashboard(true);
+            } else if (getActivity() != null) {
+                getActivity().onBackPressed();
+            }
+        });
+        btOpenContents.setOnClickListener((v) -> openContentsForRuntimeInstall());
+        updateRuntimeSelectionUi(view);
 
         loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize() : Container.DEFAULT_SCREEN_SIZE);
 
@@ -506,7 +584,7 @@ public class ContainerDetailFragment extends Fragment {
                 HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
                 String graphicsDriverVersion = config.get("version");
                 if (graphicsDriverVersion == null || graphicsDriverVersion.trim().isEmpty()) {
-                    config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
+                    config.put("version", DefaultVersion.WRAPPER);
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
                 String dxwrapper = getSelectedIdentifier(sDXWrapper, Container.DEFAULT_DXWRAPPER);
@@ -1110,6 +1188,7 @@ public class ContainerDetailFragment extends Fragment {
                     sEmulator64.setSelection(1, false);
                     loadBox64VersionSpinner(context, container, contentsManager, sBox64Version, false);
                     setupDXWrapperSpinner(sDXWrapper, vDXWrapperConfig, false);
+                    updateRuntimeSelectionUi(view);
                     return;
                 }
 
@@ -1128,6 +1207,7 @@ public class ContainerDetailFragment extends Fragment {
                 }
                 loadBox64VersionSpinner(context, container, contentsManager, sBox64Version, wineInfo.isArm64EC());
                 setupDXWrapperSpinner(sDXWrapper, vDXWrapperConfig, wineInfo.isArm64EC());
+                updateRuntimeSelectionUi(view);
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
@@ -1168,6 +1248,8 @@ public class ContainerDetailFragment extends Fragment {
         if (isEditMode() && hasWineVersion) {
             AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
         }
+
+        updateRuntimeSelectionUi(view);
     }
 
     public String getControllerMapping(View view) {

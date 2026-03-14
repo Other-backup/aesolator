@@ -271,3 +271,44 @@
 - Next step: re-run the exact create-container and graphics-driver interaction
   on-device once more to confirm there is no second downstream crash behind the
   native loader failure.
+
+### Entry 18: XR lazy-load crash tail closure
+
+- Goal: stop ordinary container/UI flows from crashing on phones that should
+  never touch OpenXR at all.
+- Context: fresh device `logcat` still showed `SIGSEGV` in
+  `libopenxr_loader.so`, but the new trace proved the crash now came from
+  `XrActivity.<clinit>` rather than from the shared `winlator` runtime load
+  path.
+- Decision: remove the static native load from `XrActivity`, add a guarded
+  `ensureNativeLibraryLoaded()` helper, and load `winlatorxr` only inside
+  `XrActivity.onCreate()`.
+- Tradeoff: XR native loading now happens later and only on the XR entry path,
+  which is the intended behavior; the class can still be referenced safely for
+  capability checks and tab visibility logic without pulling OpenXR into normal
+  screens.
+- Verification: rebuilt APK installed on the target device, `New Container`
+  opened without a fresh crash, and the crash buffer remained empty during the
+  post-fix entry pass.
+- Next step: continue UI-led polish on the now-stable create-container screen
+  and verify the rest of the form rather than just the opening transition.
+
+### Entry 19: Device-led New Container polish pass
+
+- Goal: make the stabilized `New Container` screen read like a deliberate
+  product surface instead of a recovered crash-test form.
+- Context: once the crash tail was gone, live screenshots showed two remaining
+  friction points immediately: the tab row still read as cramped/technical, and
+  the footer CTA visually collapsed the longer `Create Container` label.
+- Decision: switch the tab row to a scrollable, non-all-caps text treatment,
+  shorten the primary CTA to `Create`, tighten footer button sizing for the
+  available width, and rename the missing-runtime helper action from
+  `Open Contents` to `Install Runtime` so the action matches the user intent on
+  that screen.
+- Tradeoff: the CTA becomes less verbose, but the screen gains cleaner action
+  hierarchy and no longer forces a truncated button label in the sticky footer.
+- Verification: rebuilt and reinstalled on-device; live screenshots now show
+  the scrollable mixed-case tab row, stable footer actions, and no fresh crash
+  while entering `New Container`.
+- Next step: run a full top-to-bottom create flow and then return to
+  `Contents` source-switch/install QA from the same installed build.

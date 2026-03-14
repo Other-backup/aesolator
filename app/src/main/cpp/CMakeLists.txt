@@ -14,14 +14,10 @@ else()
     set(HAS_ADRENOTOOLS OFF)
 endif()
 
-# Add Winlator shared library
+# Add Winlator shared libraries
+set(WINLATOR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlator.exports.map.txt")
+
 add_library(winlator SHARED
-        xr/engine.c
-        xr/framebuffer.c
-        xr/input.c
-        xr/main.c
-        xr/math.c
-        xr/renderer.c
         winlator/drawable.c
         winlator/gpu_image.c
         winlator/sysvshared_memory.c
@@ -32,12 +28,14 @@ add_library(winlator SHARED
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
 target_compile_definitions(winlator PRIVATE AERO_HAS_ADRENOTOOLS=$<BOOL:${HAS_ADRENOTOOLS}>)
+target_link_options(winlator PRIVATE
+        "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
+)
 
 target_link_libraries(winlator
         log
         android
         jnigraphics
-        openxr_loader
         c++_shared
         aaudio
         EGL
@@ -48,3 +46,27 @@ target_link_libraries(winlator
 if (HAS_ADRENOTOOLS)
     target_link_libraries(winlator adrenotools)
 endif()
+
+add_library(winlatorxr SHARED
+        xr/engine.c
+        xr/framebuffer.c
+        xr/input.c
+        xr/main.c
+        xr/math.c
+        xr/renderer.c
+)
+
+target_compile_options(winlatorxr PRIVATE -Wall -Wextra)
+target_link_options(winlatorxr PRIVATE
+        "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
+)
+
+target_link_libraries(winlatorxr
+        log
+        android
+        openxr_loader
+        c++_shared
+        EGL
+        GLESv2
+        GLESv3
+)

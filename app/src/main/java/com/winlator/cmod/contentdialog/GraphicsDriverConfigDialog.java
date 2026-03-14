@@ -150,7 +150,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     private String[] queryAvailableExtensions(String driver, Context context) {
-        return GPUInformation.enumerateExtensions(driver, context);
+        return new String[0];
     }
 
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
@@ -393,8 +393,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         String[] wrapperDefaultVersions = context.getResources().getStringArray(R.array.wrapper_graphics_driver_version_entries);
 
         for (String version : wrapperDefaultVersions) {
-            if (GPUInformation.isDriverSupported(version, context))
-                wrapperVersions.add(version);
+            wrapperVersions.add(version);
         }
 
         // Add installed versions from AdrenotoolsManager
@@ -537,7 +536,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         }
 
-        AppUtils.setSpinnerSelectionFromValue(spinner, GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, getContext()) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
+        AppUtils.setSpinnerSelectionFromValue(spinner, DefaultVersion.WRAPPER);
     }
 
     private void applyPopupTheme(Context context) {

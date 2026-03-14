@@ -13,17 +13,15 @@ Second autonomous developer lane for `aesolator`:
 
 ## Current Priorities
 
-1. `Contents` UI contract closure
-   - top-card sizing/alignment
-   - selector readability and lane visibility
-   - source provenance clarity (`WCP Archive` vs `WCPHub`)
-   - install/update/remove UX checks
-2. `Containers` action-surface cleanup
-   - expose `New Container` and `Big Picture` as first-class dashboard cards
-     in the main menu grid
-   - keep the `Containers` screen focused on the container list itself
-   - keep container creation on the canonical `ContainerDetailFragment` path
-   - reduce icon-only ambiguity before further crash/device passes
+1. `New Container` device-led UX closure
+   - keep container creation free of XR/native startup regressions
+   - polish the runtime-missing state, footer actions, and tab readability from
+     real screenshots instead of XML-only inference
+   - run top-to-bottom behavioral QA on the full create flow
+2. `Contents` integrated source closure
+   - keep `WCP Archive` and `WCPHub` visible together without provenance drift
+   - preserve top-card sizing/alignment and selector readability
+   - verify install/update/remove behavior on the current build
 3. `Contents` source-of-truth enforcement
    - `REMOTE_WINE_PROTON_OVERLAY` must track `aesolator/contents/contents.json`
    - `Wine` lane must expose archive-managed `freewine11`
@@ -55,12 +53,12 @@ Second autonomous developer lane for `aesolator`:
 
 ## Current Open Risks
 
-- `Contents` layout changes are now build-validated and installed locally, but
-  screen-level behavioral QA still needs explicit in-app review.
-- native runtime loading for container-adjacent flows now has an explicit
-  `libc++_shared.so` packaging path in the APK, but the actual create-container
-  and graphics-driver dialog path still needs one fresh device retest after the
-  native packaging fix.
+- `New Container` now opens on-device after the XR lazy-load split, but the
+  entire create flow still needs end-to-end QA beyond initial screen entry and
+  footer/layout checks.
+- `Contents` no longer loses archive provenance on feed failure, but live
+  `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
+  across source switching and install actions.
 - Termux local build currently depends on local-only SDK/NDK compatibility
   shims; this is an environment workaround, not a committed repository fix.
 - `llvm-strip` from the desktop NDK host bundle is still incompatible with

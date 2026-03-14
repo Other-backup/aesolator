@@ -230,6 +230,17 @@
         <item name="android:background">@drawable/button_neutral</item>
     </style>
 
+    <style name="ButtonInlineNeutral" parent="ButtonNeutral">
+        <item name="android:layout_height">38dp</item>
+        <item name="android:minHeight">38dp</item>
+        <item name="android:minWidth">90dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="ButtonInlineNeutral.Dark" parent="ButtonInlineNeutral" />
+
     <style name="ButtonPositive" parent="BaseButton">
         <item name="android:background">@drawable/button_positive</item>
         <item name="android:textColor">@color/surface_button_positive_text</item>
@@ -239,6 +250,28 @@
         <item name="android:background">@drawable/button_positive</item>
         <item name="android:textColor">@color/surface_button_positive_text</item>
     </style>
+
+    <style name="ButtonFooterNeutral" parent="ButtonNeutral">
+        <item name="android:layout_height">46dp</item>
+        <item name="android:minHeight">46dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="ButtonFooterNeutral.Dark" parent="ButtonFooterNeutral" />
+
+    <style name="ButtonFooterPositive" parent="ButtonPositive">
+        <item name="android:layout_height">46dp</item>
+        <item name="android:minHeight">46dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="ButtonFooterPositive.Dark" parent="ButtonFooterPositive" />
 
     <!-- Base ImageButton Styles -->
     <style name="BaseImageButton">
@@ -406,6 +439,12 @@
 
     <style name="TabLayoutBackground.Dark" >
         <item name="android:background">@drawable/tab_layout_background_dark</item>
+    </style>
+
+    <style name="ContainerTabTextAppearance" parent="TextAppearance.AppCompat.Caption">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="SpinnerDialogDark" parent="Theme.AppCompat.Light.Dialog">
