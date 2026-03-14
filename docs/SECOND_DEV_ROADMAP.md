@@ -118,6 +118,20 @@ Second autonomous developer lane for `aesolator`:
 
 ## Current Open Risks
 
+- The old `New Container -> black canvas / no taskbar` blocker is now reduced
+  from an unknown launch failure to a specific shell-registry contract:
+  `HKCU\Software\Wine\Explorer\Desktops\shell` must be seeded before launch.
+  With that registry prep in place, a direct on-device launch now reaches and
+  holds a real desktop surface with `Start` visible after the bootstrap window.
+  Remaining risk is now narrowed to follow-up desktop input UX and
+  package/runtime integration, not the prior shell-collapse loop.
+- The next desktop-closure gate after shell/taskbar visibility is direct input
+  reachability on live hardware. A no-shortcut desktop session that renders
+  but stays in hidden touchpad semantics is still considered open until
+  direct-touch hit testing is verified on-device. That verification has now
+  been completed once on March 14, 2026 with a resumed `XServerDisplayActivity`
+  and a two-tap screenshot delta on the live desktop, so the remaining desktop
+  risk is follow-up package/runtime behavior rather than basic clickability.
 - `New Container` now has a verified end-to-end baseline on-device: a local
   donor runtime resolves correctly, `Create` reaches `Creating Container…`,
   and a real `/files/imagefs/home/xuser-*` container root is materialized.
@@ -159,6 +173,11 @@ Second autonomous developer lane for `aesolator`:
 - `BannersComponentInjector` still has deeper donor logic not yet harvested
   locally, especially around richer source discovery, release-tag browsing, and
   download-management UX.
+- Donor audit on March 14, 2026 confirmed that
+  `BannersComponentInjector` is most useful here as an external source-manager
+  reference, not as a desktop/runtime-launch source-of-truth. The immediately
+  relevant donor value is feed/release parsing and package intake logic, while
+  the container desktop fix remained an in-prefix Wine shell contract issue.
 - A cross-repo handoff is now open for the `freewine11` build lane:
   review Valve Wine commit
   `6ccff11d0e7d620cd958b56b0904fcbd9a9bfb26` in the dedicated handoff note

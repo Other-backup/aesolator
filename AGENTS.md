@@ -98,6 +98,19 @@ runtime-binding, documentation alignment, and repository contract integrity.
   local package root, UI state, and downstream consumer (`SWineVersion`,
   runtime picker, driver picker, etc.) either agree or produce a recorded
   mismatch with evidence.
+- For no-shortcut container desktop launches, verify both layers of shell
+  readiness:
+  1. app-side bootstrap command / deferred-exit flow,
+  2. prefix-side registry contract under
+  `HKCU\Software\Wine\Explorer\Desktops\shell` (`EnableShell`, geometry,
+  systray/taskbar intent).
+  A mapped `explorer.exe` window without those registry keys is not enough to
+  call the desktop fixed.
+- For no-shortcut desktop sessions, verify the input contract separately from
+  shell readiness:
+  a live desktop is not complete unless the session enters a direct-touch
+  model (`simulateTouchScreen` or equivalent) and accepts real pointer hits on
+  device, not just window maps in forensic logs.
 - If a download completes but install state does not materialize, treat that as
   a first-class contract failure between intake UI and local package indexing,
   not as a cosmetic device quirk.

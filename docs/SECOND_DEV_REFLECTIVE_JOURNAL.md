@@ -977,3 +977,39 @@
 - Next step: keep the dialog on the safe catalog path, and later improve the
   catalog quality only if a non-crashing, off-path probe can provide verified
   driver-specific filtering without reintroducing a native open-path tail.
+
+### Entry 48: Desktop shell input-model closure after shell-registry success
+
+- Goal: close the next container-launch tail after the shell/taskbar fix by
+  making the rendered desktop actually clickable on real hardware.
+- Context: after the registry-backed shell bootstrap fix, the device finally
+  reached and held a real desktop surface with `Start` visible, but the user
+  correctly reported that “nothing was clickable”. Forensics and local app
+  state showed the session was still entering the default hidden touchpad model
+  for no-shortcut launches: `touchscreen_toggle` was off globally, the desktop
+  session had no shortcut-specific `simTouchScreen` override, and the shell was
+  therefore alive but not in a direct-touch hit-testing mode.
+- Decision: promote no-shortcut desktop launches into an explicit direct-touch
+  input contract inside `XServerDisplayActivity.setupUI()`: force
+  `touchpadView.setSimTouchScreen(true)`, make the cursor visible for
+  discoverability, and log a dedicated `DESKTOP_INPUT_MODEL_APPLIED` forensic
+  event so future passes can distinguish “desktop rendered” from “desktop is
+  interactable”.
+- Tradeoff: desktop bootstrap is now more opinionated for no-shortcut sessions,
+  because it overrides the old hidden touchpad semantics. That is the correct
+  tradeoff for the default container desktop path: the primary contract is a
+  clickable desktop, not an invisible laptop-style touchpad abstraction.
+- Verification: rebuilt and reinstalled the APK, relaunched
+  `XServerDisplayActivity` for `container_id=3`, and confirmed on-device that
+  the session stayed `resumed` with a live `TouchpadView` input channel.
+  `logcat` recorded `DESKTOP_INPUT_MODEL_APPLIED` with
+  `simulate_touchscreen:true` and `relative_mouse:false`, followed by
+  `DESKTOP_SHELL_REGISTRY_APPLIED` and two `XSERVER_APP_WINDOW_MAPPED` events
+  for `explorer.exe`. A device-led tap pass on the held desktop then changed
+  the captured frame size from `187352` bytes to `86127` bytes on the first
+  tap and to `201319` bytes on the second tap, while
+  `XServerDisplayActivity` remained `resumed`, confirming that desktop hit
+  testing now reaches the live shell instead of stalling in a hidden touchpad
+  model.
+- Next step: return to the remaining payload/runtime tails from a stable base:
+  `DXVK`, `VKD3D`, `Vulkan SDK`, `dgVoodoo`, and post-desktop UX polish.

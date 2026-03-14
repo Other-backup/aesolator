@@ -132,10 +132,14 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -210,6 +214,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Runnable configChangedCallback = null;
     private boolean isPaused = false;
     private boolean isRelativeMouseMovement = false;
+    private final LinkedHashSet<Integer> mappedApplicationWindowIds = new LinkedHashSet<>();
+    private volatile boolean desktopShellBootstrapActive = false;
+    private volatile boolean guestLauncherExited = false;
+    private volatile int guestLauncherExitStatus = Integer.MIN_VALUE;
 
     // Inside the XServerDisplayActivity class
     private SensorManager sensorManager;
@@ -223,6 +231,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Handler handler;
     private Runnable savePlaytimeRunnable;
     private static final long SAVE_INTERVAL_MS = 1000;
+    private final ExecutorService exitTeardownExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean exitInProgress = new AtomicBoolean(false);
 
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
@@ -629,14 +639,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         boolean[] winStarted = {false};
 
+        Runnable[] markGuestWindowStarted = new Runnable[1];
+        markGuestWindowStarted[0] = () -> {
+            if (!winStarted[0]) {
+                xServerView.getRenderer().setCursorVisible(true);
+                preloaderDialog.closeOnUiThread();
+                winStarted[0] = true;
+            }
+        };
+
         // Add the OnWindowModificationListener for dynamic workarounds
         xServer.windowManager.addOnWindowModificationListener(new WindowManager.OnWindowModificationListener() {
             @Override
             public void onUpdateWindowContent(Window window) {
                 if (!winStarted[0] && window.isApplicationWindow()) {
-                    xServerView.getRenderer().setCursorVisible(true);
-                    preloaderDialog.closeOnUiThread();
-                    winStarted[0] = true;
+                    markGuestWindowStarted[0].run();
                 }
 
                 if (frameRatingWindowId == window.id) frameRating.update();
@@ -644,9 +661,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onMapWindow(Window window) {
+                if (!winStarted[0] && window.isApplicationWindow()) {
+                    ForensicLogger.logEvent(
+                            XServerDisplayActivity.this,
+                            "warn",
+                            "PRELOADER_MAP_FALLBACK",
+                            null,
+                            "xserver",
+                            "preloader_closed_on_window_map",
+                            ForensicLogger.fields(
+                                    "class_name", window.getClassName(),
+                                    "window_id", window.id
+                            )
+                    );
+                    markGuestWindowStarted[0].run();
+                }
                 // Log the class name of the mapped window
                 Log.d("XServerDisplayActivity", "onMapWindow: Detected window className: " + window.getClassName());
                 assignTaskAffinity(window);
+                noteApplicationWindowMapped(window);
             }
 
             @Override
@@ -657,6 +690,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             @Override
             public void onUnmapWindow(Window window) {
                 changeFrameRatingVisibility(window, null);
+                noteApplicationWindowUnmapped(window);
             }
         });
 
@@ -939,35 +973,96 @@ public class XServerDisplayActivity extends AppCompatActivity {
         editor.apply();
     }
 
-    private void exit() {
-        NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
-        preloaderDialog.showOnUiThread(R.string.shutdown);
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                savePlaytimeData(); // Save on destroy
-                handler.removeCallbacks(savePlaytimeRunnable);
-                if (midiHandler != null) midiHandler.stop();
-                // Unregister sensor listener to avoid memory leaks
-                if (sensorManager != null) sensorManager.unregisterListener(gyroListener);
-                if (environment != null) environment.stopEnvironmentComponents();
-                if (preloaderDialog != null && preloaderDialog.isShowing()) preloaderDialog.closeOnUiThread();
-                if (winHandler != null) winHandler.stop();
-                if (wineRequestHandler != null) wineRequestHandler.stop();
-                /* Gracefully terminate all running wine processes */
-                ProcessHelper.terminateAllWineProcesses();
-                /* Wait until all processes have gracefully terminated, forcefully killing them only after a certain amount of time */
-                long start = System.currentTimeMillis();
-                while (!ProcessHelper.listRunningWineProcesses().isEmpty()) {
-                    long elapsed = System.currentTimeMillis() - start;
-                    if (elapsed >= 1500) {
-                        break;
-                    }
-                }
-                preloaderDialog.closeOnUiThread();
-                AppUtils.restartApplication(getApplicationContext());
+    private void waitForWineProcessesToTerminate(long timeoutMs) {
+        long start = System.currentTimeMillis();
+        while (!ProcessHelper.listRunningWineProcesses().isEmpty()) {
+            if ((System.currentTimeMillis() - start) >= timeoutMs) {
+                break;
             }
-        }, 1000);
+            try {
+                Thread.sleep(50);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+
+    private void performExitTeardown() {
+        long teardownStart = System.currentTimeMillis();
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_EXIT_TEARDOWN_START",
+                null,
+                "xserver",
+                "runtime_exit_teardown_started",
+                null
+        );
+
+        try {
+            savePlaytimeData();
+            handler.removeCallbacks(savePlaytimeRunnable);
+            if (midiHandler != null) midiHandler.stop();
+            if (sensorManager != null) sensorManager.unregisterListener(gyroListener);
+            if (winHandler != null) winHandler.stop();
+            if (wineRequestHandler != null) wineRequestHandler.stop();
+            if (environment != null) environment.stopEnvironmentComponents();
+            ProcessHelper.terminateAllWineProcesses();
+            waitForWineProcessesToTerminate(1500);
+
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_EXIT_TEARDOWN_DONE",
+                    null,
+                    "xserver",
+                    "runtime_exit_teardown_completed",
+                    ForensicLogger.fields(
+                            "duration_ms", System.currentTimeMillis() - teardownStart
+                    )
+            );
+        }
+        catch (Throwable t) {
+            Log.e("XServerDisplayActivity", "Exit teardown failed", t);
+            ForensicLogger.logEvent(
+                    this,
+                    "error",
+                    "XSERVER_EXIT_TEARDOWN_FAILED",
+                    null,
+                    "xserver",
+                    "runtime_exit_teardown_failed",
+                    ForensicLogger.fields(
+                            "duration_ms", System.currentTimeMillis() - teardownStart,
+                            "error_class", t.getClass().getName(),
+                            "message", t.getMessage()
+                    )
+            );
+        }
+        finally {
+            handler.post(() -> {
+                if (preloaderDialog != null) preloaderDialog.closeOnUiThread();
+                exitInProgress.set(false);
+                AppUtils.restartApplication(getApplicationContext());
+            });
+        }
+    }
+
+    private void exit() {
+        if (!exitInProgress.compareAndSet(false, true)) return;
+        NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_EXIT_REQUESTED",
+                null,
+                "xserver",
+                "runtime_exit_requested",
+                null
+        );
+        preloaderDialog.showOnUiThread(R.string.shutdown);
+        handler.postDelayed(() -> exitTeardownExecutor.execute(this::performExitTeardown), 1000);
     }
 
     @Override
@@ -1288,6 +1383,82 @@ public class XServerDisplayActivity extends AppCompatActivity {
             Log.d("XServerDisplayActivity", "Failed to extract input dlls");
     }
 
+    private boolean isTrackedApplicationWindow(Window window) {
+        if (window == null) return false;
+        return window.getWidth() > 1
+                && window.getHeight() > 1
+                && window.getWMHintsValue(Window.WMHints.WINDOW_GROUP) == window.id;
+    }
+
+    private void noteApplicationWindowMapped(Window window) {
+        if (!isTrackedApplicationWindow(window)) return;
+        int trackedCount;
+        synchronized (mappedApplicationWindowIds) {
+            if (!mappedApplicationWindowIds.add(window.id)) return;
+            trackedCount = mappedApplicationWindowIds.size();
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_APP_WINDOW_MAPPED",
+                null,
+                "xserver",
+                "tracked_application_window_mapped",
+                ForensicLogger.fields(
+                        "window_id", window.id,
+                        "class_name", window.getClassName(),
+                        "tracked_count", trackedCount,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                )
+        );
+    }
+
+    private void noteApplicationWindowUnmapped(Window window) {
+        if (window == null) return;
+        int trackedCount;
+        synchronized (mappedApplicationWindowIds) {
+            if (!mappedApplicationWindowIds.remove(window.id)) return;
+            trackedCount = mappedApplicationWindowIds.size();
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_APP_WINDOW_UNMAPPED",
+                null,
+                "xserver",
+                "tracked_application_window_unmapped",
+                ForensicLogger.fields(
+                        "window_id", window.id,
+                        "class_name", window.getClassName(),
+                        "tracked_count", trackedCount,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "guest_launcher_exited", guestLauncherExited,
+                        "guest_launcher_exit_status", guestLauncherExitStatus
+                )
+        );
+        if (desktopShellBootstrapActive && guestLauncherExited && trackedCount == 0) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_DEFERRED_EXIT_RESUMED",
+                    null,
+                    "xserver",
+                    "deferred_exit_resumed_after_last_window",
+                    ForensicLogger.fields(
+                            "guest_launcher_exit_status", guestLauncherExitStatus
+                    )
+            );
+            runOnUiThread(this::exit);
+        }
+    }
+
+    private boolean shouldDeferGuestTermination(int status) {
+        if (!desktopShellBootstrapActive || status != 0) return false;
+        synchronized (mappedApplicationWindowIds) {
+            return !mappedApplicationWindowIds.isEmpty();
+        }
+    }
+
     private void setupWineSystemFiles() {
         String appVersion = String.valueOf(AppUtils.getVersionCode(this));
         String imgVersion = String.valueOf(imageFs.getVersion());
@@ -1362,10 +1533,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         FileUtils.clear(imageFs.getTmpDir());
 
         int bindingPathCount = 0;
+        synchronized (mappedApplicationWindowIds) {
+            mappedApplicationWindowIds.clear();
+        }
+        guestLauncherExited = false;
+        guestLauncherExitStatus = Integer.MIN_VALUE;
+        desktopShellBootstrapActive = false;
 
         guestProgramLauncherComponent = new GuestProgramLauncherComponent(
                 contentsManager,
-                contentsManager.getProfileByEntryName(container.getWineVersion()),
+                contentsManager.resolveBestRuntimeProfile(container.getWineVersion()),
                 shortcut
         );
 
@@ -1377,7 +1554,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
             guestProgramLauncherComponent.setContainer(this.container);
             guestProgramLauncherComponent.setWineInfo(this.wineInfo);
 
+            if (shortcut == null) {
+                configureDesktopShellRegistry();
+            }
             String guestExecutable = "wine explorer /desktop=shell," + xServer.screenInfo + " " + getWineStartCommand();
+            desktopShellBootstrapActive = shortcut == null
+                    && guestExecutable.toLowerCase(java.util.Locale.ROOT).contains("explorer /desktop=shell");
 
             guestProgramLauncherComponent.setGuestExecutable(guestExecutable);
 
@@ -1437,7 +1619,42 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         // Pass final envVars to the launcher
         guestProgramLauncherComponent.setEnvVars(envVars);
-        guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
+        guestProgramLauncherComponent.setTerminationCallback((status) -> {
+            guestLauncherExited = true;
+            guestLauncherExitStatus = status;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "GUEST_PROGRAM_TERMINATED",
+                    null,
+                    "xserver",
+                    "guest_program_terminated",
+                    ForensicLogger.fields(
+                            "status", status
+                    )
+            );
+            if (shouldDeferGuestTermination(status)) {
+                int trackedWindowCount;
+                synchronized (mappedApplicationWindowIds) {
+                    trackedWindowCount = mappedApplicationWindowIds.size();
+                }
+                ForensicLogger.logEvent(
+                        this,
+                        "info",
+                        "GUEST_PROGRAM_TERMINATION_DEFERRED",
+                        null,
+                        "xserver",
+                        "guest_program_termination_deferred",
+                        ForensicLogger.fields(
+                                "status", status,
+                                "tracked_window_count", trackedWindowCount,
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive
+                        )
+                );
+                return;
+            }
+            exit();
+        });
 
         // Add the launcher to our environment
         environment.addComponent(guestProgramLauncherComponent);
@@ -1554,7 +1771,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
             touchpadView.setSimTouchScreen(shortcut.getExtraBoolean("simTouchScreen", false));
             applyShortcutTouchpadGestureProfile();
         } else {
+            touchpadView.setSimTouchScreen(true);
+            renderer.setCursorVisible(true);
             touchpadView.resetGestureRuntimeTuning();
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_INPUT_MODEL_APPLIED",
+                    null,
+                    "xserver",
+                    "desktop_input_model_applied",
+                    ForensicLogger.fields(
+                            "shortcut_launch", false,
+                            "simulate_touchscreen", touchpadView.isSimTouchScreen(),
+                            "relative_mouse", xServer.isRelativeMouseMovement(),
+                            "cursor_visible", true
+                    )
+            );
         }
 
         AppUtils.observeSoftKeyboardVisibility(xserverRootView != null ? xserverRootView : rootView, renderer::setScreenOffsetYRelativeToCursor);
@@ -1951,17 +2184,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
         int vulkanSdkProfileCount = safeParseInt(envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"));
         boolean vulkanSdkAvailable = vulkanSdkProfileCount > 0;
         boolean requestedValidationLayer = upscalerEnabled && upscalerVulkanValidationLayer;
-        boolean upscalerValidationLayerActive = requestedValidationLayer && vulkanSdkAvailable;
+        Set<String> availableVkLayers = resolveAvailableVulkanLayerNames(envVars);
+        boolean validationLayerAvailable = availableVkLayers.contains("VK_LAYER_KHRONOS_validation");
+        boolean upscalerValidationLayerActive = requestedValidationLayer && vulkanSdkAvailable && validationLayerAvailable;
         if (requestedValidationLayer && !vulkanSdkAvailable && "none".equals(guardReason)) {
             guardReason = "vk_validation_requires_vulkansdk";
+        }
+        if (requestedValidationLayer && vulkanSdkAvailable && !validationLayerAvailable && "none".equals(guardReason)) {
+            guardReason = "vk_validation_layer_missing";
         }
         setOrClearEnv("AERO_VK_VALIDATION_REQUESTED", requestedValidationLayer ? "1" : "0");
         setOrClearEnv("AERO_VK_VALIDATION_LAYER", upscalerValidationLayerActive ? "1" : "0");
         setOrClearEnv(
                 "AERO_VK_VALIDATION_GUARD",
-                requestedValidationLayer && !vulkanSdkAvailable ? "vulkan_sdk_missing" : ""
+                requestedValidationLayer && !vulkanSdkAvailable
+                        ? "vulkan_sdk_missing"
+                        : requestedValidationLayer && vulkanSdkAvailable && !validationLayerAvailable
+                        ? "vulkan_validation_layer_missing"
+                        : ""
         );
-        setOrClearEnv("VK_INSTANCE_LAYERS", upscalerValidationLayerActive ? "VK_LAYER_KHRONOS_validation" : "");
+        String vkLayers = removeVkInstanceLayer(envVars.get("VK_INSTANCE_LAYERS"), "VK_LAYER_KHRONOS_validation");
+        if (upscalerValidationLayerActive) {
+            vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
+        } else if (requestedValidationLayer && vulkanSdkAvailable) {
+            logMissingVulkanLayer("upscaler", "VK_LAYER_KHRONOS_validation", availableVkLayers);
+        }
+        setOrClearEnv("VK_INSTANCE_LAYERS", vkLayers);
         setOrClearEnv("AERO_UPSCALER_TARGET_FPS", String.valueOf(effectiveTargetFps));
         setOrClearEnv("AERO_FRAMEGEN_ENABLED", frameGenerationActive ? "1" : "0");
         setOrClearEnv("AERO_FRAMEGEN_GENERATED_FRAMES", String.valueOf(effectiveGeneratedFrames));
@@ -2455,9 +2703,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv(targetEnv, "ALSA_DEBUG", snapshot.enableAlsaLogs ? "1" : "");
         setOrClearEnv(targetEnv, "VK_LOADER_DEBUG", snapshot.enableVulkanLoaderDebug ? "all" : "");
 
-        String vkLayers = targetEnv.get("VK_INSTANCE_LAYERS");
-        if (snapshot.enableVulkanApiDump) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_LUNARG_api_dump");
-        if (snapshot.enableVulkanValidation) vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
+        Set<String> availableVkLayers = resolveAvailableVulkanLayerNames(targetEnv);
+        String vkLayers = removeVkInstanceLayer(targetEnv.get("VK_INSTANCE_LAYERS"), "VK_LAYER_LUNARG_api_dump");
+        vkLayers = removeVkInstanceLayer(vkLayers, "VK_LAYER_KHRONOS_validation");
+        if (snapshot.enableVulkanApiDump) {
+            if (availableVkLayers.contains("VK_LAYER_LUNARG_api_dump")) {
+                vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_LUNARG_api_dump");
+            } else {
+                logMissingVulkanLayer("forensic", "VK_LAYER_LUNARG_api_dump", availableVkLayers);
+            }
+        }
+        if (snapshot.enableVulkanValidation) {
+            if (availableVkLayers.contains("VK_LAYER_KHRONOS_validation")) {
+                vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
+            } else {
+                logMissingVulkanLayer("forensic", "VK_LAYER_KHRONOS_validation", availableVkLayers);
+            }
+        }
         setOrClearEnv(targetEnv, "VK_INSTANCE_LAYERS", vkLayers);
     }
 
@@ -2562,6 +2824,85 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return baseLayers + ":" + normalizedLayer;
     }
 
+    private String removeVkInstanceLayer(String baseLayers, String layer) {
+        if (baseLayers == null || baseLayers.trim().isEmpty()) return "";
+        if (layer == null || layer.trim().isEmpty()) return baseLayers;
+        String normalizedLayer = layer.trim();
+        String[] parts = baseLayers.split(":");
+        ArrayList<String> filtered = new ArrayList<>(parts.length);
+        for (String part : parts) {
+            String candidate = part == null ? "" : part.trim();
+            if (candidate.isEmpty() || normalizedLayer.equals(candidate)) continue;
+            filtered.add(candidate);
+        }
+        return filtered.isEmpty() ? "" : String.join(":", filtered);
+    }
+
+    private Set<String> resolveAvailableVulkanLayerNames(EnvVars sourceEnv) {
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        LinkedHashSet<String> manifestDirs = new LinkedHashSet<>();
+        String rawLayerPath = sourceEnv != null ? sourceEnv.get("VK_LAYER_PATH") : null;
+        if (rawLayerPath != null && !rawLayerPath.trim().isEmpty()) {
+            String[] parts = rawLayerPath.split(":");
+            for (String part : parts) {
+                String candidate = part == null ? "" : part.trim();
+                if (!candidate.isEmpty()) manifestDirs.add(candidate);
+            }
+        }
+        if (imageFs != null) {
+            manifestDirs.add(new File(imageFs.getShareDir(), "vulkan/implicit_layer.d").getAbsolutePath());
+            manifestDirs.add(new File(imageFs.getShareDir(), "vulkan/explicit_layer.d").getAbsolutePath());
+        }
+        for (String manifestDirPath : manifestDirs) {
+            File manifestDir = new File(manifestDirPath);
+            File[] manifestFiles = manifestDir.listFiles((dir, name) -> name != null && name.endsWith(".json"));
+            if (manifestFiles == null) continue;
+            for (File manifestFile : manifestFiles) {
+                collectVulkanLayerNames(manifestFile, names);
+            }
+        }
+        return names;
+    }
+
+    private void collectVulkanLayerNames(File manifestFile, Set<String> names) {
+        if (manifestFile == null || names == null || !manifestFile.isFile()) return;
+        try {
+            JSONObject object = new JSONObject(FileUtils.readString(manifestFile));
+            JSONObject layer = object.optJSONObject("layer");
+            if (layer != null) {
+                String name = layer.optString("name", "").trim();
+                if (!name.isEmpty()) names.add(name);
+            }
+            JSONArray layers = object.optJSONArray("layers");
+            if (layers == null) return;
+            for (int i = 0; i < layers.length(); i++) {
+                JSONObject layerObject = layers.optJSONObject(i);
+                if (layerObject == null) continue;
+                String name = layerObject.optString("name", "").trim();
+                if (!name.isEmpty()) names.add(name);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void logMissingVulkanLayer(String requester, String layerName, Set<String> availableLayers) {
+        ForensicLogger.logEvent(
+                this,
+                "warn",
+                "VULKAN_LAYER_REQUEST_SKIPPED",
+                null,
+                "xserver",
+                "requested_vulkan_layer_missing",
+                ForensicLogger.fields(
+                        "requester", requester,
+                        "layer_name", layerName,
+                        "available_layers", availableLayers == null || availableLayers.isEmpty()
+                                ? ""
+                                : String.join(",", availableLayers)
+                )
+        );
+    }
+
     private String normalizeRequestedVulkanApi(String raw) {
         if (raw == null || raw.trim().isEmpty()) return "1.3";
         Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(raw);
@@ -2630,12 +2971,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private String detectVulkanSdkLaneArch(ContentProfile profile) {
         if (profile == null) return "generic";
+        boolean hasArm64 = false;
+        boolean hasArm64Ec = false;
+        boolean hasX64 = false;
+        if (profile.fileList != null) {
+            for (ContentProfile.ContentFile contentFile : profile.fileList) {
+                if (contentFile == null || contentFile.source == null) continue;
+                String lowerSource = contentFile.source.toLowerCase(Locale.US);
+                hasArm64 |= lowerSource.contains("/arm64/") || lowerSource.contains("/aarch64/");
+                hasArm64Ec |= lowerSource.contains("/arm64ec/") || lowerSource.contains("/arm64-ec/");
+                hasX64 |= lowerSource.contains("/x86_64/") || lowerSource.contains("/x86-64/") || lowerSource.contains("/amd64/");
+            }
+        }
+        if ((hasArm64 || hasArm64Ec) && hasX64) return "bundle";
         String combined = (
                 (profile.verName == null ? "" : profile.verName) + " " +
                 (profile.desc == null ? "" : profile.desc) + " " +
                 (profile.releaseTag == null ? "" : profile.releaseTag) + " " +
                 (profile.remoteUrl == null ? "" : profile.remoteUrl)
         ).toLowerCase(Locale.US);
+        if (combined.contains("bundle") || combined.contains("unified") || combined.contains("all-arch")) return "bundle";
         if (combined.contains("arm64ec")) return "arm64ec";
         if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
         if (combined.contains("arm64")) return "arm64";
@@ -2680,7 +3035,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         ArrayList<ContentProfile> selected = new ArrayList<>();
-        String[] preferredOrder = {"arm64", "arm64ec", "x86_64", "generic"};
+        String[] preferredOrder = wineInfo != null && wineInfo.isArm64EC()
+                ? new String[] {"bundle", "arm64ec", "x86_64", "arm64", "generic"}
+                : new String[] {"bundle", "arm64", "x86_64", "arm64ec", "generic"};
         for (String arch : preferredOrder) {
             ContentProfile profile = bestByArch.get(arch);
             if (profile != null) selected.add(profile);
@@ -2747,12 +3104,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void applyGraphicsDriverPackages(String selectedDriverId, boolean dxvkRoute) {
         AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
         AdrenotoolsManager.DriverPackageInfo selectedInfo = adrenotoolsManager.getDriverPackageInfo(selectedDriverId);
-        AdrenotoolsManager.DriverPackageInfo turnipInfo = adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", selectedInfo);
-        AdrenotoolsManager.DriverPackageInfo openGlInfo = adrenotoolsManager.resolvePreferredDriverForLane("freedreno-opengl", selectedInfo);
-        AdrenotoolsManager.DriverPackageInfo activeInfo = dxvkRoute ? turnipInfo : openGlInfo;
-        AdrenotoolsManager.DriverPackageInfo companionInfo = dxvkRoute ? openGlInfo : turnipInfo;
-        if (activeInfo == null && selectedInfo != null && selectedInfo.isSystemSelection()) {
-            activeInfo = selectedInfo;
+        boolean systemSelection = selectedInfo != null && selectedInfo.isSystemSelection();
+        AdrenotoolsManager.DriverPackageInfo turnipInfo = null;
+        AdrenotoolsManager.DriverPackageInfo openGlInfo = null;
+        AdrenotoolsManager.DriverPackageInfo activeInfo = null;
+        AdrenotoolsManager.DriverPackageInfo companionInfo = null;
+
+        if (!systemSelection) {
+            turnipInfo = adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", selectedInfo);
+            openGlInfo = adrenotoolsManager.resolvePreferredDriverForLane("freedreno-opengl", selectedInfo);
+            activeInfo = dxvkRoute ? turnipInfo : openGlInfo;
+            companionInfo = dxvkRoute ? openGlInfo : turnipInfo;
         }
 
         if (activeInfo != null && !activeInfo.isSystemSelection() && !activeInfo.isOpenGlProvider()) {
@@ -3443,6 +3805,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String getWineStartCommand() {
         // Initialize overrideEnvVars if not already done
         EnvVars envVars = getOverrideEnvVars();
+        boolean directDesktopShellBootstrap = shortcut == null
+                && wineInfo != null
+                && wineInfo.isArm64EC()
+                && !envVars.has("EXTRA_EXEC_ARGS");
 
         // Define default arguments
         String args = "";
@@ -3472,14 +3838,59 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (envVars.has("EXTRA_EXEC_ARGS")) {
                 args += " " + envVars.get("EXTRA_EXEC_ARGS");
                 envVars.remove("EXTRA_EXEC_ARGS"); // Remove the key after use
+            } else if (directDesktopShellBootstrap) {
+                // Let Wine own the virtual desktop shell directly for clean container boot.
+                args = "";
             } else {
                 args += "\"wfm.exe\"";
             }
         }
-        // Construct the final command
-        String command = "winhandler.exe " + args;
+        // ARM64EC desktop bootstrap is more stable when the shell starts directly,
+        // bypassing the intermediate winhandler wrapper that trips libarm64ecfex.
+        String command = directDesktopShellBootstrap ? args.trim() : "winhandler.exe " + args;
 
         return command;
+    }
+
+    private void configureDesktopShellRegistry() {
+        if (container == null || xServer == null) return;
+        File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
+        String desktopName = "shell";
+        String desktopGeometry = String.valueOf(xServer.screenInfo);
+        try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
+            registryEditor.setStringValue("Software\\Wine\\Explorer", "Desktop", desktopName);
+            registryEditor.setStringValue("Software\\Wine\\Explorer\\Desktops", desktopName, desktopGeometry);
+            registryEditor.setDwordValue("Software\\Wine\\Explorer\\Desktops\\" + desktopName, "EnableShell", 1);
+            registryEditor.setDwordValue("Software\\Wine\\Explorer\\Desktops\\" + desktopName, "ShowSystray", 1);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_SHELL_REGISTRY_APPLIED",
+                    null,
+                    "xserver",
+                    "desktop_shell_registry_applied",
+                    ForensicLogger.fields(
+                            "desktop_name", desktopName,
+                            "desktop_geometry", desktopGeometry,
+                            "shortcut_launch", shortcut != null
+                    )
+            );
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to configure desktop shell registry", e);
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "DESKTOP_SHELL_REGISTRY_FAILED",
+                    null,
+                    "xserver",
+                    "desktop_shell_registry_failed",
+                    ForensicLogger.fields(
+                            "desktop_name", desktopName,
+                            "desktop_geometry", desktopGeometry,
+                            "error", e.getMessage() == null ? "" : e.getMessage()
+                    )
+            );
+        }
     }
 
     private String getExecutable() {
@@ -3487,8 +3898,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (shortcut != null) {
             filename = FileUtils.getName(shortcut.path);
         }
-        else
-            filename = "wfm.exe";
+        else {
+            boolean directDesktopShellBootstrap = wineInfo != null
+                    && wineInfo.isArm64EC()
+                    && !getOverrideEnvVars().has("EXTRA_EXEC_ARGS");
+            filename = directDesktopShellBootstrap ? "explorer.exe" : "wfm.exe";
+        }
         return filename;
     }
 
