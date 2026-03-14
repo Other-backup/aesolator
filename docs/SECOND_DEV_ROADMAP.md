@@ -76,6 +76,9 @@ Second autonomous developer lane for `aesolator`:
      improvements and document every borrowed behavior before integration
    - map `imagefs` structure, libraries, overlays, and runtime patch points in
      detail before changing rootfs-related install logic
+   - keep release artifacts traceable after install:
+     source label, release tag, artifact name, published date, and notes should
+     survive from remote feed to local profile metadata where available
 
 ## Phase Plan
 
@@ -131,8 +134,9 @@ Second autonomous developer lane for `aesolator`:
   visible ordering, but it still needs a live `Contents` device pass to confirm
   that nightly/stable and architecture variants render as intended in the UI.
 - `BannersComponentInjector` has not yet been fully harvested into a local
-  donor-notes contract, so there is still a risk of missing better package-link
-  sources or richer release browsing behavior already solved there.
+  donor-integration pass, so there is still a risk of missing a first-class
+  `Nightlies by The412Banner` lane or other package-link paths already solved
+  there.
 - `WCPHub` source parsing no longer drops overlapping families at ingest time,
   but the integrated device pass still needs one more live confirmation for
   list rendering and install actions after the parser fix.
@@ -150,3 +154,6 @@ Second autonomous developer lane for `aesolator`:
 - `llvm-strip` from the desktop NDK host bundle is still incompatible with
   Termux ARM64, so debug packaging currently proceeds with unstripped native
   libraries.
+- `imagefs` now has a documented reverse map, so the remaining rootfs risk is
+  no longer “unknown structure” but future ownership mistakes between base
+  image, Wine payloads, and boot-time overlays.

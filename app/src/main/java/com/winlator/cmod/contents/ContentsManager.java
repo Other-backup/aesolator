@@ -166,6 +166,9 @@ public class ContentsManager {
                     remoteProfile.sourceFeed = object.optString(ContentProfile.MARK_SOURCE_FEED, "").trim();
                     remoteProfile.sourceLabel = object.optString(ContentProfile.MARK_SOURCE_LABEL, "").trim();
                     remoteProfile.releaseTag = object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim();
+                    remoteProfile.artifactName = object.optString(ContentProfile.MARK_ARTIFACT_NAME, "").trim();
+                    remoteProfile.publishedAt = object.optString(ContentProfile.MARK_PUBLISHED_AT, "").trim();
+                    remoteProfile.releaseNotes = object.optString(ContentProfile.MARK_RELEASE_NOTES, "").trim();
                     remoteProfile.vulkanApiMin = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MIN), 0);
                     remoteProfile.vulkanApiMax = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MAX), 0);
                     remoteProfile.vulkanSdkVersion = object.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "").trim();
@@ -450,6 +453,9 @@ public class ContentsManager {
             changed |= putProfileField(object, ContentProfile.MARK_SOURCE_FEED, profile.sourceFeed);
             changed |= putProfileField(object, ContentProfile.MARK_SOURCE_LABEL, profile.sourceLabel);
             changed |= putProfileField(object, ContentProfile.MARK_RELEASE_TAG, profile.releaseTag);
+            changed |= putProfileField(object, ContentProfile.MARK_ARTIFACT_NAME, profile.artifactName);
+            changed |= putProfileField(object, ContentProfile.MARK_PUBLISHED_AT, profile.publishedAt);
+            changed |= putProfileField(object, ContentProfile.MARK_RELEASE_NOTES, profile.releaseNotes);
             changed |= putProfileField(object, ContentProfile.MARK_SHA256, profile.remoteSha256);
 
             if (profile.vulkanApiMin > 0 && object.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0) != profile.vulkanApiMin) {
@@ -551,6 +557,9 @@ public class ContentsManager {
             profile.sourceFeed = profileJSONObject.optString(ContentProfile.MARK_SOURCE_FEED, "");
             profile.sourceLabel = profileJSONObject.optString(ContentProfile.MARK_SOURCE_LABEL, "");
             profile.releaseTag = profileJSONObject.optString(ContentProfile.MARK_RELEASE_TAG, "");
+            profile.artifactName = profileJSONObject.optString(ContentProfile.MARK_ARTIFACT_NAME, "");
+            profile.publishedAt = profileJSONObject.optString(ContentProfile.MARK_PUBLISHED_AT, "");
+            profile.releaseNotes = profileJSONObject.optString(ContentProfile.MARK_RELEASE_NOTES, "");
             profile.vulkanApiMin = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0);
             profile.vulkanApiMax = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0);
             profile.vulkanSdkVersion = profileJSONObject.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "");
@@ -924,6 +933,9 @@ public class ContentsManager {
         profile.sourceFeed = remoteHint.sourceFeed;
         profile.sourceLabel = remoteHint.sourceLabel;
         profile.releaseTag = remoteHint.releaseTag;
+        profile.artifactName = remoteHint.artifactName;
+        profile.publishedAt = remoteHint.publishedAt;
+        profile.releaseNotes = remoteHint.releaseNotes;
         profile.vulkanApiMin = remoteHint.vulkanApiMin;
         profile.vulkanApiMax = remoteHint.vulkanApiMax;
         profile.vulkanSdkVersion = remoteHint.vulkanSdkVersion;
@@ -965,6 +977,9 @@ public class ContentsManager {
             object.put(ContentProfile.MARK_SOURCE_FEED, profile.sourceFeed == null ? "" : profile.sourceFeed);
             object.put(ContentProfile.MARK_SOURCE_LABEL, profile.sourceLabel == null ? "" : profile.sourceLabel);
             object.put(ContentProfile.MARK_RELEASE_TAG, profile.releaseTag == null ? "" : profile.releaseTag);
+            object.put(ContentProfile.MARK_ARTIFACT_NAME, profile.artifactName == null ? "" : profile.artifactName);
+            object.put(ContentProfile.MARK_PUBLISHED_AT, profile.publishedAt == null ? "" : profile.publishedAt);
+            object.put(ContentProfile.MARK_RELEASE_NOTES, profile.releaseNotes == null ? "" : profile.releaseNotes);
             if (profile.remoteSha256 != null && !profile.remoteSha256.trim().isEmpty()) {
                 object.put(ContentProfile.MARK_SHA256, profile.remoteSha256.trim());
             }

@@ -617,3 +617,44 @@
 - Verification: `AGENTS.md` and `SECOND_DEV_ROADMAP.md` updated locally.
 - Next step: keep the current lane on feature/UX/package closure, then return
   to deeper debugging only after the list pass is explicitly marked closed.
+
+### Entry 34: Artifact metadata carry-through
+
+- Goal: stop remote release assets from losing their identity once they enter
+  the app and later become installed local profiles.
+- Context: donor analysis showed that `BannersComponentInjector` keeps richer
+  artifact metadata on remote items: source, published date, file size, release
+  notes, and release-tag browsing. In `Ae.solator`, remote package identity was
+  still flattened too early, especially after manual install of downloaded
+  artifacts.
+- Decision: extend `ContentProfile` and `ContentsManager` to carry
+  `artifactName`, `publishedAt`, and `releaseNotes` alongside source and
+  release tag metadata; populate those fields from GameHub release assets and
+  persist them into synthetic/local profile metadata during install flows.
+- Tradeoff: the profile model becomes slightly wider, but install provenance is
+  stronger and the app can now present remote artifacts with more honest
+  metadata after download and import.
+- Verification: `assembleDebug` completed successfully, the rebuilt APK was
+  reinstalled on `10.0.0.1:42363`, and a fresh launcher smoke pass completed
+  without new crash-buffer output.
+- Next step: wire the new metadata into the package info UI and then rebuild.
+
+### Entry 35: Content info and imagefs reverse-map closure
+
+- Goal: close two lingering tails at once:
+  richer package detail UI and a concrete `imagefs` reverse-engineering map.
+- Context: after donor review, the current `ContentInfoDialog` looked too thin
+  for artifact-backed feeds, and `imagefs` structure knowledge still lived
+  mostly in working notes instead of a dedicated repo document.
+- Decision: expand the package info dialog to show source, release tag,
+  artifact name, channel, published date, and release notes when available; at
+  the same time, capture the current `imagefs` layout, toolchain, libraries,
+  overlays, and ownership zones into `docs/IMAGEFS_REVERSE_MAP.md`.
+- Tradeoff: the info dialog becomes denser, but it now surfaces the artifact
+  metadata that the rest of the `Contents` work is already preserving.
+- Verification: live `imagefs` path listings captured again from the installed
+  app sandbox; docs and UI resources updated locally; build, reinstall, and
+  smoke-launch verification completed successfully in the same pass.
+- Next step: continue the queued donor/package task from a clean committed
+  state and only then return to deeper debugging if something still blocks the
+  next feature lane.

@@ -431,7 +431,13 @@
     <string name="content_glibc_import_unsupported">GLIBC-tagged Wine/Proton archives are not allowed in bionic-only runtime lanes.</string>
     <string name="content_info">Content Info</string>
     <string name="content_info_summary">Package metadata</string>
-    <string name="content_info_summary_hint">Package version, description and installed files for the selected item.</string>
+    <string name="content_info_summary_hint">Package version, source, artifact metadata and installed files for the selected item.</string>
+    <string name="content_info_release_tag">Release tag</string>
+    <string name="content_info_artifact">Artifact</string>
+    <string name="content_info_published_at">Published</string>
+    <string name="content_info_release_notes">Release notes</string>
+    <string name="source">Source</string>
+    <string name="channel">Channel</string>
     <string name="version_code">Version Code</string>
     <string name="description">Description</string>
     <string name="file_list">File List</string>

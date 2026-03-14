@@ -25,6 +25,9 @@ public class ContentProfile {
     public static final String MARK_SOURCE_FEED = "sourceFeed";
     public static final String MARK_SOURCE_LABEL = "sourceLabel";
     public static final String MARK_RELEASE_TAG = "releaseTag";
+    public static final String MARK_ARTIFACT_NAME = "artifactName";
+    public static final String MARK_PUBLISHED_AT = "publishedAt";
+    public static final String MARK_RELEASE_NOTES = "releaseNotes";
     public static final String MARK_SHA256 = "sha256";
     public static final String MARK_VULKAN_API_MIN = "vulkanApiMin";
     public static final String MARK_VULKAN_API_MAX = "vulkanApiMax";
@@ -111,6 +114,9 @@ public class ContentProfile {
     public String sourceFeed = "";
     public String sourceLabel = "";
     public String releaseTag = "";
+    public String artifactName = "";
+    public String publishedAt = "";
+    public String releaseNotes = "";
     public int vulkanApiMin = 0;
     public int vulkanApiMax = 0;
     public String vulkanSdkVersion = "";
@@ -214,6 +220,15 @@ public class ContentProfile {
         }
         if ((releaseTag == null || releaseTag.trim().isEmpty()) && remoteProfile.releaseTag != null) {
             releaseTag = remoteProfile.releaseTag;
+        }
+        if ((artifactName == null || artifactName.trim().isEmpty()) && remoteProfile.artifactName != null) {
+            artifactName = remoteProfile.artifactName;
+        }
+        if ((publishedAt == null || publishedAt.trim().isEmpty()) && remoteProfile.publishedAt != null) {
+            publishedAt = remoteProfile.publishedAt;
+        }
+        if ((releaseNotes == null || releaseNotes.trim().isEmpty()) && remoteProfile.releaseNotes != null) {
+            releaseNotes = remoteProfile.releaseNotes;
         }
         if (vulkanApiMin <= 0 && remoteProfile.vulkanApiMin > 0) {
             vulkanApiMin = remoteProfile.vulkanApiMin;

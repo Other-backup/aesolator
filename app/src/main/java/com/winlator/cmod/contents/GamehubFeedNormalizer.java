@@ -86,8 +86,10 @@ public final class GamehubFeedNormalizer {
         String releaseTag = release == null ? "" : release.optString("tag_name", "").trim();
         String versionName = stripArchiveSuffix(assetName);
         String channel = deriveReleaseChannel(release, releaseTag, assetName);
+        String publishedAt = release == null ? "" : release.optString("published_at", asset.optString("updated_at", "")).trim();
+        String releaseNotes = release == null ? "" : release.optString("body", "").trim();
         int versionCode = deriveReleaseVersionCode(
-                release == null ? "" : release.optString("published_at", asset.optString("updated_at", "")),
+                publishedAt,
                 assetName
         );
 
@@ -105,6 +107,9 @@ public final class GamehubFeedNormalizer {
             normalized.put(ContentProfile.MARK_SOURCE_FEED, SOURCE_FEED_ID);
             normalized.put(ContentProfile.MARK_SOURCE_LABEL, SOURCE_LABEL);
             if (!releaseTag.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_TAG, releaseTag);
+            if (!assetName.isEmpty()) normalized.put(ContentProfile.MARK_ARTIFACT_NAME, assetName);
+            if (!publishedAt.isEmpty()) normalized.put(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
+            if (!releaseNotes.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_NOTES, releaseNotes);
             return normalized;
         } catch (Exception ignored) {
             return null;
@@ -147,6 +152,7 @@ public final class GamehubFeedNormalizer {
             normalized.put(ContentProfile.MARK_SOURCE_FEED, SOURCE_FEED_ID);
             normalized.put(ContentProfile.MARK_SOURCE_LABEL, SOURCE_LABEL);
             if (!version.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_TAG, version);
+            if (!fileName.isEmpty()) normalized.put(ContentProfile.MARK_ARTIFACT_NAME, fileName);
             return normalized;
         } catch (Exception ignored) {
             return null;

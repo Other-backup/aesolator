@@ -1,0 +1,223 @@
+# ImageFS Reverse Map
+
+Updated: `2026-03-14`
+
+## Scope
+
+Runtime-oriented reverse map of the shipped `imagefs` rootfs as observed from:
+
+- source code in `ImageFs.java`, `ImageFsInstaller.java`, and
+  `XServerDisplayActivity.applyGeneralPatches()`
+- a live installed build on device `10.0.0.1:42363`
+
+This document separates:
+
+- base rootfs facts shipped by `imagefs.txz`
+- installer behavior
+- runtime overlays and mutations that happen after base extraction
+
+## Base Install Contract
+
+- `ImageFsInstaller.LATEST_VERSION = 21`
+- `installFromAssets()` clears the rootfs, extracts `imagefs.txz`, then
+  installs bundled Wine assets and bundled graphics-driver assets
+- installer writes `.winlator/.img_version`
+- `clearRootDir()` preserves `home/` across reinstalls
+- `clearOptDir()` preserves `opt/installed-wine` while clearing other
+  `opt/*` payloads during targeted cleanup paths
+
+## Top-Level Layout
+
+Observed under `/data/user/0/com.winlator.cmod/files/imagefs`:
+
+- `bin`
+- `etc`
+- `home`
+- `lib`
+- `opt`
+- `share`
+- `storage`
+- `tmp`
+- `usr`
+- `var`
+- `.winlator/.img_version`
+
+Interpretation:
+
+- `usr/` is the main runtime payload surface
+- `home/` is intentionally preserved because user/container state evolves there
+- `.winlator/.img_version` is the image validity/version marker
+
+## User-State Paths
+
+From `ImageFs.java`:
+
+- runtime user: `xuser`
+- home: `/home/xuser`
+- cache: `/home/xuser/.cache`
+- config: `/home/xuser/.config`
+- wineprefix: `/home/xuser/.wine`
+
+Important observation:
+
+- base `imagefs/home` is not the final user state; container lifecycle and
+  runtime boot paths populate `xuser` and the effective prefix later
+
+## Core Runtime Directories
+
+Observed under `imagefs/usr`:
+
+- `bin`
+- `etc`
+- `lib`
+- `libexec`
+- `sbin`
+- `share`
+- `tmp`
+- `var`
+
+Important code-level accessors:
+
+- `getTmpDir()` -> `/usr/tmp`
+- `getLibDir()` -> `/usr/lib`
+- `getBinDir()` -> `/usr/bin`
+- `getShareDir()` -> `/usr/share`
+- `getEtcDir()` -> `/usr/etc`
+
+## Notable Binaries
+
+Observed under `imagefs/usr/bin`:
+
+- `curl`
+- `tar`
+- `grep`
+- `openssl`
+- `zstd`
+- `ffmpeg`
+- `xmllint`
+- `gio`
+- `gst-device-monitor-1.0`
+- `gst-discoverer-1.0`
+- `gst-inspect-1.0`
+- `gst-launch-1.0`
+- `gst-play-1.0`
+- `gst-stats-1.0`
+- `gst-transcoder-1.0`
+- `gst-typefind-1.0`
+- `winetricksfolder`
+
+Interpretation:
+
+- the base rootfs already ships network, archive, XML, multimedia, and
+  GStreamer tooling
+- `winetricksfolder` confirms the rootfs is prepared for Wine-adjacent helper
+  workflows, not only a minimal process sandbox
+
+## Notable Libraries
+
+Observed under `imagefs/usr/lib`:
+
+- X11/XCB stack:
+  `libX11*`, `libxcb-*`
+- Android compatibility shims:
+  `libandroid-*`
+- audio stack:
+  `libpulse.so`, `libpulseaudio.so`, `libpulsecommon-13.0.so`,
+  `libpulsecore-13.0.so`
+- Vulkan loader:
+  `libvulkan.so`, `libvulkan.so.1`, `libvulkan.so.1.4.315`
+- multimedia:
+  `libavformat*`
+- GStreamer:
+  `libgstreamer-1.0*`, `libgst*`
+- Winlator-specific hook:
+  `libfile_redirect_hook.so`
+
+Interpretation:
+
+- this is a broad userland runtime, not a thin Wine-only package
+- `libfile_redirect_hook.so` is a Winlator-specific integration point worth
+  treating as contract-sensitive
+
+## Config and Shared Data
+
+Observed under `imagefs/usr/etc`:
+
+- `alsa`
+- `dbus-1`
+- `fonts`
+- `hosts`
+- `host.conf`
+- `pulse`
+- `resolv.conf`
+- `rpc`
+- `tls`
+- `unbound`
+- `xattr.conf`
+- `xdg`
+
+Observed under `imagefs/usr/share/wine`:
+
+- `fonts`
+- `nls`
+
+Interpretation:
+
+- network, font, pulse, dbus, and xdg assumptions are already baked into the
+  base image
+- Wine language/font payload is partly base-image owned, not entirely
+  container-owned
+
+## Opt Surface
+
+From code:
+
+- `getInstalledWineDir()` -> `/opt/installed-wine`
+- `ImageFs.winePath` defaults to `/opt/<main-wine-version>`
+- `installWineFromAssets()` extracts each bundled Wine runtime into `opt/<ver>`
+
+Interpretation:
+
+- `opt/` is the Wine runtime ownership surface
+- app-side Wine updates should respect `installed-wine` preservation rules
+
+## Runtime Patch Layer
+
+At container boot, `XServerDisplayActivity.applyGeneralPatches()` extracts:
+
+- `container_pattern_common.tzst` into the rootfs root
+- `pulseaudio.tzst` into app files dir `pulseaudio`
+
+Then it applies system tweaks and clears stale container-side graphics/theme
+extras.
+
+Interpretation:
+
+- not everything visible at runtime belongs to base `imagefs.txz`
+- there is a second mutation layer applied at container/session start
+
+## Safe vs Sensitive Change Zones
+
+Safer app-side investigation zones:
+
+- metadata and documentation around `imagefs` structure
+- verification of shipped tools/libraries
+- installer diagnostics and version tracking
+
+Contract-sensitive zones:
+
+- `opt/` Wine runtime ownership
+- `container_pattern_common.tzst` overlay behavior
+- `pulseaudio.tzst` extraction path
+- any change touching `libfile_redirect_hook.so`
+- any change assuming `home/` is disposable
+
+## Working Conclusions
+
+- `imagefs` is a layered runtime:
+  base rootfs + bundled Wine/assets + boot-time overlay patches
+- `home/` and container-user state must be treated as mutable/preserved state,
+  not as part of a stateless base image
+- any future optimization or artifact migration for `imagefs` should first be
+  classified as:
+  base image content, Wine runtime payload, or boot-time overlay content
