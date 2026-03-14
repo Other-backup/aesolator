@@ -1013,3 +1013,34 @@
   model.
 - Next step: return to the remaining payload/runtime tails from a stable base:
   `DXVK`, `VKD3D`, `Vulkan SDK`, `dgVoodoo`, and post-desktop UX polish.
+
+### Entry 49: Cursor-touchpad refinement after direct-touch proof
+
+- Goal: refine the fixed desktop session so the cursor behaves like a desktop
+  pointer instead of duplicating the user’s finger on every touch.
+- Context: the first closure pass proved that a no-shortcut desktop session was
+  finally clickable, but it did so with `simulateTouchScreen:true`. That made
+  the visible cursor behave like a touch surrogate and jump directly to the tap
+  point, which is not the intended desktop interaction model.
+- Decision: switch no-shortcut desktop bootstrap from touch-surrogate mode to a
+  visible cursor-touchpad model. In `XServerDisplayActivity.setupUI()` the
+  session now forces `simulateTouchScreen:false`, clears relative-mouse mode,
+  centers the pointer at desktop start, keeps the cursor visible, and records
+  the resulting pointer state in `DESKTOP_INPUT_MODEL_APPLIED`.
+- Tradeoff: raw tap-to-hit proof is less trivial than in touch-surrogate mode,
+  because the pointer is now a real cursor instead of a direct touch mirror.
+  That is the correct tradeoff for the desktop route: usability now matches the
+  user’s requested desktop semantics instead of a tablet-style touch overlay.
+- Verification: rebuilt and reinstalled the APK, cold-started
+  `XServerDisplayActivity` for `container_id=3`, and observed on-device
+  forensic lines:
+  `DESKTOP_INPUT_MODEL_APPLIED` with `simulate_touchscreen:false`,
+  `relative_mouse:false`, `pointer_x:640`, `pointer_y:360`,
+  `input_mode:"cursor_touchpad"`, followed by
+  `DESKTOP_SHELL_REGISTRY_APPLIED` and `XSERVER_APP_WINDOW_MAPPED` for
+  `explorer.exe`. `dumpsys activity top` kept `XServerDisplayActivity`
+  `mResumed=true`, confirming that the refined input contract holds on the live
+  desktop session without falling back to the old touch surrogate.
+- Next step: continue payload/runtime closure from this cursor-based desktop
+  baseline, then revisit any remaining desktop UX polish only after
+  `DXVK` / `VKD3D` / `Vulkan SDK` / `dgVoodoo` consumers are stable.

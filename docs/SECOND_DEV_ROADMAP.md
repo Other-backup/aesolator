@@ -132,6 +132,11 @@ Second autonomous developer lane for `aesolator`:
   been completed once on March 14, 2026 with a resumed `XServerDisplayActivity`
   and a two-tap screenshot delta on the live desktop, so the remaining desktop
   risk is follow-up package/runtime behavior rather than basic clickability.
+- The desktop input baseline was then refined again on March 14, 2026 from a
+  touch-surrogate cursor to an explicit `cursor_touchpad` model with a visible
+  centered pointer. Remaining desktop work should preserve that desktop-style
+  cursor semantics unless the user explicitly asks for tablet-style direct
+  touch.
 - `New Container` now has a verified end-to-end baseline on-device: a local
   donor runtime resolves correctly, `Create` reaches `Creating Container…`,
   and a real `/files/imagefs/home/xuser-*` container root is materialized.

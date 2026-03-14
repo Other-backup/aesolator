@@ -1771,8 +1771,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             touchpadView.setSimTouchScreen(shortcut.getExtraBoolean("simTouchScreen", false));
             applyShortcutTouchpadGestureProfile();
         } else {
-            touchpadView.setSimTouchScreen(true);
+            isRelativeMouseMovement = false;
+            xServer.setRelativeMouseMovement(false);
+            touchpadView.setSimTouchScreen(false);
             renderer.setCursorVisible(true);
+            xServer.injectPointerMove(xServer.screenInfo.width / 2, xServer.screenInfo.height / 2);
             touchpadView.resetGestureRuntimeTuning();
             ForensicLogger.logEvent(
                     this,
@@ -1785,7 +1788,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "shortcut_launch", false,
                             "simulate_touchscreen", touchpadView.isSimTouchScreen(),
                             "relative_mouse", xServer.isRelativeMouseMovement(),
-                            "cursor_visible", true
+                            "cursor_visible", true,
+                            "pointer_x", xServer.pointer.getClampedX(),
+                            "pointer_y", xServer.pointer.getClampedY(),
+                            "input_mode", "cursor_touchpad"
                     )
             );
         }

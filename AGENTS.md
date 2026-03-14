@@ -108,9 +108,14 @@ runtime-binding, documentation alignment, and repository contract integrity.
   call the desktop fixed.
 - For no-shortcut desktop sessions, verify the input contract separately from
   shell readiness:
-  a live desktop is not complete unless the session enters a direct-touch
-  model (`simulateTouchScreen` or equivalent) and accepts real pointer hits on
-  device, not just window maps in forensic logs.
+  a live desktop is not complete unless the session enters an explicit pointer
+  interaction model (`simulateTouchScreen`, cursor-touchpad, or equivalent)
+  and accepts real pointer hits on device, not just window maps in forensic
+  logs.
+- Default no-shortcut desktop behavior should prefer a visible cursor with
+  cursor-touchpad semantics over a touch-surrogate cursor that jumps directly
+  to the finger. If the user asks for desktop-style interaction, do not let the
+  cursor merely duplicate the touch point.
 - If a download completes but install state does not materialize, treat that as
   a first-class contract failure between intake UI and local package indexing,
   not as a cosmetic device quirk.
