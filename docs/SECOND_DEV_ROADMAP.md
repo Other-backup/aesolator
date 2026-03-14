@@ -141,6 +141,19 @@ Second autonomous developer lane for `aesolator`:
   `publishedAt`/`verCode`, and donor `Wine/Proton` intake now prefers
   compressed `.wcp.xz/.wcp.zst` artifacts because that is where the usable
   prefix-bearing payloads live.
+- `Nightlies` source discovery is still vulnerable to unauthenticated GitHub
+  API rate limiting on first load. Device logs now confirm `HTTP 403` from
+  `api.github.com`, so the next closure step is a non-API or cached fallback
+  path rather than more UI-only tuning.
+- `Vulkan SDK` had a false installed-state in `Contents` because the base
+  `imagefs` already ships `usr/share/vulkan`; package visibility now needs to
+  stay tied to real `Contents` installs plus explicit `vulkanApiMin/max` /
+  `vulkanSdkVersion` metadata so runtime pickup and UI state do not drift.
+- `dgVoodoo` still had a split-brain contract: `Contents` packages lived in
+  `contents/DgVoodoo/*`, while runtime stage/dependency checks looked only at
+  `contents/dgvoodoo/current`. That bridge now needs to stay aligned so
+  package installs, wrapper presence checks, and runtime staging all see the
+  same installed payload set.
 - `BannersComponentInjector` still has deeper donor logic not yet harvested
   locally, especially around richer source discovery, release-tag browsing, and
   download-management UX.
@@ -157,9 +170,18 @@ Second autonomous developer lane for `aesolator`:
 - The shared selector/switch/preference geometry pass is now built and
   installed, but many secondary dialogs still have only code-level validation
   rather than screenshot proof on the target device.
+- `Graphics Driver Configuration` had its extension probe stubbed to an empty
+  array, which forced the UI to `0` extensions. The runtime probe path is now
+  restored through `GPUInformation.enumerateExtensions()`, but it still needs a
+  fresh on-device confirmation once the current install overlay/activity churn
+  settles down.
 - The `New Container` boolean-control/env-var cleanup is build-complete and
   installed, but stable screenshot proof of the deeper tabs is still limited by
   shared-device foreground hijacking during ADB capture.
+- Device-side inspection now shows `files/contents` has no local `Wine` or
+  `Proton` package roots at all, so current runtime discovery failure in `New
+  Container` is at least partly real package absence, not just selector UI
+  drift. The next pass must therefore verify the install path itself.
 - The repo-side `Contents` workflow contract is now aligned with the static
   checklist gate, so the remaining `Contents` risk is device behavior rather
   than source-of-truth drift inside `.github/workflows/ci-winlator.yml`.

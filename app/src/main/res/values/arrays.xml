@@ -92,6 +92,16 @@
         <item>x86_64</item>
         <item>arm64ec</item>
     </string-array>
+    <string-array name="contents_arch_entries_vulkan_sdk">
+        <item>All SDK lanes</item>
+        <item>ARM64 SDK lane</item>
+        <item>x86_64 SDK lane</item>
+    </string-array>
+    <string-array name="contents_arch_values_vulkan_sdk">
+        <item>all</item>
+        <item>arm64</item>
+        <item>x86_64</item>
+    </string-array>
     <string-array name="dxvk_version_entries">
         <item>1.11.1-sarek</item>
         <item>1.10.3-arm64ec-async</item>

@@ -464,6 +464,13 @@ public class ContentsFragment extends Fragment {
 
     private int resolveProfileArchPriority(ContentProfile profile) {
         String archTag = resolveProfileArchTag(profile);
+        if (profile != null && profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            if ("arm64".equalsIgnoreCase(archTag)) return 40;
+            if ("x86_64".equalsIgnoreCase(archTag)) return 30;
+            if ("arm64ec".equalsIgnoreCase(archTag)) return 20;
+            if ("generic".equalsIgnoreCase(archTag)) return 10;
+            return 0;
+        }
         if ("x86_64".equalsIgnoreCase(archTag)) return 40;
         if ("arm64ec".equalsIgnoreCase(archTag)) return 30;
         if ("arm64".equalsIgnoreCase(archTag)) return 20;
@@ -602,6 +609,7 @@ public class ContentsFragment extends Fragment {
     private boolean supportsArchitectureFilters(ContentProfile.ContentType type) {
         return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
@@ -734,6 +742,9 @@ public class ContentsFragment extends Fragment {
         if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
             return new String[]{getString(R.string.contents_arch_all_lanes)};
         }
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            return getResources().getStringArray(R.array.contents_arch_entries_vulkan_sdk);
+        }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             return getResources().getStringArray(R.array.contents_arch_entries_dxvk_vkd3d);
@@ -809,6 +820,9 @@ public class ContentsFragment extends Fragment {
     private String[] getArchValuesForType(ContentProfile.ContentType type) {
         if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
             return new String[]{"all"};
+        }
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            return getResources().getStringArray(R.array.contents_arch_values_vulkan_sdk);
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
@@ -936,7 +950,9 @@ public class ContentsFragment extends Fragment {
             return false;
         }
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            return isVulkanSdkRuntimePresent();
+            // Base ImageFS already ships a generic Vulkan directory. Treat the SDK
+            // as installed only when the actual Contents package is present.
+            return false;
         }
         return false;
     }
@@ -948,19 +964,6 @@ public class ContentsFragment extends Fragment {
             return "x64".equals(normalizedInstalled) || "x86_64".equals(normalizedInstalled);
         }
         return normalizedProfile.equals(normalizedInstalled);
-    }
-
-    private boolean isVulkanSdkRuntimePresent() {
-        File shareRoot = new File(requireContext().getFilesDir(), "imagefs/usr/share");
-        File vulkanDir = new File(shareRoot, "vulkan");
-        File sdkDir = new File(shareRoot, "vulkan-sdk");
-        return (vulkanDir.isDirectory() && hasChildren(vulkanDir))
-                || (sdkDir.isDirectory() && hasChildren(sdkDir));
-    }
-
-    private boolean hasChildren(File dir) {
-        String[] list = dir.list();
-        return list != null && list.length > 0;
     }
 
     private void reloadRemoteContents() {
@@ -1751,6 +1754,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private String resolveArchLabel(String archTag) {
+        if ("arm64".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_arm64_runtime);
         if ("arm64ec".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_arm64ec_runtime);
         if ("x86_64".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_x64_runtime);
         return archTag;
@@ -1861,6 +1865,25 @@ public class ContentsFragment extends Fragment {
         return isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
     }
 
+    private int resolveContentPrimaryTextColor() {
+        return ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text);
+    }
+
+    private int resolveContentSecondaryTextColor() {
+        return ContextCompat.getColor(requireContext(), isDarkMode ? R.color.fieldset_label_text_dark : R.color.fieldset_label_text_light);
+    }
+
+    private GradientDrawable buildContentItemBackground(int accentColor) {
+        int fillColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_card_bg_dark : R.color.surface_card_bg);
+        int borderBaseColor = ContextCompat.getColor(requireContext(), isDarkMode ? R.color.surface_card_border_dark : R.color.surface_card_border);
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setCornerRadius(dpToPx(14f));
+        drawable.setColor(fillColor);
+        drawable.setStroke(dpToPx(1f), blendColors(borderBaseColor, accentColor, isDarkMode ? 0.28f : 0.18f));
+        return drawable;
+    }
+
     private GradientDrawable buildCategoryBadgeBackground(int accentColor) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.RECTANGLE);
@@ -1868,6 +1891,20 @@ public class ContentsFragment extends Fragment {
         drawable.setColor(withAlpha(accentColor, isDarkMode ? 74 : 36));
         drawable.setStroke(dpToPx(1f), withAlpha(accentColor, isDarkMode ? 220 : 132));
         return drawable;
+    }
+
+    private int blendColors(int baseColor, int overlayColor, float overlayFraction) {
+        float clampedFraction = Math.max(0f, Math.min(1f, overlayFraction));
+        int baseRed = (baseColor >> 16) & 0xff;
+        int baseGreen = (baseColor >> 8) & 0xff;
+        int baseBlue = baseColor & 0xff;
+        int overlayRed = (overlayColor >> 16) & 0xff;
+        int overlayGreen = (overlayColor >> 8) & 0xff;
+        int overlayBlue = overlayColor & 0xff;
+        int red = Math.round(baseRed + ((overlayRed - baseRed) * clampedFraction));
+        int green = Math.round(baseGreen + ((overlayGreen - baseGreen) * clampedFraction));
+        int blue = Math.round(baseBlue + ((overlayBlue - baseBlue) * clampedFraction));
+        return (0xff << 24) | (red << 16) | (green << 8) | blue;
     }
 
     private int withAlpha(int color, int alpha) {
@@ -1962,17 +1999,13 @@ public class ContentsFragment extends Fragment {
             };
             holder.ivIcon.setImageResource(iconId);
             int accentColor = resolveProfileAccentColor(profile);
-            int secondaryColor = withAlpha(accentColor, isDarkMode ? 228 : 176);
+            int primaryTextColor = resolveContentPrimaryTextColor();
+            int secondaryColor = resolveContentSecondaryTextColor();
             holder.ivIcon.setColorFilter(accentColor);
-            GradientDrawable itemBackground = new GradientDrawable();
-            itemBackground.setShape(GradientDrawable.RECTANGLE);
-            itemBackground.setCornerRadius(dpToPx(12f));
-            itemBackground.setColor(withAlpha(accentColor, isDarkMode ? 56 : 26));
-            itemBackground.setStroke(dpToPx(1f), withAlpha(accentColor, isDarkMode ? 210 : 138));
-            holder.itemView.setBackground(itemBackground);
+            holder.itemView.setBackground(buildContentItemBackground(accentColor));
 
             holder.tvVersionName.setText(buildProfileTitleLine(profile));
-            holder.tvVersionName.setTextColor(accentColor);
+            holder.tvVersionName.setTextColor(primaryTextColor);
 
             String categoryBadgeText = profile.getDisplayCategory();
             if (categoryBadgeText == null || categoryBadgeText.trim().isEmpty()) {

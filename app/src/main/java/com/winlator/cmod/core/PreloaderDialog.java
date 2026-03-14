@@ -6,6 +6,9 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
+
 import com.winlator.cmod.R;
 
 public class PreloaderDialog {
@@ -23,6 +26,15 @@ public class PreloaderDialog {
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);
         dialog.setContentView(R.layout.preloader_dialog);
+        boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(activity).getBoolean("dark_mode", false);
+        ThemeAssetPainter.apply(activity, dialog.getWindow() != null ? dialog.getWindow().getDecorView() : dialog.findViewById(android.R.id.content), isDarkMode);
+        TextView textView = dialog.findViewById(R.id.TextView);
+        if (textView != null) {
+            textView.setTextColor(ContextCompat.getColor(
+                    activity,
+                    isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+            ));
+        }
 
         Window window = dialog.getWindow();
         if (window != null) {
@@ -35,7 +47,8 @@ public class PreloaderDialog {
         if (isShowing()) return;
         close();
         if (dialog == null) create();
-        ((TextView)dialog.findViewById(R.id.TextView)).setText(textResId);
+        TextView textView = dialog.findViewById(R.id.TextView);
+        if (textView != null) textView.setText(textResId);
         dialog.show();
     }
 

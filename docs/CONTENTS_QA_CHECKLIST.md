@@ -47,12 +47,17 @@
 - [ ] Beta/nightly toggle is hidden for `Wine` family tab
 - [ ] Rows show source/provenance line for remote packages (repo + release tag)
 - [ ] UI does not imply packages are embedded in APK
+- [x] `Vulkan SDK` installed-state no longer keys off the base `imagefs/usr/share/vulkan*` directories; it must reflect real `Contents` package installs
 
 ## Install/update paths
 - [ ] Downloading a remote WCP from `Contents` installs successfully
 - [ ] Installed package moves from download action to local menu action
 - [ ] Duplicate install is rejected cleanly (`content already exist`)
 - [ ] Removing an installed `Wine` package fails safely if a container uses it
+- [ ] Installed `Vulkan SDK` lanes expose correct API/version metadata to runtime pickup (`AERO_VULKAN_SDK_PROFILE*`, `AERO_VULKAN_API_*`)
+- [ ] Installed `dgVoodoo` lanes are visible to wrapper dependency checks and runtime stage without a separate hidden install path
+- [ ] `Nightlies` source lane remains usable when unauthenticated GitHub API requests hit rate limits (`HTTP 403`) by falling back to cached or alternate donor metadata instead of rendering an empty lane
+- [ ] After a successful `Wine` or `Proton` install, a real local package root exists under `files/contents/Wine` or `files/contents/Proton` and `New Container` sees it without needing a restart
 
 ## Turnip / Adrenotools UX
 - [ ] Version picker opens (latest + recent/history entries)
@@ -72,6 +77,7 @@
 - [ ] Attach one ADB device and confirm it appears in `adb devices`
 - [ ] Refresh/install latest `freewine11` + graphics payloads on-device
 - [ ] Verify `Contents` shows FreeWine + graphics lanes on the committed baseline
+- [ ] Verify `Vulkan SDK` rows only show installed when a matching `Contents` SDK package exists locally
 - [ ] Run install/update/remove checks for `freewine11` and one graphics package
 
 Use `docs/DEVICE_EXECUTION_CHECKLIST_RC005_CONTENTS.md` as the exact execution

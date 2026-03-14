@@ -10,7 +10,7 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
@@ -101,26 +101,32 @@ public class Downloader {
     }
 
     public static String downloadString(String address) {
+        HttpURLConnection connection = null;
+        InputStream input = null;
+        InputStream error = null;
+        BufferedReader reader = null;
         try {
-            URL url = new URL(address);
-            URLConnection connection = url.openConnection();
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setRequestProperty("User-Agent", USER_AGENT);
+            connection = openConnection(address);
             connection.connect();
-
-            InputStream input = connection.getInputStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
+            int responseCode = connection.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                error = connection.getErrorStream();
+                String errorBody = readFully(error);
+                System.err.println("HTTP " + responseCode + " for " + address
+                        + (errorBody.isEmpty() ? "" : " :: " + errorBody));
+                return null;
             }
-            reader.close();
-            return sb.toString();
+
+            input = connection.getInputStream();
+            return readFully(input);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        } finally {
+            closeQuietly(reader);
+            closeQuietly(error);
+            closeQuietly(input);
+            if (connection != null) connection.disconnect();
         }
     }
 
@@ -152,7 +158,32 @@ public class Downloader {
         connection.setReadTimeout(READ_TIMEOUT_MS);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", USER_AGENT);
+        connection.setRequestProperty("Accept-Encoding", "identity");
+        connection.setRequestProperty("Connection", "close");
+        applySourceHeaders(connection, address);
         return connection;
+    }
+
+    private static void applySourceHeaders(HttpURLConnection connection, String address) {
+        String host = "";
+        try {
+            URI uri = new URI(address);
+            host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
+        } catch (Exception ignored) {
+        }
+
+        if (host.contains("api.github.com")) {
+            connection.setRequestProperty("Accept", "application/vnd.github+json, application/json;q=0.9, */*;q=0.8");
+            connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+            connection.setRequestProperty("Referer", "https://github.com/");
+            return;
+        }
+
+        if (host.contains("raw.githubusercontent.com")
+                || host.contains("githubusercontent.com")
+                || host.contains("github.com")) {
+            connection.setRequestProperty("Accept", "application/json, text/plain, */*");
+        }
     }
 
     private static long resolveExpectedTotalLength(HttpURLConnection connection, boolean partialResponse, long resumeFrom) {
@@ -211,6 +242,22 @@ public class Downloader {
         }
     }
 
+    private static String readFully(InputStream input) throws IOException {
+        if (input == null) return "";
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            return sb.toString();
+        } finally {
+            closeQuietly(reader);
+        }
+    }
+
     private static DownloadMeta readMeta(File metaFile) {
         if (metaFile == null || !metaFile.isFile()) return null;
         InputStream input = null;
@@ -258,6 +305,14 @@ public class Downloader {
         if (input == null) return;
         try {
             input.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void closeQuietly(BufferedReader reader) {
+        if (reader == null) return;
+        try {
+            reader.close();
         } catch (IOException ignored) {
         }
     }

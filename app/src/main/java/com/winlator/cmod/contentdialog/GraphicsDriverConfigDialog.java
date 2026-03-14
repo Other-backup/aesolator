@@ -150,7 +150,35 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     private String[] queryAvailableExtensions(String driver, Context context) {
-        return new String[0];
+        if (context == null || driver == null) return new String[0];
+        String normalizedDriver = driver.trim();
+        if (normalizedDriver.isEmpty() || AppUtils.isMissingComponentValue(normalizedDriver)) {
+            return new String[0];
+        }
+
+        try {
+            // Ensure built-in driver bundles are materialized before the native
+            // probe asks the wrapper for the extension list.
+            AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(context);
+            adrenotoolsManager.getDriverPackageInfo(normalizedDriver);
+
+            String[] rawExtensions = GPUInformation.enumerateExtensions(normalizedDriver, context);
+            if (rawExtensions == null || rawExtensions.length == 0) {
+                return new String[0];
+            }
+
+            TreeSet<String> orderedExtensions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (String extension : rawExtensions) {
+                if (extension == null) continue;
+                String trimmed = extension.trim();
+                if (trimmed.isEmpty() || !trimmed.startsWith("VK_")) continue;
+                orderedExtensions.add(trimmed);
+            }
+            return orderedExtensions.toArray(new String[0]);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to enumerate driver extensions for " + normalizedDriver, t);
+            return new String[0];
+        }
     }
 
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {

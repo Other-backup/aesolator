@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -44,28 +45,29 @@ public class DgVoodooManager {
     }
 
     public boolean isInstalled() {
-        return hasAnyRuntimeArch(getPackageDir());
+        for (File packageRoot : getPackageRootsSorted()) {
+            if (hasAnyRuntimeArch(packageRoot)) return true;
+        }
+        return false;
     }
 
     public String getVersionHint() {
-        File metaFile = new File(getPackageDir(), META_FILE);
-        if (metaFile.isFile()) {
-            ArrayList<String> lines = FileUtils.readLines(metaFile);
-            if (!lines.isEmpty()) {
-                String value = lines.get(0).trim();
-                if (!value.isEmpty()) return value;
-            }
+        for (File packageRoot : getPackageRootsSorted()) {
+            String versionHint = readVersionHint(packageRoot);
+            if (!versionHint.isEmpty()) return versionHint;
         }
         return isInstalled() ? "local" : "missing";
     }
 
     public ArrayList<String> getInstalledArchitectures() {
         ArrayList<String> architectures = new ArrayList<>();
-        File packageDir = getPackageDir();
-        if (hasRuntimeArch(packageDir, ARCH_X86)) architectures.add(ARCH_X86);
-        if (hasRuntimeArch(packageDir, ARCH_X64)) architectures.add(ARCH_X64);
-        if (hasRuntimeArch(packageDir, ARCH_ARM64)) architectures.add(ARCH_ARM64);
-        if (hasRuntimeArch(packageDir, ARCH_ARM64EC)) architectures.add(ARCH_ARM64EC);
+        HashSet<String> seen = new HashSet<>();
+        for (File packageRoot : getPackageRootsSorted()) {
+            appendInstalledArch(packageRoot, ARCH_X86, architectures, seen);
+            appendInstalledArch(packageRoot, ARCH_X64, architectures, seen);
+            appendInstalledArch(packageRoot, ARCH_ARM64, architectures, seen);
+            appendInstalledArch(packageRoot, ARCH_ARM64EC, architectures, seen);
+        }
         return architectures;
     }
 
@@ -131,13 +133,13 @@ public class DgVoodooManager {
 
         String value = shortcutPath == null ? "" : shortcutPath.toLowerCase(Locale.ROOT);
         if (value.contains("program files (x86)") || value.contains("syswow64")) {
-            if (hasRuntimeArch(getPackageDir(), ARCH_X86)) return ARCH_X86;
+            if (hasInstalledRuntimeArch(ARCH_X86)) return ARCH_X86;
         }
 
-        if (hasRuntimeArch(getPackageDir(), ARCH_ARM64EC)) return ARCH_ARM64EC;
-        if (hasRuntimeArch(getPackageDir(), ARCH_X64)) return ARCH_X64;
-        if (hasRuntimeArch(getPackageDir(), ARCH_ARM64)) return ARCH_ARM64;
-        if (hasRuntimeArch(getPackageDir(), ARCH_X86)) return ARCH_X86;
+        if (hasInstalledRuntimeArch(ARCH_ARM64EC)) return ARCH_ARM64EC;
+        if (hasInstalledRuntimeArch(ARCH_X64)) return ARCH_X64;
+        if (hasInstalledRuntimeArch(ARCH_ARM64)) return ARCH_ARM64;
+        if (hasInstalledRuntimeArch(ARCH_X86)) return ARCH_X86;
         return ARCH_X64;
     }
 
@@ -147,15 +149,24 @@ public class DgVoodooManager {
         cleanupStagedRuntime(targetDir);
 
         String normalizedArch = normalizeRuntimeArch(arch);
-        File sourceDir = resolveRuntimeDir(getPackageDir(), normalizedArch);
+        File packageRoot = resolveBestPackageRootForArch(normalizedArch);
+        File sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, normalizedArch);
         if (!sourceDir.isDirectory() && ARCH_ARM64EC.equals(normalizedArch)) {
-            sourceDir = resolveRuntimeDir(getPackageDir(), ARCH_X64);
-            if (!sourceDir.isDirectory()) sourceDir = resolveRuntimeDir(getPackageDir(), ARCH_ARM64);
+            packageRoot = resolveBestPackageRootForArch(ARCH_X64);
+            sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_X64);
+            if (!sourceDir.isDirectory()) {
+                packageRoot = resolveBestPackageRootForArch(ARCH_ARM64);
+                sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_ARM64);
+            }
         } else if (!sourceDir.isDirectory() && ARCH_ARM64.equals(normalizedArch)) {
-            sourceDir = resolveRuntimeDir(getPackageDir(), ARCH_ARM64EC);
-            if (!sourceDir.isDirectory()) sourceDir = resolveRuntimeDir(getPackageDir(), ARCH_X64);
+            packageRoot = resolveBestPackageRootForArch(ARCH_ARM64EC);
+            sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_ARM64EC);
+            if (!sourceDir.isDirectory()) {
+                packageRoot = resolveBestPackageRootForArch(ARCH_X64);
+                sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_X64);
+            }
         }
-        if (!sourceDir.isDirectory()) return false;
+        if (!sourceDir.isDirectory() || packageRoot == null) return false;
 
         ArrayList<String> stagedFiles = new ArrayList<>();
         File[] files = sourceDir.listFiles();
@@ -177,8 +188,8 @@ public class DgVoodooManager {
             stagedFiles.add(sourceFile.getName());
         }
 
-        if (!copyOptionalFile(new File(getPackageDir(), "dgVoodoo.conf"), targetDir, stagedFiles)
-                || !copyOptionalFile(new File(getPackageDir(), "dgVoodooCpl.exe"), targetDir, stagedFiles)) {
+        if (!copyOptionalFile(new File(packageRoot, "dgVoodoo.conf"), targetDir, stagedFiles)
+                || !copyOptionalFile(new File(packageRoot, "dgVoodooCpl.exe"), targetDir, stagedFiles)) {
             cleanupStagedFiles(targetDir, stagedFiles);
             return false;
         }
@@ -318,6 +329,82 @@ public class DgVoodooManager {
 
     private File getPackageDir() {
         return new File(rootDir, PACKAGE_DIR);
+    }
+
+    private ArrayList<File> getPackageRootsSorted() {
+        ArrayList<File> roots = new ArrayList<>();
+
+        File legacyRoot = getPackageDir();
+        if (isValidPackageRoot(legacyRoot)) roots.add(legacyRoot);
+
+        File contentsRoot = ContentsManager.getContentTypeDir(context, ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO);
+        File[] installedDirs = contentsRoot.listFiles();
+        if (installedDirs != null) {
+            for (File dir : installedDirs) {
+                if (dir != null && dir.isDirectory() && isValidPackageRoot(dir)) {
+                    roots.add(dir);
+                }
+            }
+        }
+
+        roots.sort((left, right) -> {
+            int versionCompare = Integer.compare(resolvePackageVersionCode(right), resolvePackageVersionCode(left));
+            if (versionCompare != 0) return versionCompare;
+            int modifiedCompare = Long.compare(right.lastModified(), left.lastModified());
+            if (modifiedCompare != 0) return modifiedCompare;
+            return left.getAbsolutePath().compareToIgnoreCase(right.getAbsolutePath());
+        });
+        return roots;
+    }
+
+    private int resolvePackageVersionCode(File packageRoot) {
+        ContentProfile profile = readProfile(packageRoot);
+        return profile != null ? profile.verCode : 0;
+    }
+
+    private ContentProfile readProfile(File packageRoot) {
+        if (packageRoot == null) return null;
+        File profileFile = new File(packageRoot, ContentsManager.PROFILE_NAME);
+        if (!profileFile.isFile()) return null;
+        try {
+            return new ContentsManager(context).readProfile(profileFile);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String readVersionHint(File packageRoot) {
+        if (packageRoot == null) return "";
+        File metaFile = new File(packageRoot, META_FILE);
+        if (metaFile.isFile()) {
+            ArrayList<String> lines = FileUtils.readLines(metaFile);
+            if (!lines.isEmpty()) {
+                String value = lines.get(0).trim();
+                if (!value.isEmpty()) return value;
+            }
+        }
+
+        ContentProfile profile = readProfile(packageRoot);
+        if (profile != null && profile.verName != null && !profile.verName.trim().isEmpty()) {
+            return profile.verName.trim();
+        }
+        return "";
+    }
+
+    private void appendInstalledArch(File packageRoot, String arch, ArrayList<String> architectures, HashSet<String> seen) {
+        if (!hasRuntimeArch(packageRoot, arch)) return;
+        if (seen.add(arch)) architectures.add(arch);
+    }
+
+    private boolean hasInstalledRuntimeArch(String arch) {
+        return resolveBestPackageRootForArch(arch) != null;
+    }
+
+    private File resolveBestPackageRootForArch(String arch) {
+        for (File packageRoot : getPackageRootsSorted()) {
+            if (hasRuntimeArch(packageRoot, arch)) return packageRoot;
+        }
+        return null;
     }
 
     private File findPackageRoot(File tempDir) {

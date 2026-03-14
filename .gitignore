@@ -5,6 +5,7 @@
 /.idea/
 /build
 /captures
+.adb-captures/
 .externalNativeBuild
 .cxx
 # Local build outputs and working trees

@@ -30,6 +30,9 @@
     "sourceVersion": "rolling-latest",
     "releaseTag": "vulkan-sdk-arm64-latest",
     "artifactName": "vulkan-sdk-arm64.wcp",
+    "vulkanApiMin": 1,
+    "vulkanApiMax": 4,
+    "vulkanSdkVersion": "1.4.341.1",
     "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/vulkan-sdk-arm64.wcp",
     "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/SHA256SUMS-vulkan-sdk-arm64.txt"
   },
@@ -47,6 +50,9 @@
     "sourceVersion": "rolling-latest",
     "releaseTag": "vulkan-sdk-x86_64-latest",
     "artifactName": "vulkan-sdk-x86_64.wcp",
+    "vulkanApiMin": 1,
+    "vulkanApiMax": 4,
+    "vulkanSdkVersion": "1.4.341.1",
     "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/vulkan-sdk-x86_64.wcp",
     "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/SHA256SUMS-vulkan-sdk-x86_64.txt"
   },

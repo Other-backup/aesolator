@@ -781,3 +781,103 @@
 - Next step: perform a direct device install pass on the newest `Nightlies`
   `Proton` entry to confirm end-to-end installation on the corrected intake
   path.
+
+### Entry 41: Vulkan SDK installed-state and runtime-pickup alignment
+
+- Goal: remove the false `Vulkan SDK` installed-state in `Contents` and align
+  the package metadata with the runtime selector so SDK lanes are chosen from
+  real package installs instead of base `imagefs` noise.
+- Context: device-side inspection showed `files/contents/VulkanSDK` was empty
+  while `Contents` could still report Vulkan SDK as installed because the base
+  `imagefs` already ships `usr/share/vulkan`. That made the UI over-report SDK
+  presence even though runtime selection still depends on locally installed
+  `Contents` profiles.
+- Decision: stop treating the base `imagefs/usr/share/vulkan*` directories as
+  proof of an installed `Vulkan SDK` package, add a dedicated `Vulkan SDK`
+  architecture filter in `Contents`, and enrich `contents/contents.json` with
+  explicit `vulkanApiMin`, `vulkanApiMax`, and `vulkanSdkVersion` fields for
+  the archive SDK lanes.
+- Tradeoff: legacy/manual rootfs mutations without a matching `Contents`
+  profile will no longer masquerade as an installed SDK, but that is the
+  correct contract because Ae.solator is package-driven for runtime overlays.
+- Verification: on-device `run-as com.winlator.cmod` inspection confirmed an
+  empty `files/contents/VulkanSDK` before the fix while the base rootfs still
+  contained `usr/share/vulkan`; code was updated so installed-state now stays
+  tied to package presence rather than shared rootfs directories.
+- Next step: rebuild, reinstall, and run a device pass in `Contents` plus
+  `Graphics Driver Config` to confirm the SDK rows no longer lie about install
+  status and that Vulkan API selection still resolves from installed packages.
+
+### Entry 42: dgVoodoo Contents-to-runtime bridge repair
+
+- Goal: repair the `dgVoodoo` install contract so packages installed through
+  `Contents` are visible to wrapper presence checks and runtime staging.
+- Context: code review exposed a split-brain model. `Contents` installs
+  `dgVoodoo` into versioned `contents/DgVoodoo/<ver>-<code>` directories, but
+  `DgVoodooManager`, dependency checks, and runtime staging were still reading
+  only `contents/dgvoodoo/current`. That meant the UI/install path and the
+  launch/runtime path could drift apart.
+- Decision: teach `DgVoodooManager` to scan both the legacy `current` package
+  root and the installed `Contents` package roots, sort them, union their
+  available architectures, and stage from the best matching root for the
+  requested architecture.
+- Tradeoff: manager logic is now slightly richer, but the contract becomes
+  correct: one installed package set, one runtime view, and parallel
+  architecture support instead of hidden install islands.
+- Verification: the current `dgvoodoo-*.wcp` artifacts were inspected and
+  confirmed to carry `profile.json`, `ae-runtime-contract`, wrapper env, and
+  `payload/runtime/<arch>` trees, which matches the new manager fallback path.
+- Next step: rebuild, reinstall, and run a device-led `dgVoodoo` route pass to
+  confirm `WrapperRuntimePresenceDependency`, config summary, and runtime
+  staging all resolve against the same installed package roots.
+
+### Entry 43: Contents surface dark-theme repair and preloader normalization
+
+- Goal: remove the dark-theme visual drift in `Contents` list cards and stop
+  the install overlay from flashing as a light, foreign-looking surface.
+- Context: device screenshots showed the library/package cards being painted by
+  accent-tinted `GradientDrawable` fills inside `onBindViewHolder`, which
+  pushed rows into muddy brown/pink surfaces outside the shared dark theme. The
+  `Installing Content…` overlay also bypassed the theme painter, so it could
+  appear as a light card during runtime/install transitions.
+- Decision: move `Contents` rows back onto the shared surface-card palette,
+  keep accent usage on the icon/badge rather than on the whole row fill, and
+  make `PreloaderDialog` explicitly theme-aware with the runtime scrim plus
+  dark-mode text/card colors.
+- Tradeoff: package rows now read more like a stable product list and less like
+  per-lane color chips, but the screen becomes much more coherent and readable
+  in dark mode.
+- Verification: a fresh device screenshot on `Contents` confirms the install
+  overlay now renders as a dark surface card instead of a white slab, and the
+  list rows remain within the same visual system as the top cards.
+- Next step: keep using screenshot-led passes for remaining list/card states
+  whenever a new donor lane or install state is introduced.
+
+### Entry 44: Graphics-driver extensions probe restoration and device-source reality check
+
+- Goal: restore the missing extension list inside `Graphics Driver
+  Configuration` and document the current device-side truth for runtime lanes.
+- Context: code review found `GraphicsDriverConfigDialog.queryAvailableExtensions()`
+  reduced to a hardcoded empty array, which explains why the dialog showed `0`
+  extensions regardless of driver state. In the same device pass, inspection of
+  `run-as com.winlator.cmod` showed `files/contents` currently contains
+  `DXVK/VKD3D/VulkanSDK/DgVoodoo/Box64/FEXCore`, but no local `Wine` or
+  `Proton` package roots at all, so `New Container` cannot legitimately
+  discover a runtime from the local package index in that state.
+- Decision: restore the extension path through `GPUInformation.enumerateExtensions()`
+  with resource-driver extraction before probing, dedupe/sort real `VK_*`
+  names, and log the device-side fact that empty `Wine/Proton` runtime
+  discovery is currently caused by missing local package roots rather than a
+  spinner-only UI defect.
+- Tradeoff: `Graphics Driver Config` returns to a native runtime probe instead
+  of a placeholder path, but `Nightlies`/remote source availability remains a
+  separate external problem when GitHub rate-limits the app's unauthenticated
+  requests.
+- Verification: live device logs showed `Nightlies` refresh failing with
+  `HTTP 403` from `api.github.com` and `WCP Archive` using the bundled fallback
+  after a `404` on the canonical raw `contents.json` endpoint. A direct
+  `run-as` filesystem pass confirmed the absence of local `Wine/Proton`
+  package directories under `files/contents`.
+- Next step: add a non-API fallback/cached path for `Nightlies` source
+  discovery so first-load package availability does not collapse on GitHub rate
+  limiting, then repeat the runtime install pass for `Wine/Proton`.

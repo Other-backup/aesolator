@@ -875,6 +875,7 @@
     <string name="contents_package_remote_generic">Remote package</string>
     <string name="contents_package_dgvoodoo_arch">dgVoodoo=%1$s</string>
     <string name="contents_arch_all_lanes">All lanes</string>
+    <string name="contents_arch_arm64_runtime">ARM64 runtime lane</string>
     <string name="contents_arch_x64_runtime">x86_64 runtime lane</string>
     <string name="contents_arch_arm64ec_runtime">ARM64EC runtime lane</string>
     <string name="contents_source_runtime_lanes">WCP Runtime Lanes</string>
