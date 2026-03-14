@@ -11,17 +11,17 @@
         android:layout_height="wrap_content"
         android:baselineAligned="false"
         android:gravity="top"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:weightSum="2">
 
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="108dp"
             android:layout_marginTop="0dp"
             android:layout_gravity="top"
-            android:minHeight="96dp"
             android:layout_weight="1"
-            android:paddingTop="26dp"
+            android:paddingTop="24dp"
             android:tag="theme_card">
 
             <TextView
@@ -42,13 +42,12 @@
         <LinearLayout
             style="@style/FieldSetCompact"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="108dp"
             android:layout_gravity="top"
             android:layout_marginStart="6dp"
             android:layout_marginTop="0dp"
-            android:minHeight="96dp"
             android:layout_weight="1"
-            android:paddingTop="26dp"
+            android:paddingTop="24dp"
             android:tag="theme_card">
 
             <TextView
@@ -62,17 +61,17 @@
                 android:id="@+id/BTInstallContent"
                 style="@style/ButtonNeutral"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="44dp"
                 android:layout_marginTop="6dp"
                 android:breakStrategy="simple"
                 android:gravity="start|center_vertical"
                 android:hyphenationFrequency="none"
                 android:lineSpacingExtra="0dp"
-                android:maxLines="2"
-                android:minHeight="40dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:singleLine="false"
+                android:maxLines="1"
+                android:minHeight="44dp"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:singleLine="true"
                 android:textAlignment="viewStart"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"

@@ -437,3 +437,42 @@
   `-Pandroid.aapt2FromMavenOverride` flag.
 - Next step: keep the helper-script path as the default local build contract
   and continue device-led UI closure.
+
+### Entry 26: Contents top-row geometry alignment
+
+- Goal: remove the remaining geometric wobble in the top `Contents` cards so
+  `Content Type` and `Install Content` read as one aligned surface.
+- Context: live device feedback showed the two top cards still rendering as
+  different-sized blocks even after earlier width passes, because the left card
+  was governed by spinner height while the right card expanded around a looser
+  button layout.
+- Decision: lock both top cards to the same explicit height, keep the same top
+  inset, and normalize the action control on the right to the same 44dp control
+  height used by the spinner on the left.
+- Tradeoff: the install button no longer reserves two-line growth in that top
+  slot, but the label already fits on one line at the current equal-width
+  geometry and the overall surface is now visually stable.
+- Verification: rebuilt APK installed over Wi-Fi ADB; fresh `Contents`
+  screenshot now shows both top cards aligned to the same height and internal
+  control geometry.
+- Next step: continue the UI pass on the remaining `Contents` details rather
+  than on top-row card shape.
+
+### Entry 27: Termux ADB path correction
+
+- Goal: make the local helper script reliable not only for build, but also for
+  immediate device install flows.
+- Context: after the top-row geometry rebuild succeeded, the chained install
+  step still failed because `tools/env-android-local.sh` put SDK
+  `platform-tools/adb` ahead of Termux `adb` in `PATH`, and the desktop binary
+  is not executable in this Termux ARM64 environment.
+- Decision: reorder the helper-script `PATH` so `/data/data/com.termux/files/usr/bin`
+  stays first, preserving the Termux-native `adb` while still keeping the SDK
+  tools visible later in the lookup order.
+- Tradeoff: none meaningful; the helper path is simply more correct for this
+  host environment.
+- Verification: the already-built APK installed successfully after switching to
+  the corrected `adb` path, so the helper contract now covers both build and
+  install flows.
+- Next step: keep closing remaining device-side UI and behavior tails from the
+  refreshed installed build.

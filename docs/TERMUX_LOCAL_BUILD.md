@@ -55,6 +55,9 @@ Run from repo root:
   build now exports the Gradle property through
   `GRADLE_OPTS=-Dorg.gradle.project.android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2`
   in `tools/env-android-local.sh`.
+- `tools/env-android-local.sh` also keeps Termux `adb` first in `PATH`, so the
+  local shell does not accidentally pick the desktop `platform-tools/adb`
+  binary from the SDK.
 - Stock NDK host toolchain path assumed desktop `linux-x86_64` execution. Local
   Termux build required local-only host compatibility shims in the installed
   SDK/NDK runtime state so `clang`/`clang++` could use NDK Android sysroot and
