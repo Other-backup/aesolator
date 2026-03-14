@@ -856,9 +856,11 @@
     <string name="contents_channel_selector">Channel</string>
     <string name="contents_arch_selector">Architecture</string>
     <string name="contents_source_aesolator_mainline">WCP Archive</string>
+    <string name="contents_source_nightlies_feed">Nightlies</string>
     <string name="contents_source_gamehub_feed">GameHub</string>
     <string name="contents_source_wcphub_feed">WCPHub</string>
     <string name="contents_source_wcphub">WCPHub</string>
+    <string name="contents_source_nightlies">Nightlies</string>
     <string name="contents_source_gamehub">GameHub</string>
     <string name="contents_source_aesolator">WCP Archive</string>
     <string name="contents_source_unknown">Unknown source</string>
@@ -880,6 +882,7 @@
     <string name="contents_source_archive_runtime_lane">Runtime lane</string>
     <string name="contents_source_archive_graphics_lane">Graphics lane</string>
     <string name="contents_source_wcphub_lane">Community feed</string>
+    <string name="contents_source_nightlies_release_lane">Nightly release lane</string>
     <string name="contents_source_gamehub_release_lane">Release lane</string>
     <string name="contents_source_gamehub_raw_lane">Raw component feed</string>
     <string name="contents_filter_arm64ec">ARM64EC lanes</string>
@@ -890,6 +893,7 @@
     <string name="contents_lane_scope_runtime">Runtime packages maintained in WCP Runtime Lanes</string>
     <string name="contents_lane_scope_graphics">Graphics packages maintained in WCP Graphics Lanes</string>
     <string name="contents_lane_scope_wcphub">WCPHub community runtime packages</string>
+    <string name="contents_lane_scope_nightlies">The412Banner nightly packages sourced from Nightlies releases</string>
     <string name="contents_lane_scope_gamehub">GameHub packages sourced from Gamehub-Components releases and raw component feeds</string>
     <string name="dri3_mode_title">DRI3 mode</string>
     <string name="dri3_mode_hint">Auto follows the runtime policy. Off forces the safer software WSI fallback.</string>

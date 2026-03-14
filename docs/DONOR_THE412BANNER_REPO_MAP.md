@@ -21,7 +21,7 @@ ranked by relevance to `Ae.solator`.
 
 - Role: dedicated nightly artifact repository
 - Current `Ae.solator` status:
-  not yet a first-class source lane
+  integrated as a first-class `Contents` source lane for donor nightly feeds
 - Why it matters:
   missing donor-backed nightly packages are likely to come from here before
   anywhere else in the `The412Banner` ecosystem
@@ -125,8 +125,9 @@ ranked by relevance to `Ae.solator`.
   app logic (`BannersComponentInjector`),
   and patch/build infrastructure (`gamehub-lite`, `bannerhub`,
   `gamehub-revanced-patches`, `ghl-add`)
-- The next highest-value integration target is `Nightlies` as a first-class
-  source lane, especially for donor `Proton` and other nightly runtime streams
+- `Nightlies` has now moved from donor research into direct app integration:
+  it is the first-class donor lane for `Proton`, `DXVK`, `VKD3D`, `Box64`,
+  `WOWBox64`, and `FEXCore` nightly package discovery in `Contents`
 - The next highest-value research target after that is the GameHub-side build
   and patch chain:
   `gamehub-lite`, `bannerhub`, `gamehub-revanced-patches`, `ghl-add`

@@ -134,11 +134,13 @@ Second autonomous developer lane for `aesolator`:
 - GameHub feed ingestion now includes paginated release polling and stronger
   visible ordering, but it still needs a live `Contents` device pass to confirm
   that nightly/stable and architecture variants render as intended in the UI.
-- `BannersComponentInjector` has not yet been fully harvested into a local
-  donor-integration pass, so there is still a risk of missing a first-class
-  `Nightlies by The412Banner` lane or other package-link paths already solved
-  there. `Nightlies` is now explicitly confirmed to carry packaged ARM64EC
-  `Proton` artifacts, not just graphics or Box64 builds.
+- `Nightlies by The412Banner` is now integrated as a first-class `Contents`
+  source lane for `Proton`, `DXVK`, `VKD3D`, `Box64`, `WOWBox64`, and
+  `FEXCore`, but device-led validation of source switching and installation
+  across those donor packages is still pending.
+- `BannersComponentInjector` still has deeper donor logic not yet harvested
+  locally, especially around richer source discovery, release-tag browsing, and
+  download-management UX.
 - A cross-repo handoff is now open for the `freewine11` build lane:
   review Valve Wine commit
   `6ccff11d0e7d620cd958b56b0904fcbd9a9bfb26` in the dedicated handoff note

@@ -727,3 +727,31 @@
   matching `.sha256` sidecars.
 - Next step: keep `Nightlies` at the top of the donor integration backlog for
   a future first-class `Contents` source lane and package-install pass.
+
+### Entry 39: Nightlies lane integration in Contents
+
+- Goal: move `The412Banner/Nightlies` from donor report status into a real
+  first-class `Contents` source lane with working package metadata and sane
+  filtering defaults.
+- Context: donor review had already confirmed that `Nightlies` carries
+  packaged `Proton`, `DXVK`, `VKD3D`, `Box64`, `WOWBox64`, and `FEXCore`
+  artifacts, but the app still exposed only `WCP Archive`, `GameHub`, and
+  `WCPHub`, which meant the confirmed donor runtime stream was invisible in the
+  product UI.
+- Decision: add a dedicated `nightlies` source mode in `ContentsFragment`,
+  paginate `The412Banner/Nightlies` releases through a separate release
+  normalizer path, surface `Nightlies` labels/scope strings in the UI, and
+  include GitHub asset `digest` values as `sha256` metadata for release-backed
+  package verification. For source/filter UX, when a selected lane has nightly
+  packages but no stable packages, the channel spinner now collapses to
+  `nightly` instead of defaulting to an empty stable view.
+- Tradeoff: this widens the source-lane model and increases feed complexity,
+  but it removes a real donor-package blind spot and prevents the `Proton`
+  nightly lane from looking empty by default.
+- Verification: `assembleDebug` completed successfully, the rebuilt APK was
+  installed via Wi-Fi ADB, and a smoke launch of `com.winlator.cmod` completed
+  without a fresh crash-buffer entry. Build-time verification also confirms the
+  new strings, source-mode wiring, and normalizer path compile cleanly.
+- Next step: run a device-led pass inside `Contents` to verify `Nightlies`
+  source switching, nightly-only channel behavior, and installation of at
+  least one donor package per family.

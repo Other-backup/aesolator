@@ -15,11 +15,39 @@ public final class GamehubFeedNormalizer {
     public static final String SOURCE_REPO = "The412Banner/Gamehub-Components";
     public static final String SOURCE_REPO_RELEASES = SOURCE_REPO + " Releases";
     public static final String SOURCE_REPO_RAW = SOURCE_REPO + " Raw Feed";
+    public static final String NIGHTLIES_FEED_ID = "nightlies";
+    public static final String NIGHTLIES_LABEL = "Nightlies";
+    public static final String NIGHTLIES_REPO = "The412Banner/Nightlies";
+    public static final String NIGHTLIES_REPO_RELEASES = NIGHTLIES_REPO + " Releases";
 
     private GamehubFeedNormalizer() {
     }
 
     public static String normalizeReleaseFeed(String json) {
+        return normalizeReleaseFeed(
+                json,
+                SOURCE_FEED_ID,
+                SOURCE_LABEL,
+                SOURCE_REPO_RELEASES,
+                "GameHub release package"
+        );
+    }
+
+    public static String normalizeNightliesReleaseFeed(String json) {
+        return normalizeReleaseFeed(
+                json,
+                NIGHTLIES_FEED_ID,
+                NIGHTLIES_LABEL,
+                NIGHTLIES_REPO_RELEASES,
+                "The412Banner nightly package"
+        );
+    }
+
+    private static String normalizeReleaseFeed(String json,
+                                               String sourceFeedId,
+                                               String sourceLabel,
+                                               String sourceRepo,
+                                               String descriptionPrefix) {
         JSONArray normalized = new JSONArray();
         if (json == null || json.trim().isEmpty()) return normalized.toString();
 
@@ -34,7 +62,14 @@ public final class GamehubFeedNormalizer {
 
                 for (int j = 0; j < assets.length(); j++) {
                     JSONObject asset = assets.optJSONObject(j);
-                    JSONObject candidate = normalizeReleaseAsset(release, asset);
+                    JSONObject candidate = normalizeReleaseAsset(
+                            release,
+                            asset,
+                            sourceFeedId,
+                            sourceLabel,
+                            sourceRepo,
+                            descriptionPrefix
+                    );
                     if (candidate == null) continue;
                     String key = buildFeedKey(candidate);
                     if (seen.add(key)) normalized.put(candidate);
@@ -74,7 +109,12 @@ public final class GamehubFeedNormalizer {
         return normalized.toString();
     }
 
-    private static JSONObject normalizeReleaseAsset(JSONObject release, JSONObject asset) {
+    private static JSONObject normalizeReleaseAsset(JSONObject release,
+                                                   JSONObject asset,
+                                                   String sourceFeedId,
+                                                   String sourceLabel,
+                                                   String sourceRepo,
+                                                   String descriptionPrefix) {
         if (asset == null) return null;
         String assetName = asset.optString("name", "").trim();
         String downloadUrl = asset.optString("browser_download_url", "").trim();
@@ -98,18 +138,20 @@ public final class GamehubFeedNormalizer {
             normalized.put("type", type.toString());
             normalized.put("verName", versionName);
             normalized.put("verCode", versionCode);
-            normalized.put("description", buildReleaseDescription(assetName, releaseTag, type));
+            normalized.put("description", buildReleaseDescription(assetName, releaseTag, type, descriptionPrefix));
             normalized.put("remoteUrl", downloadUrl);
             normalized.put(ContentProfile.MARK_CHANNEL, channel);
             normalized.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
             normalized.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
-            normalized.put(ContentProfile.MARK_SOURCE_REPO, SOURCE_REPO_RELEASES);
-            normalized.put(ContentProfile.MARK_SOURCE_FEED, SOURCE_FEED_ID);
-            normalized.put(ContentProfile.MARK_SOURCE_LABEL, SOURCE_LABEL);
+            normalized.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
+            normalized.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
+            normalized.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
             if (!releaseTag.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_TAG, releaseTag);
             if (!assetName.isEmpty()) normalized.put(ContentProfile.MARK_ARTIFACT_NAME, assetName);
             if (!publishedAt.isEmpty()) normalized.put(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
             if (!releaseNotes.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_NOTES, releaseNotes);
+            String digest = asset.optString("digest", "").trim();
+            if (!digest.isEmpty()) normalized.put(ContentProfile.MARK_SHA256, digest);
             return normalized;
         } catch (Exception ignored) {
             return null;
@@ -201,8 +243,13 @@ public final class GamehubFeedNormalizer {
         return type.toString();
     }
 
-    private static String buildReleaseDescription(String assetName, String releaseTag, ContentProfile.ContentType type) {
-        StringBuilder builder = new StringBuilder("GameHub release package");
+    private static String buildReleaseDescription(String assetName,
+                                                  String releaseTag,
+                                                  ContentProfile.ContentType type,
+                                                  String descriptionPrefix) {
+        StringBuilder builder = new StringBuilder(descriptionPrefix == null || descriptionPrefix.trim().isEmpty()
+                ? "Release package"
+                : descriptionPrefix.trim());
         if (type != null) builder.append(" • ").append(type.toString());
         if (releaseTag != null && !releaseTag.trim().isEmpty()) builder.append(" • ").append(releaseTag.trim());
         if (assetName != null && !assetName.trim().isEmpty()) builder.append(" • ").append(stripArchiveSuffix(assetName));
