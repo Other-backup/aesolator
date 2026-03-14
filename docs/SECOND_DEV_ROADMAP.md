@@ -137,7 +137,10 @@ Second autonomous developer lane for `aesolator`:
 - `Nightlies by The412Banner` is now integrated as a first-class `Contents`
   source lane for `Proton`, `DXVK`, `VKD3D`, `Box64`, `WOWBox64`, and
   `FEXCore`, but device-led validation of source switching and installation
-  across those donor packages is still pending.
+  across those donor packages is still pending. Ordering now prefers
+  `publishedAt`/`verCode`, and donor `Wine/Proton` intake now prefers
+  compressed `.wcp.xz/.wcp.zst` artifacts because that is where the usable
+  prefix-bearing payloads live.
 - `BannersComponentInjector` still has deeper donor logic not yet harvested
   locally, especially around richer source discovery, release-tag browsing, and
   download-management UX.

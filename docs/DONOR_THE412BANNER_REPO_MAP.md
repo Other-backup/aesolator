@@ -28,6 +28,10 @@ ranked by relevance to `Ae.solator`.
 - Confirmed signal:
   release `proton-bleeding-edge-20260312-b310f0c-run23` already ships ARM64EC
   packaged Proton artifacts as both `.wcp` and `.wcp.xz`
+- Intake note:
+  donor `Wine/Proton` flows should prefer `.wcp.xz/.wcp.zst` variants when
+  present, because that is where the usable prefix-bearing package layout is
+  expected
 
 ### `BannersComponentInjector`
 

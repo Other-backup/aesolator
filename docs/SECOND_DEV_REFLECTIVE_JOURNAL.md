@@ -755,3 +755,29 @@
 - Next step: run a device-led pass inside `Contents` to verify `Nightlies`
   source switching, nightly-only channel behavior, and installation of at
   least one donor package per family.
+
+### Entry 40: Global package ordering and Proton intake repair
+
+- Goal: make package ordering stable across all source lanes and fix the donor
+  `Proton` install path that was still selecting the wrong artifact variant.
+- Context: the user called out two connected problems: package ordering still
+  felt inconsistent across lanes, and the latest donor `Proton` was not
+  installing. Donor packaging clarified the root cause: packages carrying the
+  usable prefix are delivered in `.wcp.xz`, while the plain `.wcp` sibling can
+  represent a less complete runtime payload for the wine-family case.
+- Decision: add `publishedAt` as an explicit sort key both in visible profile
+  ordering and in merged remote-candidate selection, then specialize format
+  priority so `Wine/Proton` packages prefer `.wcp.xz/.wcp.zst` over plain
+  `.wcp`. This keeps ordering date-aware across source lanes and makes donor
+  `Proton` resolution land on the prefix-carrying artifact by default.
+- Tradeoff: format preference is now type-aware instead of globally uniform,
+  but that is the correct model because donor `Wine/Proton` packaging semantics
+  differ from the graphics/component lanes.
+- Verification: `assembleDebug` completed successfully, APK reinstall via Wi-Fi
+  ADB succeeded, and a fresh smoke launch finished without a new crash-buffer
+  record. The live in-app tap-through for final donor `Proton` installation is
+  still pending, but the selection logic now targets the correct compressed
+  artifact family.
+- Next step: perform a direct device install pass on the newest `Nightlies`
+  `Proton` entry to confirm end-to-end installation on the corrected intake
+  path.

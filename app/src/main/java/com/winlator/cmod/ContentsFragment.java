@@ -424,6 +424,9 @@ public class ContentsFragment extends Fragment {
             int channelCompare = Integer.compare(resolveProfileChannelPriority(right), resolveProfileChannelPriority(left));
             if (channelCompare != 0) return channelCompare;
 
+            long publishedCompare = Long.compare(resolveProfilePublishedAtKey(right), resolveProfilePublishedAtKey(left));
+            if (publishedCompare != 0) return publishedCompare > 0 ? 1 : -1;
+
             int verCodeCompare = Integer.compare(right.verCode, left.verCode);
             if (verCodeCompare != 0) return verCodeCompare;
 
@@ -470,7 +473,12 @@ public class ContentsFragment extends Fragment {
 
     private int resolveProfileFormatPriority(ContentProfile profile) {
         if (profile == null) return 0;
-        return resolveRemotePackageFormatPriority(profile.remoteUrl);
+        return resolveRemotePackageFormatPriority(profile.type, profile.remoteUrl);
+    }
+
+    private long resolveProfilePublishedAtKey(ContentProfile profile) {
+        if (profile == null) return 0L;
+        return parsePublishedAtKey(profile.publishedAt);
     }
 
     private String resolveProfileSourceMode(ContentProfile profile) {
@@ -1340,6 +1348,10 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean isBetterRemoteCandidate(JSONObject candidate, JSONObject currentBest) {
+        long candidatePublishedAt = resolveRemotePublishedAtKey(candidate);
+        long currentPublishedAt = resolveRemotePublishedAtKey(currentBest);
+        if (candidatePublishedAt != currentPublishedAt) return candidatePublishedAt > currentPublishedAt;
+
         int candidateVerCode = parseRemoteVerCode(candidate);
         int currentVerCode = parseRemoteVerCode(currentBest);
         if (candidateVerCode != currentVerCode) return candidateVerCode > currentVerCode;
@@ -1352,8 +1364,14 @@ public class ContentsFragment extends Fragment {
         int currentChannelPriority = resolveChannelPriority(currentBest.optString(ContentProfile.MARK_CHANNEL, ""));
         if (candidateChannelPriority != currentChannelPriority) return candidateChannelPriority > currentChannelPriority;
 
-        int candidateFormatPriority = resolveRemotePackageFormatPriority(candidate.optString("remoteUrl", ""));
-        int currentFormatPriority = resolveRemotePackageFormatPriority(currentBest.optString("remoteUrl", ""));
+        int candidateFormatPriority = resolveRemotePackageFormatPriority(
+                candidate.optString("type", ""),
+                candidate.optString("remoteUrl", "")
+        );
+        int currentFormatPriority = resolveRemotePackageFormatPriority(
+                currentBest.optString("type", ""),
+                currentBest.optString("remoteUrl", "")
+        );
         if (candidateFormatPriority != currentFormatPriority) return candidateFormatPriority > currentFormatPriority;
 
         // Stable tie-breaker to avoid flicker.
@@ -1372,6 +1390,23 @@ public class ContentsFragment extends Fragment {
             }
         }
         return 0;
+    }
+
+    private long resolveRemotePublishedAtKey(JSONObject object) {
+        if (object == null) return 0L;
+        return parsePublishedAtKey(object.optString(ContentProfile.MARK_PUBLISHED_AT, ""));
+    }
+
+    private long parsePublishedAtKey(String value) {
+        if (value == null) return 0L;
+        String digits = value.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return 0L;
+        if (digits.length() > 14) digits = digits.substring(0, 14);
+        try {
+            return Long.parseLong(digits);
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     private int resolveRemoteSourcePriority(JSONObject object) {
@@ -1840,13 +1875,26 @@ public class ContentsFragment extends Fragment {
         return (color & 0x00ffffff) | (clampedAlpha << 24);
     }
 
-    private int resolveRemotePackageFormatPriority(String remoteUrl) {
+    private int resolveRemotePackageFormatPriority(ContentProfile.ContentType type, String remoteUrl) {
         String lower = remoteUrl == null ? "" : remoteUrl.trim().toLowerCase(Locale.US);
-        if (lower.endsWith(".wcp") || lower.endsWith(".wcp.xz") || lower.endsWith(".wcp.zst")) return 40;
+        boolean wineFamily = type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+        if (wineFamily) {
+            if (lower.endsWith(".wcp.xz") || lower.endsWith(".wcp.zst")) return 50;
+            if (lower.endsWith(".wcp")) return 40;
+        } else if (lower.endsWith(".wcp")) {
+            return 45;
+        } else if (lower.endsWith(".wcp.xz") || lower.endsWith(".wcp.zst")) {
+            return 40;
+        }
         if (lower.endsWith(".zip")) return 30;
         if (lower.endsWith(".txz") || lower.endsWith(".tar.xz")) return 20;
         if (lower.endsWith(".tzst") || lower.endsWith(".tar.zst")) return 10;
         return 0;
+    }
+
+    private int resolveRemotePackageFormatPriority(String typeName, String remoteUrl) {
+        return resolveRemotePackageFormatPriority(ContentProfile.ContentType.getTypeByName(typeName), remoteUrl);
     }
 
     private int dpToPx(float dp) {
