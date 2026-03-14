@@ -240,13 +240,54 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
     private static final long DESKTOP_RUNTIME_PAUSE_GRACE_MS = 1800L;
+    private static final long DESKTOP_SHELL_TERMINATION_GRACE_MS = 8000L;
     private final Handler runtimePauseHandler = new Handler(Looper.getMainLooper());
     private boolean deferredDesktopPauseScheduled = false;
+    private boolean deferredGuestTerminationScheduled = false;
+    private long desktopShellBootstrapStartedAtMs = 0L;
     private final Runnable deferredDesktopPauseRunnable = new Runnable() {
         @Override
         public void run() {
             deferredDesktopPauseScheduled = false;
             pauseDesktopRuntime("deferred_background_pause");
+        }
+    };
+    private final Runnable deferredGuestTerminationRunnable = new Runnable() {
+        @Override
+        public void run() {
+            deferredGuestTerminationScheduled = false;
+            int trackedCount = getTrackedApplicationWindowCount();
+            if (!desktopShellBootstrapActive || !guestLauncherExited || trackedCount > 0) {
+                ForensicLogger.logEvent(
+                        XServerDisplayActivity.this,
+                        "info",
+                        "GUEST_PROGRAM_TERMINATION_DEFER_CANCELLED",
+                        null,
+                        "xserver",
+                        "guest_program_termination_grace_cancelled",
+                        ForensicLogger.fields(
+                                "tracked_window_count", trackedCount,
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                                "guest_launcher_exited", guestLauncherExited
+                        )
+                );
+                return;
+            }
+
+            ForensicLogger.logEvent(
+                    XServerDisplayActivity.this,
+                    "warn",
+                    "GUEST_PROGRAM_TERMINATION_GRACE_EXPIRED",
+                    null,
+                    "xserver",
+                    "guest_program_termination_grace_expired",
+                    ForensicLogger.fields(
+                            "tracked_window_count", trackedCount,
+                            "guest_launcher_exit_status", guestLauncherExitStatus,
+                            "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs)
+                    )
+            );
+            runOnUiThread(XServerDisplayActivity.this::exit);
         }
     };
 
@@ -1481,6 +1522,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (!mappedApplicationWindowIds.add(window.id)) return;
             trackedCount = mappedApplicationWindowIds.size();
         }
+        cancelDeferredGuestTermination("window_mapped");
         ForensicLogger.logEvent(
                 this,
                 "info",
@@ -1589,14 +1631,44 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean shouldDeferGuestTermination(int status) {
         if (!desktopShellBootstrapActive) return false;
         synchronized (mappedApplicationWindowIds) {
-            return !mappedApplicationWindowIds.isEmpty();
+            if (!mappedApplicationWindowIds.isEmpty()) return true;
         }
+        return Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs)
+                < DESKTOP_SHELL_TERMINATION_GRACE_MS;
     }
 
     private int getTrackedApplicationWindowCount() {
         synchronized (mappedApplicationWindowIds) {
             return mappedApplicationWindowIds.size();
         }
+    }
+
+    private void scheduleDeferredGuestTermination(int status) {
+        long elapsedMs = Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs);
+        long delayMs = Math.max(0L, DESKTOP_SHELL_TERMINATION_GRACE_MS - elapsedMs);
+        guestLauncherExitStatus = status;
+        runtimePauseHandler.removeCallbacks(deferredGuestTerminationRunnable);
+        deferredGuestTerminationScheduled = true;
+        runtimePauseHandler.postDelayed(deferredGuestTerminationRunnable, delayMs);
+    }
+
+    private void cancelDeferredGuestTermination(String reason) {
+        if (!deferredGuestTerminationScheduled) return;
+        runtimePauseHandler.removeCallbacks(deferredGuestTerminationRunnable);
+        deferredGuestTerminationScheduled = false;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "GUEST_PROGRAM_TERMINATION_DEFER_CANCELLED",
+                null,
+                "xserver",
+                "guest_program_termination_grace_cancelled",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                )
+        );
     }
 
     private boolean shouldKeepDesktopRuntimeActiveOnPause() {
@@ -1735,6 +1807,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         guestLauncherExited = false;
         guestLauncherExitStatus = Integer.MIN_VALUE;
         desktopShellBootstrapActive = false;
+        desktopShellBootstrapStartedAtMs = 0L;
+        cancelDeferredGuestTermination("setup_xenvironment");
 
         guestProgramLauncherComponent = new GuestProgramLauncherComponent(
                 contentsManager,
@@ -1756,6 +1830,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             String guestExecutable = "wine explorer /desktop=shell," + xServer.screenInfo + " " + getWineStartCommand();
             desktopShellBootstrapActive = shortcut == null
                     && guestExecutable.toLowerCase(java.util.Locale.ROOT).contains("explorer /desktop=shell");
+            if (desktopShellBootstrapActive) {
+                desktopShellBootstrapStartedAtMs = System.currentTimeMillis();
+            }
 
             guestProgramLauncherComponent.setGuestExecutable(guestExecutable);
 
@@ -1834,6 +1911,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 synchronized (mappedApplicationWindowIds) {
                     trackedWindowCount = mappedApplicationWindowIds.size();
                 }
+                scheduleDeferredGuestTermination(status);
                 ForensicLogger.logEvent(
                         this,
                         "info",
@@ -1844,7 +1922,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         ForensicLogger.fields(
                                 "status", status,
                                 "tracked_window_count", trackedWindowCount,
-                                "desktop_shell_bootstrap", desktopShellBootstrapActive
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                                "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs),
+                                "termination_grace_ms", DESKTOP_SHELL_TERMINATION_GRACE_MS
                         )
                 );
                 return;

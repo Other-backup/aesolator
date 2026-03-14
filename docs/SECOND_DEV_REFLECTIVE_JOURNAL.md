@@ -1296,3 +1296,35 @@
   again. The recovered-container tail is closed; remaining desktop work is
   pointer/input quality and payload-consumer correctness, not missing metadata
   for existing prefixes.
+
+### Entry 58: Desktop bootstrap termination now waits for the first shell-map race to settle
+
+- Goal: stop `XServerDisplayActivity` from honoring an early guest-launcher
+  exit before the first desktop shell window has a chance to map.
+- Context: after `Container-4` was removed and the orphan-container tail was
+  gone, the next clean device traces showed a narrower risk. The desktop path
+  could reach `explorer.exe` mapping, but the code still had a bootstrap race:
+  if the guest launcher exited before any tracked application window was
+  recorded, `setTerminationCallback()` could go straight to `exit()` even
+  though `explorer /desktop=shell` was still in the process of surfacing its
+  first real window. That kind of race matches the user's intermittent
+  "sometimes black screen, sometimes launcher, sometimes works" reports.
+- Decision: add an explicit desktop-shell termination grace window in
+  `XServerDisplayActivity`. During no-shortcut shell bootstrap, guest launcher
+  termination is now deferred for up to 8 seconds even if tracked-window count
+  is still zero. The deferred exit is cancelled immediately once the first
+  tracked shell window maps. New forensic markers capture both the defer path
+  and the grace-expired fallback.
+- Tradeoff: this keeps the activity alive a little longer in the genuinely bad
+  case where no shell window ever appears. That is the correct tradeoff
+  because the previous behavior could kill a valid desktop bootstrap on a race,
+  which is worse than waiting a few seconds before conceding failure.
+- Verification: rebuilt and reinstalled the APK, ran a clean device launch for
+  `container_id=3`, and confirmed `PRELOADER_MAP_FALLBACK`,
+  `XSERVER_APP_WINDOW_MAPPED`, and `XSERVER_WINDOW_FOCUS_CHANGED` without any
+  immediate `XSERVER_EXIT_REQUESTED` or
+  `GUEST_PROGRAM_TERMINATION_GRACE_EXPIRED` in the short bootstrap pass.
+- Next step: keep hunting the later desktop tail with this race removed from
+  the picture. The remaining suspects are true post-bootstrap interaction
+  defects or native/process death after the shell is already live, not the old
+  first-window termination race.

@@ -219,6 +219,12 @@ Second autonomous developer lane for `aesolator`:
   portrait gate, `am start -W` completes again, and live forensics confirm
   `explorer.exe` window mapping. The remaining desktop risk has moved
   downstream into post-bootstrap interaction quality and payload consumers.
+- Desktop shell bootstrap now has a termination grace window before the app
+  honors a guest-launcher exit with zero mapped windows. This closes the
+  early-race path where `explorer /desktop=shell` could exit milliseconds
+  before the first shell window map and drag the activity into `exit()` too
+  early. Remaining desktop risk is later interaction quality and true native
+  process death, not that early bootstrap race.
 - The desktop cursor stack now has an explicit ownership split in
   `GLRenderer`: fullscreen-like non-shell guest windows can suppress the
   compositor cursor entirely, not just the root fallback, so duplicate cursor
