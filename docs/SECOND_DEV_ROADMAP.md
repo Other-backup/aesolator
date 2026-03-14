@@ -32,15 +32,21 @@ Second autonomous developer lane for `aesolator`:
    - verify the new landscape density pass on a stable device session
    - keep the main menu readable as a control surface, not a stretched portrait
      grid
-4. `Contents` source-of-truth enforcement
+4. Shared control-system polish
+   - keep selectors, switches, seekbars, preference rows, and compact toggles
+     on one geometry system instead of drifting by screen
+   - prefer global style/resource fixes where possible, then validate on live
+     `Contents`, `Settings`, and `Graphics Center` screens
+   - keep long text readable by truncation or controlled wrapping, not marquee
+5. `Contents` source-of-truth enforcement
    - `REMOTE_WINE_PROTON_OVERLAY` must track `aesolator/contents/contents.json`
    - `Wine` lane must expose archive-managed `freewine11`
-5. Documentation sync
+6. Documentation sync
   - keep `AGENTS.md`, roadmap, and reflective journal current
   - keep implementation notes aligned with repo contracts
   - keep the Termux local-build path self-contained instead of relying on
     ad-hoc CLI flags for `aapt2`
-6. Handoff/reporting discipline
+7. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
 
@@ -80,6 +86,9 @@ Second autonomous developer lane for `aesolator`:
 - `WCPHub` source parsing no longer drops overlapping families at ingest time,
   but the integrated device pass still needs one more live confirmation for
   list rendering and install actions after the parser fix.
+- The shared selector/switch/preference geometry pass is now built and
+  installed, but many secondary dialogs still have only code-level validation
+  rather than screenshot proof on the target device.
 - The repo-side `Contents` workflow contract is now aligned with the static
   checklist gate, so the remaining `Contents` risk is device behavior rather
   than source-of-truth drift inside `.github/workflows/ci-winlator.yml`.

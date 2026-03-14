@@ -87,21 +87,20 @@
     <!-- Base ComboBox Styles -->
     <style name="ComboBox">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_height">46dp</item>
+        <item name="android:minHeight">46dp</item>
         <item name="android:focusable">true</item>
         <item name="android:clickable">true</item>
         <item name="android:textColor">?attr/aePrimaryTextColor</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:gravity">start|center_vertical</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">44dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">40dp</item>
         <item name="android:paddingTop">0dp</item>
         <item name="android:paddingBottom">0dp</item>
         <item name="android:maxLines">1</item>
-        <item name="android:ellipsize">marquee</item>
-        <item name="android:marqueeRepeatLimit">marquee_forever</item>
-        <item name="android:scrollHorizontally">true</item>
-        <item name="android:fadingEdge">horizontal</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:scrollHorizontally">false</item>
         <item name="android:spinnerMode">dropdown</item>
         <item name="android:background">?attr/aeComboBoxBackground</item>
         <item name="android:popupBackground">?attr/aePopupBackground</item>
@@ -158,14 +157,14 @@
     <!-- EditText Styles -->
     <style name="EditText">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">44dp</item>
-        <item name="android:minHeight">44dp</item>
+        <item name="android:layout_height">46dp</item>
+        <item name="android:minHeight">46dp</item>
         <item name="android:textColor">?attr/aePrimaryTextColor</item>
         <item name="android:textColorHint">?attr/aeHintTextColor</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:gravity">start|center_vertical</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
         <item name="android:paddingTop">0dp</item>
         <item name="android:paddingBottom">0dp</item>
         <item name="android:maxLines">1</item>
@@ -193,27 +192,32 @@
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:textColorSecondary">@color/colorPrimary</item>
         <item name="android:textColor">?attr/aePrimaryTextColor</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">2dp</item>
     </style>
 
     <style name="CheckBox.Dark" parent="CheckBox">
         <item name="colorAccent">@color/colorAccentDark</item>
         <item name="android:textColorSecondary">@color/colorPrimaryDark</item>
         <item name="android:textColor">?attr/aePrimaryTextColor</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
     </style>
 
     <!-- Button Styles -->
     <style name="BaseButton">
         <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">42dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:minHeight">44dp</item>
         <item name="android:focusable">true</item>
         <item name="android:clickable">true</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:lines">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:paddingLeft">24dp</item>
-        <item name="android:paddingRight">24dp</item>
+        <item name="android:paddingLeft">18dp</item>
+        <item name="android:paddingRight">18dp</item>
         <item name="android:textAllCaps">false</item>
     </style>
 
@@ -231,15 +235,25 @@
     </style>
 
     <style name="ButtonInlineNeutral" parent="ButtonNeutral">
-        <item name="android:layout_height">38dp</item>
-        <item name="android:minHeight">38dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">90dp</item>
-        <item name="android:paddingLeft">16dp</item>
-        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingLeft">14dp</item>
+        <item name="android:paddingRight">14dp</item>
         <item name="android:textSize">14sp</item>
     </style>
 
     <style name="ButtonInlineNeutral.Dark" parent="ButtonInlineNeutral" />
+
+    <style name="ToggleButtonCompact">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:minWidth">72dp</item>
+        <item name="android:minHeight">34dp</item>
+        <item name="android:background">@drawable/toggle_button_selector</item>
+        <item name="android:textOn"></item>
+        <item name="android:textOff"></item>
+    </style>
 
     <style name="ButtonPositive" parent="BaseButton">
         <item name="android:background">@drawable/button_positive</item>
@@ -304,12 +318,12 @@
     </style>
 
     <style name="ListMenuButton" parent="BaseImageButton">
-        <item name="android:layout_width">38dp</item>
-        <item name="android:layout_height">38dp</item>
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
         <item name="android:background">@drawable/list_menu_button_bg</item>
         <item name="android:tint">@color/colorAccent</item>
-        <item name="android:layout_marginStart">2dp</item>
-        <item name="android:layout_marginEnd">2dp</item>
+        <item name="android:layout_marginStart">3dp</item>
+        <item name="android:layout_marginEnd">3dp</item>
     </style>
 
     <style name="ListMenuButton.Dark" parent="ListMenuButton">
@@ -361,11 +375,11 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/surface_card_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">12dp</item>
-        <item name="android:paddingBottom">12dp</item>
-        <item name="android:paddingTop">46dp</item>
-        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="android:paddingTop">44dp</item>
+        <item name="android:layout_marginTop">8dp</item>
     </style>
 
     <style name="FieldSet.Dark" parent="FieldSet">
@@ -373,11 +387,11 @@
     </style>
 
     <style name="FieldSetCompact" parent="FieldSet">
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">10dp</item>
-        <item name="android:paddingBottom">10dp</item>
-        <item name="android:paddingTop">38dp</item>
-        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:paddingTop">36dp</item>
+        <item name="android:layout_marginTop">6dp</item>
     </style>
 
     <style name="FieldSetCompact.Dark" parent="FieldSetCompact">
@@ -389,14 +403,14 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/surface_badge_background</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
-        <item name="android:paddingTop">2dp</item>
-        <item name="android:paddingBottom">2dp</item>
-        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:paddingStart">9dp</item>
+        <item name="android:paddingEnd">9dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:layout_marginStart">14dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:textSize">10sp</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:textColor">@color/surface_badge_text</item>
     </style>
 
@@ -600,6 +614,7 @@
     </style>
     <style name="PreferenceSummaryTextStyle">
         <item name="android:textAppearance">?android:textAppearanceListItemSecondary</item>
+        <item name="android:textSize">13sp</item>
     </style>
     <style name="PreferenceThemeOverlay">
         <item name="android:scrollbars">vertical</item>

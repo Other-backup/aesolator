@@ -51,6 +51,14 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - For meaningful device-led passes, record:
   screen observed, issue found, code decision, verification evidence, and any
   remaining risk for the next pass.
+- When the screen is unfamiliar or the user asks for broad UX cleanup, run a
+  compact audit cycle:
+  screen identification, layout map, detected controls, likely interactions,
+  visual hierarchy, UX/accessibility issues, implementation decision, and next
+  ADB action.
+- Prefer global control-system fixes over one-off pixel edits when the same
+  issue appears across activities, dialogs, selectors, settings rows, or
+  preference surfaces.
 
 ## Main Docs
 

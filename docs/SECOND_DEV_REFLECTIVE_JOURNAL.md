@@ -476,3 +476,48 @@
   install flows.
 - Next step: keep closing remaining device-side UI and behavior tails from the
   refreshed installed build.
+
+### Entry 28: Shared control-system geometry pass
+
+- Goal: stop the app from feeling like a mix of unrelated control densities by
+  tightening selectors, switches, seekbars, preference rows, compact toggles,
+  and settings action controls under one geometry pass.
+- Context: after the `Contents` top-row repair, the remaining visual drift was
+  no longer isolated to one screen. `Settings`, preferences, and legacy toggle
+  rows still mixed marquee titles, uneven heights, loose widget frames, and
+  undersized action controls.
+- Decision: widen the fix from screen-level XML tweaks to a shared control
+  layer: update `ComboBox`, `EditText`, `BaseButton`, `FieldSet`, compact
+  spinner rows, preference rows, switch widgets, seekbar widgets, and legacy
+  toggle rows. Then extend the pass with global `CheckBox` and `ListMenuButton`
+  geometry so activities and dialogs inherit the same spacing rhythm.
+- Tradeoff: some controls became slightly denser and a few old marquee behaviors
+  were removed, but the result is more stable and readable than allowing each
+  surface to self-size in different ways.
+- Verification: debug build completed successfully after the full resource
+  patch, APK reinstalled over Wi-Fi ADB, and follow-up screenshots confirmed
+  the new shared sizing system on live screens rather than only in XML.
+- Next step: keep validating the highest-traffic surfaces (`Contents`,
+  `Settings`, `Graphics Center`) and only return to individual dialogs when a
+  screenshot reveals a concrete outlier.
+
+### Entry 29: Settings device pass after shared polish
+
+- Goal: confirm that the broad style-system pass actually improved a dense
+  settings surface on the phone and did not just compile cleanly.
+- Context: `Settings` is the fastest live stress test for the new geometry
+  layer because it combines selectors, icon-button action rows, checkboxes,
+  long-path rows, and a persistent bottom-right confirm FAB on one scrollable
+  screen.
+- Decision: raise the screen-level bottom inset, normalize the preset action
+  rows, let long path values truncate instead of pushing the chooser buttons,
+  and leave the rest to the new shared control styles instead of introducing
+  screen-specific custom widgets.
+- Tradeoff: the confirm FAB still stays visible as a persistent action anchor,
+  so the screen keeps a strong call-to-save affordance at the cost of some
+  bottom-right visual weight.
+- Verification: rebuilt APK installed successfully and fresh on-device
+  screenshots show the updated `Settings` cards, action-row rhythm, and bottom
+  spacing without new crashes or resource regressions.
+- Next step: continue with deeper device-led behavioral QA for `New Container`
+  and `Contents` install flows now that the broad geometry pass is stable.
