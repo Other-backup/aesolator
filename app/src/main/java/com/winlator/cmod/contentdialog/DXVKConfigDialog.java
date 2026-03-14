@@ -7,8 +7,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
 import android.widget.Spinner;
-import android.widget.ToggleButton;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
@@ -40,9 +40,9 @@ public class DXVKConfigDialog extends ContentDialog {
     public static final int DXVK_TYPE_NONE = 0;
     public static final int DXVK_TYPE_ASYNC = 1;
     public static final int DXVK_TYPE_GPLASYNC = 2;
-    private final ToggleButton swAsync;
+    private final CompoundButton swAsync;
     private boolean isARM64EC = false;
-    private final ToggleButton swAsyncCache;
+    private final CompoundButton swAsyncCache;
     private final View llAsync;
     private final View llAsyncCache;
     private final Context context;

@@ -255,6 +255,13 @@
         <item name="android:textOff"></item>
     </style>
 
+    <style name="SwitchControl" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:minHeight">32dp</item>
+        <item name="showText">false</item>
+        <item name="switchMinWidth">52dp</item>
+        <item name="splitTrack">false</item>
+    </style>
+
     <style name="ButtonPositive" parent="BaseButton">
         <item name="android:background">@drawable/button_positive</item>
         <item name="android:textColor">@color/surface_button_positive_text</item>

@@ -314,18 +314,48 @@
                             android:src="@drawable/ae_icon_menu" />
                     </LinearLayout>
 
-                    <CheckBox
-                        android:id="@+id/CBShowFPS"
-                        android:layout_width="wrap_content"
+                    <View style="@style/FieldSeparator" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/show_fps" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/CBShowFPS"
+                            style="@style/SwitchControl"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:showText="false" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="@string/show_fps" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <CheckBox
-                        android:id="@+id/CBFullscreenStretched"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/fullscreen_stretched" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/fullscreen_stretched" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/CBFullscreenStretched"
+                            style="@style/SwitchControl"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:showText="false" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <TextView
@@ -344,15 +374,30 @@
                     style="@style/FieldSet"
                     android:tag="theme_card">
 
-                    <CheckBox
-                        android:id="@+id/CBContainerFgEnable"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/upscaler_enable_frame_generation" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/upscaler_enable_frame_generation" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/CBContainerFgEnable"
+                            style="@style/SwitchControl"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:showText="false" />
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:text="@string/upscaler_preset" />
 
                     <Spinner
@@ -372,11 +417,26 @@
                         android:layout_width="match_parent"
                         android:entries="@array/upscaler_framegen_mode_entries" />
 
-                    <CheckBox
-                        android:id="@+id/CBContainerFgThermalGuard"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/upscaler_thermal_guard" />
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/upscaler_thermal_guard" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/CBContainerFgThermalGuard"
+                            style="@style/SwitchControl"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:showText="false" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/TVContainerFgHint"
@@ -577,22 +637,57 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <com.winlator.cmod.widget.EnvVarsView
-                    android:id="@+id/EnvVarsView"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="2dp"/>
+                    android:layout_marginTop="8dp">
 
-                <View style="@style/HorizontalLine" />
+                    <LinearLayout
+                        style="@style/FieldSet"
+                        android:tag="theme_card">
 
-                <Button
-                    style="@style/ButtonNeutral"
-                    android:id="@+id/BTAddEnvVar"
-                    android:layout_width="160dp"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:text="@string/add" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/environment_variables"
+                                android:textStyle="bold" />
+
+                            <Button
+                                android:id="@+id/BTAddEnvVar"
+                                style="@style/ButtonInlineNeutral"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/add" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/new_environment_variable_hint"
+                            android:textSize="12sp" />
+
+                        <com.winlator.cmod.widget.EnvVarsView
+                            android:id="@+id/EnvVarsView"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:paddingStart="0dp"
+                            android:paddingEnd="0dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FieldSetLabel"
+                        android:tag="theme_badge"
+                        android:text="@string/environment_variables" />
+                </FrameLayout>
             </LinearLayout>
 
             <LinearLayout
@@ -778,9 +873,61 @@
                         android:tag="theme_card">
 
                         <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/enable_xinput_for_wine_game" />
+
+                            <ImageView
+                                android:id="@+id/BTXInputHelp"
+                                style="@style/HelpButton" />
+
+                            <androidx.appcompat.widget.SwitchCompat
+                                android:id="@+id/CBEnableXInput"
+                                style="@style/SwitchControl"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                app:showText="false" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/enable_dinput_for_wine_game" />
+
+                            <ImageView
+                                android:id="@+id/BTDInputHelp"
+                                style="@style/HelpButton" />
+
+                            <androidx.appcompat.widget.SwitchCompat
+                                android:id="@+id/CBEnableDInput"
+                                style="@style/SwitchControl"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                app:showText="false" />
+                        </LinearLayout>
+
+                        <LinearLayout
                             android:id="@+id/LLDinputMapperType"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
                             android:orientation="vertical">
 
                             <TextView
@@ -789,8 +936,8 @@
                                 android:text="@string/directinput_mapper_type" />
 
                             <Spinner
-                                style="@style/ComboBox"
                                 android:id="@+id/SDInputType"
+                                style="@style/ComboBox"
                                 android:layout_width="match_parent"
                                 android:entries="@array/dinput_mapper_type_entries" />
                         </LinearLayout>
@@ -798,47 +945,23 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                            <CheckBox
-                                android:id="@+id/CBEnableXInput"
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/enable_sdl2_compatibility" />
+
+                            <androidx.appcompat.widget.SwitchCompat
+                                android:id="@+id/CBSdl2Toggle"
+                                style="@style/SwitchControl"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_gravity="center"
-                                android:text="@string/enable_xinput_for_wine_game" />
-
-                            <ImageView
-                                android:id="@+id/BTXInputHelp"
-                                style="@style/HelpButton"
-                                android:layout_gravity="center" />
+                                app:showText="false" />
                         </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
-
-                            <CheckBox
-                                android:id="@+id/CBEnableDInput"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/enable_dinput_for_wine_game" />
-
-
-
-                            <ImageView
-                                android:id="@+id/BTDInputHelp"
-                                style="@style/HelpButton"
-                                android:layout_gravity="center" />
-                        </LinearLayout>
-
-                        <CheckBox
-                            android:id="@+id/CBSdl2Toggle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/enable_sdl2_compatibility" />
 
 
                     </LinearLayout>

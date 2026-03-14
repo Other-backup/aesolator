@@ -10,12 +10,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.ToggleButton;
 
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -157,10 +157,6 @@ public class EnvVarsView extends FrameLayout {
                     R.attr.aePopupBackground,
                     isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background
             ));
-        } else if (view instanceof ToggleButton) {
-            ToggleButton toggle = (ToggleButton) view;
-            toggle.setTextColor(primaryTextColor);
-            toggle.setBackgroundResource(R.drawable.toggle_button_selector);
         } else if (view instanceof TextView) {
             ((TextView) view).setTextColor(primaryTextColor);
         }
@@ -214,7 +210,6 @@ public class EnvVarsView extends FrameLayout {
         final View itemView = inflater.inflate(R.layout.env_vars_list_item, container, false);
         TextView nameTextView = itemView.findViewById(R.id.TextView);
         nameTextView.setText(name);
-        nameTextView.setSelected(true);
         int accent = ContextCompat.getColor(context, isDarkMode ? R.color.colorAccentDark : R.color.colorAccent);
         itemView.setBackground(buildInlineCardBackground(accent));
 
@@ -225,13 +220,9 @@ public class EnvVarsView extends FrameLayout {
 
         switch (type) {
             case "CHECKBOX":
-                final ToggleButton toggleButton = itemView.findViewById(R.id.ToggleButton);
+                final CompoundButton toggleButton = itemView.findViewById(R.id.ToggleButton);
                 toggleButton.setVisibility(VISIBLE);
                 toggleButton.setChecked(value.equals("1") || value.equals("true"));
-                applyDarkTheme(toggleButton); // Apply dark theme
-                toggleButton.jumpDrawablesToCurrentState();
-                toggleButton.refreshDrawableState();
-                toggleButton.invalidate();
                 getValueCallback = () -> toggleButton.isChecked() ? knownEnvVar[3] : knownEnvVar[2];
                 break;
             case "SELECT":
@@ -255,8 +246,7 @@ public class EnvVarsView extends FrameLayout {
                 EditText editText = itemView.findViewById(R.id.EditText);
                 editText.setVisibility(VISIBLE);
                 editText.setText(value);
-                // Apply specific styling for "TEXT" fields
-                editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text); // Apply dark background resource for "TEXT"
+                applyDarkTheme(editText);
                 getValueCallback = () -> editText.getText().toString();
                 break;
             case "NUMBER":
@@ -265,11 +255,12 @@ public class EnvVarsView extends FrameLayout {
                 editTextNumber.setVisibility(VISIBLE);
                 editTextNumber.setText(value);
                 if (type.equals("NUMBER")) editTextNumber.setInputType(InputType.TYPE_CLASS_NUMBER);
-                editTextNumber.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
+                applyDarkTheme(editTextNumber);
                 getValueCallback = () -> editTextNumber.getText().toString();
                 break;
         }
 
+        applyItemTheme(itemView);
         itemView.setTag(getValueCallback);
         itemView.findViewById(R.id.BTRemove).setOnClickListener((v) -> {
             container.removeView(itemView);
@@ -289,7 +280,7 @@ public class EnvVarsView extends FrameLayout {
         this.isDarkMode = isDarkMode;
         applyDarkTheme(emptyTextView); // Apply dark theme to the current instance
         for (int i = 0; i < container.getChildCount(); i++) {
-            applyDarkTheme(container.getChildAt(i));
+            applyItemTheme(container.getChildAt(i));
         }
     }
 
@@ -300,6 +291,20 @@ public class EnvVarsView extends FrameLayout {
         background.setColor((accent & 0x00ffffff) | ((isDarkMode ? 50 : 20) << 24));
         background.setStroke(Math.round(UnitUtils.dpToPx(1)), (accent & 0x00ffffff) | ((isDarkMode ? 220 : 130) << 24));
         return background;
+    }
+
+    private void applyItemTheme(View itemView) {
+        View nameView = itemView.findViewById(R.id.TextView);
+        if (nameView != null) applyDarkTheme(nameView);
+
+        View spinner = itemView.findViewById(R.id.Spinner);
+        if (spinner != null && spinner.getVisibility() == VISIBLE) applyDarkTheme(spinner);
+
+        View editText = itemView.findViewById(R.id.EditText);
+        if (editText != null && editText.getVisibility() == VISIBLE) applyDarkTheme(editText);
+
+        View toggleButton = itemView.findViewById(R.id.ToggleButton);
+        if (toggleButton != null && toggleButton.getVisibility() == VISIBLE) applyDarkTheme(toggleButton);
     }
 
 }

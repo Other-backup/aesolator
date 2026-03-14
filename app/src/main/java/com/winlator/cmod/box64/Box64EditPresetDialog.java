@@ -5,11 +5,11 @@ import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -90,7 +90,7 @@ public class Box64EditPresetDialog extends ContentDialog {
             String name = ((TextView)child.findViewById(R.id.TextView)).getText().toString();
 
             Spinner spinner = child.findViewById(R.id.Spinner);
-            ToggleButton toggleButton = child.findViewById(R.id.ToggleButton);
+            CompoundButton toggleButton = child.findViewById(R.id.ToggleButton);
             boolean toggleSwitch = toggleButton.getVisibility() == View.VISIBLE;
             String value = toggleSwitch ? (toggleButton.isChecked() ? "1" : "0") : spinner.getSelectedItem().toString();
             envVars.put(name, value);
@@ -118,7 +118,7 @@ public class Box64EditPresetDialog extends ContentDialog {
                 });
 
                 Spinner spinner = child.findViewById(R.id.Spinner);
-                ToggleButton toggleButton = child.findViewById(R.id.ToggleButton);
+                CompoundButton toggleButton = child.findViewById(R.id.ToggleButton);
                 String[] values = ArrayUtils.toStringArray(item.getJSONArray("values"));
                 String value = envVars != null && envVars.has(name) ? envVars.get(name) : item.getString("defaultValue");
 

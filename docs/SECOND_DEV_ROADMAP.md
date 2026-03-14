@@ -17,6 +17,8 @@ Second autonomous developer lane for `aesolator`:
    - keep container creation free of XR/native startup regressions
    - polish the runtime-missing state, footer actions, and tab readability from
      real screenshots instead of XML-only inference
+   - normalize boolean controls and env-var editing so the flow stops looking
+     like a mix of legacy checkbox/toggle widgets
    - run top-to-bottom behavioral QA on the full create flow
    - confirm the new cold-start routing after deferred prompts on a stable
      foreground session
@@ -72,8 +74,8 @@ Second autonomous developer lane for `aesolator`:
 ## Current Open Risks
 
 - `New Container` now opens on-device after the XR lazy-load split, but the
-  entire create flow still needs end-to-end QA beyond initial screen entry and
-  footer/layout checks.
+  entire create flow still needs end-to-end QA beyond initial screen entry,
+  footer/layout checks, and the latest env-var/switch cleanup pass.
 - Direct cold-start validation for `selected_menu_item_id` flows is now coded
   more defensively in `MainActivity`, but shared-device foreground contention
   still limits clean screenshot proof for those routes.
@@ -89,6 +91,9 @@ Second autonomous developer lane for `aesolator`:
 - The shared selector/switch/preference geometry pass is now built and
   installed, but many secondary dialogs still have only code-level validation
   rather than screenshot proof on the target device.
+- The `New Container` boolean-control/env-var cleanup is build-complete and
+  installed, but stable screenshot proof of the deeper tabs is still limited by
+  shared-device foreground hijacking during ADB capture.
 - The repo-side `Contents` workflow contract is now aligned with the static
   checklist gate, so the remaining `Contents` risk is device behavior rather
   than source-of-truth drift inside `.github/workflows/ci-winlator.yml`.

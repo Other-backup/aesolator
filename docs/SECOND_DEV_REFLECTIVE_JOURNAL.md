@@ -521,3 +521,33 @@
   spacing without new crashes or resource regressions.
 - Next step: continue with deeper device-led behavioral QA for `New Container`
   and `Contents` install flows now that the broad geometry pass is stable.
+
+### Entry 30: New Container env-var and switch cleanup
+
+- Goal: remove the remaining legacy look from the `New Container` flow,
+  especially the `Environment Variables` tab and the boolean controls in the
+  runtime, frame-generation, and controller sections.
+- Context: the screen had stopped crashing, but it still mixed modern cards and
+  selectors with older checkbox/toggle patterns. `EnvVarsView` rendered as a
+  dense technical list, preset editors still used `ToggleButton`, and container
+  boolean options read more like raw form fields than a polished mobile
+  control surface.
+- Decision: redesign the container env-var tab as a proper card section with a
+  header action row, convert env-var/preset boolean controls from
+  `ToggleButton` to `SwitchCompat`, and replace container checkbox rows with
+  explicit label-plus-switch rows in `container_detail_fragment.xml`. Extend
+  the same switch cleanup to the DXVK config dialog so boolean controls stop
+  drifting by surface.
+- Tradeoff: this pass touches several shared files at once (`EnvVarsView`,
+  preset dialogs, DXVK config, container layout), so it is broader than a
+  one-screen tweak. That is acceptable because the visual problem was a shared
+  component problem, not a single broken XML node.
+- Verification: debug build completed successfully, APK reinstalled via
+  `adb push + pm install`, direct `MainActivity` start into the new-container
+  route produced no fresh crash logs, and app splash/startup into the route was
+  observed. Full screenshot proof of the deep tabs remains partial because the
+  shared device repeatedly pulled foreground focus back to another app during
+  capture.
+- Next step: when the device session is quieter, capture the advanced/env tabs
+  directly and verify the new switch rows and env-var cards visually end to
+  end.

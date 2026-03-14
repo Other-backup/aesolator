@@ -17,7 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.Button;
-import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -429,15 +429,15 @@ public class ContainerDetailFragment extends Fragment {
         MidiManager.loadSFSpinner(sMIDISoundFont);
         AppUtils.setSpinnerSelectionFromValue(sMIDISoundFont, isEditMode() ? container.getMIDISoundFont() : "");
 
-        final CheckBox cbShowFPS = view.findViewById(R.id.CBShowFPS);
+        final CompoundButton cbShowFPS = view.findViewById(R.id.CBShowFPS);
         cbShowFPS.setChecked(isEditMode() && container.isShowFPS());
 
-        final CheckBox cbFullscreenStretched = view.findViewById(R.id.CBFullscreenStretched);
+        final CompoundButton cbFullscreenStretched = view.findViewById(R.id.CBFullscreenStretched);
         cbFullscreenStretched.setChecked(isEditMode() && container.isFullscreenStretched());
-        final CheckBox cbContainerFgEnable = view.findViewById(R.id.CBContainerFgEnable);
+        final CompoundButton cbContainerFgEnable = view.findViewById(R.id.CBContainerFgEnable);
         final Spinner sContainerFgPreset = view.findViewById(R.id.SContainerFgPreset);
         final Spinner sContainerFgMode = view.findViewById(R.id.SContainerFgMode);
-        final CheckBox cbContainerFgThermalGuard = view.findViewById(R.id.CBContainerFgThermalGuard);
+        final CompoundButton cbContainerFgThermalGuard = view.findViewById(R.id.CBContainerFgThermalGuard);
         UpscalerProfileStore.Profile globalUpscalerProfile = UpscalerProfileStore.getSelectedProfile(preferences);
         String containerFgPreset = UpscalerProfileStore.normalizePreset(isEditMode()
                 ? container.getExtra("upscalerPreset", globalUpscalerProfile.preset)
@@ -466,8 +466,8 @@ public class ContainerDetailFragment extends Fragment {
 
         // Existing declarations of UI components and variables
         final Runnable showInputWarning = () -> ContentDialog.alert(context, R.string.enable_xinput_and_dinput_same_time, null);
-        final CheckBox cbEnableXInput = view.findViewById(R.id.CBEnableXInput);
-        final CheckBox cbEnableDInput = view.findViewById(R.id.CBEnableDInput);
+        final CompoundButton cbEnableXInput = view.findViewById(R.id.CBEnableXInput);
+        final CompoundButton cbEnableDInput = view.findViewById(R.id.CBEnableDInput);
         final View llDInputType = view.findViewById(R.id.LLDinputMapperType);
         final View btHelpXInput = view.findViewById(R.id.BTXInputHelp);
         final View btHelpDInput = view.findViewById(R.id.BTDInputHelp);
@@ -497,7 +497,7 @@ public class ContainerDetailFragment extends Fragment {
         btHelpXInput.setOnClickListener(v -> AppUtils.showHelpBox(context, v, R.string.help_xinput));
         btHelpDInput.setOnClickListener(v -> AppUtils.showHelpBox(context, v, R.string.help_dinput));
 
-        final CheckBox cbSdl2Toggle = view.findViewById(R.id.CBSdl2Toggle);
+        final CompoundButton cbSdl2Toggle = view.findViewById(R.id.CBSdl2Toggle);
         cbSdl2Toggle.setChecked(isEditMode() && container.getEnvVars().contains("SDL_XINPUT_ENABLED=1"));
 
         final EditText etLC_ALL = view.findViewById(R.id.ETlcall);

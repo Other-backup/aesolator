@@ -1,59 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
-    android:paddingStart="2dp"
-    android:paddingTop="6dp"
-    android:paddingEnd="2dp"
-    android:paddingBottom="6dp">
+    android:layout_marginTop="6dp"
+    android:orientation="vertical"
+    android:paddingStart="10dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="10dp">
 
-    <FrameLayout
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.85"
-        android:layout_marginEnd="4dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
         <TextView
             android:id="@+id/TextView"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:ellipsize="end"
-            android:maxLines="1"
-            android:paddingEnd="22dp"
-            android:scrollHorizontally="false" />
+            android:maxLines="2"
+            android:paddingEnd="8dp"
+            android:scrollHorizontally="false"
+            android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/BTHelp"
-            style="@style/HelpButton"
-            android:layout_gravity="end" />
-    </FrameLayout>
+            style="@style/HelpButton" />
+    </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="46dp"
-        android:layout_marginStart="8dp"
-        android:layout_weight="1.15"
-        android:gravity="end|center_vertical"
-        android:orientation="horizontal">
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
 
         <Spinner
+            android:id="@+id/Spinner"
             style="@style/ComboBox"
             android:layout_width="match_parent"
-            android:id="@+id/Spinner"
             android:visibility="gone" />
 
         <EditText
+            android:id="@+id/EditText"
             style="@style/EditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/EditText"
             android:visibility="gone" />
 
-        <ToggleButton
-            style="@style/ToggleButtonCompact"
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/ToggleButton"
-            android:visibility="gone" />
-    </LinearLayout>
+            style="@style/SwitchControl"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:visibility="gone"
+            app:showText="false" />
+    </FrameLayout>
 </LinearLayout>
