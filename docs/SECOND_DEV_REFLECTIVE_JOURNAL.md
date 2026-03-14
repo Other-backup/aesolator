@@ -337,3 +337,25 @@
 - Next step: re-run the direct-start `New Container`/`Contents` path on a
   stable foreground session, then continue the full create-flow and contents
   behavioral QA.
+
+### Entry 21: Landscape dashboard density pass
+
+- Goal: make the main dashboard feel intentional on wide/landscape screens
+  instead of reading like a portrait grid stretched sideways.
+- Context: live device sessions repeatedly ended up in landscape, where the
+  existing dashboard still rendered only two columns, leaving oversized cards
+  and a heavy hero block even though there was enough horizontal space for a
+  denser control surface.
+- Decision: make `MainMenuGridFragment` resolve to 3, 4, or 5 columns based on
+  available width, then add dedicated `layout-land` variants for the dashboard
+  hero and menu cards with a shorter hero, tighter padding, and lower card
+  height.
+- Tradeoff: landscape cards carry slightly less text weight per item, but the
+  dashboard reads faster and uses horizontal space more like a control panel
+  than a blown-up phone list.
+- Verification: new responsive logic and `layout-land` resources added, debug
+  build completed successfully, and the APK was reinstalled on-device. Clean
+  screenshot proof is still limited by shared-device foreground contention, so
+  this pass is currently build-validated rather than fully device-documented.
+- Next step: confirm the landscape grid visually on a stable foreground
+  session, then return to `Contents` behavioral QA.

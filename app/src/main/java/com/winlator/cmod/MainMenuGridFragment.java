@@ -87,7 +87,7 @@ public class MainMenuGridFragment extends Fragment {
 
     private void populateMenuRows(LinearLayout rowsContainer, LayoutInflater inflater, int spanCount) {
         rowsContainer.removeAllViews();
-        int spacing = dpToPx(3f);
+        int spacing = dpToPx(spanCount >= 4 ? 4f : 3f);
         for (int i = 0; i < MENU_ENTRIES.size(); i += spanCount) {
             LinearLayout row = new LinearLayout(requireContext());
             row.setLayoutParams(new LinearLayout.LayoutParams(
@@ -160,7 +160,10 @@ public class MainMenuGridFragment extends Fragment {
     private int resolveSpanCount() {
         float widthDp = requireContext().getResources().getDisplayMetrics().widthPixels
                 / requireContext().getResources().getDisplayMetrics().density;
-        return widthDp >= 960f ? 4 : 2;
+        if (widthDp >= 960f) return 5;
+        if (widthDp >= 700f) return 4;
+        if (widthDp >= 520f) return 3;
+        return 2;
     }
 
     private int dpToPx(float dp) {

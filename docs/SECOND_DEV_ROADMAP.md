@@ -18,17 +18,23 @@ Second autonomous developer lane for `aesolator`:
    - polish the runtime-missing state, footer actions, and tab readability from
      real screenshots instead of XML-only inference
    - run top-to-bottom behavioral QA on the full create flow
+   - confirm the new cold-start routing after deferred prompts on a stable
+     foreground session
 2. `Contents` integrated source closure
    - keep `WCP Archive` and `WCPHub` visible together without provenance drift
    - preserve top-card sizing/alignment and selector readability
    - verify install/update/remove behavior on the current build
-3. `Contents` source-of-truth enforcement
+3. Dashboard adaptive polish
+   - verify the new landscape density pass on a stable device session
+   - keep the main menu readable as a control surface, not a stretched portrait
+     grid
+4. `Contents` source-of-truth enforcement
    - `REMOTE_WINE_PROTON_OVERLAY` must track `aesolator/contents/contents.json`
    - `Wine` lane must expose archive-managed `freewine11`
-4. Documentation sync
+5. Documentation sync
    - keep `AGENTS.md`, roadmap, and reflective journal current
    - keep implementation notes aligned with repo contracts
-5. Handoff/reporting discipline
+6. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
 
@@ -59,6 +65,9 @@ Second autonomous developer lane for `aesolator`:
 - Direct cold-start validation for `selected_menu_item_id` flows is now coded
   more defensively in `MainActivity`, but shared-device foreground contention
   still limits clean screenshot proof for those routes.
+- The landscape dashboard density pass is build-complete and installed, but it
+  still needs one stable foreground capture to confirm the new 4-column control
+  surface on the target phone.
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
   across source switching and install actions.
