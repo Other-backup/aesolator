@@ -71,6 +71,9 @@ Second autonomous developer lane for `aesolator`:
 - `Contents` no longer loses archive provenance on feed failure, but live
   `WCPHub` plus `WCP Archive` behavior still needs explicit on-device review
   across source switching and install actions.
+- The repo-side `Contents` workflow contract is now aligned with the static
+  checklist gate, so the remaining `Contents` risk is device behavior rather
+  than source-of-truth drift inside `.github/workflows/ci-winlator.yml`.
 - Termux local build currently depends on local-only SDK/NDK compatibility
   shims; this is an environment workaround, not a committed repository fix.
 - `llvm-strip` from the desktop NDK host bundle is still incompatible with

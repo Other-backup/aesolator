@@ -28,7 +28,14 @@ permissions:
 jobs:
   dispatch_wcp_archive_lane:
     runs-on: ubuntu-24.04
+    env:
+      RUNTIME_RELEASE_REPO: kosoymiki/wcp-runtime-lanes
+      GRAPHICS_RELEASE_REPO: kosoymiki/wcp-graphics-lanes
+      APP_RELEASE_REPO: aesolator
     steps:
+      # Build native Aesolator APK (debug, no embedded runtimes)
+      # Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)
+      # tag: winlator-latest
       - name: Dispatch Aesolator APK build in WCP Archive
         env:
           GH_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}

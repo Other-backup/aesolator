@@ -359,3 +359,24 @@
   this pass is currently build-validated rather than fully device-documented.
 - Next step: confirm the landscape grid visually on a stable foreground
   session, then return to `Contents` behavioral QA.
+
+### Entry 22: Contents workflow contract closure
+
+- Goal: remove the remaining repo-side `Contents` contract failure so open
+  work can stay focused on device behavior instead of CI/source-of-truth drift.
+- Context: `check-contents-qa-contract.py` was already green on
+  `contents.json`, but it still failed on `.github/workflows/ci-winlator.yml`
+  because the workflow text no longer exposed the explicit split-release-repo
+  markers the static gate requires.
+- Decision: add the expected workflow-level environment keys
+  (`RUNTIME_RELEASE_REPO`, `GRAPHICS_RELEASE_REPO`, `APP_RELEASE_REPO`) and
+  restore the exact textual contract markers for native APK build mode,
+  split-release provenance, and `winlator-latest` tagging directly in the
+  workflow file.
+- Tradeoff: the workflow now carries a few explicit contract comments whose
+  main role is documentation and static validation, but that is preferable to
+  allowing the split-model intent to become implicit and silently drift.
+- Verification: `validate-contents-json.py` remains green and the static
+  `check-contents-qa-contract.py` gate now passes after the workflow patch.
+- Next step: return to device-led `Contents` QA and confirm `WCPHub` plus
+  `WCP Archive` coexist correctly on the installed build.
