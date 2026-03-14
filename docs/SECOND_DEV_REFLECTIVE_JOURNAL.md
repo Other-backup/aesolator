@@ -1148,3 +1148,60 @@
   desktop cursor tail is now manual-session quality: drag behavior, repeated
   clicks after longer interaction, and pointer-state stability once the user
   starts actually using the desktop instead of just opening `Start`.
+
+### Entry 53: Cursor ownership split to eliminate the duplicate X11 fallback
+
+- Goal: stop the desktop from showing two cursors at once when the guest window
+  already paints its own pointer.
+- Context: after the `GameNative`-aligned tap transport fix, shell hit-testing
+  was finally correct, but the user then reported a new visible defect:
+  one cursor from the container/guest and a second fallback cursor from the X11
+  side. Full grep over `GameNative` and `Ae.solator` showed that both projects
+  still render a GL cursor in `GLRenderer`; the likely offender in our case was
+  the unconditional root fallback branch that draws `rootCursorDrawable` when
+  the point window does not expose an explicit X cursor.
+- Decision: keep the fallback cursor for desktop shell surfaces, but add a
+  cursor-ownership heuristic in `GLRenderer`: for no-shortcut desktop sessions,
+  if the pointer resolves to a fullscreen-like non-shell application window,
+  suppress the root/X11 fallback and let the guest own the visible cursor.
+  `XServerDisplayActivity` now enables this owner mode explicitly for the
+  default desktop path and records it in `DESKTOP_INPUT_MODEL_APPLIED`.
+- Tradeoff: the ownership split is heuristic, not omniscient. That is still the
+  correct tradeoff because the old behavior was definitely wrong: it always
+  allowed an X11 fallback cursor to appear even when the guest was clearly
+  drawing its own pointer. The new rule narrows the risk to misclassification
+  of some app windows instead of guaranteed duplication.
+- Verification: rebuilt and reinstalled the APK, launched the desktop with the
+  same `aeso_debug_probe_start_tap=true` forensic pass, and captured
+  `.tmp_adb/probe_start_after_36s_v5.png`. The shell still opens `Start`, the
+  cursor remains visible on desktop surfaces, and forensic logs show
+  `desktop_cursor_owner_mode:true` together with the live `touchpad_view`
+  transport. That confirms the ownership patch did not regress the already
+  fixed desktop click path.
+- Next step: run a manual device pass inside non-shell application windows to
+  see whether any remaining duplicate-cursor cases survive the fullscreen-like
+  ownership split, then tighten the heuristic only if the issue still
+  reproduces on real app windows.
+
+### Entry 54: Default desktop input contract switched back to true trackpad mode
+
+- Goal: align the default no-shortcut desktop path with the user's clarified
+  expectation for cursor behavior.
+- Context: the previous desktop pass had closed shell hit-testing by letting a
+  tap reposition the cursor for the click. That made debugging easier, but the
+  user then clarified the desired UX explicitly: this session should behave like
+  a real trackpad, where cursor movement and clicking are parallel concerns and
+  a tap does not teleport the pointer to the touched screen coordinate.
+- Decision: keep the fixed direct pointer transport, but disable
+  `tapToClickMovesCursor` for the default desktop route in
+  `XServerDisplayActivity`. The active mode is now logged as
+  `input_mode:"cursor_trackpad"` with `tap_to_click_moves_cursor:false`.
+- Tradeoff: this gives up the earlier hybrid tap-to-hit shortcut. That is the
+  correct tradeoff because the product contract is now clearer than the debug
+  convenience: desktop input should feel like a trackpad, not like hidden
+  touch-surrogate mode wearing a cursor costume.
+- Verification: code and docs updated; next live device pass should confirm that
+  taps now fire at the current pointer position while cursor movement remains
+  delta-based.
+- Next step: rebuild, reinstall, and run a manual desktop pass to verify click,
+  drag, and repeated interaction quality under the restored trackpad contract.

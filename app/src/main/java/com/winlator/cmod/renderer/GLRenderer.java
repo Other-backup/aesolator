@@ -26,6 +26,7 @@ import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -45,6 +46,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private boolean toggleFullscreen = false;
     public boolean viewportNeedsUpdate = true;
     private boolean cursorVisible = true;
+    private boolean desktopCursorOwnershipMode = false;
     private boolean screenOffsetYRelativeToCursor = false;
     private String[] unviewableWMClasses = null;
     private float magnifierZoom = 1.0f;
@@ -291,10 +293,48 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             if (cursor != null) {
                 if (cursor.isVisible()) renderDrawable(cursor.cursorImage, x - cursor.hotSpotX, y - cursor.hotSpotY, cursorMaterial);
             }
-            else renderDrawable(rootCursorDrawable, x, y, cursorMaterial);
+            else if (shouldRenderRootCursorFallback(pointWindow)) {
+                renderDrawable(rootCursorDrawable, x, y, cursorMaterial);
+            }
         }
 
         quadVertices.disable();
+    }
+
+    private boolean shouldRenderRootCursorFallback(Window pointWindow) {
+        if (!desktopCursorOwnershipMode) return true;
+
+        Window ownerWindow = resolveCursorOwnerWindow(pointWindow);
+        if (ownerWindow == null || ownerWindow == xServer.windowManager.rootWindow) return true;
+        if (!ownerWindow.isApplicationWindow()) return true;
+
+        String className = ownerWindow.getClassName();
+        String lowerClassName = className != null ? className.toLowerCase(Locale.ROOT) : "";
+        if (lowerClassName.contains("explorer.exe")
+                || lowerClassName.contains("progman")
+                || lowerClassName.contains("shell_traywnd")
+                || lowerClassName.contains("workerw")) {
+            return true;
+        }
+
+        return !isFullscreenLike(ownerWindow);
+    }
+
+    private Window resolveCursorOwnerWindow(Window pointWindow) {
+        Window current = pointWindow;
+        while (current != null) {
+            if (current == xServer.windowManager.rootWindow) return current;
+            if (current.isApplicationWindow()) return current;
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private boolean isFullscreenLike(Window window) {
+        if (window == null) return false;
+        float widthCoverage = window.getWidth() / (float) xServer.screenInfo.width;
+        float heightCoverage = window.getHeight() / (float) xServer.screenInfo.height;
+        return widthCoverage >= 0.9f && heightCoverage >= 0.9f;
     }
 
     public void toggleFullscreen() {
@@ -368,6 +408,11 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     public boolean isCursorVisible() {
         return cursorVisible;
+    }
+
+    public void setDesktopCursorOwnershipMode(boolean desktopCursorOwnershipMode) {
+        this.desktopCursorOwnershipMode = desktopCursorOwnershipMode;
+        xServerView.requestRender();
     }
 
     public boolean isScreenOffsetYRelativeToCursor() {

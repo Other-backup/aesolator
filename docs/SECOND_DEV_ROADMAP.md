@@ -134,15 +134,21 @@ Second autonomous developer lane for `aesolator`:
   the shell itself, but the current narrow tail has shifted again:
   long-session cursor behavior, pointer-state drift, and multi-gesture/manual
   interaction still need live validation after the tap transport fix.
+- Cursor ownership is now explicitly split: desktop shell surfaces may keep the
+  GL/X11 root fallback cursor, while fullscreen-like non-shell app windows
+  suppress that fallback to avoid the old “guest cursor + X11 cursor” double
+  image. Remaining cursor risk is therefore quality of the ownership heuristic,
+  not the old unconditional fallback.
 - The desktop input baseline was then refined again on March 14, 2026 from a
   touch-surrogate cursor to an explicit `cursor_touchpad` model with a visible
   centered pointer. Remaining desktop work should preserve that desktop-style
   cursor semantics unless the user explicitly asks for tablet-style direct
   touch. `GameNative` is now the donor reference for that cursor path, and the
   old async move/button queue has been retired in favor of a direct
-  `move -> press -> delayed release` tap contract. The next closure step is a
-  live manual pass for cursor drag, repeated clicks, and post-click state
-  stability, not another shell/bootstrap rewrite.
+  trackpad-style contract. The current baseline is `cursor_trackpad`:
+  movement by delta, click at the current cursor position, no jump-to-tap.
+  The next closure step is a live manual pass for cursor drag, repeated clicks,
+  and post-click state stability, not another shell/bootstrap rewrite.
 - `New Container` now has a verified end-to-end baseline on-device: a local
   donor runtime resolves correctly, `Create` reaches `Creating Container…`,
   and a real `/files/imagefs/home/xuser-*` container root is materialized.

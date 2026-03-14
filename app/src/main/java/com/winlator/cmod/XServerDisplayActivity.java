@@ -1908,6 +1908,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         xServerView = new XServerView(this, xServer);
         final GLRenderer renderer = xServerView.getRenderer();
         renderer.setCursorVisible(false);
+        renderer.setDesktopCursorOwnershipMode(shortcut == null);
 
         if (shortcut != null) {
             renderer.setUnviewableWMClasses("explorer.exe");
@@ -1971,9 +1972,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } else {
             isRelativeMouseMovement = false;
             xServer.setRelativeMouseMovement(false);
-            touchpadView.setTapToClickMovesCursor(true);
+            touchpadView.setTapToClickMovesCursor(false);
             touchpadView.setSimTouchScreen(false);
             renderer.setCursorVisible(true);
+            renderer.setDesktopCursorOwnershipMode(true);
             xServer.injectPointerMove(xServer.screenInfo.width / 2, xServer.screenInfo.height / 2);
             touchpadView.resetGestureRuntimeTuning();
             ForensicLogger.logEvent(
@@ -1988,10 +1990,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "simulate_touchscreen", touchpadView.isSimTouchScreen(),
                             "relative_mouse", xServer.isRelativeMouseMovement(),
                             "cursor_visible", true,
-                            "tap_to_click_moves_cursor", true,
+                            "tap_to_click_moves_cursor", false,
+                            "desktop_cursor_owner_mode", true,
                             "pointer_x", xServer.pointer.getClampedX(),
                             "pointer_y", xServer.pointer.getClampedY(),
-                            "input_mode", "cursor_touchpad"
+                            "input_mode", "cursor_trackpad"
                     )
             );
         }

@@ -128,12 +128,21 @@ runtime-binding, documentation alignment, and repository contract integrity.
   readiness: a direct `xServer.injectPointer*` probe proving `Start` opens is
   not enough. Closure requires the same hit target to open through the live
   `TouchpadView` path as well.
+- Treat duplicate-cursor reports as cursor-ownership bugs, not mere cosmetics.
+  Inspect at least these layers before changing behavior:
+  Android/system pointer icon, `GLRenderer` root/X11 cursor fallback, and any
+  guest-owned software cursor in fullscreen/non-shell application windows.
 - For the default no-shortcut desktop path, treat input closure as two separate
   requirements:
   1. cursor movement remains desktop-like and does not mirror every touch point,
-  2. a single tap still produces a click at the intended hit target.
-  If the cursor moves but desktop controls stay inert, fix the tap-to-click
-  contract before revisiting runtime/bootstrap code.
+  2. a single tap still produces a click at the current cursor location unless
+     the user explicitly asks for touch-surrogate behavior.
+  If the cursor moves but desktop controls stay inert, fix the trackpad-style
+  click contract before revisiting runtime/bootstrap code.
+- For no-shortcut desktop sessions, prefer a single visible cursor owner:
+  keep the shell/root fallback cursor for desktop surfaces, but suppress that
+  fallback in fullscreen-like non-shell app windows when the guest is likely
+  already painting its own cursor.
 - If a donor comparison shows the working input path uses direct pointer
   injection on the active UI thread, prefer matching that proven contract over
   background move/button queues unless fresh device forensics prove the direct
