@@ -6,9 +6,11 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.MSLink;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.TarCompressorUtils;
@@ -47,27 +49,148 @@ public class ContainerManager {
         containers.clear();
         maxContainerId = 0;
 
-        try {
-            File[] files = homeDir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isDirectory()) {
-                        if (file.getName().startsWith(ImageFs.USER + "-")) {
-                            Container container = new Container(
-                                    Integer.parseInt(file.getName().replace(ImageFs.USER + "-", "")), this
-                            );
+        File[] files = homeDir.listFiles();
+        if (files == null) return;
 
-                            container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
-                            JSONObject data = new JSONObject(FileUtils.readString(container.getConfigFile()));
-                            container.loadData(data);
-                            containers.add(container);
-                            maxContainerId = Math.max(maxContainerId, container.id);
-                        }
+        for (File file : files) {
+            if (!file.isDirectory()) continue;
+            if (!file.getName().startsWith(ImageFs.USER + "-")) continue;
+            try {
+                Container container = new Container(
+                        Integer.parseInt(file.getName().replace(ImageFs.USER + "-", "")), this
+                );
+                container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
+                File configFile = container.getConfigFile();
+                if (!configFile.isFile()) {
+                    if (tryRecoverOrphanContainer(container, file)) {
+                        containers.add(container);
+                        maxContainerId = Math.max(maxContainerId, container.id);
+                        continue;
                     }
+                    Log.w("ContainerManager", "Skipping container without config: " + file.getName());
+                    continue;
                 }
+                String configContent = FileUtils.readString(configFile);
+                if (configContent == null || configContent.trim().isEmpty()) {
+                    Log.w("ContainerManager", "Skipping container with unreadable config: " + file.getName());
+                    continue;
+                }
+                JSONObject data = new JSONObject(configContent);
+                container.loadData(data);
+                containers.add(container);
+                maxContainerId = Math.max(maxContainerId, container.id);
+            } catch (JSONException | NumberFormatException | NullPointerException e) {
+                Log.e("ContainerManager", "Skipping broken container: " + file.getName(), e);
             }
-        } catch (JSONException | NullPointerException e) {
-            Log.e("ContainerManager", "Error loading containers", e);
+        }
+    }
+
+    private boolean tryRecoverOrphanContainer(Container container, File containerDir) {
+        if (container == null || containerDir == null || !containerDir.isDirectory()) return false;
+
+        File wineRoot = new File(containerDir, ".wine");
+        if (!wineRoot.isDirectory()) return false;
+
+        LocalRuntimeCandidate runtimeCandidate = findBestLocalRuntimeCandidate();
+        if (runtimeCandidate == null) {
+            ForensicLogger.logEvent(
+                    context,
+                    "warn",
+                    "CONTAINER_CONFIG_RECOVERY_SKIPPED",
+                    null,
+                    "containers",
+                    "missing_runtime_for_orphan_container",
+                    ForensicLogger.fields(
+                            "container_id", container.id,
+                            "container_dir", containerDir.getAbsolutePath()
+                    )
+            );
+            return false;
+        }
+
+        container.setName("Container-" + container.id);
+        container.setEmulator(Container.DEFAULT_EMULATOR);
+        container.setWineVersion(runtimeCandidate.entryName);
+        container.saveData();
+
+        ForensicLogger.logEvent(
+                context,
+                "warn",
+                "CONTAINER_CONFIG_RECOVERED",
+                null,
+                "containers",
+                "recovered_orphan_container_config",
+                ForensicLogger.fields(
+                        "container_id", container.id,
+                        "container_dir", containerDir.getAbsolutePath(),
+                        "runtime_entry", runtimeCandidate.entryName,
+                        "runtime_type", runtimeCandidate.type.toString(),
+                        "runtime_version_code", runtimeCandidate.verCode,
+                        "runtime_last_modified", runtimeCandidate.lastModified
+                )
+        );
+        Log.w("ContainerManager", "Recovered container config for " + containerDir.getName() + " using " + runtimeCandidate.entryName);
+        return container.getConfigFile().isFile();
+    }
+
+    private LocalRuntimeCandidate findBestLocalRuntimeCandidate() {
+        ArrayList<LocalRuntimeCandidate> candidates = new ArrayList<>();
+        collectRuntimeCandidates(
+                candidates,
+                ContentProfile.ContentType.CONTENT_TYPE_PROTON,
+                ContentsManager.getContentTypeDir(context, ContentProfile.ContentType.CONTENT_TYPE_PROTON)
+        );
+        collectRuntimeCandidates(
+                candidates,
+                ContentProfile.ContentType.CONTENT_TYPE_WINE,
+                ContentsManager.getContentTypeDir(context, ContentProfile.ContentType.CONTENT_TYPE_WINE)
+        );
+        if (candidates.isEmpty()) return null;
+        candidates.sort(
+                Comparator
+                        .comparingInt((LocalRuntimeCandidate candidate) -> candidate.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON ? 1 : 0)
+                        .thenComparingLong(candidate -> candidate.lastModified)
+                        .thenComparingInt(candidate -> candidate.verCode)
+                        .reversed()
+        );
+        return candidates.get(0);
+    }
+
+    private void collectRuntimeCandidates(ArrayList<LocalRuntimeCandidate> out, ContentProfile.ContentType type, File typeDir) {
+        if (out == null || type == null || typeDir == null || !typeDir.isDirectory()) return;
+
+        File[] installedRoots = typeDir.listFiles();
+        if (installedRoots == null) return;
+
+        for (File installRoot : installedRoots) {
+            if (installRoot == null || !installRoot.isDirectory()) continue;
+            String dirName = installRoot.getName();
+            int dashIndex = dirName.lastIndexOf('-');
+            if (dashIndex <= 0 || dashIndex >= dirName.length() - 1) continue;
+            try {
+                int versionCode = Integer.parseInt(dirName.substring(dashIndex + 1));
+                out.add(new LocalRuntimeCandidate(
+                        type,
+                        type.toString() + "-" + dirName,
+                        versionCode,
+                        installRoot.lastModified()
+                ));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+    }
+
+    private static final class LocalRuntimeCandidate {
+        private final ContentProfile.ContentType type;
+        private final String entryName;
+        private final int verCode;
+        private final long lastModified;
+
+        private LocalRuntimeCandidate(ContentProfile.ContentType type, String entryName, int verCode, long lastModified) {
+            this.type = type;
+            this.entryName = entryName;
+            this.verCode = verCode;
+            this.lastModified = lastModified;
         }
     }
 

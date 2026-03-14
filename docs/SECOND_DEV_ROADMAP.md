@@ -154,6 +154,12 @@ Second autonomous developer lane for `aesolator`:
   and a real `/files/imagefs/home/xuser-*` container root is materialized.
   Remaining risk is now secondary runtime choice/defaulting and deeper
   post-create UX, not the old false missing-runtime gate.
+- Container launch is no longer allowed to fail silently on orphaned
+  `/files/imagefs/home/xuser-*` roots. If the prefix exists but `.container`
+  metadata is missing, `ContainerManager` now recovers the config from the
+  newest local `Proton`/`Wine` install and records
+  `CONTAINER_CONFIG_RECOVERED`. The old `container_id -> null -> finish()`
+  collapse on `XServerDisplayActivity` is closed for this failure mode.
 - Direct cold-start validation for `selected_menu_item_id` flows is now coded
   more defensively in `MainActivity`, but shared-device foreground contention
   still limits clean screenshot proof for those routes.

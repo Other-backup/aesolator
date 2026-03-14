@@ -1262,3 +1262,37 @@
 - Next step: validate the new compositor suppression in a stable manual pass,
   then narrow the shell/app heuristic only if a specific window class still
   duplicates or loses its cursor.
+
+### Entry 57: Orphan container recovery closed the `container_id -> null -> finish()` launch tail
+
+- Goal: stop `XServerDisplayActivity` from self-finishing when a real
+  `/files/imagefs/home/xuser-*` prefix exists but its `.container` metadata
+  file is missing.
+- Context: the last launch failure looked like another desktop/input collapse,
+  but direct device inspection showed a different root cause. `xuser-4`
+  existed, `.wine` existed, and the launch intent carried `container_id=4`,
+  yet `ContainerManager` skipped the root entirely because `.container` was
+  missing. That left `getContainerById(4)` returning `null`, so
+  `XServerDisplayActivity` exited before the desktop bootstrap could even
+  start. This was a state-recovery bug, not another cursor or shell bug.
+- Decision: teach `ContainerManager.loadContainers()` to treat a prefix root
+  with a real `.wine` directory and no `.container` file as an orphaned but
+  recoverable container. The manager now scans local `Contents` installs under
+  `files/contents/Proton` and `files/contents/Wine`, picks the best candidate
+  by local freshness/version, writes a minimal recovered `.container`, and
+  records `CONTAINER_CONFIG_RECOVERED` before the launch path continues.
+- Tradeoff: the recovered runtime is inferred from the best locally installed
+  runtime, not from lost historical metadata. That is still the correct
+  tradeoff because the previous behavior was guaranteed failure. Recovery turns
+  a dead prefix into a runnable container and keeps the remaining ambiguity
+  explicit in forensic logs.
+- Verification: rebuilt and reinstalled the APK, confirmed that
+  `files/imagefs/home/xuser-4/.container` did not exist before the pass, then
+  launched `XServerDisplayActivity` with `container_id=4`. The device created
+  a new `.container` with `wineVersion:"Proton-10.0.99-arm64ec-1"`, emitted
+  `CONTAINER_CONFIG_RECOVERED`, and `am start -W` returned `Status: ok` rather
+  than the old `Failed to retrieve container with ID: 4`.
+- Next step: keep desktop debugging focused on real post-bootstrap defects
+  again. The recovered-container tail is closed; remaining desktop work is
+  pointer/input quality and payload-consumer correctness, not missing metadata
+  for existing prefixes.

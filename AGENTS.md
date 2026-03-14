@@ -170,6 +170,11 @@ runtime-binding, documentation alignment, and repository contract integrity.
   verify the selected entry, resolved runtime path, and resulting
   `/files/imagefs/home/xuser-*` container root on device before declaring the
   flow fixed.
+- If `/files/imagefs/home/xuser-*` exists with a real `.wine` prefix but the
+  `.container` file is missing, treat it as an orphaned recoverable container,
+  not as an unknown launch crash. Recover the config from the best locally
+  installed `Proton`/`Wine` runtime, persist a new `.container`, and record a
+  forensic event before revisiting desktop/input code.
 
 ## Main Docs
 
