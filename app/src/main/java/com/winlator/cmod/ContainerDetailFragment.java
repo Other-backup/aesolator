@@ -52,6 +52,7 @@ import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
@@ -630,7 +631,31 @@ public class ContainerDetailFragment extends Fragment {
                     }
                 }
                 WineInfo selectedWineInfo = WineInfo.fromIdentifier(context, contentsManager, selectedWineVersion);
-                if (selectedWineInfo.path == null || !new File(selectedWineInfo.path).exists()) {
+                ContentProfile selectedRuntimeProfile = contentsManager.getProfileByEntryName(selectedWineVersion);
+                boolean runtimePathExists = selectedWineInfo.path != null && new File(selectedWineInfo.path).exists();
+                ForensicLogger.logEvent(
+                        context,
+                        runtimePathExists ? "info" : "warn",
+                        "NEW_CONTAINER_RUNTIME_RESOLVE",
+                        null,
+                        "containers",
+                        "runtime_resolve",
+                        ForensicLogger.fields(
+                                "selected_entry", selectedWineVersion,
+                                "resolved_type", selectedWineInfo.type,
+                                "resolved_version", selectedWineInfo.fullVersion(),
+                                "resolved_arch", selectedWineInfo.getArch(),
+                                "resolved_path", selectedWineInfo.path,
+                                "path_exists", runtimePathExists,
+                                "profile_found", selectedRuntimeProfile != null,
+                                "profile_type", selectedRuntimeProfile != null && selectedRuntimeProfile.type != null
+                                        ? selectedRuntimeProfile.type.toString()
+                                        : "",
+                                "profile_ver_name", selectedRuntimeProfile != null ? selectedRuntimeProfile.verName : "",
+                                "profile_ver_code", selectedRuntimeProfile != null ? selectedRuntimeProfile.verCode : -1
+                        )
+                );
+                if (!runtimePathExists) {
                     AppUtils.showToast(context, R.string.install_runtime_before_container);
                     return;
                 }
@@ -1235,23 +1260,29 @@ public class ContainerDetailFragment extends Fragment {
 
         view.findViewById(R.id.LLWineVersion).setVisibility(View.VISIBLE);
         LinkedHashSet<String> wineVersionSet = new LinkedHashSet<>();
+        int embeddedCount = 0;
         for (String version : getResources().getStringArray(R.array.wine_entries)) {
             if (hasEmbeddedWineVersion(context, version)) {
                 wineVersionSet.add(version);
+                embeddedCount++;
             }
         }
         List<ContentProfile> wineProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE);
+        int localWineCount = 0;
         if (wineProfiles != null) {
             for (ContentProfile profile : wineProfiles) {
                 if (profile == null || !profile.locallyInstalled) continue;
                 wineVersionSet.add(ContentsManager.getEntryName(profile));
+                localWineCount++;
             }
         }
         List<ContentProfile> protonProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON);
+        int localProtonCount = 0;
         if (protonProfiles != null) {
             for (ContentProfile profile : protonProfiles) {
                 if (profile == null || !profile.locallyInstalled) continue;
                 wineVersionSet.add(ContentsManager.getEntryName(profile));
+                localProtonCount++;
             }
         }
         ArrayList<String> wineVersions = new ArrayList<>(wineVersionSet);
@@ -1259,6 +1290,22 @@ public class ContainerDetailFragment extends Fragment {
         if (!hasWineVersion) {
             wineVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
         }
+
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "NEW_CONTAINER_RUNTIME_SCAN",
+                null,
+                "containers",
+                "runtime_scan",
+                ForensicLogger.fields(
+                        "embedded_runtime_count", embeddedCount,
+                        "local_wine_count", localWineCount,
+                        "local_proton_count", localProtonCount,
+                        "total_entries", wineVersions.size(),
+                        "runtime_available", hasWineVersion
+                )
+        );
 
         sWineVersion.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), wineVersions));
         sWineVersion.setEnabled(hasWineVersion);

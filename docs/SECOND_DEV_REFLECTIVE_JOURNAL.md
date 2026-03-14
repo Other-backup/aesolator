@@ -881,3 +881,69 @@
 - Next step: add a non-API fallback/cached path for `Nightlies` source
   discovery so first-load package availability does not collapse on GitHub rate
   limiting, then repeat the runtime install pass for `Wine/Proton`.
+
+### Entry 45: Nightlies donor fallback closure and channel-lane repair
+
+- Goal: stop `Contents -> Nightlies` from collapsing to an empty lane on
+  GitHub API rate limiting, while also preserving actual nightly-channel assets
+  instead of filtering them out at ingest time.
+- Context: device logs proved the primary failure mode: unauthenticated
+  `api.github.com` calls for `The412Banner/Nightlies` were returning `HTTP 403`
+  and leaving the source lane empty. Code review also exposed a second defect:
+  the `Nightlies` lane still flowed through the generic remote-profile setter,
+  which dropped beta/nightly rows during parsing.
+- Decision: keep the GitHub API path as the first attempt, but add a non-API
+  fallback that parses `releases.atom`, extracts recent release tags, then
+  normalizes each `expanded_assets/<tag>` HTML page into the existing contents
+  model. In parallel, route both `Nightlies` and `GameHub` lanes through
+  all-channel remote-profile setters so nightly artifacts are not discarded at
+  ingest time.
+- Tradeoff: refresh for `Nightlies` now does more network work when the API is
+  rate-limited, but the source lane remains functional and the metadata stays
+  rich enough for date/version sorting, digest verification, and provenance
+  display.
+- Verification: fresh device pass on March 14, 2026 showed
+  `CONTENTS_FEED_REFRESH_DONE` with `source_mode:\"nightlies\"`,
+  `sources_polled:12`, `payloads_received:10`, `bundled_fallback:false`
+  immediately after two `HTTP 403` API failures. The live `Contents` screen
+  then rendered donor `Proton` packages from `proton-bleeding-edge-20260312-b310f0c-run23`,
+  confirming the fallback path and the lane parser on real hardware.
+- Next step: finish the install-path closure for freshly downloaded donor
+  `Wine/Proton` so a successful `Nightlies` install always materializes a real
+  local package root under `files/contents/Proton` or `files/contents/Wine`
+  and becomes visible to `New Container`.
+
+### Entry 46: New Container runtime-entry false-negative closure
+
+- Goal: stop `New Container` from falsely claiming `Install a Wine or Proton
+  runtime before creating a container` after a donor runtime was already
+  installed and visible under `files/contents`.
+- Context: device forensics had already shown both local runtime roots and a
+  healthy spinner population, but the create action still failed the final
+  runtime gate. Live device state on March 14, 2026 showed:
+  `NEW_CONTAINER_RUNTIME_SCAN` with `local_wine_count:1`,
+  `local_proton_count:1`, and `runtime_available:true`. The remaining defect
+  was therefore in runtime resolution, not package installation.
+- Decision: repair `WineInfo.fromIdentifier()` so `Contents` entry labels such
+  as `Wine-10.0.99-arm64ec-0` and `Proton-10.0.99-arm64ec-1` resolve through
+  `ContentsManager` profile metadata and tolerate the trailing `-verCode`
+  suffix instead of falling back to `MAIN_WINE_VERSION`. In parallel, add a
+  `NEW_CONTAINER_RUNTIME_RESOLVE` forensic event on the create path to record
+  selected entry, resolved type, resolved path, and path existence.
+- Tradeoff: runtime resolution logic is now slightly more explicit about the
+  distinction between picker labels and canonical runtime identifiers, but that
+  is the correct contract for a `Contents`-driven app where the UI carries
+  versioned entry names rather than raw `wine-...` identifiers.
+- Verification: rebuilt and reinstalled the APK, then ran an ADB-driven device
+  pass through `MainActivity --ei selected_menu_item_id 2131297101`, captured
+  the `New Container` screen, tapped `Create`, and observed `Creating
+  Container…` instead of the old missing-runtime toast. Fresh device forensics
+  recorded `NEW_CONTAINER_RUNTIME_RESOLVE` with
+  `selected_entry:"Wine-10.0.99-arm64ec-0"`,
+  `resolved_path:"/data/user/0/com.winlator.cmod/files/contents/Wine/10.0.99-arm64ec-0"`,
+  and `path_exists:true`. After the operation, the app returned to the
+  dashboard and `/data/data/com.winlator.cmod/files/imagefs/home/xuser-1`
+  existed on-device.
+- Next step: keep the richer forensic pair for future runtime regressions, and
+  continue the same device-led closure pattern for donor `DXVK`, `VKD3D`,
+  `Vulkan SDK`, and `dgVoodoo` install-to-consumer flows.

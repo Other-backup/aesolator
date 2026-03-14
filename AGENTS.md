@@ -85,6 +85,28 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - Prefer global control-system fixes over one-off pixel edits when the same
   issue appears across activities, dialogs, selectors, settings rows, or
   preference surfaces.
+- For runtime/install/container blockers, capture the full forensic bundle
+  before changing code:
+  `logcat`, in-app forensic jsonl, current screenshot/UI dump, and a
+  `run-as` snapshot of `files/contents` / relevant app-private state.
+- When simulating a device flow such as `Contents -> install -> New Container`,
+  do not stop at the first symptom; carry the pass through until the expected
+  local package root, UI state, and downstream consumer (`SWineVersion`,
+  runtime picker, driver picker, etc.) either agree or produce a recorded
+  mismatch with evidence.
+- If a download completes but install state does not materialize, treat that as
+  a first-class contract failure between intake UI and local package indexing,
+  not as a cosmetic device quirk.
+- When a runtime picker uses `Contents` entry labels such as
+  `Wine-<ver>-<arch>-<verCode>` or `Proton-<ver>-<arch>-<verCode>`, downstream
+  consumers must resolve that entry through `ContentsManager` profile metadata
+  before falling back to generic runtime parsing. Do not assume the visible
+  picker string is already a canonical `wine-...` / `proton-...` identifier.
+- For `New Container` regressions, capture both events
+  `NEW_CONTAINER_RUNTIME_SCAN` and `NEW_CONTAINER_RUNTIME_RESOLVE`, then
+  verify the selected entry, resolved runtime path, and resulting
+  `/files/imagefs/home/xuser-*` container root on device before declaring the
+  flow fixed.
 
 ## Main Docs
 

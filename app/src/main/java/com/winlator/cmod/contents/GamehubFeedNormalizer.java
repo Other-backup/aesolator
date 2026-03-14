@@ -1,13 +1,20 @@
 package com.winlator.cmod.contents;
 
+import android.os.Build;
+import android.text.Html;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class GamehubFeedNormalizer {
     public static final String SOURCE_FEED_ID = "gamehub";
@@ -19,8 +26,34 @@ public final class GamehubFeedNormalizer {
     public static final String NIGHTLIES_LABEL = "Nightlies";
     public static final String NIGHTLIES_REPO = "The412Banner/Nightlies";
     public static final String NIGHTLIES_REPO_RELEASES = NIGHTLIES_REPO + " Releases";
+    private static final Pattern EXPANDED_ASSET_ROW_PATTERN =
+            Pattern.compile("(?is)<li[^>]*Box-row[^>]*>(.*?)</li>");
+    private static final Pattern EXPANDED_ASSET_HREF_PATTERN =
+            Pattern.compile("href=\"([^\"]+/releases/download/[^\"]+)\"");
+    private static final Pattern EXPANDED_ASSET_NAME_PATTERN =
+            Pattern.compile("(?is)<span[^>]*Truncate-text\\s+text-bold[^>]*>([^<]+)</span>");
+    private static final Pattern EXPANDED_ASSET_DIGEST_PATTERN =
+            Pattern.compile("sha256:([0-9a-fA-F]{64})");
+    private static final Pattern EXPANDED_ASSET_DATETIME_PATTERN =
+            Pattern.compile("datetime=\"([^\"]+)\"");
 
     private GamehubFeedNormalizer() {
+    }
+
+    public static final class ReleaseFeedEntry {
+        public final String tag;
+        public final String publishedAt;
+        public final String releaseNotes;
+
+        public ReleaseFeedEntry(String tag, String publishedAt, String releaseNotes) {
+            this.tag = tag == null ? "" : tag.trim();
+            this.publishedAt = publishedAt == null ? "" : publishedAt.trim();
+            this.releaseNotes = releaseNotes == null ? "" : releaseNotes.trim();
+        }
+
+        public boolean isValid() {
+            return !tag.isEmpty();
+        }
     }
 
     public static String normalizeReleaseFeed(String json) {
@@ -41,6 +74,113 @@ public final class GamehubFeedNormalizer {
                 NIGHTLIES_REPO_RELEASES,
                 "The412Banner nightly package"
         );
+    }
+
+    public static List<ReleaseFeedEntry> parseGitHubReleaseAtom(String atom, String repoPath) {
+        ArrayList<ReleaseFeedEntry> entries = new ArrayList<>();
+        if (atom == null || atom.trim().isEmpty()) return entries;
+
+        HashSet<String> seen = new HashSet<>();
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(false);
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(new StringReader(atom));
+
+            boolean insideEntry = false;
+            String updatedAt = "";
+            String alternateLink = "";
+            String content = "";
+            int eventType = parser.getEventType();
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                String tagName = parser.getName();
+                if (eventType == XmlPullParser.START_TAG) {
+                    if ("entry".equals(tagName)) {
+                        insideEntry = true;
+                        updatedAt = "";
+                        alternateLink = "";
+                        content = "";
+                    } else if (insideEntry && "updated".equals(tagName)) {
+                        updatedAt = parser.nextText();
+                    } else if (insideEntry && "content".equals(tagName)) {
+                        content = parser.nextText();
+                    } else if (insideEntry && "link".equals(tagName)) {
+                        String rel = parser.getAttributeValue(null, "rel");
+                        String href = parser.getAttributeValue(null, "href");
+                        if ("alternate".equalsIgnoreCase(rel) && href != null) {
+                            alternateLink = href.trim();
+                        }
+                    }
+                } else if (eventType == XmlPullParser.END_TAG && "entry".equals(tagName)) {
+                    insideEntry = false;
+                    String tag = extractReleaseTagFromLink(alternateLink, repoPath);
+                    if (!tag.isEmpty() && seen.add(tag)) {
+                        entries.add(new ReleaseFeedEntry(tag, updatedAt, sanitizeReleaseNotes(content)));
+                    }
+                }
+                eventType = parser.next();
+            }
+        } catch (Exception ignored) {
+        }
+        return entries;
+    }
+
+    public static String normalizeExpandedAssetsHtml(String html,
+                                                    ReleaseFeedEntry entry,
+                                                    String sourceFeedId,
+                                                    String sourceLabel,
+                                                    String sourceRepo,
+                                                    String descriptionPrefix) {
+        JSONArray normalized = new JSONArray();
+        if (html == null || html.trim().isEmpty() || entry == null || !entry.isValid()) {
+            return normalized.toString();
+        }
+
+        HashSet<String> seen = new HashSet<>();
+        try {
+            Matcher rowMatcher = EXPANDED_ASSET_ROW_PATTERN.matcher(html);
+            while (rowMatcher.find()) {
+                String rowHtml = rowMatcher.group(1);
+                String href = findFirstGroup(EXPANDED_ASSET_HREF_PATTERN, rowHtml);
+                String assetName = decodeHtmlEntities(findFirstGroup(EXPANDED_ASSET_NAME_PATTERN, rowHtml));
+                if (href.isEmpty() || assetName.isEmpty()) continue;
+
+                String downloadUrl = href.startsWith("http") ? href : "https://github.com" + href;
+                if (!looksLikeArchive(assetName)) continue;
+
+                ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName);
+                if (type == null) continue;
+
+                String publishedAt = findFirstGroup(EXPANDED_ASSET_DATETIME_PATTERN, rowHtml);
+                if (publishedAt.isEmpty()) publishedAt = entry.publishedAt;
+                int versionCode = deriveReleaseVersionCode(publishedAt, assetName);
+
+                JSONObject candidate = new JSONObject();
+                candidate.put("type", type.toString());
+                candidate.put("verName", stripArchiveSuffix(assetName));
+                candidate.put("verCode", versionCode);
+                candidate.put("description", buildReleaseDescription(assetName, entry.tag, type, descriptionPrefix));
+                candidate.put("remoteUrl", downloadUrl);
+                candidate.put(ContentProfile.MARK_CHANNEL, deriveReleaseChannel(null, entry.tag, assetName));
+                candidate.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
+                candidate.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
+                candidate.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
+                candidate.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
+                candidate.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
+                candidate.put(ContentProfile.MARK_RELEASE_TAG, entry.tag);
+                candidate.put(ContentProfile.MARK_ARTIFACT_NAME, assetName);
+                if (!publishedAt.isEmpty()) candidate.put(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
+                if (!entry.releaseNotes.isEmpty()) candidate.put(ContentProfile.MARK_RELEASE_NOTES, entry.releaseNotes);
+
+                String digest = findFirstGroup(EXPANDED_ASSET_DIGEST_PATTERN, rowHtml);
+                if (!digest.isEmpty()) candidate.put(ContentProfile.MARK_SHA256, digest);
+
+                String key = buildFeedKey(candidate);
+                if (seen.add(key)) normalized.put(candidate);
+            }
+        } catch (Exception ignored) {
+        }
+        return normalized.toString();
     }
 
     private static String normalizeReleaseFeed(String json,
@@ -334,5 +474,44 @@ public final class GamehubFeedNormalizer {
     private static String stripArchiveSuffix(String name) {
         if (name == null) return "";
         return name.trim().replaceAll("(?i)\\.(wcp\\.xz|wcp\\.zst|tar\\.xz|tar\\.zst|wcp|zip|txz|tzst)$", "");
+    }
+
+    private static String extractReleaseTagFromLink(String link, String repoPath) {
+        String normalizedLink = link == null ? "" : link.trim();
+        String normalizedRepo = repoPath == null ? "" : repoPath.trim();
+        if (normalizedLink.isEmpty() || normalizedRepo.isEmpty()) return "";
+        String marker = "/" + normalizedRepo + "/releases/tag/";
+        int index = normalizedLink.indexOf(marker);
+        if (index < 0) return "";
+        return normalizedLink.substring(index + marker.length()).trim();
+    }
+
+    private static String sanitizeReleaseNotes(String value) {
+        String normalized = decodeHtmlEntities(value);
+        if (normalized.isEmpty()) return "";
+        normalized = normalized.replaceAll("(?is)<br\\s*/?>", "\n");
+        normalized = normalized.replaceAll("(?is)</p>", "\n\n");
+        normalized = normalized.replaceAll("(?is)</li>", "\n");
+        normalized = normalized.replaceAll("(?is)<[^>]+>", " ");
+        normalized = normalized.replace('\u00a0', ' ');
+        normalized = normalized.replaceAll("[ \\t\\x0B\\f\\r]+", " ");
+        normalized = normalized.replaceAll("\\n{3,}", "\n\n");
+        return normalized.trim();
+    }
+
+    private static String decodeHtmlEntities(String value) {
+        if (value == null || value.trim().isEmpty()) return "";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return Html.fromHtml(value, Html.FROM_HTML_MODE_LEGACY).toString().trim();
+        }
+        return Html.fromHtml(value).toString().trim();
+    }
+
+    private static String findFirstGroup(Pattern pattern, String value) {
+        if (pattern == null || value == null || value.isEmpty()) return "";
+        Matcher matcher = pattern.matcher(value);
+        if (!matcher.find() || matcher.groupCount() < 1) return "";
+        String group = matcher.group(1);
+        return group == null ? "" : group.trim();
     }
 }

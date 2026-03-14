@@ -69,6 +69,7 @@ public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_NIGHTLIES = "nightlies";
     private static final int MAX_GAMEHUB_RELEASE_PAGES = 16;
     private static final int MAX_NIGHTLIES_RELEASE_PAGES = 16;
+    private static final int MAX_NIGHTLIES_ATOM_RELEASES = 12;
 
     private enum ImportArchHint {
         UNKNOWN,
@@ -1084,9 +1085,9 @@ public class ContentsFragment extends Fragment {
         if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
             manager.setArchiveRemoteProfiles(json);
         } else if (SOURCE_MODE_NIGHTLIES.equals(selectedSourceMode)) {
-            manager.setRemoteProfiles(json);
+            manager.setNightliesRemoteProfiles(json);
         } else if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
-            manager.setRemoteProfiles(json);
+            manager.setGamehubRemoteProfiles(json);
         } else if (SOURCE_MODE_WCPHUB.equals(selectedSourceMode)) {
             manager.setHubRemoteProfiles(json);
         } else {
@@ -1131,6 +1132,8 @@ public class ContentsFragment extends Fragment {
                 emptyPages = 0;
             }
         }
+        if (!payloads.isEmpty()) return;
+        appendNightliesAtomFallbackFeeds(payloads, seenSources);
     }
 
     private String buildGamehubReleasePageUrl(int page) {
@@ -1141,6 +1144,41 @@ public class ContentsFragment extends Fragment {
     private String buildNightliesReleasePageUrl(int page) {
         int normalizedPage = Math.max(1, page);
         return ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES + "&page=" + normalizedPage;
+    }
+
+    private void appendNightliesAtomFallbackFeeds(List<String> payloads, HashSet<String> seenSources) {
+        String atom = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM);
+        List<GamehubFeedNormalizer.ReleaseFeedEntry> entries =
+                GamehubFeedNormalizer.parseGitHubReleaseAtom(atom, "The412Banner/Nightlies");
+        if (entries.isEmpty()) return;
+
+        int consumed = 0;
+        for (GamehubFeedNormalizer.ReleaseFeedEntry entry : entries) {
+            if (entry == null || !entry.isValid()) continue;
+            if (consumed >= MAX_NIGHTLIES_ATOM_RELEASES) break;
+            String expandedAssetsUrl = buildNightliesExpandedAssetsUrl(entry.tag);
+            if (seenSources.contains(expandedAssetsUrl) || !isAllowedFeedUrl(expandedAssetsUrl)) continue;
+            seenSources.add(expandedAssetsUrl);
+
+            String html = Downloader.downloadString(expandedAssetsUrl);
+            if (html == null || html.trim().isEmpty()) continue;
+            String payload = GamehubFeedNormalizer.normalizeExpandedAssetsHtml(
+                    html,
+                    entry,
+                    GamehubFeedNormalizer.NIGHTLIES_FEED_ID,
+                    GamehubFeedNormalizer.NIGHTLIES_LABEL,
+                    GamehubFeedNormalizer.NIGHTLIES_REPO_RELEASES,
+                    "The412Banner nightly package"
+            );
+            if (isEmptyRemotePayload(payload)) continue;
+            payloads.add(payload);
+            consumed++;
+        }
+    }
+
+    private String buildNightliesExpandedAssetsUrl(String releaseTag) {
+        String normalizedTag = releaseTag == null ? "" : releaseTag.trim();
+        return "https://github.com/The412Banner/Nightlies/releases/expanded_assets/" + normalizedTag;
     }
 
     private boolean isEmptyRemotePayload(@Nullable String payload) {
@@ -1496,20 +1534,39 @@ public class ContentsFragment extends Fragment {
                             case ERROR_UNTRUSTPROFILE -> "untrusted_profile";
                             default -> "unknown";
                         };
-                        ForensicLogger.logEvent(
-                                getContext(),
-                                "warn",
-                                "CONTENTS_IMPORT_REJECTED",
-                                null,
-                                "contents_import",
-                                "import_rejected",
-                                ForensicLogger.fields(
-                                        "reason", reasonCode,
-                                        "file_name", importFileName,
-                                        "expected_type", expectedType != null ? expectedType.toString() : "-",
-                                        "expected_arch", getImportArchLabel(expectedArch)
-                                )
-                        );
+                        if (isExtracting) {
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "warn",
+                                    "CONTENTS_IMPORT_REJECTED",
+                                    null,
+                                    "contents_import",
+                                    "import_rejected",
+                                    ForensicLogger.fields(
+                                            "reason", reasonCode,
+                                            "file_name", importFileName,
+                                            "expected_type", expectedType != null ? expectedType.toString() : "-",
+                                            "expected_arch", getImportArchLabel(expectedArch)
+                                    )
+                            );
+                        } else {
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "warn",
+                                    "CONTENTS_PACKAGE_INSTALL_FAIL",
+                                    null,
+                                    "contents",
+                                    "install_failed",
+                                    ForensicLogger.fields(
+                                            "reason", reasonCode,
+                                            "file_name", importFileName,
+                                            "type", remoteHint != null && remoteHint.type != null ? remoteHint.type.toString() : "-",
+                                            "ver_name", remoteHint != null ? remoteHint.verName : "-",
+                                            "expected_type", expectedType != null ? expectedType.toString() : "-",
+                                            "expected_arch", getImportArchLabel(expectedArch)
+                                    )
+                            );
+                        }
                         int msgId = switch (reason) {
                             case ERROR_BADTAR -> R.string.file_cannot_be_recognied;
                             case ERROR_NOPROFILE -> R.string.profile_not_found_in_content;
@@ -1529,6 +1586,23 @@ public class ContentsFragment extends Fragment {
                     @Override
                     public void onSucceed(ContentProfile profile) {
                         if (isExtracting) {
+                            ImportArchHint detectedArch = detectProfileArch(profile);
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "info",
+                                    "CONTENTS_IMPORT_EXTRACT_DONE",
+                                    null,
+                                    "contents_import",
+                                    "extract_complete",
+                                    ForensicLogger.fields(
+                                            "file_name", importFileName,
+                                            "detected_type", profile.type != null ? profile.type.toString() : "-",
+                                            "detected_arch", getImportArchLabel(detectedArch),
+                                            "ver_name", profile.verName,
+                                            "ver_code", profile.verCode,
+                                            "source_mode", sourceMode == null ? "-" : sourceMode
+                                    )
+                            );
                             if (expectedType != null && profile.type != expectedType) {
                                 ForensicLogger.logEvent(
                                         getContext(),
@@ -1556,8 +1630,6 @@ public class ContentsFragment extends Fragment {
                                 ));
                                 return;
                             }
-
-                            ImportArchHint detectedArch = detectProfileArch(profile);
                             if (isImportArchMismatch(expectedArch, detectedArch)) {
                                 ForensicLogger.logEvent(
                                         getContext(),
@@ -1587,6 +1659,26 @@ public class ContentsFragment extends Fragment {
                             }
 
                             ContentsManager.OnInstallFinishedCallback cb = this;
+                            Runnable startInstall = () -> {
+                                ForensicLogger.logEvent(
+                                        getContext(),
+                                        "info",
+                                        "CONTENTS_PACKAGE_INSTALL_START",
+                                        null,
+                                        "contents",
+                                        "install_start",
+                                        ForensicLogger.fields(
+                                                "type", profile.type != null ? profile.type.toString() : "-",
+                                                "ver_name", profile.verName,
+                                                "ver_code", profile.verCode,
+                                                "file_name", importFileName,
+                                                "detected_arch", getImportArchLabel(detectedArch)
+                                        )
+                                );
+                                preloaderDialog.showOnUiThread(R.string.installing_content);
+                                manager.finishInstallContent(profile, cb);
+                            };
+                            preloaderDialog.closeOnUiThread();
                             requireActivity().runOnUiThread(() -> {
                                 ContentInfoDialog dialog = new ContentInfoDialog(getContext(), profile);
                                 ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string._continue);
@@ -1596,16 +1688,30 @@ public class ContentsFragment extends Fragment {
                                     if (!untrustedFiles.isEmpty()) {
                                         ContentUntrustedDialog untrustedDialog = new ContentUntrustedDialog(getContext(), untrustedFiles);
                                         untrustedDialog.setOnCancelCallback(preloaderDialog::closeOnUiThread);
-                                        untrustedDialog.setOnConfirmCallback(() -> manager.finishInstallContent(profile, cb));
+                                        untrustedDialog.setOnConfirmCallback(startInstall);
                                         untrustedDialog.show();
                                     } else {
-                                        manager.finishInstallContent(profile, cb);
+                                        startInstall.run();
                                     }
                                 });
                                 dialog.setOnCancelCallback(preloaderDialog::closeOnUiThread);
                                 dialog.show();
                             });
                         } else {
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "info",
+                                    "CONTENTS_PACKAGE_INSTALL_DONE",
+                                    null,
+                                    "contents",
+                                    "install_complete",
+                                    ForensicLogger.fields(
+                                            "type", profile.type != null ? profile.type.toString() : "-",
+                                            "ver_name", profile.verName,
+                                            "ver_code", profile.verCode,
+                                            "source_mode", sourceMode == null ? "-" : sourceMode
+                                    )
+                            );
                             preloaderDialog.closeOnUiThread();
                             requireActivity().runOnUiThread(() -> {
                                 ContentDialog.alert(getContext(), R.string.content_installed_success, null);

@@ -139,17 +139,16 @@ public class WineInfo implements Parcelable {
 
         if (wineProfile != null && wineProfile.isWineProtonFamily()) {
             path = contentsManager.getInstallDir(context, wineProfile).getPath();
-            parsed = parseIdentifier(normalizedIdentifier);
-            if (parsed != null) {
-                String profileType = wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON ? "proton" : "wine";
-                if (!profileType.equals(parsed.type)) {
-                    parsed = new ParsedIdentifier(profileType, parsed.version, parsed.arch);
-                }
-            }
+            parsed = parseProfileIdentifier(wineProfile);
+            if (parsed == null) parsed = parseIdentifier(stripEntryVersionCodeSuffix(normalizedIdentifier));
         }
 
         if (parsed == null) {
             parsed = parseIdentifier(normalizedIdentifier);
+        }
+
+        if (parsed == null) {
+            parsed = parseIdentifier(stripEntryVersionCodeSuffix(normalizedIdentifier));
         }
 
         if (path.isEmpty()) {
@@ -233,6 +232,49 @@ public class WineInfo implements Parcelable {
         }
 
         return new ParsedIdentifier(type, version, arch);
+    }
+
+    private static ParsedIdentifier parseProfileIdentifier(ContentProfile profile) {
+        if (profile == null || !profile.isWineProtonFamily()) {
+            return null;
+        }
+
+        String normalizedVersionName = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.ENGLISH);
+        if (normalizedVersionName.isEmpty()) {
+            return null;
+        }
+
+        String typePrefix = profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON || profile.isProtonLike()
+                ? "proton"
+                : "wine";
+
+        ParsedIdentifier parsed = parseIdentifier(typePrefix + "-" + normalizedVersionName);
+        if (parsed != null) {
+            return parsed;
+        }
+
+        if (normalizedVersionName.startsWith("wine-") || normalizedVersionName.startsWith("proton-")) {
+            return parseIdentifier(normalizedVersionName);
+        }
+
+        return null;
+    }
+
+    private static String stripEntryVersionCodeSuffix(String identifier) {
+        if (identifier == null) {
+            return "";
+        }
+        String normalized = identifier.trim().toLowerCase(Locale.ENGLISH);
+        int lastDash = normalized.lastIndexOf('-');
+        if (lastDash <= 0 || lastDash >= normalized.length() - 1) {
+            return normalized;
+        }
+        for (int i = lastDash + 1; i < normalized.length(); i++) {
+            if (!Character.isDigit(normalized.charAt(i))) {
+                return normalized;
+            }
+        }
+        return normalized.substring(0, lastDash);
     }
 
     private static class ParsedIdentifier {

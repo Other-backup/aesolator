@@ -39,6 +39,7 @@ public class ContentsManager {
     public static final String REMOTE_GAMEHUB_RELEASES = "https://api.github.com/repos/The412Banner/Gamehub-Components/releases?per_page=100";
     public static final String REMOTE_GAMEHUB_COMPONENTS = "https://raw.githubusercontent.com/The412Banner/Gamehub-Components/main/sp_winemu_all_components12.xml";
     public static final String REMOTE_THE412BANNER_NIGHTLIES_RELEASES = "https://api.github.com/repos/The412Banner/Nightlies/releases?per_page=100";
+    public static final String REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM = "https://github.com/The412Banner/Nightlies/releases.atom";
     public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
@@ -132,6 +133,18 @@ public class ContentsManager {
     public void setArchiveRemoteProfiles(String json) {
         remoteProfiles = new ArrayList<>();
         appendRemoteProfiles(json, false, false, true, true);
+        syncContents();
+    }
+
+    public void setGamehubRemoteProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, false, false, false, true);
+        syncContents();
+    }
+
+    public void setNightliesRemoteProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, false, false, false, true);
         syncContents();
     }
 
