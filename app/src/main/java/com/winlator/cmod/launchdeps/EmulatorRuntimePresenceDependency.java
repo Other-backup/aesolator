@@ -60,7 +60,12 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
         String selectedWine = resolveWineIdentifier(container, shortcut);
         if (selectedWine.isEmpty()) return missing;
 
-        WineInfo wineInfo = WineInfo.fromIdentifier(context, manager, selectedWine);
+        String requestedRuntimeModel = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        String inferredRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(selectedWine);
+        if (!inferredRuntimeModel.isEmpty()) {
+            requestedRuntimeModel = inferredRuntimeModel;
+        }
+        WineInfo wineInfo = WineInfo.fromIdentifier(context, manager, selectedWine, requestedRuntimeModel);
         File imageFsRoot = ImageFs.find(context).getRootDir();
 
         if (wineInfo.isArm64EC()) {

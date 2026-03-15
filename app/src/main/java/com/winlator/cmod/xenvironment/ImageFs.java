@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.util.Locale;
 
 public class ImageFs {
+    public static final String ROOTFS_PROVIDER_GAMENATIVE = "gamenative";
+    public static final String ROOTFS_LAYOUT_UBUNTUFS = "ubuntufs";
     public static final String USER = "xuser";
     public static final String HOME_PATH = "/home/"+USER;
     public static final String CACHE_PATH = HOME_PATH+"/.cache";
@@ -26,11 +28,17 @@ public class ImageFs {
 
     private ImageFs(File rootDir) {
         this.rootDir = rootDir;
-        winePath = rootDir + "/opt/" + WineInfo.MAIN_WINE_VERSION.identifier();
+        winePath = resolveMainWineDir(rootDir).getPath();
         home_path = rootDir + HOME_PATH;
         cache_path = rootDir + CACHE_PATH;
         config_path = rootDir + CONFIG_PATH;
         wineprefix = rootDir + WINEPREFIX;
+    }
+
+    private static File resolveMainWineDir(File rootDir) {
+        File donorStyleDir = new File(rootDir, "/opt/wine");
+        if (donorStyleDir.isDirectory()) return donorStyleDir;
+        return new File(rootDir, "/opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
     }
 
     public static ImageFs find(Context context) {
@@ -104,6 +112,62 @@ public class ImageFs {
         }
     }
 
+    public String getRootfsProvider() {
+        File providerFile = getRootfsProviderFile();
+        if (providerFile.exists()) {
+            return normalizeRootfsProvider(FileUtils.readLines(providerFile).get(0));
+        }
+        return ROOTFS_PROVIDER_GAMENATIVE;
+    }
+
+    public void createRootfsProviderFile(String provider) {
+        getConfigDir().mkdirs();
+        File file = getRootfsProviderFile();
+        try {
+            file.createNewFile();
+            FileUtils.writeString(file, normalizeRootfsProvider(provider));
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String getRootfsLayout() {
+        File layoutFile = getRootfsLayoutFile();
+        if (layoutFile.exists()) {
+            return normalizeRootfsLayout(FileUtils.readLines(layoutFile).get(0));
+        }
+        return ROOTFS_LAYOUT_UBUNTUFS;
+    }
+
+    public void createRootfsLayoutFile(String layout) {
+        getConfigDir().mkdirs();
+        File file = getRootfsLayoutFile();
+        try {
+            file.createNewFile();
+            FileUtils.writeString(file, normalizeRootfsLayout(layout));
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isGameNativeRootfs() {
+        return ROOTFS_PROVIDER_GAMENATIVE.equalsIgnoreCase(getRootfsProvider());
+    }
+
+    public boolean isUbuntuFsLayout() {
+        return ROOTFS_LAYOUT_UBUNTUFS.equalsIgnoreCase(getRootfsLayout());
+    }
+
+    private static String normalizeRootfsProvider(String provider) {
+        return ROOTFS_PROVIDER_GAMENATIVE;
+    }
+
+    private static String normalizeRootfsLayout(String layout) {
+        return ROOTFS_LAYOUT_UBUNTUFS;
+    }
+
     public String getWinePath() {
         return winePath;
     }
@@ -128,11 +192,35 @@ public class ImageFs {
         return new File(getConfigDir(), ".arch");
     }
 
+    public File getRootfsProviderFile() {
+        return new File(getConfigDir(), ".provider");
+    }
+
+    public File getRootfsLayoutFile() {
+        return new File(getConfigDir(), ".layout");
+    }
+
+    public File getOptDir() {
+        return new File(rootDir, "/opt");
+    }
+
     public File getInstalledWineDir() {
         return new File(rootDir, "/opt/installed-wine");
     }
 
+    public File getMainWineDir() {
+        return resolveMainWineDir(rootDir);
+    }
+
     public File getTmpDir() {
+        File canonicalTmpDir = new File(rootDir, "/tmp");
+        if (canonicalTmpDir.exists() || isGameNativeRootfs()) {
+            return canonicalTmpDir;
+        }
+        return getCompatTmpDir();
+    }
+
+    public File getCompatTmpDir() {
         return new File(rootDir, "/usr/tmp");
     }
 
@@ -149,6 +237,10 @@ public class ImageFs {
     }
 
     public File getBinDir() { return new File(rootDir, "/usr/bin"); }
+
+    public File getLocalBinDir() {
+        return new File(rootDir, "/usr/local/bin");
+    }
 
     public File getGlibcBinDir() {
         return new File(rootDir, "/usr/glibc/bin");

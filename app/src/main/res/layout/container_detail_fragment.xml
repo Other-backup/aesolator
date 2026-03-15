@@ -533,25 +533,27 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                            android:layout_marginTop="4dp"
+                            android:orientation="vertical">
 
                             <Spinner
                                 android:id="@+id/SDesktopBackgroundType"
                                 style="@style/ComboBox"
-                                android:layout_width="0dp"
-                                android:layout_weight="1"
+                                android:layout_width="match_parent"
                                 android:entries="@array/desktop_background_type_entries" />
 
                             <com.winlator.cmod.widget.ColorPickerView
                                 android:id="@+id/CPVDesktopBackgroundColor"
-                                android:layout_width="84dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
                                 android:visibility="gone" />
 
                             <com.winlator.cmod.widget.ImagePickerView
                                 android:id="@+id/IPVDesktopBackgroundImage"
-                                android:layout_width="84dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
                                 android:visibility="gone" />
                         </LinearLayout>
                     </LinearLayout>

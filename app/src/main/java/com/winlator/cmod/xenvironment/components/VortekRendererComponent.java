@@ -1,0 +1,195 @@
+package com.winlator.cmod.xenvironment.components;
+
+import android.content.Context;
+
+import androidx.annotation.Keep;
+
+import com.winlator.cmod.contentdialog.VortekConfigDialog;
+import com.winlator.cmod.core.GPUHelper;
+import com.winlator.cmod.core.GeneralComponents;
+import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.renderer.GPUImage;
+import com.winlator.cmod.renderer.Texture;
+import com.winlator.cmod.widget.XServerView;
+import com.winlator.cmod.xconnector.Client;
+import com.winlator.cmod.xconnector.ConnectionHandler;
+import com.winlator.cmod.xconnector.RequestHandler;
+import com.winlator.cmod.xconnector.UnixSocketConfig;
+import com.winlator.cmod.xconnector.XConnectorEpoll;
+import com.winlator.cmod.xconnector.XInputStream;
+import com.winlator.cmod.xenvironment.EnvironmentComponent;
+import com.winlator.cmod.xserver.Drawable;
+import com.winlator.cmod.xserver.Window;
+import com.winlator.cmod.xserver.XServer;
+
+import java.io.IOException;
+import java.util.Objects;
+
+public class VortekRendererComponent extends EnvironmentComponent implements ConnectionHandler, RequestHandler {
+    public static final int VK_MAX_VERSION = GPUHelper.vkMakeVersion(1, 3, 128);
+
+    private XConnectorEpoll connector;
+    private final Options options;
+    private final UnixSocketConfig socketConfig;
+    private final XServer xServer;
+    private final Context context;
+
+    private native long createVkContext(int fd, Options options);
+
+    private native void destroyVkContext(long contextPtr);
+
+    private native boolean handleExtraDataRequest(long contextPtr, int requestId, int requestLength);
+
+    private native void initVulkanWrapper(String nativeLibraryDir, String libvulkanPath);
+
+    static {
+        System.loadLibrary("vortekrenderer");
+    }
+
+    public static class Options {
+        public int vkMaxVersion = VK_MAX_VERSION;
+        public short maxDeviceMemory = 0;
+        public short imageCacheSize = 256;
+        public byte resourceMemoryType = 0;
+        public String[] exposedDeviceExtensions = null;
+        public String libvulkanPath = null;
+
+        public static Options fromKeyValueSet(Context context, KeyValueSet config) {
+            if (config == null || config.isEmpty()) return new Options();
+
+            Options options = new Options();
+            String exposedDeviceExtensions = config.get("exposedDeviceExtensions", "all");
+            if (!exposedDeviceExtensions.isEmpty() && !"all".equals(exposedDeviceExtensions)) {
+                options.exposedDeviceExtensions = exposedDeviceExtensions.split("\\|");
+            }
+
+            String defaultVkMaxVersion = VortekConfigDialog.DEFAULT_VK_MAX_VERSION;
+            String vkMaxVersion = config.get("vkMaxVersion", defaultVkMaxVersion);
+            if (!vkMaxVersion.equals(defaultVkMaxVersion)) {
+                String[] parts = vkMaxVersion.split("\\.");
+                options.vkMaxVersion = GPUHelper.vkMakeVersion(
+                        Integer.parseInt(parts[0]),
+                        Integer.parseInt(parts[1]),
+                        128
+                );
+            }
+
+            options.maxDeviceMemory = (short) config.getInt("maxDeviceMemory");
+            options.imageCacheSize = (short) config.getInt("imageCacheSize", 256);
+            options.resourceMemoryType = (byte) config.getInt("resourceMemoryType");
+            String adrenotoolsDriver = config.get("adrenotoolsDriver");
+            options.libvulkanPath = GeneralComponents.getDefinitivePath(
+                    GeneralComponents.Type.ADRENOTOOLS_DRIVER,
+                    context,
+                    adrenotoolsDriver
+            );
+            return options;
+        }
+    }
+
+    public VortekRendererComponent(XServer xServer, UnixSocketConfig socketConfig, Options options, Context context) {
+        this.xServer = xServer;
+        this.socketConfig = socketConfig;
+        this.options = options;
+        this.context = context;
+        initVulkanWrapper(context.getApplicationInfo().nativeLibraryDir, options.libvulkanPath);
+    }
+
+    @Override
+    public void start() {
+        if (connector != null) return;
+        connector = new XConnectorEpoll(socketConfig, this, this);
+        connector.setInitialInputBufferCapacity(8);
+        connector.setInitialOutputBufferCapacity(0);
+        connector.start();
+    }
+
+    @Override
+    public void stop() {
+        if (connector != null) {
+            connector.stop();
+            connector = null;
+        }
+    }
+
+    @Keep
+    private int getWindowWidth(int windowId) {
+        Window window = xServer.windowManager.getWindow(windowId);
+        return window != null ? window.getWidth() : 0;
+    }
+
+    @Keep
+    private int getWindowHeight(int windowId) {
+        Window window = xServer.windowManager.getWindow(windowId);
+        return window != null ? window.getHeight() : 0;
+    }
+
+    @Keep
+    private long getWindowHardwareBuffer(int windowId) {
+        Window window = xServer.windowManager.getWindow(windowId);
+        if (window == null) return 0L;
+
+        Drawable drawable = window.getContent();
+        Texture texture = drawable.getTexture();
+        if (!(texture instanceof GPUImage)) {
+            XServerView xServerView = xServer.getRenderer().xServerView;
+            Objects.requireNonNull(texture);
+            xServerView.queueEvent(() -> destroyTexture(texture));
+            drawable.setTexture(new GPUImage(drawable.width, drawable.height));
+        }
+        return ((GPUImage) drawable.getTexture()).getHardwareBufferPtr();
+    }
+
+    @Keep
+    private void updateWindowContent(int windowId) {
+        Window window = xServer.windowManager.getWindow(windowId);
+        if (window == null) return;
+
+        Drawable drawable = window.getContent();
+        synchronized (drawable.renderLock) {
+            drawable.forceUpdate();
+        }
+    }
+
+    @Override
+    public void handleConnectionShutdown(Client client) {
+        if (client.getTag() != null) {
+            destroyVkContext((Long) client.getTag());
+        }
+    }
+
+    @Override
+    public void handleNewConnection(Client client) {
+        client.createIOStreams();
+    }
+
+    @Override
+    public boolean handleRequest(Client client) throws IOException {
+        XInputStream inputStream = client.getInputStream();
+        if (inputStream.available() < 8) return false;
+
+        int requestCode = inputStream.readInt();
+        int requestLength = inputStream.readInt();
+        if (requestCode == 1) {
+            long contextPtr = createVkContext(client.clientSocket.fd, options);
+            if (contextPtr > 0) {
+                client.setTag(contextPtr);
+            } else if (connector != null) {
+                connector.killConnection(client);
+            }
+        } else if (requestCode > 32767 && (requestCode >> 16) == 2) {
+            int requestId = requestCode & 65535;
+            boolean success = handleExtraDataRequest((Long) client.getTag(), requestId, requestLength);
+            if (!success) {
+                throw new IOException("Failed to handle extra data request.");
+            }
+        }
+        return true;
+    }
+
+    public static void destroyTexture(Texture texture) {
+        if (texture != null) {
+            texture.destroy();
+        }
+    }
+}

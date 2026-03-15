@@ -1,8 +1,10 @@
 package com.winlator.cmod.container;
 
 import android.os.Environment;
+import android.util.Log;
 
 import com.winlator.cmod.box64.Box64Preset;
+import com.winlator.cmod.box86_64.Box86_64Preset;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.core.DefaultVersion;
@@ -20,12 +22,20 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.Iterator;
+import java.util.Locale;
 
 public class Container {
     public enum XrControllerMapping {
         BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_GRIP, BUTTON_TRIGGER,
         THUMBSTICK_UP, THUMBSTICK_DOWN, THUMBSTICK_LEFT, THUMBSTICK_RIGHT
     }
+
+    public static final String EXTERNAL_DISPLAY_MODE_OFF = "off";
+    public static final String EXTERNAL_DISPLAY_MODE_TOUCHPAD = "touchpad";
+    public static final String EXTERNAL_DISPLAY_MODE_KEYBOARD = "keyboard";
+    public static final String EXTERNAL_DISPLAY_MODE_HYBRID = "hybrid";
+    public static final String DEFAULT_EXTERNAL_DISPLAY_MODE = EXTERNAL_DISPLAY_MODE_OFF;
+
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
@@ -41,16 +51,25 @@ public class Container {
     public static final String DEFAULT_DDRAWRAPPER = "none";
     public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1";
     public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1";
-    public static final String DEFAULT_DRIVES = "F:"+Environment.getExternalStorageDirectory().getAbsolutePath()+"D:"+Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+    public static final String DEFAULT_DRIVES = "F:" + Environment.getExternalStorageDirectory().getAbsolutePath() + "D:" + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     public static final byte STARTUP_SELECTION_NORMAL = 0;
     public static final byte STARTUP_SELECTION_ESSENTIAL = 1;
     public static final byte STARTUP_SELECTION_AGGRESSIVE = 2;
+    public static final String SUSPEND_POLICY_AUTO = "auto";
+    public static final String SUSPEND_POLICY_NEVER = "never";
+    public static final String SUSPEND_POLICY_MANUAL = "manual";
+    public static final String STEAM_TYPE_NORMAL = "normal";
+    public static final String STEAM_TYPE_LIGHT = "light";
+    public static final String STEAM_TYPE_ULTRALIGHT = "ultralight";
     public static final byte MAX_DRIVE_LETTERS = 26;
+
     public final int id;
+
     private String name;
     private String screenSize = DEFAULT_SCREEN_SIZE;
     private String envVars = DEFAULT_ENV_VARS;
     private String graphicsDriver = DEFAULT_GRAPHICS_DRIVER;
+    private String graphicsDriverVersion = DefaultVersion.WRAPPER;
     private String graphicsDriverConfig = DEFAULT_GRAPHICSDRIVERCONFIG;
     private String dxwrapper = DEFAULT_DXWRAPPER;
     private String dxwrapperConfig = "";
@@ -60,36 +79,63 @@ public class Container {
     private String wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
     private boolean showFPS;
     private boolean fullscreenStretched;
+    private boolean launchRealSteam;
+    private boolean allowSteamUpdates;
+    private boolean wow64Mode = true;
+    private boolean needsUnpacking = true;
     private byte startupSelection = STARTUP_SELECTION_ESSENTIAL;
     private String cpuList;
     private String cpuListWoW64;
     private String desktopTheme = WineThemeManager.DEFAULT_DESKTOP_THEME;
+    private String box86Version = DefaultVersion.BOX64;
+    private String box64Version;
+    private String box86Preset = Box86_64Preset.COMPATIBILITY;
+    private String box64Preset = Box64Preset.COMPATIBILITY;
     private String fexcoreVersion;
     private String fexcorePreset = FEXCorePreset.INTERMEDIATE;
-    private String box64Preset = Box64Preset.COMPATIBILITY;
     private File rootDir;
+    private String installPath = "";
     private JSONObject extraData;
+    private JSONObject sessionMetadata;
+    private int rcfileId;
     private String midiSoundFont = "";
     private int inputType = WinHandler.DEFAULT_INPUT_TYPE;
     private String lc_all = "";
     private int primaryController = 1;
     private String controllerMapping = new String(new char[XrControllerMapping.values().length]);
-    private String box64Version;
+    private String execArgs = "";
+    private String executablePath = "";
+    private boolean sdlControllerAPI;
+    private String language = "english";
+    private byte dinputMapperType = 1;
+    private boolean disableMouseInput;
+    private boolean touchscreenMode;
+    private boolean shooterMode = true;
+    private String gestureConfig = "";
+    private String externalDisplayMode = DEFAULT_EXTERNAL_DISPLAY_MODE;
+    private boolean externalDisplaySwap;
+    private boolean useDRI3 = true;
+    private String steamType = STEAM_TYPE_NORMAL;
+    private boolean gstreamerWorkaround;
+    private boolean forceDlc;
+    private boolean steamOfflineMode;
+    private boolean useLegacyDRM;
+    private boolean unpackFiles;
+    private String suspendPolicy = SUSPEND_POLICY_MANUAL;
+    private boolean portraitMode;
     private String emulator;
     private String containerVariant = DEFAULT_VARIANT;
 
     private ContainerManager containerManager;
 
-
-
     public Container(int id) {
         this.id = id;
-        this.name = "Container-"+id;
+        this.name = "Container-" + id;
     }
 
     public Container(int id, ContainerManager containerManager) {
         this.id = id;
-        this.name = "Container-"+id;
+        this.name = "Container-" + id;
         this.containerManager = containerManager;
     }
 
@@ -129,9 +175,21 @@ public class Container {
         this.graphicsDriver = graphicsDriver;
     }
 
-    public String getGraphicsDriverConfig() { return this.graphicsDriverConfig; }
+    public String getGraphicsDriverVersion() {
+        return graphicsDriverVersion != null ? graphicsDriverVersion : DefaultVersion.WRAPPER;
+    }
 
-    public void setGraphicsDriverConfig(String graphicsDriverConfig) { this.graphicsDriverConfig = graphicsDriverConfig; }
+    public void setGraphicsDriverVersion(String graphicsDriverVersion) {
+        this.graphicsDriverVersion = graphicsDriverVersion != null ? graphicsDriverVersion : DefaultVersion.WRAPPER;
+    }
+
+    public String getGraphicsDriverConfig() {
+        return graphicsDriverConfig != null ? graphicsDriverConfig : "";
+    }
+
+    public void setGraphicsDriverConfig(String graphicsDriverConfig) {
+        this.graphicsDriverConfig = graphicsDriverConfig != null ? graphicsDriverConfig : "";
+    }
 
     public String getDXWrapper() {
         return dxwrapper;
@@ -142,7 +200,7 @@ public class Container {
     }
 
     public String getDXWrapperConfig() {
-        return dxwrapperConfig;
+        return dxwrapperConfig != null ? dxwrapperConfig : "";
     }
 
     public void setDXWrapperConfig(String dxwrapperConfig) {
@@ -197,16 +255,52 @@ public class Container {
         this.controllerMapping = controllerMapping;
     }
 
-    public boolean isFullscreenStretched() { return fullscreenStretched; }
+    public boolean isFullscreenStretched() {
+        return fullscreenStretched;
+    }
+
+    public void setFullscreenStretched(boolean fullscreenStretched) {
+        this.fullscreenStretched = fullscreenStretched;
+    }
 
     public boolean isShowFPS() {
         return showFPS;
     }
 
-    public void setFullscreenStretched(boolean fullscreenStretched) { this.fullscreenStretched = fullscreenStretched; }
-
     public void setShowFPS(boolean showFPS) {
         this.showFPS = showFPS;
+    }
+
+    public boolean isLaunchRealSteam() {
+        return launchRealSteam;
+    }
+
+    public void setLaunchRealSteam(boolean launchRealSteam) {
+        this.launchRealSteam = launchRealSteam;
+    }
+
+    public boolean isAllowSteamUpdates() {
+        return allowSteamUpdates;
+    }
+
+    public void setAllowSteamUpdates(boolean allowSteamUpdates) {
+        this.allowSteamUpdates = allowSteamUpdates;
+    }
+
+    public boolean isWoW64Mode() {
+        return wow64Mode;
+    }
+
+    public void setWoW64Mode(boolean wow64Mode) {
+        this.wow64Mode = wow64Mode;
+    }
+
+    public boolean isNeedsUnpacking() {
+        return needsUnpacking;
+    }
+
+    public void setNeedsUnpacking(boolean needsUnpacking) {
+        this.needsUnpacking = needsUnpacking;
     }
 
     public byte getStartupSelection() {
@@ -241,20 +335,28 @@ public class Container {
         this.cpuListWoW64 = cpuListWoW64 != null && !cpuListWoW64.isEmpty() ? cpuListWoW64 : null;
     }
 
-    public void setFEXCoreVersion(String version) {
-        this.fexcoreVersion = version;
+    public String getBox86Version() {
+        return box86Version;
     }
 
-    public String getFEXCoreVersion() {
-        return this.fexcoreVersion;
+    public void setBox86Version(String box86Version) {
+        this.box86Version = box86Version;
     }
 
-    public void setFEXCorePreset(String preset) {
-        this.fexcorePreset = preset;
+    public String getBox64Version() {
+        return box64Version;
     }
 
-    public String getFEXCorePreset() {
-        return fexcorePreset;
+    public void setBox64Version(String version) {
+        this.box64Version = version;
+    }
+
+    public String getBox86Preset() {
+        return box86Preset;
+    }
+
+    public void setBox86Preset(String box86Preset) {
+        this.box86Preset = box86Preset;
     }
 
     public String getBox64Preset() {
@@ -265,14 +367,27 @@ public class Container {
         this.box64Preset = box64Preset;
     }
 
-    public String getBox64Version() { return box64Version; }
+    public void setFEXCoreVersion(String version) {
+        this.fexcoreVersion = version;
+    }
 
-    public void setBox64Version(String version) { this.box64Version = version; }
+    public String getFEXCoreVersion() {
+        return fexcoreVersion;
+    }
+
+    public void setFEXCorePreset(String preset) {
+        this.fexcorePreset = preset;
+    }
+
+    public String getFEXCorePreset() {
+        return fexcorePreset;
+    }
 
     public void setEmulator(String emulator) {
         if (emulator == null || emulator.trim().isEmpty()) {
             this.emulator = DEFAULT_EMULATOR;
-        } else {
+        }
+        else {
             this.emulator = emulator;
         }
     }
@@ -287,9 +402,11 @@ public class Container {
     public void setContainerVariant(String containerVariant) {
         if (containerVariant == null || containerVariant.trim().isEmpty()) {
             this.containerVariant = DEFAULT_VARIANT;
-        } else if (GLIBC.equalsIgnoreCase(containerVariant)) {
+        }
+        else if (GLIBC.equalsIgnoreCase(containerVariant)) {
             this.containerVariant = GLIBC;
-        } else {
+        }
+        else {
             this.containerVariant = BIONIC;
         }
     }
@@ -304,6 +421,14 @@ public class Container {
 
     public void setRootDir(File rootDir) {
         this.rootDir = rootDir;
+    }
+
+    public String getInstallPath() {
+        return installPath;
+    }
+
+    public void setInstallPath(String installPath) {
+        this.installPath = installPath != null ? installPath : "";
     }
 
     public void setExtraData(JSONObject extraData) {
@@ -329,9 +454,45 @@ public class Container {
             if (value != null) {
                 extraData.put(name, value);
             }
-            else extraData.remove(name);
+            else {
+                extraData.remove(name);
+            }
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.e("Container", "Failed to put extra", e);
+        }
+    }
+
+    public String getSessionMetadata(String name) {
+        return getSessionMetadata(name, "");
+    }
+
+    public String getSessionMetadata(String name, String fallback) {
+        try {
+            return sessionMetadata != null && sessionMetadata.has(name) ? sessionMetadata.getString(name) : fallback;
+        }
+        catch (JSONException e) {
+            return fallback;
+        }
+    }
+
+    public void putSessionMetadata(String name, Object value) {
+        if (sessionMetadata == null) sessionMetadata = new JSONObject();
+        try {
+            if (value != null) {
+                sessionMetadata.put(name, value);
+            }
+            else {
+                sessionMetadata.remove(name);
+            }
+        }
+        catch (JSONException e) {
+            Log.e("Container", "Failed to put session metadata", e);
+        }
+    }
+
+    public void clearSessionMetadata() {
+        sessionMetadata = null;
     }
 
     public String getWineVersion() {
@@ -347,7 +508,7 @@ public class Container {
     }
 
     public File getDesktopDir() {
-        return new File(rootDir, ".wine/drive_c/users/"+ImageFs.USER+"/Desktop/");
+        return new File(rootDir, ".wine/drive_c/users/" + ImageFs.USER + "/Desktop/");
     }
 
     public File getStartMenuDir() {
@@ -355,7 +516,7 @@ public class Container {
     }
 
     public File getIconsDir(int size) {
-        return new File(rootDir, ".local/share/icons/hicolor/"+size+"x"+size+"/apps/");
+        return new File(rootDir, ".local/share/icons/hicolor/" + size + "x" + size + "/apps/");
     }
 
     public String getDesktopTheme() {
@@ -364,6 +525,14 @@ public class Container {
 
     public void setDesktopTheme(String desktopTheme) {
         this.desktopTheme = desktopTheme;
+    }
+
+    public int getRCFileId() {
+        return rcfileId;
+    }
+
+    public void setRcfileId(int id) {
+        rcfileId = id;
     }
 
     public String getMIDISoundFont() {
@@ -382,8 +551,208 @@ public class Container {
         this.inputType = inputType;
     }
 
+    public String getExecArgs() {
+        return execArgs;
+    }
+
+    public void setExecArgs(String execArgs) {
+        this.execArgs = execArgs != null ? execArgs : "";
+    }
+
+    public String getExecutablePath() {
+        return executablePath;
+    }
+
+    public void setExecutablePath(String executablePath) {
+        this.executablePath = executablePath != null ? executablePath : "";
+    }
+
+    public boolean isSdlControllerAPI() {
+        return sdlControllerAPI;
+    }
+
+    public void setSdlControllerAPI(boolean sdlControllerAPI) {
+        this.sdlControllerAPI = sdlControllerAPI;
+    }
+
+    public String getLanguage() {
+        return language != null ? language : "english";
+    }
+
+    public void setLanguage(String language) {
+        this.language = (language != null && !language.isEmpty()) ? language : "english";
+    }
+
+    public boolean isGstreamerWorkaround() {
+        return gstreamerWorkaround;
+    }
+
+    public void setGstreamerWorkaround(boolean gstreamerWorkaround) {
+        this.gstreamerWorkaround = gstreamerWorkaround;
+    }
+
+    public byte getDinputMapperType() {
+        return dinputMapperType;
+    }
+
+    public void setDinputMapperType(byte dinputMapperType) {
+        this.dinputMapperType = dinputMapperType;
+    }
+
+    public boolean isDisableMouseInput() {
+        return disableMouseInput;
+    }
+
+    public void setDisableMouseInput(boolean disableMouseInput) {
+        this.disableMouseInput = disableMouseInput;
+    }
+
+    public boolean isTouchscreenMode() {
+        return touchscreenMode;
+    }
+
+    public void setTouchscreenMode(boolean touchscreenMode) {
+        this.touchscreenMode = touchscreenMode;
+    }
+
+    public boolean isShooterMode() {
+        return shooterMode;
+    }
+
+    public void setShooterMode(boolean shooterMode) {
+        this.shooterMode = shooterMode;
+    }
+
+    public String getGestureConfig() {
+        return gestureConfig != null ? gestureConfig : "";
+    }
+
+    public void setGestureConfig(String gestureConfig) {
+        this.gestureConfig = gestureConfig != null ? gestureConfig : "";
+    }
+
+    public String getExternalDisplayMode() {
+        return externalDisplayMode != null ? externalDisplayMode : DEFAULT_EXTERNAL_DISPLAY_MODE;
+    }
+
+    public void setExternalDisplayMode(String externalDisplayMode) {
+        this.externalDisplayMode = externalDisplayMode != null ? externalDisplayMode : DEFAULT_EXTERNAL_DISPLAY_MODE;
+    }
+
+    public boolean isExternalDisplaySwap() {
+        return externalDisplaySwap;
+    }
+
+    public void setExternalDisplaySwap(boolean externalDisplaySwap) {
+        this.externalDisplaySwap = externalDisplaySwap;
+    }
+
+    public boolean isUseDRI3() {
+        return useDRI3;
+    }
+
+    public void setUseDRI3(boolean useDRI3) {
+        this.useDRI3 = useDRI3;
+    }
+
+    public String getSteamType() {
+        return steamType;
+    }
+
+    public void setSteamType(String steamType) {
+        String normalized = steamType == null ? "" : steamType.toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            case STEAM_TYPE_LIGHT:
+                this.steamType = STEAM_TYPE_LIGHT;
+                break;
+            case STEAM_TYPE_ULTRALIGHT:
+                this.steamType = STEAM_TYPE_ULTRALIGHT;
+                break;
+            default:
+                this.steamType = STEAM_TYPE_NORMAL;
+                break;
+        }
+    }
+
+    public boolean isForceDlc() {
+        return forceDlc;
+    }
+
+    public void setForceDlc(boolean forceDlc) {
+        this.forceDlc = forceDlc;
+    }
+
+    public boolean isSteamOfflineMode() {
+        return steamOfflineMode;
+    }
+
+    public void setSteamOfflineMode(boolean steamOfflineMode) {
+        this.steamOfflineMode = steamOfflineMode;
+    }
+
+    public boolean isUseLegacyDRM() {
+        return useLegacyDRM;
+    }
+
+    public void setUseLegacyDRM(boolean useLegacyDRM) {
+        this.useLegacyDRM = useLegacyDRM;
+    }
+
+    public boolean isUnpackFiles() {
+        return unpackFiles;
+    }
+
+    public void setUnpackFiles(boolean unpackFiles) {
+        this.unpackFiles = unpackFiles;
+    }
+
+    public static String normalizeSuspendPolicy(String suspendPolicy) {
+        String normalized = suspendPolicy == null ? "" : suspendPolicy.toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            case SUSPEND_POLICY_NEVER:
+                return SUSPEND_POLICY_NEVER;
+            case SUSPEND_POLICY_MANUAL:
+                return SUSPEND_POLICY_MANUAL;
+            case SUSPEND_POLICY_AUTO:
+            default:
+                return SUSPEND_POLICY_AUTO;
+        }
+    }
+
+    public String getSuspendPolicy() {
+        return normalizeSuspendPolicy(suspendPolicy);
+    }
+
+    public void setSuspendPolicy(String suspendPolicy) {
+        this.suspendPolicy = normalizeSuspendPolicy(suspendPolicy);
+    }
+
+    public boolean isPortraitMode() {
+        return portraitMode;
+    }
+
+    public void setPortraitMode(boolean portraitMode) {
+        this.portraitMode = portraitMode;
+    }
+
+    public String getContainerJson() {
+        String content = FileUtils.readString(getConfigFile());
+        return content == null ? "{}" : content.replace("\\u0000", "").replace("\u0000", "");
+    }
+
     public Iterable<String[]> drivesIterator() {
         return drivesIterator(drives);
+    }
+
+    public static char getNextAvailableDriveLetter(String drives) throws Exception {
+        char drive = 'A';
+        while (drives.contains(drive + ":")) {
+            drive += 1;
+            if (drive > 'Z') {
+                throw new Exception("All drive letters taken");
+            }
+        }
+        return drive;
     }
 
     public static Iterable<String[]> drivesIterator(final String drives) {
@@ -397,9 +766,9 @@ public class Container {
 
             @Override
             public String[] next() {
-                item[0] = String.valueOf(drives.charAt(index[0]-1));
-                int nextIndex = drives.indexOf(":", index[0]+1);
-                item[1] = drives.substring(index[0]+1, nextIndex != -1 ? nextIndex-1 : drives.length());
+                item[0] = String.valueOf(drives.charAt(index[0] - 1));
+                int nextIndex = drives.indexOf(":", index[0] + 1);
+                item[1] = drives.substring(index[0] + 1, nextIndex != -1 ? nextIndex - 1 : drives.length());
                 index[0] = nextIndex;
                 return item;
             }
@@ -416,34 +785,65 @@ public class Container {
             data.put("cpuList", cpuList);
             data.put("cpuListWoW64", cpuListWoW64);
             data.put("graphicsDriver", graphicsDriver);
+            data.put("graphicsDriverVersion", graphicsDriverVersion);
             data.put("graphicsDriverConfig", graphicsDriverConfig);
-            data.put("emulator", emulator);
+            data.put("emulator", getEmulator());
             data.put("dxwrapper", dxwrapper);
-            if (!dxwrapperConfig.isEmpty()) data.put("dxwrapperConfig", dxwrapperConfig);
+            if (!getDXWrapperConfig().isEmpty()) data.put("dxwrapperConfig", dxwrapperConfig);
             data.put("audioDriver", audioDriver);
             data.put("wincomponents", wincomponents);
             data.put("drives", drives);
             data.put("showFPS", showFPS);
             data.put("fullscreenStretched", fullscreenStretched);
+            data.put("launchRealSteam", launchRealSteam);
+            data.put("allowSteamUpdates", allowSteamUpdates);
             data.put("inputType", inputType);
+            data.put("dinputMapperType", dinputMapperType);
+            data.put("wow64Mode", wow64Mode);
+            data.put("needsUnpacking", needsUnpacking);
             data.put("startupSelection", startupSelection);
+            data.put("box86Version", box86Version);
             data.put("box64Version", box64Version);
-            data.put("fexcorePreset", fexcorePreset);
-            data.put("fexcoreVersion", fexcoreVersion);
+            data.put("box86Preset", box86Preset);
             data.put("box64Preset", box64Preset);
+            data.put("fexcoreVersion", fexcoreVersion);
+            data.put("fexcorePreset", fexcorePreset);
             data.put("desktopTheme", desktopTheme);
             data.put("containerVariant", getContainerVariant());
             data.put("extraData", extraData);
+            data.put("sessionMetadata", sessionMetadata);
+            data.put("rcfileId", rcfileId);
             data.put("midiSoundFont", midiSoundFont);
             data.put("lc_all", lc_all);
             data.put("primaryController", primaryController);
             data.put("controllerMapping", controllerMapping);
+            data.put("execArgs", execArgs);
+            data.put("executablePath", executablePath);
+            data.put("installPath", installPath);
+            data.put("sdlControllerAPI", sdlControllerAPI);
+            data.put("disableMouseInput", disableMouseInput);
+            data.put("touchscreenMode", touchscreenMode);
+            data.put("shooterMode", shooterMode);
+            if (!getGestureConfig().isEmpty()) data.put("gestureConfig", gestureConfig);
+            data.put("externalDisplayMode", getExternalDisplayMode());
+            data.put("externalDisplaySwap", externalDisplaySwap);
+            data.put("useDRI3", useDRI3);
+            data.put("steamType", steamType);
+            data.put("language", language);
+            data.put("gstreamerWorkaround", gstreamerWorkaround);
+            data.put("forceDlc", forceDlc);
+            data.put("steamOfflineMode", steamOfflineMode);
+            data.put("useLegacyDRM", useLegacyDRM);
+            data.put("unpackFiles", unpackFiles);
+            data.put("suspendPolicy", getSuspendPolicy());
+            data.put("portraitMode", portraitMode);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.e("Container", "Failed to save data", e);
+        }
     }
-
 
     public void loadData(JSONObject data) throws JSONException {
         wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
@@ -453,68 +853,106 @@ public class Container {
         for (Iterator<String> it = data.keys(); it.hasNext(); ) {
             String key = it.next();
             switch (key) {
-                case "name" :
+                case "name":
                     setName(data.getString(key));
                     break;
-                case "screenSize" :
+                case "screenSize":
                     setScreenSize(data.getString(key));
                     break;
-                case "envVars" :
+                case "envVars":
                     setEnvVars(data.getString(key));
                     break;
-                case "cpuList" :
+                case "cpuList":
                     setCPUList(data.getString(key));
                     break;
-                case "cpuListWoW64" :
+                case "cpuListWoW64":
                     setCPUListWoW64(data.getString(key));
                     break;
-                case "graphicsDriver" :
+                case "graphicsDriver":
                     setGraphicsDriver(data.getString(key));
                     break;
-                case "graphicsDriverConfig" :
+                case "graphicsDriverVersion":
+                    setGraphicsDriverVersion(data.getString(key));
+                    break;
+                case "graphicsDriverConfig":
                     setGraphicsDriverConfig(data.getString(key));
                     break;
                 case "emulator":
                     setEmulator(data.getString(key));
                     break;
-                case "containerVariant" :
+                case "containerVariant":
                     setContainerVariant(data.getString(key));
                     break;
-                case "wincomponents" :
+                case "wincomponents":
                     setWinComponents(data.getString(key));
                     break;
-                case "dxwrapper" :
+                case "dxwrapper":
                     setDXWrapper(data.getString(key));
                     break;
-                case "dxwrapperConfig" :
+                case "dxwrapperConfig":
                     setDXWrapperConfig(data.getString(key));
                     break;
-                case "drives" :
+                case "drives":
                     setDrives(data.getString(key));
                     break;
-                case "showFPS" :
+                case "showFPS":
                     setShowFPS(data.getBoolean(key));
                     break;
-                case "fullscreenStretched" :
+                case "fullscreenStretched":
                     setFullscreenStretched(data.getBoolean(key));
                     break;
-                case "inputType" :
+                case "launchRealSteam":
+                    setLaunchRealSteam(data.getBoolean(key));
+                    break;
+                case "allowSteamUpdates":
+                    setAllowSteamUpdates(data.getBoolean(key));
+                    break;
+                case "steamType":
+                    setSteamType(data.getString(key));
+                    break;
+                case "language":
+                    setLanguage(data.getString(key));
+                    break;
+                case "inputType":
                     setInputType(data.getInt(key));
                     break;
-                case "startupSelection" :
-                    setStartupSelection((byte)data.getInt(key));
+                case "dinputMapperType":
+                    setDinputMapperType((byte) data.getInt(key));
                     break;
-                case "extraData" : {
-                    JSONObject extraData = data.getJSONObject(key);
-                    checkObsoleteOrMissingProperties(extraData);
-                    setExtraData(extraData);
+                case "wow64Mode":
+                    setWoW64Mode(data.getBoolean(key));
                     break;
-                }
-                case "wineVersion" :
+                case "needsUnpacking":
+                    setNeedsUnpacking(data.getBoolean(key));
+                    break;
+                case "startupSelection":
+                    setStartupSelection((byte) data.getInt(key));
+                    break;
+                case "extraData":
+                    setExtraData(data.getJSONObject(key));
+                    break;
+                case "sessionMetadata":
+                    try {
+                        sessionMetadata = data.getJSONObject(key);
+                    }
+                    catch (JSONException e) {
+                        sessionMetadata = null;
+                    }
+                    break;
+                case "wineVersion":
                     setWineVersion(data.getString(key));
+                    break;
+                case "box86Version":
+                    setBox86Version(data.getString(key));
                     break;
                 case "box64Version":
                     setBox64Version(data.getString(key));
+                    break;
+                case "box86Preset":
+                    setBox86Preset(data.getString(key));
+                    break;
+                case "box64Preset":
+                    setBox64Preset(data.getString(key));
                     break;
                 case "fexcoreVersion":
                     setFEXCoreVersion(data.getString(key));
@@ -522,26 +960,80 @@ public class Container {
                 case "fexcorePreset":
                     setFEXCorePreset(data.getString(key));
                     break;
-                case "box64Preset" :
-                    setBox64Preset(data.getString(key));
-                    break;
-                case "audioDriver" :
+                case "audioDriver":
                     setAudioDriver(data.getString(key));
                     break;
-                case "desktopTheme" :
+                case "desktopTheme":
                     setDesktopTheme(data.getString(key));
                     break;
-                case "midiSoundFont" :
+                case "rcfileId":
+                    setRcfileId(data.getInt(key));
+                    break;
+                case "midiSoundFont":
                     setMidiSoundFont(data.getString(key));
                     break;
-                case "lc_all" :
+                case "lc_all":
                     setLC_ALL(data.getString(key));
                     break;
-                case "primaryController" :
+                case "primaryController":
                     setPrimaryController(data.getInt(key));
                     break;
-                case "controllerMapping" :
+                case "controllerMapping":
                     controllerMapping = data.getString(key);
+                    break;
+                case "execArgs":
+                    setExecArgs(data.getString(key));
+                    break;
+                case "executablePath":
+                    setExecutablePath(data.getString(key));
+                    break;
+                case "installPath":
+                    setInstallPath(data.getString(key));
+                    break;
+                case "sdlControllerAPI":
+                    setSdlControllerAPI(data.getBoolean(key));
+                    break;
+                case "disableMouseInput":
+                    setDisableMouseInput(data.getBoolean(key));
+                    break;
+                case "touchscreenMode":
+                    setTouchscreenMode(data.getBoolean(key));
+                    break;
+                case "shooterMode":
+                    setShooterMode(data.getBoolean(key));
+                    break;
+                case "gestureConfig":
+                    setGestureConfig(data.optString(key, ""));
+                    break;
+                case "externalDisplayMode":
+                    setExternalDisplayMode(data.getString(key));
+                    break;
+                case "externalDisplaySwap":
+                    setExternalDisplaySwap(data.getBoolean(key));
+                    break;
+                case "useDRI3":
+                    setUseDRI3(data.getBoolean(key));
+                    break;
+                case "gstreamerWorkaround":
+                    setGstreamerWorkaround(data.getBoolean(key));
+                    break;
+                case "forceDlc":
+                    setForceDlc(data.getBoolean(key));
+                    break;
+                case "steamOfflineMode":
+                    setSteamOfflineMode(data.getBoolean(key));
+                    break;
+                case "useLegacyDRM":
+                    setUseLegacyDRM(data.getBoolean(key));
+                    break;
+                case "unpackFiles":
+                    setUnpackFiles(data.getBoolean(key));
+                    break;
+                case "suspendPolicy":
+                    setSuspendPolicy(data.getString(key));
+                    break;
+                case "portraitMode":
+                    setPortraitMode(data.getBoolean(key));
                     break;
             }
         }
@@ -549,6 +1041,9 @@ public class Container {
 
     public static void checkObsoleteOrMissingProperties(JSONObject data) {
         try {
+            if (!data.has("envVars")) data.put("envVars", DEFAULT_ENV_VARS);
+            if (!data.has("wincomponents")) data.put("wincomponents", DEFAULT_WINCOMPONENTS);
+
             if (data.has("dxcomponents")) {
                 data.put("wincomponents", data.getString("dxcomponents"));
                 data.remove("dxcomponents");
@@ -579,58 +1074,62 @@ public class Container {
                 int appVersion = Integer.parseInt(extraData.optString("appVersion", "0"));
                 if (appVersion < 16) {
                     EnvVars defaultEnvVars = new EnvVars(DEFAULT_ENV_VARS);
-                    EnvVars envVars = new EnvVars(data.getString("envVars"));
-                    for (String name : defaultEnvVars) if (!envVars.has(name)) envVars.put(name, defaultEnvVars.get(name));
-                    data.put("envVars", envVars.toString());
+                    EnvVars existingEnvVars = new EnvVars(data.getString("envVars"));
+                    for (String name : defaultEnvVars) {
+                        if (!existingEnvVars.has(name)) {
+                            existingEnvVars.put(name, defaultEnvVars.get(name));
+                        }
+                    }
+                    data.put("envVars", existingEnvVars.toString());
                 }
             }
 
-            KeyValueSet wincomponents1 = new KeyValueSet(DEFAULT_WINCOMPONENTS);
-            KeyValueSet wincomponents2 = new KeyValueSet(data.getString("wincomponents"));
+            KeyValueSet defaultWincomponents = new KeyValueSet(DEFAULT_WINCOMPONENTS);
+            KeyValueSet currentWincomponents = new KeyValueSet(data.getString("wincomponents"));
             String result = "";
 
-            for (String[] wincomponent1 : wincomponents1) {
-                String value = wincomponent1[1];
+            for (String[] defaultWincomponent : defaultWincomponents) {
+                String value = defaultWincomponent[1];
 
-                for (String[] wincomponent2 : wincomponents2) {
-                    if (wincomponent1[0].equals(wincomponent2[0])) {
-                        value = wincomponent2[1];
+                for (String[] currentWincomponent : currentWincomponents) {
+                    if (defaultWincomponent[0].equals(currentWincomponent[0])) {
+                        value = currentWincomponent[1];
                         break;
                     }
                 }
 
-                result += (!result.isEmpty() ? "," : "")+wincomponent1[0]+"="+value;
+                result += (!result.isEmpty() ? "," : "") + defaultWincomponent[0] + "=" + value;
             }
 
             data.put("wincomponents", result);
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.e("Container", "Failed to check obsolete or missing properties", e);
+        }
     }
 
     public static String getFallbackCPUList() {
         String cpuList = "";
         int numProcessors = Runtime.getRuntime().availableProcessors();
-        for (int i = 0; i < numProcessors; i++) cpuList += (!cpuList.isEmpty() ? "," : "")+i;
+        for (int i = 0; i < numProcessors; i++) cpuList += (!cpuList.isEmpty() ? "," : "") + i;
         return cpuList;
     }
 
     public static String getFallbackCPUListWoW64() {
         String cpuList = "";
         int numProcessors = Runtime.getRuntime().availableProcessors();
-        for (int i = numProcessors / 2; i < numProcessors; i++) cpuList += (!cpuList.isEmpty() ? "," : "")+i;
+        for (int i = numProcessors / 2; i < numProcessors; i++) cpuList += (!cpuList.isEmpty() ? "," : "") + i;
         return cpuList;
     }
 
-    // Check if a specific environment variable exists
     public boolean hasEnvVar(String keyValue) {
         if (envVars == null || envVars.isEmpty()) return false;
         String[] vars = envVars.split(",");
         for (String var : vars) {
             if (var.trim().equalsIgnoreCase(keyValue.trim())) {
-                return true; // Found the variable
+                return true;
             }
         }
         return false;
     }
-
 }

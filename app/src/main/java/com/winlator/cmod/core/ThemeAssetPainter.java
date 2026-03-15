@@ -51,6 +51,9 @@ public final class ThemeAssetPainter {
             if (shouldTintImageView(imageView)) tint(imageView, iconTint);
         } else if (view instanceof TextView) {
             TextView textView = (TextView) view;
+            if (hasTagFlag(textView, "theme_combo_box")) {
+                textView.setTextColor(primaryTextColor);
+            }
             int tintColor = (textView instanceof Button) ? buttonDrawableTint : iconTint;
             tintCompoundDrawables(textView, tintColor);
         }

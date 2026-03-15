@@ -44,6 +44,7 @@ public class ColorPickerView extends View implements View.OnClickListener {
 
         setTag("theme_combo_box");
         setBackgroundResource(R.drawable.combo_box);
+        setMinimumHeight(Math.round(UnitUtils.dpToPx(44)));
         setClickable(true);
         setFocusable(true);
         setOnClickListener(this);
@@ -71,7 +72,9 @@ public class ColorPickerView extends View implements View.OnClickListener {
         if (width == 0 || height == 0) return;
 
         float rectSize = height - UnitUtils.dpToPx(12);
-        float startX = (width - rectSize) * 0.5f - UnitUtils.dpToPx(16);
+        float startX = width > UnitUtils.dpToPx(120)
+                ? UnitUtils.dpToPx(14)
+                : (width - rectSize) * 0.5f - UnitUtils.dpToPx(16);
         float startY = (height - rectSize) * 0.5f;
 
         Paint paint = new Paint();

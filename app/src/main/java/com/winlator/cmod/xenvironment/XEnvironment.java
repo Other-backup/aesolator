@@ -34,7 +34,7 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
 
     public <T extends EnvironmentComponent> T getComponent(Class<T> componentClass) {
         for (EnvironmentComponent component : components) {
-            if (component.getClass() == componentClass) return (T)component;
+            if (componentClass.isInstance(component)) return componentClass.cast(component);
         }
         return null;
     }
@@ -59,7 +59,9 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     }
 
     public void stopEnvironmentComponents() {
-        for (EnvironmentComponent environmentComponent : this) environmentComponent.stop();
+        for (int i = components.size() - 1; i >= 0; i--) {
+            components.get(i).stop();
+        }
     }
 
     public void onPause() {

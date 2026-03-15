@@ -29,6 +29,8 @@
     <string name="no_items_to_display">No items to display</string>
     <string name="new_container">New Container</string>
     <string name="edit_container">Edit Container</string>
+    <string name="edit_controls">Edit Controls</string>
+    <string name="edit_physical_controller">Edit Physical Controller</string>
     <string name="creating_container">Creating Container…</string>
     <string name="removing_container">Removing Container…</string>
     <string name="duplicating_container">Duplicating Container…</string>
@@ -39,6 +41,15 @@
     <string name="keyboard">Keyboard</string>
     <string name="toggle_fullscreen">Toggle Fullscreen</string>
     <string name="exit">Exit</string>
+    <string name="exit_game">Exit Game</string>
+    <string name="external_display_input">External Display Input</string>
+    <string name="external_display_input_subtitle">Choose how a connected presentation display should behave</string>
+    <string name="external_display_mode_off">Do not use external display</string>
+    <string name="external_display_mode_touchpad">Use as touchpad surface</string>
+    <string name="external_display_mode_keyboard">Use as full keyboard</string>
+    <string name="external_display_mode_hybrid">Hybrid (touchpad + keyboard button)</string>
+    <string name="external_display_swap">Show Game on External Display</string>
+    <string name="external_display_swap_subtitle">Swap screens so the game renders on the external display and this device becomes the controller surface</string>
     <string name="no_control_element_selected">No control element selected</string>
     <string name="scale">Scale</string>
     <string name="shape">Shape</string>
@@ -875,8 +886,10 @@
     <string name="contents_package_remote_generic">Remote package</string>
     <string name="contents_package_dgvoodoo_arch">dgVoodoo=%1$s</string>
     <string name="contents_arch_all_lanes">All lanes</string>
+    <string name="contents_arch_bundle_runtime">Unified bundle lane</string>
     <string name="contents_arch_arm64_runtime">ARM64 runtime lane</string>
     <string name="contents_arch_x64_runtime">x86_64 runtime lane</string>
+    <string name="contents_arch_x86_runtime">x86 runtime lane</string>
     <string name="contents_arch_arm64ec_runtime">ARM64EC runtime lane</string>
     <string name="contents_source_runtime_lanes">WCP Runtime Lanes</string>
     <string name="contents_source_graphics_lanes">WCP Graphics Lanes</string>
@@ -1130,5 +1143,6 @@
     <string name="vkbasalt_sharpness_effects">Sharpness Effect</string>
     <string name="vkbasalt_sharpness_level">Sharpness Level</string>
     <string name="vkbasalt_sharpness_denoise">Sharpeness Denoise</string>
+    <string name="title_ubuntufs">Ubuntu FS</string>
     <string name="shutdown">Shutdown</string>
 </resources>

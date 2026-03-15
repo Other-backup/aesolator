@@ -1,6 +1,6 @@
-package com.winlator.cmod.xserver;
+package com.winlator.cmod.xserver
 
-public enum XKeycode {
+enum class XKeycode(@JvmField val id: Byte) {
     KEY_NONE(0),
     KEY_ESC(9),
     KEY_1(10),
@@ -102,10 +102,5 @@ public enum XKeycode {
     KEY_NEXT(117),
     KEY_INSERT(118),
     KEY_DEL(119),
-    KEY_MAX(KEY_DEL.id);
-    public final byte id;
-
-    XKeycode(int id) {
-        this.id = (byte)id;
-    }
+    KEY_MAX(KEY_DEL.id),
 }

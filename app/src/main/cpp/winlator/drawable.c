@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdint.h>
 #include <android/bitmap.h>
 #include <android/log.h>
 
@@ -161,25 +162,18 @@ Java_com_winlator_cmod_xserver_Drawable_fillRect(JNIEnv *env, jclass obj, jshort
         printf("Error: NULL buffer address in fillRect\n");
         return;
     }
-
-    uint8_t rgba[4];
-    unpackColor(color, rgba);
-
-    int rowSize = width * 4;
-    uint8_t *row = malloc(rowSize);
-    if (!row) {
-        printf("Error: Failed to allocate memory for row\n");
+    if (width <= 0 || height <= 0 || stride <= 0) {
         return;
     }
 
-    for (int i = 0; i < rowSize; i += 4) {
-        memcpy(row + i, rgba, 4);
+    uint32_t pixel = 0xff000000u | ((uint32_t) color & 0x00ffffffu);
+    uint32_t *pixels = (uint32_t *) dataAddr;
+    for (int16_t row = 0; row < height; row++) {
+        uint32_t *dst = pixels + x + ((row + y) * stride);
+        for (int16_t col = 0; col < width; col++) {
+            dst[col] = pixel;
+        }
     }
-    for (int16_t i = 0; i < height; i++) {
-        memcpy(dataAddr + (x + (i + y) * stride) * 4, row, rowSize);
-    }
-
-    free(row);
 }
 
 JNIEXPORT void JNICALL
@@ -192,6 +186,9 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
         printf("Error: NULL buffer address in drawLine\n");
         return;
     }
+    if (lineWidth <= 0 || stride <= 0) {
+        return;
+    }
 
     int dx =  abs(x1 - x0);
     int dy = -abs(y1 - y0);
@@ -199,23 +196,15 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
     int8_t sy = y0 < y1 ? 1 : -1;
     int e1 = dx + dy, e2;
 
-    uint8_t rgba[4];
-    unpackColor(color, rgba);
-
-    int rowSize = lineWidth * 4;
-    uint8_t *row = malloc(rowSize);
-    if (!row) {
-        printf("Error: Failed to allocate memory for row\n");
-        return;
-    }
-
-    for (int i = 0; i < rowSize; i += 4) {
-        memcpy(row + i, rgba, 4);
-    }
+    uint32_t pixel = 0xff000000u | ((uint32_t) color & 0x00ffffffu);
+    uint32_t *pixels = (uint32_t *) dataAddr;
 
     while (true) {
-        for (int16_t i = 0; i < lineWidth; i++) {
-            memcpy(dataAddr + (x0 + (i + y0) * stride) * 4, row, rowSize);
+        for (int16_t row = 0; row < lineWidth; row++) {
+            uint32_t *dst = pixels + x0 + ((row + y0) * stride);
+            for (int16_t col = 0; col < lineWidth; col++) {
+                dst[col] = pixel;
+            }
         }
         if (x0 == x1 && y0 == y1) break;
 
@@ -229,8 +218,6 @@ Java_com_winlator_cmod_xserver_Drawable_drawLine(JNIEnv *env, jclass obj, jshort
             y0 += sy;
         }
     }
-
-    free(row);
 }
 
 JNIEXPORT void JNICALL

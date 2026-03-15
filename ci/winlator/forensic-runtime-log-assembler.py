@@ -146,8 +146,25 @@ def discover_input_files(scenario_dir: Path) -> list[Path]:
             files.append(path)
     runtime_dir = scenario_dir / "runtime-logs"
     if runtime_dir.is_dir():
-        files.extend(sorted(p for p in runtime_dir.iterdir() if p.is_file()))
+        files.extend(discover_latest_runtime_logs(runtime_dir))
     return files
+
+
+def discover_latest_runtime_logs(runtime_dir: Path) -> list[Path]:
+    latest_by_stream: dict[str, Path] = {}
+    for path in sorted(p for p in runtime_dir.iterdir() if p.is_file()):
+        stream = infer_runtime_stream(path)
+        current = latest_by_stream.get(stream)
+        if current is None or path.name > current.name:
+            latest_by_stream[stream] = path
+    return sorted(latest_by_stream.values())
+
+
+def infer_runtime_stream(path: Path) -> str:
+    match = re.match(r"(.+)_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.txt$", path.name)
+    if match:
+        return match.group(1)
+    return path.stem
 
 
 def infer_library(category: str, match: re.Match[str], line: str) -> str:

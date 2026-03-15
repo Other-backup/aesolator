@@ -310,7 +310,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         Window ownerWindow = resolveCursorOwnerWindow(pointWindow);
         if (ownerWindow == null || ownerWindow == xServer.windowManager.rootWindow) return true;
         if (!ownerWindow.isApplicationWindow()) return true;
-        if (isDesktopShellWindow(ownerWindow)) return true;
+        if (isDesktopShellWindow(ownerWindow)) return false;
         return !isFullscreenLike(ownerWindow);
     }
 

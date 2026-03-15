@@ -17,8 +17,11 @@ Second autonomous developer lane for `aesolator`:
   visible instead of bouncing between fresh requests ad hoc.
 - When the user explicitly says "do not compile until the full transfer is
   done", keep the active donor-transfer lane build-free. Land code, docs, and
-  commits first; reopen `assembleDebug` / APK verification only after that
+  staged transfer work first; reopen `assembleDebug` / APK verification only after that
   lane reaches a written closure point or the user changes the rule.
+- When the user says the full transfer is one batch, keep donor work under one
+  cumulative commit target instead of cutting per-lane commits while the
+  transfer is still in flight.
 - Default lane order for this repo:
   requested product/UI/content work first, documentation sync second,
   debugging/forensics third.
@@ -91,6 +94,8 @@ Second autonomous developer lane for `aesolator`:
   - import only foundation pieces first:
     Vulkan probe helpers, fd/socket hygiene, hardware-buffer exposure,
     driver classification, and renderer/component plumbing
+  - donor X11/input foundation now also includes arch-specific input DLL
+    payload selection instead of one flat legacy archive
   - defer broad gesture/UI borrowing until desktop input closure is stable
   - keep the donor audit written in
     `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md`
@@ -115,6 +120,47 @@ Second autonomous developer lane for `aesolator`:
   - donor network/runtime environment parity has started too:
     `NetworkHelper` now carries donor IF-address probing and
     `NetworkInfoUpdateComponent` is staged into the local environment stack
+  - donor request routing is now being absorbed into `XEnvironment` too:
+    `WineRequestComponent` replaces the old standalone handler model, with the
+    remaining open tail narrowed to donor-specific Steam/auth branches
+  - donor `SteamPipeServer` / `SteamClientComponent` foundation is no longer
+    just staged locally; `SteamClientComponent` is now attached to the local
+    `XEnvironment`, so the remaining tail is runtime verification rather than
+    basic wiring
+  - latest donor-wrapper closure:
+    `PrefManager.kt`, `container/ContainerData.kt`,
+    `contentdialog/NavigationDialog.java`, and Kotlin `xserver/XKeycode.kt`
+    are now staged locally, and the file-level donor Java/Kotlin delta under
+    `com/winlator/*` is currently `MISSING_COUNT 0`
+  - latest build-perimeter closure:
+    the app module is now prepared for the staged donor Kotlin lane via the
+    Kotlin Android plugin, but this remains a pre-compile closure point until
+    the user reopens the first honest build
+  - second-sweep closure:
+    a broad donor pass outside `com/winlator/*` is now recorded in
+    `docs/GAMENATIVE_SECOND_SWEEP_INVENTORY.md`; remaining donor surfaces are
+    storefront/external-display/Compose/dynamic-feature lanes, not forgotten
+    core runtime files
+  - latest container-contract closure:
+    local `Container` now carries donor-style runtime state and JSON keys for
+    Steam type, graphics-driver version, exec args, executable path, install
+    path, session metadata, box86 state, gesture config, external-display
+    state, suspend policy, DRM flags, and portrait mode
+  - latest second-sweep foundation closure:
+    donor low-dependency `app/gamenative/*` runtime pieces are now staged
+    locally too: `TouchGestureConfig`, `PhysicalControllerHandler`, and the
+    external-display foundation (`ExternalDisplayInputController`,
+    `ExternalDisplaySwapController`, `ExternalOnScreenKeyboardView`,
+    `IMEInputReceiver`, `SwapInputOverlayView`)
+  - latest donor app-routing closure:
+    `ContainerUtils`, `IntentLaunchManager`, `ContainerMigrator`,
+    `ContainerConfigTransfer`, and a local `GameSource` model are now staged
+    too; donor `appId` semantics are bridged through `Container.sessionMetadata`
+    instead of replacing the numeric local `ContainerManager` identity model
+  - remaining donor second-sweep tail is now honest rather than missing-file
+    based:
+    compile/runtime proof for the staged lane, storefront-service decisions,
+    and rootfs archive ownership mapping
 11. Hybrid `ImageFS` refresh lane
   - treat `GameNative` `ubuntufs` as a donor source map, not as the final
     product rootfs
@@ -129,6 +175,57 @@ Second autonomous developer lane for `aesolator`:
     variant-aware `ImageFsInstaller`, donor overlay deployment, preserved
     imported runtimes in `opt/`, and `Container.containerVariant` /
     `imagefs .variant/.arch` markers
+  - newly closed tail inside this phase:
+    donor-style rootfs delivery fallback is now represented in code too
+    (`downloads.gamenative.app` + R2 fallback), glibc patch payload
+    prefetch is staged, donor `container_pattern_gamenative.tzst` /
+    `pulseaudio-gamenative.tzst` are present locally, and container fallback
+    now accepts both `prefixPack.tzst` and `prefixPack.txz`
+  - latest rootfs compatibility closure:
+    local main-runtime lookup now bridges donor `/opt/wine` and local
+    `/opt/<main-runtime-id>`, and streamed donor archive inventory has already
+    confirmed that `glibc` carries a heavy `opt/` tooling layer while `bionic`
+    is closer to a clean userland/Vulkan surface
+  - latest runtime-package placement closure:
+    installed `Wine` / `Proton` packages now derive their effective runtime
+    root from the shared parent of `wineBinPath` / `wineLibPath` /
+    `winePrefixPack`, while post-install hooks normalize `lib/wine` layout,
+    guarantee `prefixPack.*` at the effective runtime root, and restore
+    executable bits on runtime binaries before the first honest compile
+  - latest archive-diff closure:
+    streamed inspection now shows local `imagefs.txz` and donor
+    `imagefs_bionic.txz` are close on broad userland, while donor
+    `imagefs_patches_gamenative.tzst` owns the extra `opt/system32` /
+    `opt/apps` / `Steamless` / `7-Zip` utility overlay and donor `glibc`
+    archives carry macOS packaging noise that must stay out of any rebuilt lane
+  - latest ownership-table closure:
+    rootfs layers are now explicitly classified in
+    `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md`, including the fact that
+    `imagefs.txz.02` is orphan/invalid baggage rather than a live archive shard
+  - latest donor-rootfs-first closure:
+    canonical donor base is now staged in code too:
+    `imagefs_bionic.txz` / `imagefs_gamenative.txz`, `:ubuntufs` scaffold,
+    shared `imagefs/opt` for `Wine` / `Proton`, canonical `/tmp`, and
+    `usr/local/bin/box64` with a compatibility bridge for `usr/bin/box64`
+  - latest per-library closure:
+    `docs/IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md` now records which Vulkan,
+    OpenGL, Pulse, sysvshm, redirect, XAudio/XACT, utility, and helper-library
+    paths belong to donor base, donor overlays, APK-to-guest helper lane, or
+    legacy hold
+  - latest runtime-asset closure:
+    the donor-only runtime payload gaps are now staged locally too:
+    extra `graphics_driver`, `dxwrapper`, `fexcore`, `wowbox64`,
+    `steampipe`, `wincomponents`, `box86_64`, `steaminput`,
+    `steam_regions.json`, and `box86_env_vars.json`
+12. `libwinlator_11.so` source-backed reconstruction lane
+  - treat donor `libwinlator_11.so` as an audit surface, not a binary drop-in
+  - record every reconstructible donor-native behavior in
+    `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md`
+  - current closure:
+    reconstructible source-backed behavior has largely been staged already
+    (`GPUHelper`, `xconnector_epoll`, `GPUImage`, helper libs, Vortek
+    foundation, stream-path parity)
+  - remaining tail is compile/runtime proof, not more blind binary copying
 
 ## Phase Plan
 
@@ -188,6 +285,10 @@ Second autonomous developer lane for `aesolator`:
 - compare and adapt donor container routing:
   `ContainerUtils`, `IntentLaunchManager`, `ContainerMigrator`,
   `ContainerConfigTransfer`
+- current closure inside this phase:
+  donor routing/config-transfer foundation is now staged locally through a
+  `sessionMetadata` appId bridge and local `SharedPreferences`-backed
+  `PrefManager`
 - compare and adapt donor Wine/Proton management surfaces only after the
   runtime stack beneath them is stable
 
@@ -365,3 +466,48 @@ Second autonomous developer lane for `aesolator`:
 - `imagefs` now has a documented reverse map, so the remaining rootfs risk is
   no longer “unknown structure” but future ownership mistakes between base
   image, Wine payloads, and boot-time overlays.
+- donor `Vortek` Java-side renderer/config foundation and the matching APK
+  native libraries are now staged locally. Remaining risk in that lane is no
+  longer “missing donor subsystem”, but later runtime wiring and first compile
+  verification.
+- donor bionic helper-lib parity now has explicit local placement rules:
+  `libevshim.so` and `libdummyvk.so` are mirrored into guest `usr/lib`, while
+  `libvirglrenderer.so` and `libvortekrenderer.so` stay APK-native runtime
+  dependencies.
+- donor `libwinlator_11.so` has now been inventoried and deliberately not
+  promoted to local source-of-truth. Its JNI surface maps to the donor's older
+  native stream model; local `cmod` already supersedes that lane with
+  source-backed Java streams and richer native `GPUInformation`.
+- donor `box86_64` compatibility stack is now staged locally enough that the
+  remaining donor Java/Kotlin delta has collapsed to six files:
+  `PrefManager.kt`, `ContainerData.kt`, `NavigationDialog.java`,
+  `ControllerManager.java`, `TouchMouse.java`, `XKeycode.kt`. That is now a
+  bounded donor-app/input perimeter, not a missing runtime subsystem.
+- Static audit after the donor-rootfs-first pass found three real compile
+  blockers: launch still does not enforce rootfs variant per container, legacy
+  `imagefs.txz` / `imagefs.txz.02` are still packaged as baggage, and
+  `Contents` runtime resolution still has no explicit `glibc` / `bionic`
+  contract.
+- Those static blockers are now closed in code: launch enforces rootfs
+  preparation per runtime model, `Contents` carries and resolves explicit
+  `runtimeModel`, launcher selection follows the selected runtime contract, and
+  shared `/opt` runtime roots are canonicalized as
+  `runtime-<model>-<family>-<version>-<verCode>`.
+- Remaining pre-compile observation is narrower now: embedded runtime arrays
+  stay intentionally empty under the current Contents-first lane, and donor
+  rootfs archives are still staged at build time. That is no longer a logic
+  gap in the runtime contract; it is a first-compile proof burden.
+- Clean static pass after that audit closed the next payload tails too:
+  `ImageFsInstaller` no longer keeps legacy rootfs fallback in the live path,
+  old `imagefs` archives were moved out of `app/src/main/assets` into
+  `.legacy_rootfs/`, `Vulkan SDK` selection now works as one coherent version
+  group instead of mixed arch crumbs, and `dgVoodoo` dependency checks now
+  validate the stage arch rather than any installed package.
+- Final static cleanup then removed the last live legacy-marker tail too:
+  `ImageFs` normalizes old `.provider` / `.layout` values to donor markers,
+  and `XServerDisplayActivity` now writes `gamenative` / `ubuntufs`
+  unconditionally instead of branching back into legacy labels.
+- Remaining risk before the first honest compile is now concentrated in proof,
+  not in missing static contracts: donor archive staging, runtime application
+  of the selected `Vulkan SDK` group, and end-to-end `dgVoodoo` stage/runtime
+  verification.

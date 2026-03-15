@@ -118,8 +118,13 @@ public class WineInfo implements Parcelable {
 
     @NonNull
     public static WineInfo fromIdentifier(Context context, ContentsManager contentsManager, String identifier) {
+        return fromIdentifier(context, contentsManager, identifier, null);
+    }
+
+    @NonNull
+    public static WineInfo fromIdentifier(Context context, ContentsManager contentsManager, String identifier, String requestedRuntimeModel) {
         ImageFs imageFs = ImageFs.find(context);
-        String fallbackPath = imageFs.getRootDir().getPath() + "/opt/" + MAIN_WINE_VERSION.identifier();
+        String fallbackPath = imageFs.getMainWineDir().getPath();
 
         Log.d("WineInfo", "Creating WineInfo from identifier " + identifier);
 
@@ -128,27 +133,32 @@ public class WineInfo implements Parcelable {
         }
 
         String normalizedIdentifier = identifier.toLowerCase(Locale.ENGLISH).trim();
+        String effectiveRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedRuntimeModel);
+        if (effectiveRuntimeModel.isEmpty()) {
+            effectiveRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(normalizedIdentifier);
+        }
 
         if (normalizedIdentifier.equals(MAIN_WINE_VERSION.identifier())) {
             return new WineInfo(MAIN_WINE_VERSION.type, MAIN_WINE_VERSION.version, MAIN_WINE_VERSION.arch, fallbackPath);
         }
 
-        ContentProfile wineProfile = contentsManager.getProfileByEntryName(normalizedIdentifier);
+        ContentProfile wineProfile = contentsManager.resolveBestRuntimeProfile(normalizedIdentifier, effectiveRuntimeModel);
         ParsedIdentifier parsed = null;
         String path = "";
 
         if (wineProfile != null && wineProfile.isWineProtonFamily()) {
-            path = contentsManager.getInstallDir(context, wineProfile).getPath();
+            File runtimeRoot = contentsManager.getRuntimeRootDir(wineProfile);
+            path = runtimeRoot != null ? runtimeRoot.getPath() : contentsManager.getInstallDir(context, wineProfile).getPath();
             parsed = parseProfileIdentifier(wineProfile);
-            if (parsed == null) parsed = parseIdentifier(stripEntryVersionCodeSuffix(normalizedIdentifier));
+            if (parsed == null) parsed = parseIdentifier(stripRuntimeModelToken(stripEntryVersionCodeSuffix(normalizedIdentifier)));
         }
 
         if (parsed == null) {
-            parsed = parseIdentifier(normalizedIdentifier);
+            parsed = parseIdentifier(stripRuntimeModelToken(normalizedIdentifier));
         }
 
         if (parsed == null) {
-            parsed = parseIdentifier(stripEntryVersionCodeSuffix(normalizedIdentifier));
+            parsed = parseIdentifier(stripRuntimeModelToken(stripEntryVersionCodeSuffix(normalizedIdentifier)));
         }
 
         if (path.isEmpty()) {
@@ -163,7 +173,7 @@ public class WineInfo implements Parcelable {
 
         if (parsed != null) {
             if (path.isEmpty()) {
-                File optDir = new File(imageFs.getRootDir(), "/opt/" + normalizedIdentifier);
+                File optDir = new File(imageFs.getRootDir(), "/opt/" + stripRuntimeModelToken(normalizedIdentifier));
                 if (optDir.isDirectory()) {
                     path = optDir.getPath();
                 }
@@ -275,6 +285,16 @@ public class WineInfo implements Parcelable {
             }
         }
         return normalized.substring(0, lastDash);
+    }
+
+    private static String stripRuntimeModelToken(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) return "";
+        String normalized = identifier.trim().toLowerCase(Locale.ENGLISH);
+        if (normalized.startsWith("wine-glibc-")) return "wine-" + normalized.substring("wine-glibc-".length());
+        if (normalized.startsWith("wine-bionic-")) return "wine-" + normalized.substring("wine-bionic-".length());
+        if (normalized.startsWith("proton-glibc-")) return "proton-" + normalized.substring("proton-glibc-".length());
+        if (normalized.startsWith("proton-bionic-")) return "proton-" + normalized.substring("proton-bionic-".length());
+        return normalized;
     }
 
     private static class ParsedIdentifier {

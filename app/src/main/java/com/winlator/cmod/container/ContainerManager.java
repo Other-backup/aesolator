@@ -135,12 +135,16 @@ public class ContainerManager {
 
     private LocalRuntimeCandidate findBestLocalRuntimeCandidate() {
         ArrayList<LocalRuntimeCandidate> candidates = new ArrayList<>();
+        ContentsManager manager = new ContentsManager(context);
+        manager.syncContents();
         collectRuntimeCandidates(
+                manager,
                 candidates,
                 ContentProfile.ContentType.CONTENT_TYPE_PROTON,
                 ContentsManager.getContentTypeDir(context, ContentProfile.ContentType.CONTENT_TYPE_PROTON)
         );
         collectRuntimeCandidates(
+                manager,
                 candidates,
                 ContentProfile.ContentType.CONTENT_TYPE_WINE,
                 ContentsManager.getContentTypeDir(context, ContentProfile.ContentType.CONTENT_TYPE_WINE)
@@ -156,7 +160,7 @@ public class ContainerManager {
         return candidates.get(0);
     }
 
-    private void collectRuntimeCandidates(ArrayList<LocalRuntimeCandidate> out, ContentProfile.ContentType type, File typeDir) {
+    private void collectRuntimeCandidates(ContentsManager manager, ArrayList<LocalRuntimeCandidate> out, ContentProfile.ContentType type, File typeDir) {
         if (out == null || type == null || typeDir == null || !typeDir.isDirectory()) return;
 
         File[] installedRoots = typeDir.listFiles();
@@ -164,14 +168,18 @@ public class ContainerManager {
 
         for (File installRoot : installedRoots) {
             if (installRoot == null || !installRoot.isDirectory()) continue;
+            File profileFile = new File(installRoot, ContentsManager.PROFILE_NAME);
+            if (!profileFile.isFile()) continue;
+            ContentProfile profile = manager.readProfile(profileFile);
+            if (profile == null || profile.type != type) continue;
             String dirName = installRoot.getName();
             int dashIndex = dirName.lastIndexOf('-');
             if (dashIndex <= 0 || dashIndex >= dirName.length() - 1) continue;
             try {
                 int versionCode = Integer.parseInt(dirName.substring(dashIndex + 1));
                 out.add(new LocalRuntimeCandidate(
-                        type,
-                        type.toString() + "-" + dirName,
+                        profile.type,
+                        profile.type.toString() + "-" + dirName,
                         versionCode,
                         installRoot.lastModified()
                 ));
@@ -380,17 +388,52 @@ public class ContainerManager {
         }
     }
 
+    private static boolean extractPrefixPack(String wineInstallPath, File destinationDir) {
+        if (wineInstallPath == null || wineInstallPath.trim().isEmpty()) {
+            return false;
+        }
+
+        File tzstFile = new File(wineInstallPath, "prefixPack.tzst");
+        if (tzstFile.isFile()) {
+            return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, tzstFile, destinationDir);
+        }
+
+        File txzFile = new File(wineInstallPath, "prefixPack.txz");
+        if (txzFile.isFile()) {
+            return TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, txzFile, destinationDir);
+        }
+
+        return false;
+    }
+
     public boolean extractContainerPatternFile(Container container, String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {
-        WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
+        String requestedRuntimeModel = container != null
+                ? container.getContainerVariant()
+                : com.winlator.cmod.contents.ContentProfile.inferRuntimeModelFromEntryName(wineVersion);
+        WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion, requestedRuntimeModel);
         if (wineInfo.path == null || wineInfo.path.trim().isEmpty()) {
             return false;
         }
-        String containerPattern = wineVersion + "_container_pattern.tzst";
-        boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
+        boolean result;
+        if (WineInfo.isMainWineVersion(wineVersion)) {
+            result = TarCompressorUtils.extract(
+                    TarCompressorUtils.Type.ZSTD,
+                    context,
+                    "container_pattern_gamenative.tzst",
+                    containerDir,
+                    onExtractFileListener
+            );
+            if (!result) {
+                String containerPattern = wineVersion + "_container_pattern.tzst";
+                result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
+            }
+        } else {
+            String containerPattern = wineVersion + "_container_pattern.tzst";
+            result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
+        }
 
         if (!result) {
-            File containerPatternFile = new File(wineInfo.path + "/prefixPack.txz");
-            result = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, containerPatternFile, containerDir);
+            result = extractPrefixPack(wineInfo.path, containerDir);
         }
 
         if (result) {

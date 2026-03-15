@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -76,8 +77,11 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
 
         if (wrapper.contains("dgvoodoo")) {
             DgVoodooManager dgVoodooManager = new DgVoodooManager(context);
-            if (!dgVoodooManager.isInstalled()) {
-                missing.add("dgvoodoo-package");
+            KeyValueSet config = DgVoodooConfigDialog.parseConfig(resolveDxWrapperConfig(container, shortcut));
+            String shortcutPath = shortcut != null ? shortcut.path : "";
+            String resolvedArch = dgVoodooManager.resolvePreferredArch(shortcutPath, config.get("dgvoodooArch"));
+            if (!dgVoodooManager.isArchInstalled(resolvedArch)) {
+                missing.add("dgvoodoo-" + resolvedArch);
             }
         }
 
@@ -101,7 +105,9 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
         for (ContentProfile profile : profiles) {
             if (profile == null || !profile.locallyInstalled) continue;
             String profileVersion = profile.verName == null ? "" : profile.verName.toLowerCase(Locale.ENGLISH);
-            if (profileVersion.equals(versionLower) || profileVersion.contains(versionLower)) return true;
+            if (profileVersion.equals(versionLower)) return true;
+            if (!profileVersion.isEmpty() && versionLower.startsWith(profileVersion + "-")) return true;
+            if (!versionLower.isEmpty() && profileVersion.startsWith(versionLower + "-")) return true;
         }
         return false;
     }

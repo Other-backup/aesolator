@@ -1,6 +1,5 @@
 package com.winlator.cmod.xconnector;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -44,11 +43,6 @@ public class Client {
     }
 
     protected void requestShutdown() {
-        try {
-            ByteBuffer data = ByteBuffer.allocateDirect(8);
-            data.asLongBuffer().put(1);
-            (new ClientSocket(shutdownFd)).write(data);
-        }
-        catch (IOException e) {}
+        XConnectorEpoll.signalFd(shutdownFd);
     }
 }

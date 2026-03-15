@@ -4,64 +4,42 @@ import java.nio.file.Paths
 import java.security.MessageDigest
 import java.util.Properties
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-    dependencies {
-        // Adjust Gradle plugin versions if needed
-        classpath 'com.android.tools.build:gradle:8.8.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
-    }
-
-}
-
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 tasks.register("downloadImageFS") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    File imageFS = new File(assetDir, "imagefs.txz")
-    String imageFSSHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.sha256sum"
-    int parts = 4
+    def legacyRootfsArtifacts = [
+            "imagefs.txz",
+            "imagefs.txz.02"
+    ]
+    def donorRootfsArtifacts = [
+            [name: "imagefs_bionic.txz", url: "https://downloads.gamenative.app/imagefs_bionic.txz"],
+            [name: "imagefs_gamenative.txz", url: "https://downloads.gamenative.app/imagefs_gamenative.txz"],
+            [name: "imagefs_patches_gamenative.tzst", url: "https://downloads.gamenative.app/imagefs_patches_gamenative.tzst"]
+    ]
 
     doLast {
-        if (!imageFS.exists()) {
-            println("ImageFS was not present, downloading...\n")
-            FileOutputStream outputStream = new FileOutputStream(imageFS)
-            for (int i = 0; i < parts; i++) {
-                File partFile = new File(assetDir, String.format("imagefs.txz.%02d", i))
-                String partURL = String.format("https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.%02d", i)
-                new URL(partURL).withInputStream { p ->
-                    partFile.withOutputStream { it << p }
-                    outputStream << partFile.bytes
-                }
-                partFile.delete()
+        legacyRootfsArtifacts.each { legacyName ->
+            File legacyAsset = new File(assetDir, legacyName)
+            if (legacyAsset.exists()) {
+                println("Removing legacy rootfs artifact from mainline bundle: ${legacyName}")
+                legacyAsset.delete()
             }
-            outputStream.close()
         }
-
-        String remoteChecksum = new URL(imageFSSHA256Sum).text.split("\\s+")[0].trim()
-        byte[] data = Files.readAllBytes(imageFS.toPath())
-        byte[] hash = MessageDigest.getInstance("SHA-256").digest(data)
-        String localChecksum = String.format("%064x", new BigInteger(1, hash))
-
-        if (remoteChecksum != localChecksum) {
-            println("The version of ImageFS present locally is older than remote or hasn't been downloaded properly, redownloading...\n")
-            FileOutputStream outputStream = new FileOutputStream(imageFS)
-            for (int i = 0; i < parts; i++) {
-                File partFile = new File(assetDir, String.format("imagefs.txz.%02d", i))
-                String partURL = String.format("https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.%02d", i)
-                new URL(partURL).withInputStream { p ->
-                    partFile.withOutputStream { it << p }
-                    outputStream << partFile.bytes
+        donorRootfsArtifacts.each { artifact ->
+            File destination = new File(assetDir, artifact.name)
+            if (destination.exists()) {
+                println("RootFS artifact already present: ${artifact.name}")
+            } else {
+                println("Downloading donor rootfs artifact ${artifact.name} ...")
+                destination.parentFile.mkdirs()
+                new URL(artifact.url).withInputStream { input ->
+                    destination.withOutputStream { output -> output << input }
                 }
-                partFile.delete()
             }
-            outputStream.close()
         }
     }
 }
@@ -150,6 +128,7 @@ android {
     // Keep compileSdk from your current config. If you want to match Termux-X11, you could set to 34.
     compileSdk 34
     buildToolsVersion "35.0.0"
+    dynamicFeatures = [":ubuntufs"]
 
     sourceSets {
         main {
@@ -186,6 +165,10 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
     }
 
     signingConfigs {

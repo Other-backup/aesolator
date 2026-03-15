@@ -16,9 +16,16 @@
 *.log
 *.log.*
 *.log.zip
+/.tmp*
+/.tmp_*
+/.tmp_adb/
+/.legacy_rootfs/
 prefixPack.txz
 app/src/main/assets/imagefs.txz
 app/src/main/assets/imagefs.txz.*
+app/src/main/assets/imagefs_bionic.txz
+app/src/main/assets/imagefs_gamenative.txz
+app/src/main/assets/imagefs_patches_gamenative.tzst
 
 # Patch rejection files from manual patch/debug work
 *.rej

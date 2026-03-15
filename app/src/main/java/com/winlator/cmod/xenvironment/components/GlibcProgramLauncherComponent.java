@@ -68,7 +68,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         if (getWineInfo() != null && getWineInfo().isArm64EC()) {
             return super.buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
         }
-        File usrLocalBox64 = new File(rootDir, "/usr/local/bin/box64");
+        File usrLocalBox64 = new File(imageFs.getLocalBinDir(), "box64");
         String box64Path = usrLocalBox64.isFile() ? usrLocalBox64.getPath() : imageFs.getBinDir() + "/box64";
         return box64Path + " " + getGuestExecutable();
     }

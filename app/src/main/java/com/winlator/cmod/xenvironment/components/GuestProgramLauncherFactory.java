@@ -10,9 +10,17 @@ public abstract class GuestProgramLauncherFactory {
             ImageFs imageFs,
             ContentsManager contentsManager,
             ContentProfile wineProfile,
-            Shortcut shortcut
+            Shortcut shortcut,
+            String requestedRuntimeModel
     ) {
-        if (imageFs != null && "glibc".equalsIgnoreCase(imageFs.getRuntimeLibcModel())) {
+        String effectiveRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedRuntimeModel);
+        if (effectiveRuntimeModel.isEmpty() && wineProfile != null) {
+            effectiveRuntimeModel = wineProfile.getRuntimeModel();
+        }
+        if (effectiveRuntimeModel.isEmpty() && imageFs != null) {
+            effectiveRuntimeModel = imageFs.getRuntimeLibcModel();
+        }
+        if ("glibc".equalsIgnoreCase(effectiveRuntimeModel)) {
             return new GlibcProgramLauncherComponent(contentsManager, wineProfile, shortcut);
         }
         return new BionicProgramLauncherComponent(contentsManager, wineProfile, shortcut);

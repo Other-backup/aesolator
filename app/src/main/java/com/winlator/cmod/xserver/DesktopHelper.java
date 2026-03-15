@@ -1,5 +1,8 @@
 package com.winlator.cmod.xserver;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import androidx.collection.ArrayMap;
 
 import com.winlator.cmod.winhandler.WinHandler;
@@ -7,13 +10,18 @@ import com.winlator.cmod.winhandler.WinHandler;
 import java.util.Map;
 
 public abstract class DesktopHelper {
+    private static final Handler FOCUS_HANDLER = new Handler(Looper.getMainLooper());
+
     public static void attachTo(final XServer xServer) {
         setupXResources(xServer);
 
         xServer.pointer.addOnPointerMotionListener(new Pointer.OnPointerMotionListener() {
             @Override
             public void onPointerButtonPress(Pointer.Button button) {
-                updateFocusedWindow(xServer);
+                if (button == Pointer.Button.BUTTON_SCROLL_DOWN || button == Pointer.Button.BUTTON_SCROLL_UP) {
+                    return;
+                }
+                FOCUS_HANDLER.post(() -> updateFocusedWindow(xServer));
             }
         });
 

@@ -79,7 +79,6 @@ import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
-import com.winlator.cmod.core.WineRequestHandler;
 import com.winlator.cmod.core.WineStartMenuCreator;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.core.WineUtils;
@@ -109,13 +108,16 @@ import com.winlator.cmod.winhandler.TaskManagerDialog;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
 import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.xenvironment.XEnvironment;
 import com.winlator.cmod.xenvironment.components.ALSAServerComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherFactory;
 import com.winlator.cmod.xenvironment.components.NetworkInfoUpdateComponent;
 import com.winlator.cmod.xenvironment.components.PulseAudioComponent;
+import com.winlator.cmod.xenvironment.components.SteamClientComponent;
 import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
+import com.winlator.cmod.xenvironment.components.WineRequestComponent;
 import com.winlator.cmod.xenvironment.components.XServerComponent;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.Property;
@@ -176,13 +178,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private KeyValueSet dxwrapperConfig;
     private String startupSelection;
     private WineInfo wineInfo;
+    private ContentProfile selectedRuntimeProfile;
+    private String effectiveRuntimeModel = Container.DEFAULT_VARIANT;
     private final EnvVars envVars = new EnvVars();
     private boolean firstTimeBoot = false;
     private SharedPreferences preferences;
     private OnExtractFileListener onExtractFileListener;
     private WinHandler winHandler;
-    private WineRequestHandler wineRequestHandler;
     private float globalCursorSpeed = 1.0f;
+    private boolean openWithAndroidBrowserEnabled;
+    private boolean shareAndroidClipboardEnabled;
     private MagnifierView magnifierView;
     private DebugDialog debugDialog;
     private final ArrayList<Callback<String>> forensicRuntimeCallbacks = new ArrayList<>();
@@ -444,16 +449,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
         // Check for Dark Mode
         isDarkMode = preferences.getBoolean("dark_mode", false);
 
-        boolean isOpenWithAndroidBrowser = preferences.getBoolean("open_with_android_browser", false);
-        boolean isShareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
+        openWithAndroidBrowserEnabled = preferences.getBoolean("open_with_android_browser", false);
+        shareAndroidClipboardEnabled = preferences.getBoolean("share_android_clipboard", false);
 
         // Initialize the WinHandler after context is set up
         winHandler = new WinHandler(this);
         winHandler.initializeController();
         controller = winHandler.getCurrentController();
-
-        if (isOpenWithAndroidBrowser || isShareAndroidClipboard)
-            wineRequestHandler = new WineRequestHandler(this);
 
         if (controller != null) {
             int triggerType = preferences.getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS); // Default to TRIGGER_IS_AXIS
@@ -527,8 +529,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "xserver",
                 "clipboard_policy_applied",
                 ForensicLogger.fields(
-                        "share_android_clipboard", isShareAndroidClipboard,
-                        "open_with_android_browser", isOpenWithAndroidBrowser
+                        "share_android_clipboard", shareAndroidClipboardEnabled,
+                        "open_with_android_browser", openWithAndroidBrowserEnabled
                 )
         );
 
@@ -661,8 +663,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         firstTimeBoot = container.getExtra("appVersion").isEmpty();
 
-        String wineVersion = container.getWineVersion();
-        wineInfo = WineInfo.fromIdentifier(this, contentsManager, wineVersion);
+        String wineVersion = resolveLaunchWineVersion();
+        effectiveRuntimeModel = resolveLaunchRuntimeModel(wineVersion);
+        if (ensureLaunchRootfsReady(wineVersion, effectiveRuntimeModel)) {
+            return;
+        }
+        String canonicalWineVersion = contentsManager.resolveBestRuntimeEntry(wineVersion, effectiveRuntimeModel);
+        selectedRuntimeProfile = contentsManager.resolveBestRuntimeProfile(canonicalWineVersion, effectiveRuntimeModel);
+        if (selectedRuntimeProfile != null && !selectedRuntimeProfile.getRuntimeModel().isEmpty()) {
+            effectiveRuntimeModel = selectedRuntimeProfile.getRuntimeModel();
+        }
+        wineInfo = WineInfo.fromIdentifier(this, contentsManager, canonicalWineVersion, effectiveRuntimeModel);
 
         imageFs.setWinePath(wineInfo.path);
 
@@ -896,6 +907,89 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return containerId;
     }
 
+    private String resolveLaunchWineVersion() {
+        String wineVersion = shortcut != null
+                ? shortcut.getExtra("wineVersion", container.getWineVersion())
+                : container.getWineVersion();
+        return wineVersion == null ? "" : wineVersion.trim();
+    }
+
+    private String resolveLaunchRuntimeModel(String wineVersion) {
+        String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim();
+        String inferredFromEntry = ContentProfile.inferRuntimeModelFromEntryName(normalizedWineVersion);
+        String requestedRuntimeModel = !inferredFromEntry.isEmpty()
+                ? inferredFromEntry
+                : ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        ContentProfile profile = contentsManager.resolveBestRuntimeProfile(normalizedWineVersion, requestedRuntimeModel);
+        if (profile != null && !profile.getRuntimeModel().isEmpty()) {
+            return profile.getRuntimeModel();
+        }
+
+        if (!inferredFromEntry.isEmpty()) {
+            return inferredFromEntry;
+        }
+
+        String containerVariant = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        return containerVariant.isEmpty() ? Container.DEFAULT_VARIANT : containerVariant;
+    }
+
+    private boolean ensureLaunchRootfsReady(String wineVersion, String runtimeModel) {
+        if (!ImageFsInstaller.isInstallRequired(this, container, runtimeModel)) {
+            return false;
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                "warn",
+                "XSERVER_ROOTFS_REINSTALL_REQUIRED",
+                null,
+                "xserver",
+                "rootfs_reinstall_required_before_launch",
+                ForensicLogger.fields(
+                        "wine_version", wineVersion,
+                        "runtime_model", runtimeModel,
+                        "container_variant", container != null ? container.getContainerVariant() : "",
+                        "current_rootfs_variant", imageFs != null ? imageFs.getVariant() : "",
+                        "current_rootfs_provider", imageFs != null ? imageFs.getRootfsProvider() : "",
+                        "current_rootfs_layout", imageFs != null ? imageFs.getRootfsLayout() : ""
+                )
+        );
+
+        preloaderDialog.show(R.string.installing_system_files);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            boolean success = false;
+            try {
+                success = ImageFsInstaller.installIfNeededFuture(
+                        this,
+                        getAssets(),
+                        container,
+                        runtimeModel,
+                        progress -> runOnUiThread(() -> preloaderDialog.setProgress(progress))
+                ).get();
+            } catch (Exception e) {
+                Log.e("XServerDisplayActivity", "Unable to prepare rootfs for launch", e);
+            }
+
+            final boolean installSucceeded = success;
+            runOnUiThread(() -> {
+                preloaderDialog.closeOnUiThread();
+                if (!installSucceeded) {
+                    AppUtils.showToast(this, R.string.unable_to_install_system_files);
+                    finish();
+                    return;
+                }
+
+                Intent restartIntent = new Intent(getIntent());
+                restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                startActivity(restartIntent);
+                overridePendingTransition(0, 0);
+                finish();
+                overridePendingTransition(0, 0);
+            });
+        });
+        return true;
+    }
+
     private boolean parseBoolean(String value) {
         // Return true for "true", "1", "yes" (case-insensitive)
         if ("true".equalsIgnoreCase(value) || "1".equals(value) || "yes".equalsIgnoreCase(value)) {
@@ -1125,7 +1219,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (midiHandler != null) midiHandler.stop();
             if (sensorManager != null) sensorManager.unregisterListener(gyroListener);
             if (winHandler != null) winHandler.stop();
-            if (wineRequestHandler != null) wineRequestHandler.stop();
             if (environment != null) environment.stopEnvironmentComponents();
             ProcessHelper.terminateAllWineProcesses();
             waitForWineProcessesToTerminate(1500);
@@ -1522,9 +1615,34 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private boolean hasBundledAsset(String assetName) {
+        try {
+            String[] assets = getAssets().list("");
+            if (assets == null) return false;
+            for (String asset : assets) {
+                if (assetName.equals(asset)) return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private String resolveInputDllAsset() {
+        if (wineInfo != null) {
+            if (wineInfo.isArm64EC() && hasBundledAsset("arm64ec_input_dlls.tzst")) {
+                return "arm64ec_input_dlls.tzst";
+            }
+            if ("x86_64".equalsIgnoreCase(wineInfo.getArch()) && hasBundledAsset("x86_64_input_dlls.tzst")) {
+                return "x86_64_input_dlls.tzst";
+            }
+        }
+        return "input_dlls.tzst";
+    }
+
     private void extractInputDLLs() {
-        String inputAsset = "input_dlls.tzst";
+        String inputAsset = resolveInputDllAsset();
         File wineFolder = new File(imageFs.getWinePath() + "/lib/wine/");
+        Log.d("XServerDisplayActivity", "Extracting input dlls from " + inputAsset + " to " + wineFolder.getPath());
         boolean success = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, inputAsset, wineFolder);
         if (!success)
             Log.d("XServerDisplayActivity", "Failed to extract input dlls");
@@ -1854,14 +1972,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
         guestProgramLauncherComponent = GuestProgramLauncherFactory.create(
                 imageFs,
                 contentsManager,
-                contentsManager.resolveBestRuntimeProfile(container.getWineVersion()),
-                shortcut
+                selectedRuntimeProfile != null
+                        ? selectedRuntimeProfile
+                        : contentsManager.resolveBestRuntimeProfile(container.getWineVersion(), effectiveRuntimeModel),
+                shortcut,
+                effectiveRuntimeModel
         );
 
         // Additional container checks and environment configuration
         if (container != null) {
-            imageFs.createVariantFile(container.getContainerVariant());
+            String launchVariant = effectiveRuntimeModel == null || effectiveRuntimeModel.trim().isEmpty()
+                    ? container.getContainerVariant()
+                    : effectiveRuntimeModel;
+            imageFs.createVariantFile(launchVariant);
             imageFs.createArchFile(container.getWineVersion());
+            imageFs.createRootfsProviderFile(ImageFs.ROOTFS_PROVIDER_GAMENATIVE);
+            imageFs.createRootfsLayoutFile(ImageFs.ROOTFS_LAYOUT_UBUNTUFS);
             if (Byte.parseByte(startupSelection) == Container.STARTUP_SELECTION_AGGRESSIVE) {
                 winHandler.killProcess("services.exe");
             }
@@ -1916,6 +2042,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 )
         );
         environment.addComponent(new NetworkInfoUpdateComponent());
+        environment.addComponent(new SteamClientComponent());
+        if (openWithAndroidBrowserEnabled || shareAndroidClipboardEnabled) {
+            environment.addComponent(new WineRequestComponent());
+        }
 
         // Audio driver logic
         if (audioDriver.equals("alsa")) {
@@ -1992,7 +2122,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "startup_selection", startupSelection,
                         "wine_version", container != null ? container.getWineVersion() : "",
                         "binding_paths_count", bindingPathCount,
-                        "has_wine_request_handler", wineRequestHandler != null
+                        "has_wine_request_component", openWithAndroidBrowserEnabled || shareAndroidClipboardEnabled
                 )
         );
 
@@ -2001,8 +2131,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         // Start the WinHandler
         winHandler.start();
-
-        if (wineRequestHandler != null) wineRequestHandler.start();
 
         ForensicLogger.logEvent(
                 this,
@@ -2013,7 +2141,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "runtime_environment_components_started",
                 ForensicLogger.fields(
                         "audio_driver", audioDriver,
-                        "has_wine_request_handler", wineRequestHandler != null
+                        "has_wine_request_component", openWithAndroidBrowserEnabled || shareAndroidClipboardEnabled
                 )
         );
 
@@ -2105,7 +2233,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             int centerY = xServer.screenInfo.height / 2;
             xServer.injectPointerMove(centerX, centerY);
             touchpadView.setTrackpadCursorPosition(centerX, centerY);
-            touchpadView.resetGestureRuntimeTuning();
+            // Desktop sessions need a slightly more forgiving tap envelope than
+            // game/shortcut launches, otherwise trackpad taps are too easy to
+            // miss on high-density phones.
+            touchpadView.setGestureRuntimeTuning(260, 20, 100, 350);
+            touchpadView.setStrictGestureFsmOverride(false);
             ForensicLogger.logEvent(
                     this,
                     "info",
@@ -2120,6 +2252,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "cursor_visible", true,
                             "tap_to_click_moves_cursor", false,
                             "desktop_cursor_owner_mode", true,
+                            "tap_timeout_ms", 260,
+                            "tap_travel_px", 20,
                             "pointer_x", xServer.pointer.getClampedX(),
                             "pointer_y", xServer.pointer.getClampedY(),
                             "input_mode", "cursor_trackpad"
@@ -3176,7 +3310,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void applyBionicRuntimeMarkers(EnvVars targetEnv) {
         if (targetEnv == null) return;
-        String runtimeLibc = imageFs != null ? imageFs.getRuntimeLibcModel() : "bionic";
+        String runtimeLibc = effectiveRuntimeModel == null || effectiveRuntimeModel.trim().isEmpty()
+                ? (imageFs != null ? imageFs.getRuntimeLibcModel() : "bionic")
+                : effectiveRuntimeModel;
         targetEnv.put("AERO_RUNTIME_LIBC", runtimeLibc);
         targetEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "glibc".equalsIgnoreCase(runtimeLibc) ? "0" : "1");
         targetEnv.put("AERO_RUNTIME_ANDROID_SDK", String.valueOf(Build.VERSION.SDK_INT));
@@ -3371,32 +3507,149 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return maxMinor;
     }
 
+    private long parsePublishedAtKey(String value) {
+        if (value == null) return 0L;
+        String digits = value.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return 0L;
+        if (digits.length() > 14) digits = digits.substring(0, 14);
+        try {
+            return Long.parseLong(digits);
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private long resolveProfilePublishedAtKey(ContentProfile profile) {
+        return profile == null ? 0L : parsePublishedAtKey(profile.publishedAt);
+    }
+
     private String detectVulkanSdkLaneArch(ContentProfile profile) {
-        if (profile == null) return "generic";
-        boolean hasArm64 = false;
-        boolean hasArm64Ec = false;
-        boolean hasX64 = false;
-        if (profile.fileList != null) {
-            for (ContentProfile.ContentFile contentFile : profile.fileList) {
-                if (contentFile == null || contentFile.source == null) continue;
-                String lowerSource = contentFile.source.toLowerCase(Locale.US);
-                hasArm64 |= lowerSource.contains("/arm64/") || lowerSource.contains("/aarch64/");
-                hasArm64Ec |= lowerSource.contains("/arm64ec/") || lowerSource.contains("/arm64-ec/");
-                hasX64 |= lowerSource.contains("/x86_64/") || lowerSource.contains("/x86-64/") || lowerSource.contains("/amd64/");
+        return profile == null ? "generic" : profile.getArchitectureTag();
+    }
+
+    private static final class VulkanSdkSelectionGroup {
+        final String key;
+        final HashMap<String, ContentProfile> bestByArch = new HashMap<>();
+        final HashMap<String, Integer> bestScoreByArch = new HashMap<>();
+        final HashMap<String, Integer> bestMaxByArch = new HashMap<>();
+
+        VulkanSdkSelectionGroup(String key) {
+            this.key = key;
+        }
+    }
+
+    private int computeVulkanSdkProfileScore(int requestedMinor, ContentProfile profile) {
+        int minMinor = parseMinVulkanMinor(profile);
+        int maxMinor = parseMaxVulkanMinor(profile);
+        if (minMinor <= 0 || maxMinor <= 0) return Integer.MAX_VALUE;
+        if (requestedMinor < minMinor) {
+            return (minMinor - requestedMinor) + 100;
+        }
+        if (requestedMinor <= maxMinor) {
+            return maxMinor - requestedMinor;
+        }
+        return 1000 + (requestedMinor - maxMinor);
+    }
+
+    private String buildVulkanSdkGroupKey(ContentProfile profile) {
+        if (profile == null) return "";
+        String version = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim().toLowerCase(Locale.US);
+        if (!version.isEmpty()) return version;
+        String value = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
+        return value.replace("-arm64ec", "")
+                .replace("-arm64-ec", "")
+                .replace("-arm64", "")
+                .replace("-x86_64", "")
+                .replace("-x86-64", "")
+                .replace("-amd64", "")
+                .replace("-bundle", "")
+                .replace("-unified", "")
+                .trim();
+    }
+
+    private int resolveVulkanSdkCoverageRank(VulkanSdkSelectionGroup group, boolean preferArm64Ec) {
+        if (group == null) return Integer.MAX_VALUE;
+        boolean hasBundle = group.bestByArch.containsKey("bundle");
+        boolean hasArm64 = group.bestByArch.containsKey("arm64");
+        boolean hasArm64Ec = group.bestByArch.containsKey("arm64ec");
+        boolean hasX64 = group.bestByArch.containsKey("x86_64");
+        boolean hasGeneric = group.bestByArch.containsKey("generic");
+
+        if (preferArm64Ec) {
+            if (hasBundle) return 0;
+            if (hasArm64Ec && hasX64) return 1;
+            if (hasArm64Ec) return 2;
+            if (hasArm64 && hasX64) return 3;
+            if (hasX64) return 4;
+            if (hasArm64) return 5;
+            if (hasGeneric) return 6;
+            return Integer.MAX_VALUE;
+        }
+
+        if (hasBundle) return 0;
+        if (hasArm64 && hasX64) return 1;
+        if (hasArm64) return 2;
+        if (hasX64) return 3;
+        if (hasArm64Ec) return 4;
+        if (hasGeneric) return 5;
+        return Integer.MAX_VALUE;
+    }
+
+    private int resolveVulkanSdkCoverageWidth(VulkanSdkSelectionGroup group) {
+        if (group == null) return 0;
+        if (group.bestByArch.containsKey("bundle")) return 3;
+        int width = 0;
+        if (group.bestByArch.containsKey("arm64")) width++;
+        if (group.bestByArch.containsKey("arm64ec")) width++;
+        if (group.bestByArch.containsKey("x86_64")) width++;
+        if (width == 0 && group.bestByArch.containsKey("generic")) return 1;
+        return width;
+    }
+
+    private int resolveVulkanSdkGroupApiScore(VulkanSdkSelectionGroup group, int requestedMinor) {
+        int bestScore = Integer.MAX_VALUE;
+        for (ContentProfile profile : group.bestByArch.values()) {
+            bestScore = Math.min(bestScore, computeVulkanSdkProfileScore(requestedMinor, profile));
+        }
+        return bestScore;
+    }
+
+    private long resolveVulkanSdkGroupPublishedKey(VulkanSdkSelectionGroup group) {
+        long key = 0L;
+        for (ContentProfile profile : group.bestByArch.values()) {
+            key = Math.max(key, resolveProfilePublishedAtKey(profile));
+        }
+        return key;
+    }
+
+    private int resolveVulkanSdkGroupVersionCode(VulkanSdkSelectionGroup group) {
+        int versionCode = 0;
+        for (ContentProfile profile : group.bestByArch.values()) {
+            versionCode = Math.max(versionCode, profile == null ? 0 : profile.verCode);
+        }
+        return versionCode;
+    }
+
+    @NonNull
+    private List<ContentProfile> collectOrderedVulkanSdkProfiles(VulkanSdkSelectionGroup group, boolean preferArm64Ec) {
+        ArrayList<ContentProfile> selected = new ArrayList<>();
+        if (group == null || group.bestByArch.isEmpty()) return selected;
+        ContentProfile bundle = group.bestByArch.get("bundle");
+        if (bundle != null) {
+            selected.add(bundle);
+            return selected;
+        }
+
+        String[] preferredOrder = preferArm64Ec
+                ? new String[] {"arm64ec", "x86_64", "arm64", "generic"}
+                : new String[] {"arm64", "x86_64", "arm64ec", "generic"};
+        for (String arch : preferredOrder) {
+            ContentProfile profile = group.bestByArch.get(arch);
+            if (profile != null && !selected.contains(profile)) {
+                selected.add(profile);
             }
         }
-        if ((hasArm64 || hasArm64Ec) && hasX64) return "bundle";
-        String combined = (
-                (profile.verName == null ? "" : profile.verName) + " " +
-                (profile.desc == null ? "" : profile.desc) + " " +
-                (profile.releaseTag == null ? "" : profile.releaseTag) + " " +
-                (profile.remoteUrl == null ? "" : profile.remoteUrl)
-        ).toLowerCase(Locale.US);
-        if (combined.contains("bundle") || combined.contains("unified") || combined.contains("all-arch")) return "bundle";
-        if (combined.contains("arm64ec")) return "arm64ec";
-        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
-        if (combined.contains("arm64")) return "arm64";
-        return "generic";
+        return selected;
     }
 
     @NonNull
@@ -3405,49 +3658,88 @@ public class XServerDisplayActivity extends AppCompatActivity {
         List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
         if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
 
-        HashMap<String, ContentProfile> bestByArch = new HashMap<>();
-        HashMap<String, Integer> bestScoreByArch = new HashMap<>();
-        HashMap<String, Integer> bestMaxByArch = new HashMap<>();
-
+        HashMap<String, VulkanSdkSelectionGroup> groups = new HashMap<>();
         for (ContentProfile profile : profiles) {
             if (profile == null || !profile.locallyInstalled) continue;
-            int minMinor = parseMinVulkanMinor(profile);
-            int maxMinor = parseMaxVulkanMinor(profile);
-            if (minMinor <= 0 || maxMinor <= 0) continue;
+            int profileScore = computeVulkanSdkProfileScore(requestedMinor, profile);
+            if (profileScore == Integer.MAX_VALUE) continue;
 
-            int score;
-            if (requestedMinor < minMinor) {
-                score = (minMinor - requestedMinor) + 100;
-            } else if (requestedMinor <= maxMinor) {
-                score = maxMinor - requestedMinor;
-            } else {
-                score = 1000 + (requestedMinor - maxMinor);
+            String groupKey = buildVulkanSdkGroupKey(profile);
+            if (groupKey.isEmpty()) groupKey = ContentsManager.getEntryName(profile);
+            VulkanSdkSelectionGroup group = groups.get(groupKey);
+            if (group == null) {
+                group = new VulkanSdkSelectionGroup(groupKey);
+                groups.put(groupKey, group);
             }
 
             String archKey = detectVulkanSdkLaneArch(profile);
-            Integer currentScore = bestScoreByArch.get(archKey);
-            Integer currentMax = bestMaxByArch.get(archKey);
+            Integer currentScore = group.bestScoreByArch.get(archKey);
+            Integer currentMax = group.bestMaxByArch.get(archKey);
+            int maxMinor = parseMaxVulkanMinor(profile);
             if (currentScore == null
-                    || score < currentScore
-                    || (score == currentScore && (currentMax == null || maxMinor > currentMax))) {
-                bestScoreByArch.put(archKey, score);
-                bestMaxByArch.put(archKey, maxMinor);
-                bestByArch.put(archKey, profile);
+                    || profileScore < currentScore
+                    || (profileScore == currentScore && (currentMax == null || maxMinor > currentMax))) {
+                group.bestScoreByArch.put(archKey, profileScore);
+                group.bestMaxByArch.put(archKey, maxMinor);
+                group.bestByArch.put(archKey, profile);
             }
         }
 
-        ArrayList<ContentProfile> selected = new ArrayList<>();
-        String[] preferredOrder = wineInfo != null && wineInfo.isArm64EC()
-                ? new String[] {"bundle", "arm64ec", "x86_64", "arm64", "generic"}
-                : new String[] {"bundle", "arm64", "x86_64", "arm64ec", "generic"};
-        for (String arch : preferredOrder) {
-            ContentProfile profile = bestByArch.get(arch);
-            if (profile != null) selected.add(profile);
+        boolean preferArm64Ec = wineInfo != null && wineInfo.isArm64EC();
+        VulkanSdkSelectionGroup bestGroup = null;
+        for (VulkanSdkSelectionGroup group : groups.values()) {
+            if (group == null || group.bestByArch.isEmpty()) continue;
+            if (bestGroup == null) {
+                bestGroup = group;
+                continue;
+            }
+
+            int coverageCompare = Integer.compare(
+                    resolveVulkanSdkCoverageRank(group, preferArm64Ec),
+                    resolveVulkanSdkCoverageRank(bestGroup, preferArm64Ec)
+            );
+            if (coverageCompare < 0) {
+                bestGroup = group;
+                continue;
+            }
+            if (coverageCompare > 0) continue;
+
+            int apiCompare = Integer.compare(
+                    resolveVulkanSdkGroupApiScore(group, requestedMinor),
+                    resolveVulkanSdkGroupApiScore(bestGroup, requestedMinor)
+            );
+            if (apiCompare < 0) {
+                bestGroup = group;
+                continue;
+            }
+            if (apiCompare > 0) continue;
+
+            int widthCompare = Integer.compare(
+                    resolveVulkanSdkCoverageWidth(group),
+                    resolveVulkanSdkCoverageWidth(bestGroup)
+            );
+            if (widthCompare > 0) {
+                bestGroup = group;
+                continue;
+            }
+            if (widthCompare < 0) continue;
+
+            long publishedCompare = Long.compare(
+                    resolveVulkanSdkGroupPublishedKey(group),
+                    resolveVulkanSdkGroupPublishedKey(bestGroup)
+            );
+            if (publishedCompare > 0) {
+                bestGroup = group;
+                continue;
+            }
+            if (publishedCompare < 0) continue;
+
+            if (resolveVulkanSdkGroupVersionCode(group) > resolveVulkanSdkGroupVersionCode(bestGroup)) {
+                bestGroup = group;
+            }
         }
-        for (Map.Entry<String, ContentProfile> entry : bestByArch.entrySet()) {
-            if (!selected.contains(entry.getValue())) selected.add(entry.getValue());
-        }
-        return selected;
+
+        return collectOrderedVulkanSdkProfiles(bestGroup, preferArm64Ec);
     }
 
     private String joinCsv(List<String> values) {
@@ -3777,12 +4069,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
             int effectiveMaxMinor = 0;
             ArrayList<String> selectedEntries = new ArrayList<>();
             ArrayList<String> selectedSdkVersions = new ArrayList<>();
+            ArrayList<String> selectedArchCoverage = new ArrayList<>();
+            boolean bundleLayout = false;
 
             for (ContentProfile profile : selectedVulkanSdkProfiles) {
                 contentsManager.applyContent(profile);
 
                 String entry = ContentsManager.getEntryName(profile);
                 if (!selectedEntries.contains(entry)) selectedEntries.add(entry);
+
+                String archTag = detectVulkanSdkLaneArch(profile);
+                if (!selectedArchCoverage.contains(archTag)) selectedArchCoverage.add(archTag);
+                if ("bundle".equalsIgnoreCase(archTag)) bundleLayout = true;
 
                 String sdkVersion = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim();
                 if (!sdkVersion.isEmpty() && !selectedSdkVersions.contains(sdkVersion)) {
@@ -3825,12 +4123,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("AERO_VULKAN_SDK_PROFILE", joinCsv(selectedEntries));
             envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", String.valueOf(selectedEntries.size()));
             setOrClearEnv("AERO_VULKAN_SDK_VERSION", joinCsv(selectedSdkVersions));
+            setOrClearEnv("AERO_VULKAN_SDK_ARCH_COVERAGE", joinCsv(selectedArchCoverage));
+            setOrClearEnv("AERO_VULKAN_SDK_LAYOUT", bundleLayout ? "bundle" : (selectedEntries.size() > 1 ? "split" : "single"));
             setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", effectiveMinMinor > 0 ? "1." + effectiveMinMinor : "");
             setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", effectiveMaxMinor > 0 ? "1." + effectiveMaxMinor : "");
         } else {
             envVars.put("AERO_VULKAN_SDK_PROFILE", "none");
             envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", "0");
             setOrClearEnv("AERO_VULKAN_SDK_VERSION", "");
+            setOrClearEnv("AERO_VULKAN_SDK_ARCH_COVERAGE", "");
+            setOrClearEnv("AERO_VULKAN_SDK_LAYOUT", "");
             setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
             setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", "");
         }
@@ -3917,6 +4219,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "vulkan_api_selected", envVars.get("AERO_VULKAN_API_SELECTED"),
                         "vulkan_sdk_profiles", envVars.get("AERO_VULKAN_SDK_PROFILE"),
                         "vulkan_sdk_profile_count", envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"),
+                        "vulkan_sdk_arch_coverage", envVars.get("AERO_VULKAN_SDK_ARCH_COVERAGE"),
+                        "vulkan_sdk_layout", envVars.get("AERO_VULKAN_SDK_LAYOUT"),
                         "wrapper_vk_version", envVars.get("WRAPPER_VK_VERSION")
                 )
         );
@@ -4356,8 +4660,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void applyGeneralPatches(Container container) {
         File rootDir = imageFs.getRootDir();
-        TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "container_pattern_common.tzst", rootDir);
-        TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio.tzst", new File(getFilesDir(), "pulseaudio"));
+        boolean glibcVariant = container != null && Container.GLIBC.equalsIgnoreCase(container.getContainerVariant());
+        if (glibcVariant) {
+            FileUtils.delete(new File(rootDir, "/opt/apps"));
+            if (!ImageFsInstaller.extractSupportArchive(this, "imagefs_patches_gamenative.tzst", TarCompressorUtils.Type.ZSTD, rootDir)) {
+                Log.w("XServerDisplayActivity", "Missing glibc runtime patch archive: imagefs_patches_gamenative.tzst");
+            }
+            if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio-gamenative.tzst", new File(getFilesDir(), "pulseaudio"))) {
+                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio.tzst", new File(getFilesDir(), "pulseaudio"));
+            }
+        } else {
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "container_pattern_common.tzst", rootDir);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio.tzst", new File(getFilesDir(), "pulseaudio"));
+        }
         WineUtils.applySystemTweaks(this, wineInfo);
         container.putExtra("graphicsDriver", null);
         container.putExtra("desktopTheme", null);

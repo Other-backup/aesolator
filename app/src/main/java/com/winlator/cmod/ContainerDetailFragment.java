@@ -630,8 +630,13 @@ public class ContainerDetailFragment extends Fragment {
                         return;
                     }
                 }
-                WineInfo selectedWineInfo = WineInfo.fromIdentifier(context, contentsManager, selectedWineVersion);
-                ContentProfile selectedRuntimeProfile = contentsManager.getProfileByEntryName(selectedWineVersion);
+                String requestedRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(selectedWineVersion);
+                selectedWineVersion = contentsManager.resolveBestRuntimeEntry(selectedWineVersion, requestedRuntimeModel);
+                ContentProfile selectedRuntimeProfile = contentsManager.resolveBestRuntimeProfile(selectedWineVersion, requestedRuntimeModel);
+                if (selectedRuntimeProfile != null && !selectedRuntimeProfile.getRuntimeModel().isEmpty()) {
+                    requestedRuntimeModel = selectedRuntimeProfile.getRuntimeModel();
+                }
+                WineInfo selectedWineInfo = WineInfo.fromIdentifier(context, contentsManager, selectedWineVersion, requestedRuntimeModel);
                 boolean runtimePathExists = selectedWineInfo.path != null && new File(selectedWineInfo.path).exists();
                 ForensicLogger.logEvent(
                         context,
@@ -646,6 +651,7 @@ public class ContainerDetailFragment extends Fragment {
                                 "resolved_version", selectedWineInfo.fullVersion(),
                                 "resolved_arch", selectedWineInfo.getArch(),
                                 "resolved_path", selectedWineInfo.path,
+                                "runtime_model", requestedRuntimeModel,
                                 "path_exists", runtimePathExists,
                                 "profile_found", selectedRuntimeProfile != null,
                                 "profile_type", selectedRuntimeProfile != null && selectedRuntimeProfile.type != null
@@ -738,6 +744,7 @@ public class ContainerDetailFragment extends Fragment {
                     container.setFEXCoreVersion(fexcoreVersion);
                     container.setFEXCorePreset(fexcorePreset);
                     container.setDesktopTheme(desktopTheme);
+                    container.setContainerVariant(requestedRuntimeModel);
                     container.setMidiSoundFont(midiSoundFont);
                     container.setLC_ALL(lc_all);
                     container.setPrimaryController(primaryController);
@@ -776,6 +783,7 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("fexcorePreset", fexcorePreset);
                     data.put("desktopTheme", desktopTheme);
                     data.put("wineVersion", selectedWineVersion);
+                    data.put("containerVariant", requestedRuntimeModel);
                     data.put("midiSoundFont", midiSoundFont);
                     data.put("lc_all", lc_all);
                     data.put("primaryController", primaryController);
@@ -1252,7 +1260,12 @@ public class ContainerDetailFragment extends Fragment {
                     return;
                 }
 
-                WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
+                WineInfo wineInfo = WineInfo.fromIdentifier(
+                        context,
+                        contentsManager,
+                        wineVersion,
+                        ContentProfile.inferRuntimeModelFromEntryName(wineVersion)
+                );
                 if (wineInfo.isArm64EC()) {
                     fexcoreFL.setVisibility(View.VISIBLE);
                     sEmulator.setEnabled(true);
@@ -1289,7 +1302,10 @@ public class ContainerDetailFragment extends Fragment {
         if (wineProfiles != null) {
             for (ContentProfile profile : wineProfiles) {
                 if (profile == null || !profile.locallyInstalled) continue;
-                wineVersionSet.add(ContentsManager.getEntryName(profile));
+                String runtimeEntry = contentsManager.resolveBestRuntimeEntry(ContentsManager.getEntryName(profile));
+                if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
+                    wineVersionSet.add(runtimeEntry);
+                }
                 localWineCount++;
             }
         }
@@ -1298,7 +1314,10 @@ public class ContainerDetailFragment extends Fragment {
         if (protonProfiles != null) {
             for (ContentProfile profile : protonProfiles) {
                 if (profile == null || !profile.locallyInstalled) continue;
-                wineVersionSet.add(ContentsManager.getEntryName(profile));
+                String runtimeEntry = contentsManager.resolveBestRuntimeEntry(ContentsManager.getEntryName(profile));
+                if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
+                    wineVersionSet.add(runtimeEntry);
+                }
                 localProtonCount++;
             }
         }
@@ -1328,7 +1347,10 @@ public class ContainerDetailFragment extends Fragment {
         sWineVersion.setEnabled(hasWineVersion);
 
         if (isEditMode() && hasWineVersion) {
-            AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
+            AppUtils.setSpinnerSelectionFromValue(
+                    sWineVersion,
+                    contentsManager.resolveBestRuntimeEntry(container.getWineVersion(), container.getContainerVariant())
+            );
         }
 
         updateRuntimeSelectionUi(view);
@@ -1417,7 +1439,9 @@ public class ContainerDetailFragment extends Fragment {
         try {
             ImageFs imageFs = ImageFs.find(context);
             if (imageFs == null) return false;
-            File wineDir = new File(imageFs.getRootDir(), "opt/" + version);
+            File wineDir = WineInfo.isMainWineVersion(version)
+                    ? imageFs.getMainWineDir()
+                    : new File(imageFs.getRootDir(), "opt/" + version);
             if (!wineDir.isDirectory()) return false;
             File wineBin = new File(wineDir, "bin/wine");
             File wine64Bin = new File(wineDir, "bin/wine64");

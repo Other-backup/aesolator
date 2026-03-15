@@ -116,6 +116,11 @@
     <color name="overlay_metric_renderer">#FFC774</color>
     <color name="overlay_metric_gpu">#84D8FF</color>
     <color name="overlay_metric_ram">#D0B4FF</color>
+    <color name="external_display_surface_background">#2B2B2B</color>
+    <color name="external_display_keyboard_background">#1F1F1F</color>
+    <color name="external_display_key_background">#3A3A3A</color>
+    <color name="external_display_key_highlight_background">#3D6CC4</color>
+    <color name="external_display_key_highlight_strong_background">#2E5AAC</color>
 
     <color name="abc_decor_view_status_guard">#ff000000</color>
     <color name="abc_decor_view_status_guard_light">#ffffffff</color>

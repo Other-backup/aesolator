@@ -23,10 +23,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class ForensicLogger {
     private static final String TAG = "ForensicLogger";
     private static final Object FILE_LOCK = new Object();
+    private static final ExecutorService FILE_WRITE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "ForensicLoggerWriter");
+        thread.setDaemon(true);
+        return thread;
+    });
     private static final String SINK_EXTERNAL = "external";
     private static final String SINK_APP_PRIVATE = "app_private";
     private static final ThreadLocal<SimpleDateFormat> TS_FORMAT = ThreadLocal.withInitial(
@@ -127,10 +134,12 @@ public final class ForensicLogger {
         String line = obj.toString();
         logcat(severity, line);
         if (context == null) return;
-
-        synchronized (FILE_LOCK) {
-            appendForensicLine(context, line);
-        }
+        Context sinkContext = context.getApplicationContext();
+        FILE_WRITE_EXECUTOR.execute(() -> {
+            synchronized (FILE_LOCK) {
+                appendForensicLine(sinkContext, line);
+            }
+        });
     }
 
     public static JSONObject fields(Object... keyValues) {

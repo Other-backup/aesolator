@@ -33,6 +33,7 @@ For every donor subsystem:
 
 These donor-derived foundation pieces are already in the local tree:
 
+- `container/Container.java` donor-compatible runtime-state expansion
 - `core/GPUHelper.java`
 - `cpp/winlator/gpu_helper.c`
 - `core/GPUInformation.java` hardware-classification helpers
@@ -46,12 +47,20 @@ These donor-derived foundation pieces are already in the local tree:
 - `contents/ManifestComponentHelper.java`
 - `contents/ManifestInstaller.java`
 - `renderer/GPUImage.java` hardware-buffer accessor
+- `data/TouchGestureConfig.kt`
+- `xserver/PhysicalControllerHandler.kt`
+- `externaldisplay/ExternalDisplayInputController.kt`
+- `externaldisplay/ExternalDisplaySwapController.kt`
+- `externaldisplay/ExternalOnScreenKeyboardView.kt`
+- `externaldisplay/IMEInputReceiver.kt`
+- `externaldisplay/SwapInputOverlayView.kt`
 - `xconnector/XConnectorEpoll.java` rlimit bootstrap hook
 - `cpp/winlator/xconnector_epoll.c` tracked fd close / ancillary-fd handling
 
 See also:
 
 - [GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md](/data/data/com.termux/files/home/aesolator/docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md)
+- [GAMENATIVE_SECOND_SWEEP_INVENTORY.md](/data/data/com.termux/files/home/aesolator/docs/GAMENATIVE_SECOND_SWEEP_INVENTORY.md)
 
 ## Transfer Lanes
 
@@ -70,8 +79,8 @@ Primary donor files:
 
 Status:
 
-- partially shared already
-- requires focused diff pass, not blind overwrite
+- donor container/runtime contract is now staged much more fully
+- remaining open work is routing/migration behavior, not missing base fields
 
 Next transfer intent:
 
@@ -94,12 +103,17 @@ Status:
 
 - donor path identified
 - installer/overlay foundation imported into the local tree
+- explicit rootfs layer ownership is now written down
+- per-library base/overlay adoption is now written down
 - archive diff/extraction pass still open
 
 Why it matters:
 
 - donor rootfs versioning is newer (`26` vs local `21`)
 - donor uses variant-specific base archives and post-extract overlays
+- donor delivery path is now partially mapped too:
+  primary `downloads.gamenative.app`, fallback R2 bucket, plus
+  `imagefs_patches_gamenative.tzst`
 - donor preserves imported `Wine` / `Proton` payloads more explicitly
 - rootfs quality affects every later lane:
   launcher, Wine/Proton, drivers, multimedia, wrapper hooks, and container boot
@@ -114,19 +128,65 @@ Current imported status:
 - installer is now variant-aware at the foundation level:
   `imagefs_gamenative.txz`, `imagefs_bionic.txz`, with fallback to legacy
   `imagefs.txz`
+- installer now mirrors donor rootfs delivery more honestly too:
+  when a donor variant archive is not bundled locally, it tries
+  `downloads.gamenative.app/<archive>` first and then the donor R2 fallback
 - donor overlay assets `redirect.tzst` and `extras.tzst` are staged locally
   and deployed after base extraction when present
+- glibc rootfs support now includes staged handling for
+  `imagefs_patches_gamenative.tzst` instead of treating the base archive as the
+  only donor payload that matters
 - imported `Wine` / `Proton` payloads in `opt/` are now preserved more like the
   donor path instead of being wiped on every reinstall
 - local `Container` now carries `containerVariant`, and launch-time code writes
   `imagefs` `.variant` / `.arch` markers before runtime bootstrap
+- local main-runtime compatibility now bridges donor `/opt/wine` and
+  legacy/local `/opt/<main-runtime-id>` so the rootfs lane does not silently
+  assume only one historical layout
+- donor `container_pattern_gamenative.tzst` and `pulseaudio-gamenative.tzst`
+  are now staged locally, and glibc/main-runtime paths now point at those
+  donor assets instead of only the older generic `container_pattern_common`
+  / `pulseaudio.tzst` route
+- local `ContainerManager` now accepts both `prefixPack.tzst` and
+  `prefixPack.txz` for runtime fallback extraction, matching donor intake more
+  closely
+- local `ContentsManager` now also closes the next runtime-placement tail:
+  installed `Wine` / `Proton` packages resolve their effective runtime root
+  from the shared parent of `wineBinPath` / `wineLibPath` / `winePrefixPack`,
+  and post-install hooks normalize `lib/wine` plus restore executable bits on
+  installed binaries before launcher/container code consumes them
+- donor runtime asset parity is now much closer too:
+  the local tree now stages the missing `graphics_driver`, `dxwrapper`,
+  `fexcore`, `wowbox64`, `steampipe`, `wincomponents`, `box86_64`,
+  `steaminput`, `steam_regions.json`, and `box86_env_vars.json` payloads that
+  were previously donor-only
+- local `ImageFsInstaller` now also carries a donor-derived
+  `generateCompactContainerPattern()` helper adapted to the bridged main-runtime
+  path instead of assuming only the older local layout
+- donor app-wrapper/source parity is now staged too:
+  `PrefManager.kt`, `container/ContainerData.kt`,
+  `contentdialog/NavigationDialog.java`, and `xserver/XKeycode.kt`
+- local build perimeter is now prepared for the staged donor Kotlin lane via
+  `org.jetbrains.kotlin.android`; this is a pre-compile closure step only, not
+  compile proof
+- explicit layer ownership is now tracked in
+  [IMAGEFS_LAYER_OWNERSHIP_TABLE.md](/data/data/com.termux/files/home/aesolator/docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md),
+  including the classification of `imagefs.txz.02` as orphan/invalid baggage
+  instead of a live shard
+- donor-rootfs-first runtime policy is now staged in code too:
+  shared `imagefs/opt` runtime installs for `Wine` / `Proton`, canonical `/tmp`
+  plus `/usr/tmp` compat bridge, canonical `usr/local/bin/box64` plus
+  `usr/bin/box64` compat bridge, rootfs provider/layout markers, and
+  `:ubuntufs` dynamic-feature scaffold
+- per-library adoption is tracked in
+  [IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md](/data/data/com.termux/files/home/aesolator/docs/IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md)
 
 Still open inside this lane:
 
-- extract and diff donor `imagefs_gamenative.txz` and `imagefs_bionic.txz`
-- classify donor `extras.tzst` contents by subsystem and ownership
-- decide which donor rootfs files become base-layer imports versus runtime
-  payload or overlay-only assets
+- first honest compile/runtime proof for the donor-rootfs-first lane
+- future cleanup filter enforcement for donor archive noise (`.DS_Store`, `._*`)
+- any remaining per-library refinements discovered during real runtime proof,
+  not during paper inventory
 
 ### Lane 2: Guest Program Launchers
 
@@ -161,6 +221,10 @@ Planned order:
 
 Current imported status:
 
+- local `Container` now carries donor-style runtime fields and JSON keys for:
+  Steam type, graphics-driver version, exec args, executable path, session
+  metadata, install path, box86 state, SDL/controller flags, gesture config,
+  external-display state, suspend policy, DRM flags, and portrait mode
 - `ImageFs` now exposes donor-style runtime markers:
   `.variant`, `.arch`, glibc/bin/lib accessors, storage/files roots, and
   `getRuntimeLibcModel()`
@@ -175,11 +239,26 @@ Current imported status:
 - `NetworkHelper` now exposes donor-style `IFAddress`, active-link probing, and
   IPv4 discovery, and `NetworkInfoUpdateComponent` is now part of the local
   runtime environment component set
+- local `WineRequestComponent` now replaces the old standalone request handler
+  and lives inside `XEnvironment`; request routing keeps donor socket/lifecycle
+  structure while preserving the local Android clipboard bridge
+- donor `SteamPipeServer` / `SteamClientComponent` foundation is now staged in
+  the local tree for later runtime/storefront wiring
+- donor `ControllerManager`, `TouchMouse`, and Kotlin `XKeycode` are now also
+  staged locally, so the next closure step for input is behavior/compile
+  validation instead of filename parity
+- donor second-sweep low-dependency input/display foundation is now staged
+  too: `TouchGestureConfig`, `PhysicalControllerHandler`, and the
+  external-display classes. The remaining open part is integration and donor
+  app-routing logic, not missing foundation classes.
 
 Still open inside this lane:
 
-- compare donor `WineRequestComponent`
-- finish donor network/request parity around runtime boot
+- decide where and when local runtime should actually mount
+  `SteamClientComponent`, since `Ae.solator` does not yet have a donor-style
+  Steam source lane driving it
+- decide whether any donor auth-specific request branches need a local
+  `Ae.solator` equivalent beyond plain browser/clipboard routing
 - wire launcher/runtime placement deeper into payload install and rootfs
   hybridization work
 
@@ -239,14 +318,35 @@ Primary donor files:
 
 Status:
 
-- not yet transferred
-- important for external launch, config override, app-to-container routing
+- donor scope audited
+- local-adapted routing/config foundation is now staged in the tree
+- remaining work is compile/runtime verification and any future storefront
+  service integration on top of the staged bridge
 
 Why it matters:
 
 - cleaner pending-launch handling
 - better container lookup and migration utility
 - more disciplined handoff from UI intent to runtime execution
+
+Current local adaptation:
+
+- `PrefManager` now exposes a donor-compatible property surface on top of local
+  `SharedPreferences`
+- `ContainerUtils` is now staged locally with a `sessionMetadata` bridge for
+  donor `appId` semantics instead of replacing the numeric local
+  `ContainerManager` identity model
+- `IntentLaunchManager` now stages donor-style `LaunchRequest` parsing and
+  temporary in-memory config override flow
+- `ContainerMigrator` is staged for legacy directory migration
+- `ContainerConfigTransfer` is staged for flat JSON import/export through the
+  local container bridge
+
+Remaining tail:
+
+- first honest compile/runtime validation of this staged lane
+- decide how much storefront-specific service logic should ever sit on top of
+  the appId bridge in `Ae.solator`
 
 ### Lane 5: Graphics / Driver Policy
 
@@ -292,6 +392,14 @@ Status:
 Canonical doc:
 
 - [GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md](/data/data/com.termux/files/home/aesolator/docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md)
+
+Current imported status:
+
+- donor arch-specific input DLL payloads are now staged locally:
+  `arm64ec_input_dlls.tzst`, `x86_64_input_dlls.tzst`
+- local `XServerDisplayActivity.extractInputDLLs()` now prefers those
+  arch-specific assets when the active runtime arch matches, and falls back to
+  legacy `input_dlls.tzst` otherwise
 
 ### Lane 7: Wine / Proton UI and Management Surface
 
@@ -365,3 +473,31 @@ High-signal donor files from the grep pass:
   `ManifestInstaller`, `ManifestComponentHelper`, `PreInstallSteps`
 - donor env / component compare:
   `DXVKHelper`, `GeneralComponents`, `AdrenotoolsManager`
+
+## Pre-Compile Closure Update
+
+Latest closure from the current batch:
+
+- donor `Vortek` foundation is now staged locally:
+  `VortekRendererComponent`, `VortekConfigDialog`,
+  `graphics_driver/vortek-2.0.tzst`, `graphics_driver/vortek-2.1.tzst`,
+  and donor `libvortekrenderer.so`
+- donor `virgl` APK native parity is staged locally through
+  `libvirglrenderer.so`
+- donor bionic helper-libs are now staged and owned explicitly:
+  `libevshim.so` and `libdummyvk.so` are mirrored into guest `usr/lib`, while
+  `libvirglrenderer.so` and `libvortekrenderer.so` stay APK-native
+- donor env-var metadata is staged locally through
+  `core/envvars/EnvVarInfo.kt` and `EnvVarSelectionType.kt`
+- local `UnixSocketConfig` now carries donor parity constants for
+  `VORTEK_SERVER_PATH` and `STEAM_PIPE_PATH`
+
+Important native conclusion:
+
+- donor `libwinlator_11.so` exists only as a binary in the donor repo
+- exported JNI symbols show it belongs to the donor's older native
+  `XInputStream` / `XOutputStream` model
+- local `cmod` already supersedes that lane with source-backed Java streams
+  and richer local native `GPUInformation`
+- therefore `libwinlator_11.so` is classified as donor reference only, not as
+  the local native source-of-truth

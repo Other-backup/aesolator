@@ -232,7 +232,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             }
             String appId = shortcut != null ? shortcut.name : guestExecutable;
             if (wineInfo == null) {
-                wineInfo = WineInfo.fromIdentifier(environment.getContext(), contentsManager, container.getWineVersion());
+                wineInfo = WineInfo.fromIdentifier(
+                        environment.getContext(),
+                        contentsManager,
+                        container.getWineVersion(),
+                        resolveRequestedRuntimeModel()
+                );
             }
             LaunchDependencyRegistry.DependencyRunResult dependencyResult =
                     LaunchDependencyRegistry.runDependencies(environment.getContext(), container, shortcut, appId);
@@ -340,10 +345,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         this.bindingPaths = normalized.isEmpty() ? null : normalized.toArray(new String[0]);
     }
 
-    protected String buildRuntimePath(File rootDir, String winePath) {
+    protected String buildRuntimePath(ImageFs imageFs, File rootDir, String winePath) {
         LinkedHashSet<String> segments = new LinkedHashSet<>();
         if (winePath != null && !winePath.trim().isEmpty()) {
             segments.add(winePath.trim());
+        }
+
+        File usrLocalBin = imageFs.getLocalBinDir();
+        if (usrLocalBin.exists() && usrLocalBin.isDirectory()) {
+            segments.add(usrLocalBin.getPath());
         }
 
         File glibcBin = new File(rootDir, "/usr/glibc/bin");
@@ -360,10 +370,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return String.join(":", segments);
     }
 
-    protected void applyMoboxRuntimeContracts(EnvVars launchEnv, File rootDir, String winePath) {
-        launchEnv.put("PATH", buildRuntimePath(rootDir, winePath));
+    protected void applyMoboxRuntimeContracts(ImageFs imageFs, EnvVars launchEnv, File rootDir, String winePath) {
+        launchEnv.put("PATH", buildRuntimePath(imageFs, rootDir, winePath));
 
-        File runtimeTmpDir = new File(rootDir, "/usr/tmp");
+        File runtimeTmpDir = imageFs.getTmpDir();
         if (!runtimeTmpDir.exists()) {
             runtimeTmpDir.mkdirs();
         }
@@ -418,7 +428,22 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     }
 
     protected String getLauncherModel(ImageFs imageFs) {
+        String requestedRuntimeModel = resolveRequestedRuntimeModel();
+        if (!requestedRuntimeModel.isEmpty()) return requestedRuntimeModel;
         return imageFs != null ? imageFs.getRuntimeLibcModel() : "bionic";
+    }
+
+    protected String resolveRequestedRuntimeModel() {
+        if (wineProfile != null) {
+            String profileRuntimeModel = wineProfile.getRuntimeModel();
+            if (!profileRuntimeModel.isEmpty()) return profileRuntimeModel;
+        }
+        if (container != null) {
+            String containerRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(container.getWineVersion());
+            if (!containerRuntimeModel.isEmpty()) return containerRuntimeModel;
+            return ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        }
+        return "";
     }
 
     protected void applyLauncherSpecificEnvVars(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
@@ -527,7 +552,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         // Setting up essential environment variables for Wine
         launchEnv.put("HOME", imageFs.home_path);
         launchEnv.put("USER", ImageFs.USER);
-        launchEnv.put("TMPDIR", rootDir.getPath() + "/usr/tmp");
+        launchEnv.put("TMPDIR", imageFs.getTmpDir().getPath());
         launchEnv.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
         launchEnv.put(
                 "LD_LIBRARY_PATH",
@@ -569,7 +594,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
 
-        applyMoboxRuntimeContracts(launchEnv, rootDir, winePath);
+        applyMoboxRuntimeContracts(imageFs, launchEnv, rootDir, winePath);
 
 
         launchEnv.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);

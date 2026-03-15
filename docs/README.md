@@ -55,7 +55,14 @@ This repo stores only application-layer documentation.
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 - `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md` - focused donor audit for `GameNative` X11 / renderer / driver layers.
 - `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md` - full donor transfer matrix for `GameNative` runtime, payload, container, launcher, Wine/Proton, and renderer lanes.
+- `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md` - current donor runtime/code gap status before the first honest compile.
+- `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md` - source-backed reconstruction status for donor `libwinlator_11.so` behavior.
+- `docs/GAMENATIVE_SECOND_SWEEP_INVENTORY.md` - second broad donor sweep outside `com/winlator/*`, focused on storefront/external-display/Compose/rootfs delivery lanes.
 - `docs/IMAGEFS_HYBRID_PLAN.md` - hybrid rootfs plan for combining the freshest `GameNative` UbuntuFS/imagefs pieces with `Ae.solator` runtime and forensic contracts.
+- `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md` - explicit layer ownership map for local/donor `imagefs_*`, overlays, prefix/audio layers, and archived orphan residue such as `imagefs.txz.02`.
+- `docs/IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md` - donor-rootfs-first per-library adoption map for Vulkan/OpenGL/Pulse/sysvshm/base tools, overlays, helper libs, compat bridges, and legacy hold lanes.
+- `docs/ROOTFS_RUNTIME_STATIC_AUDIT.md` - pre-compile audit of donor-rootfs-first wiring, legacy `imagefs` baggage, `glibc`/`bionic` split, and `Contents` runtime resolution blockers.
+- `docs/PAYLOAD_ROOTFS_STATIC_INVENTORY.md` - post-patch static inventory of rootfs/payload closure before the first honest compile.
 
 ## Generated In CI
 

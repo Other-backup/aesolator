@@ -8,6 +8,7 @@
     "channel": "stable",
     "delivery": "remote",
     "displayCategory": "Wine",
+    "runtimeModel": "bionic",
     "sourceRepo": "kosoymiki/wcp-runtime-lanes",
     "sourceType": "github-release",
     "sourceVersion": "rolling-latest",

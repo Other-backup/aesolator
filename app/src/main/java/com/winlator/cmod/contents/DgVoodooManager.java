@@ -51,6 +51,10 @@ public class DgVoodooManager {
         return false;
     }
 
+    public boolean isArchInstalled(String arch) {
+        return resolveBestPackageRootForArch(arch) != null;
+    }
+
     public String getVersionHint() {
         for (File packageRoot : getPackageRootsSorted()) {
             String versionHint = readVersionHint(packageRoot);
@@ -109,10 +113,27 @@ public class DgVoodooManager {
     }
 
     public void removePackage() {
+        for (File packageRoot : getPackageRootsSorted()) {
+            if (packageRoot != null && packageRoot.exists()) {
+                FileUtils.delete(packageRoot);
+            }
+        }
         File packageDir = getPackageDir();
-        if (packageDir.exists()) {
+        if (packageDir.exists() && !packageDir.isDirectory()) {
             FileUtils.delete(packageDir);
         }
+    }
+
+    public boolean matchesProfile(ContentProfile profile) {
+        if (profile == null || profile.type != ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return false;
+        if (!isInstalled()) return false;
+        String archTag = profile.getArchitectureTag();
+        if ("generic".equalsIgnoreCase(archTag)) return true;
+        if ("bundle".equalsIgnoreCase(archTag)) {
+            return isArchInstalled(ARCH_X64) && (isArchInstalled(ARCH_ARM64EC) || isArchInstalled(ARCH_ARM64));
+        }
+        if ("x86_64".equalsIgnoreCase(archTag)) return isArchInstalled(ARCH_X64);
+        return isArchInstalled(archTag);
     }
 
     public File resolveShortcutTargetDir(File imageFsRoot, String shortcutPath) {
@@ -242,7 +263,8 @@ public class DgVoodooManager {
                 return "";
             }
 
-            File destination = getPackageDir();
+            ContentProfile profile = readProfile(packageRoot);
+            File destination = resolveInstallDestination(profile);
             if (destination.exists()) FileUtils.delete(destination);
             if (!destination.mkdirs()) {
                 FileUtils.delete(tempDir);
@@ -329,6 +351,13 @@ public class DgVoodooManager {
 
     private File getPackageDir() {
         return new File(rootDir, PACKAGE_DIR);
+    }
+
+    private File resolveInstallDestination(ContentProfile profile) {
+        if (profile != null && profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            return ContentsManager.getInstallDir(context, profile);
+        }
+        return getPackageDir();
     }
 
     private ArrayList<File> getPackageRootsSorted() {

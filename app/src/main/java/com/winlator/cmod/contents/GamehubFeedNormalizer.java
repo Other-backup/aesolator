@@ -164,6 +164,8 @@ public final class GamehubFeedNormalizer {
                 candidate.put(ContentProfile.MARK_CHANNEL, deriveReleaseChannel(null, entry.tag, assetName));
                 candidate.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
                 candidate.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
+                String runtimeModel = resolveRuntimeModel(type, assetName, entry.tag, sourceRepo, sourceLabel);
+                if (!runtimeModel.isEmpty()) candidate.put(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
                 candidate.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
                 candidate.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
                 candidate.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
@@ -283,6 +285,8 @@ public final class GamehubFeedNormalizer {
             normalized.put(ContentProfile.MARK_CHANNEL, channel);
             normalized.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
             normalized.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
+            String runtimeModel = resolveRuntimeModel(type, assetName, releaseTag, sourceRepo, sourceLabel);
+            if (!runtimeModel.isEmpty()) normalized.put(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
             normalized.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
             normalized.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
             normalized.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
@@ -330,6 +334,8 @@ public final class GamehubFeedNormalizer {
             normalized.put(ContentProfile.MARK_CHANNEL, deriveChannel(itemName + " " + fileName + " " + version));
             normalized.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
             normalized.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, itemName));
+            String runtimeModel = resolveRuntimeModel(type, itemName, fileName, version, SOURCE_REPO_RAW);
+            if (!runtimeModel.isEmpty()) normalized.put(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
             normalized.put(ContentProfile.MARK_SOURCE_REPO, SOURCE_REPO_RAW);
             normalized.put(ContentProfile.MARK_SOURCE_FEED, SOURCE_FEED_ID);
             normalized.put(ContentProfile.MARK_SOURCE_LABEL, SOURCE_LABEL);
@@ -381,6 +387,14 @@ public final class GamehubFeedNormalizer {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64) return "WOWBox64";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) return "FEXCore";
         return type.toString();
+    }
+
+    private static String resolveRuntimeModel(ContentProfile.ContentType type, String... hints) {
+        if (type != ContentProfile.ContentType.CONTENT_TYPE_WINE
+                && type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return "";
+        }
+        return ContentProfile.inferRuntimeModel(type, hints);
     }
 
     private static String buildReleaseDescription(String assetName,

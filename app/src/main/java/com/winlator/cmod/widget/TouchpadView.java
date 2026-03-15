@@ -81,6 +81,7 @@ public class TouchpadView extends View {
     private int pendingMoveY = 0;
     private int logicalCursorX = 0;
     private int logicalCursorY = 0;
+    private boolean suppressTrackpadUntilAllFingersUp = false;
 
     private enum GestureMode {
         NONE,
@@ -173,6 +174,10 @@ public class TouchpadView extends View {
         private int y;
         private final int startX;
         private final int startY;
+        private float rawX;
+        private float rawY;
+        private final float rawStartX;
+        private final float rawStartY;
         private int lastX;
         private int lastY;
         private final long touchTime;
@@ -181,12 +186,16 @@ public class TouchpadView extends View {
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             this.x = this.startX = this.lastX = (int)transformedPoint[0];
             this.y = this.startY = this.lastY = (int)transformedPoint[1];
+            this.rawX = this.rawStartX = x;
+            this.rawY = this.rawStartY = y;
             touchTime = System.currentTimeMillis();
         }
 
         public void update(float x, float y) {
             lastX = this.x;
             lastY = this.y;
+            rawX = x;
+            rawY = y;
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             this.x = (int)transformedPoint[0];
             this.y = (int)transformedPoint[1];
@@ -205,11 +214,15 @@ public class TouchpadView extends View {
         }
 
         private boolean isTap() {
-            return (System.currentTimeMillis() - touchTime) < tapMilliseconds && travelDistance() < tapTravelDistance;
+            return (System.currentTimeMillis() - touchTime) < tapMilliseconds && rawTravelDistance() < tapTravelDistance;
         }
 
         private float travelDistance() {
             return (float)Math.hypot(x - startX, y - startY);
+        }
+
+        private float rawTravelDistance() {
+            return (float)Math.hypot(rawX - rawStartX, rawY - rawStartY);
         }
     }
 
@@ -317,7 +330,24 @@ public class TouchpadView extends View {
         int actionIndex = event.getActionIndex();
         int pointerId = event.getPointerId(actionIndex);
         int actionMasked = event.getActionMasked();
+        boolean desktopTrackpadMode = !simTouchScreen && !xServer.isRelativeMouseMovement();
         if (pointerId >= MAX_FINGERS) return true;
+
+        if (desktopTrackpadMode) {
+            if (actionMasked == MotionEvent.ACTION_DOWN) {
+                suppressTrackpadUntilAllFingersUp = false;
+            } else if (suppressTrackpadUntilAllFingersUp) {
+                if (actionMasked == MotionEvent.ACTION_UP || actionMasked == MotionEvent.ACTION_CANCEL) {
+                    resetTouchpadGestureState(true);
+                    suppressTrackpadUntilAllFingersUp = false;
+                }
+                return true;
+            } else if (actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                resetTouchpadGestureState(true);
+                suppressTrackpadUntilAllFingersUp = true;
+                return true;
+            }
+        }
 
         switch (actionMasked) {
             case MotionEvent.ACTION_DOWN:
@@ -407,6 +437,7 @@ public class TouchpadView extends View {
                 break;
             case MotionEvent.ACTION_CANCEL:
                 resetTouchpadGestureState(true);
+                suppressTrackpadUntilAllFingersUp = false;
                 break;
         }
 
@@ -562,6 +593,10 @@ public class TouchpadView extends View {
                     postDelayed(clickDelay, CLICK_DELAYED_TIME);
                 }
                 else if (finger1.isTap()) {
+                    if (!tapToClickMovesCursor
+                            && queueCursorTapLeftClickAt(logicalCursorX, logicalCursorY, false)) {
+                        break;
+                    }
                     if (tapToClickMovesCursor) {
                         dispatchPointerMoveAbsolute(finger1.x, finger1.y);
                     }

@@ -382,8 +382,7 @@ public class ContentsFragment extends Fragment {
             if (supportsArchitectureFilters(currentContentType)
                     && archMode != null
                     && !"all".equalsIgnoreCase(archMode)) {
-                String profileArch = resolveProfileArchTag(profile);
-                if (!archMode.equalsIgnoreCase(profileArch)) continue;
+                if (!profile.matchesArchitectureFilter(archMode)) continue;
             }
             if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                     && !matchesPreselectedDisplayCategory(profile)) {
@@ -744,6 +743,14 @@ public class ContentsFragment extends Fragment {
             return new String[]{getString(R.string.contents_arch_all_lanes)};
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            if (!currentSourceHasBundleCandidates(type)) {
+                String[] entries = getResources().getStringArray(R.array.contents_arch_entries_vulkan_sdk);
+                return new String[]{
+                        entries[0],
+                        entries[2],
+                        entries[3]
+                };
+            }
             return getResources().getStringArray(R.array.contents_arch_entries_vulkan_sdk);
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
@@ -823,6 +830,9 @@ public class ContentsFragment extends Fragment {
             return new String[]{"all"};
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
+            if (!currentSourceHasBundleCandidates(type)) {
+                return new String[]{"all", "arm64", "x86_64"};
+            }
             return getResources().getStringArray(R.array.contents_arch_values_vulkan_sdk);
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
@@ -885,19 +895,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private String resolveProfileArchTag(ContentProfile profile) {
-        if (isArm64EcProfile(profile)) return "arm64ec";
-        if (isX64Profile(profile)) return "x86_64";
-        if (isArm64Profile(profile)) return "arm64";
-        if (profile != null) {
-            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
-                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
-                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
-                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                    || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-                return "x86_64";
-            }
-        }
-        return "generic";
+        return profile == null ? "generic" : profile.getArchitectureTag();
     }
 
     private boolean currentSourceHasMultipleArchitectureCandidates() {
@@ -911,6 +909,17 @@ public class ContentsFragment extends Fragment {
             if ("generic".equalsIgnoreCase(archTag)) continue;
             archTags.add(archTag.toLowerCase(Locale.US));
             if (archTags.size() > 1) return true;
+        }
+        return false;
+    }
+
+    private boolean currentSourceHasBundleCandidates(ContentProfile.ContentType type) {
+        List<ContentProfile> profiles = manager.getProfiles(type);
+        if (profiles == null) return false;
+        for (ContentProfile profile : profiles) {
+            if (profile == null || profile.locallyInstalled) continue;
+            if (!matchesSelectedSourceMode(profile)) continue;
+            if ("bundle".equalsIgnoreCase(resolveProfileArchTag(profile))) return true;
         }
         return false;
     }
@@ -942,29 +951,55 @@ public class ContentsFragment extends Fragment {
         if (profile.isInstalledLocally()) return true;
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
             DgVoodooManager dgVoodooManager = new DgVoodooManager(requireContext());
-            if (!dgVoodooManager.isInstalled()) return false;
-            String profileArch = resolveProfileArchTag(profile);
-            if ("generic".equalsIgnoreCase(profileArch)) return true;
-            for (String installedArch : dgVoodooManager.getInstalledArchitectures()) {
-                if (matchesDgVoodooArchitecture(profileArch, installedArch)) return true;
-            }
-            return false;
+            return dgVoodooManager.matchesProfile(profile);
         }
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            // Base ImageFS already ships a generic Vulkan directory. Treat the SDK
-            // as installed only when the actual Contents package is present.
-            return false;
+            return hasInstalledVulkanSdkCoverage(profile);
         }
         return false;
     }
 
-    private boolean matchesDgVoodooArchitecture(String profileArch, String installedArch) {
-        String normalizedProfile = profileArch == null ? "" : profileArch.trim().toLowerCase(Locale.US);
-        String normalizedInstalled = installedArch == null ? "" : installedArch.trim().toLowerCase(Locale.US);
-        if ("x86_64".equals(normalizedProfile)) {
-            return "x64".equals(normalizedInstalled) || "x86_64".equals(normalizedInstalled);
+    private boolean hasInstalledVulkanSdkCoverage(ContentProfile targetProfile) {
+        if (targetProfile == null) return false;
+        List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
+        if (profiles == null || profiles.isEmpty()) return false;
+
+        String requestedArch = resolveProfileArchTag(targetProfile);
+        String requestedKey = normalizeVulkanSdkVersionKey(targetProfile);
+        HashSet<String> installedArchs = new HashSet<>();
+        for (ContentProfile profile : profiles) {
+            if (profile == null || !profile.locallyInstalled) continue;
+            if (!requestedKey.equals(normalizeVulkanSdkVersionKey(profile))) continue;
+            installedArchs.add(resolveProfileArchTag(profile));
         }
-        return normalizedProfile.equals(normalizedInstalled);
+        if (installedArchs.isEmpty()) return false;
+        if (installedArchs.contains("bundle")) return true;
+        if ("bundle".equalsIgnoreCase(requestedArch)) {
+            return installedArchs.contains("x86_64")
+                    && (installedArchs.contains("arm64") || installedArchs.contains("arm64ec"));
+        }
+        if ("arm64ec".equalsIgnoreCase(requestedArch)) {
+            return installedArchs.contains("arm64ec")
+                    || (installedArchs.contains("arm64") && installedArchs.contains("x86_64"));
+        }
+        return installedArchs.contains(requestedArch);
+    }
+
+    private String normalizeVulkanSdkVersionKey(ContentProfile profile) {
+        if (profile == null) return "";
+        String version = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim().toLowerCase(Locale.US);
+        if (!version.isEmpty()) return version;
+        String value = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
+        value = value.replace("-arm64ec", "")
+                .replace("-arm64-ec", "")
+                .replace("-arm64", "")
+                .replace("-x86_64", "")
+                .replace("-x86-64", "")
+                .replace("-amd64", "")
+                .replace("-bundle", "")
+                .replace("-unified", "")
+                .trim();
+        return value;
     }
 
     private void reloadRemoteContents() {
@@ -1860,9 +1895,11 @@ public class ContentsFragment extends Fragment {
     }
 
     private String resolveArchLabel(String archTag) {
+        if ("bundle".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_bundle_runtime);
         if ("arm64".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_arm64_runtime);
         if ("arm64ec".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_arm64ec_runtime);
         if ("x86_64".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_x64_runtime);
+        if ("x86".equalsIgnoreCase(archTag)) return getString(R.string.contents_arch_x86_runtime);
         return archTag;
     }
 
@@ -2144,7 +2181,11 @@ public class ContentsFragment extends Fragment {
                                     || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
                                 ContainerManager containerManager = new ContainerManager(getContext());
                                 for (Container container : containerManager.getContainers()) {
-                                    if (container.getWineVersion().equals(ContentsManager.getEntryName(profile))) {
+                                    String containerRuntime = manager.resolveBestRuntimeEntry(
+                                            container.getWineVersion(),
+                                            profile.getRuntimeModel()
+                                    );
+                                    if (ContentsManager.getEntryName(profile).equals(containerRuntime)) {
                                         ContentDialog.alert(getContext(), String.format(
                                                 getString(R.string.unable_to_remove_content_since_container_using),
                                                 container.getName()

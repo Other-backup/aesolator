@@ -105,6 +105,21 @@ Not immediate import material:
   closure problem
 - direct import would expand state complexity in the most fragile input area
 
+### 6. Runtime-specific input DLL payloads
+
+`GameNative` `XServerScreen.kt` no longer treats input DLL payload as one flat
+archive. It selects different assets for different runtime arches:
+
+- `arm64ec_input_dlls.tzst`
+- `x86_64_input_dlls.tzst`
+
+Why it matters here:
+
+- input/bootstrap payload should follow the actual runtime arch, not a generic
+  lowest-common-denominator asset
+- this is a small, self-contained transfer with low provenance risk
+- it strengthens the X11/input lane without importing the donor gesture stack
+
 ## Areas Where `aesolator` Is Already Stronger
 
 - forensic logging and issue-capture contract
@@ -130,12 +145,14 @@ These donor areas should not replace current `aesolator` source-of-truth:
 - `GPUInformation` hardware classification helpers
 - `GPUImage.getHardwareBufferPtr()`
 - `xconnector_epoll` fd-tracking / rlimit hygiene
+- arch-specific input DLL asset selection and staged donor payloads
+- `VortekRendererComponent` foundation
+- donor APK-native renderer libs `libvirglrenderer.so`, `libvortekrenderer.so`
 
 ### Adapt Later
 
 - `DXVKHelper` ideas for explicit env shaping
 - `GeneralComponents` install-destination abstraction
-- `VortekRendererComponent` and related config/env route
 - launch-time graphics policy from `XServerScreen.kt`
 
 ### Do Not Blind-Copy
@@ -144,6 +161,7 @@ These donor areas should not replace current `aesolator` source-of-truth:
 - donor contents/release routing as source-of-truth
 - donor UI shell or launcher architecture
 - donor package provenance semantics
+- donor binary-only `libwinlator_11.so`
 
 ## Immediate Imports Added To `aesolator`
 
@@ -160,13 +178,37 @@ into the local tree without switching app contracts:
   `RLIMIT_NOFILE` bootstrap hook
 - `app/src/main/cpp/winlator/xconnector_epoll.c`
   tracked close / ancillary-fd tracking / rlimit support
+- `app/src/main/assets/arm64ec_input_dlls.tzst`
+- `app/src/main/assets/x86_64_input_dlls.tzst`
+- `app/src/main/java/com/winlator/cmod/xenvironment/components/VortekRendererComponent.java`
+- `app/src/main/java/com/winlator/cmod/contentdialog/VortekConfigDialog.java`
+- `app/src/main/jniLibs/arm64-v8a/libvirglrenderer.so`
+- `app/src/main/jniLibs/arm64-v8a/libvortekrenderer.so`
+- `app/src/main/java/com/winlator/cmod/inputcontrols/ControllerManager.java`
+- `app/src/main/java/com/winlator/cmod/inputcontrols/TouchMouse.java`
+- `app/src/main/java/com/winlator/cmod/xserver/XKeycode.kt`
+- `XServerDisplayActivity.extractInputDLLs()` now chooses donor-style
+  arch-specific input payloads when the runtime arch and bundled asset match
+
+Binary-native conclusion:
+
+- donor `libwinlator_11.so` exports the older donor native
+  `XInputStream` / `XOutputStream` path
+- local `cmod` already supersedes that lane with source-backed Java stream
+  classes plus richer native `GPUInformation`
+- keep `libwinlator_11.so` as donor reference only unless a dedicated source
+  reconstruction pass is opened
+- dedicated audit note:
+  [GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md](/data/data/com.termux/files/home/aesolator/docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md)
 
 ## Next Import Queue
 
 1. Wire `GPUHelper` into graphics-driver policy and Vulkan SDK package routing.
 2. Decide whether `GeneralComponents` should become a narrow internal helper
    for component destinations or stay donor-only reference material.
-3. Audit `VortekRendererComponent` against current renderer contracts before
-   adding any alternate renderer lane.
-4. Revisit touchscreen gesture borrowing only after desktop cursor/click
+3. audit whether the input DLL lane needs broader runtime-family routing than
+   `arm64ec` / `x86_64` before compile
+4. Wire staged `VortekRendererComponent` into a real runtime route only after
+   the first honest compile proves the batch is mechanically healthy.
+5. Revisit touchscreen gesture borrowing only after desktop cursor/click
    closure is stable again.

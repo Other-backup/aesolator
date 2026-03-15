@@ -24,11 +24,19 @@ runtime-binding, documentation alignment, and repository contract integrity.
   complete, do not run `gradlew`, Android builds, or APK installs in the
   middle of that lane. Keep transfer passes code-and-docs only until the user
   reopens verification.
+- If the user says the full donor transfer should be one batch, keep the whole
+  active donor-transfer lane as one cumulative commit target instead of
+  fragmenting it into per-subsystem commits. Stage and document intermediate
+  steps, but do not cut a new transfer commit until the batch reaches an
+  agreed closure point.
 
 ## Working Contract
 
 - Maintain the execution roadmap in `docs/SECOND_DEV_ROADMAP.md`.
 - Maintain a reflective work journal in `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`.
+- Maintain donor binary/source boundary notes in:
+  `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md` and
+  `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md`.
 - Keep documentation aligned with actual code, runtime contracts, and split repo
   ownership before calling a task complete.
 - Report changes to the first developer as concise implementation notes with:
@@ -82,6 +90,84 @@ runtime-binding, documentation alignment, and repository contract integrity.
   donor archive source, overlay archives, preserved paths, library deltas, and
   which layer each file belongs to: base rootfs, overlay, runtime payload, or
   container-time mutable state.
+- Rootfs-transfer closure is not just `imagefs_*` extraction. Do not call the
+  lane ready for compile until these donor-linked pieces are accounted for
+  together and documented:
+  base archive delivery/fallback, `imagefs_patches_gamenative.tzst`,
+  `container_pattern_gamenative.tzst`, donor pulseaudio overlay, and
+  `prefixPack.tzst` / `prefixPack.txz` fallback handling.
+- Before the first honest post-transfer compile, keep
+  `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md` current and classify every live
+  rootfs-linked artifact as one of:
+  base rootfs, overlay, runtime payload, prefix/bootstrap layer, or orphan
+  baggage. If a fragment such as `imagefs.txz.02` exists but is unreferenced
+  and fails archive validation, document it as orphan data instead of quietly
+  treating it as a valid shard.
+- When donor rootfs becomes canonical, keep
+  `docs/IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md` current too. Record which
+  concrete libraries and tools come from donor base, donor overlays, APK guest
+  helper mirroring, local compatibility bridges, or legacy hold. Do not call
+  the rootfs lane compile-ready until both the layer table and the per-library
+  table agree with the staged code.
+- Do not leave live `legacy` provider/layout behavior in the runtime path.
+  If old `.provider` / `.layout` markers are encountered, normalize them to
+  `gamenative` / `ubuntufs` instead of letting old rootfs state silently
+  re-activate in launch code.
+- Runtime-package transfer closure is not just feed parsing. Before calling the
+  donor runtime lane ready for compile, account for all three runtime-placement
+  facts together:
+  package-root resolution from `wineBinPath` / `wineLibPath` /
+  `winePrefixPack`, post-install `lib/wine` normalization, runtime-root
+  `prefixPack` availability, and executable-bit repair for installed `Wine` /
+  `Proton` binaries.
+- Runtime-package closure also requires one explicit metadata contract:
+  `runtimeModel`. Do not treat `Wine` and `Proton` payloads as disambiguated by
+  filename folklore alone. Keep `Contents`, `ContainerDetailFragment`,
+  `ImageFsInstaller`, `XServerDisplayActivity`, `WineInfo`, and
+  `GuestProgramLauncherFactory` aligned on the same `glibc` / `bionic`
+  runtime-model field or inference rule.
+- Do not reintroduce silent cross-family fallback between `Wine` and `Proton`
+  when resolving installed runtimes. If a requested `Proton` package is not
+  present, that is a missing-runtime state, not permission to silently resolve
+  it as `Wine`, and vice versa.
+- `Vulkan SDK` is not a random per-arch pile. Keep it as one coherent
+  version-group coverage contract: launcher selection must prefer one SDK
+  group, report whether the selected layout is `bundle`, `split`, or `single`,
+  and avoid mixing unrelated versions across architecture lanes.
+- `dgVoodoo` runtime closure requires architecture-aware validation. Dependency
+  checks and stage-time routing must validate the arch that will actually be
+  staged, not merely that some `dgVoodoo` package exists somewhere in
+  `Contents`.
+- Legacy rootfs archives are no longer allowed inside `app/src/main/assets`.
+  If old `imagefs` payloads must be kept for archaeology, move them outside the
+  asset tree and document them as archived residue rather than live APK input.
+- Runtime transfer closure is also not code-only. Before calling the donor
+  runtime lane ready for compile, check that the donor payload lanes are
+  actually staged locally too:
+  `graphics_driver`, `dxwrapper`, `fexcore`, `wowbox64`, `steampipe`,
+  `wincomponents`, `box86_64`, `steaminput`, `steam_regions.json`, and
+  `box86_env_vars.json`.
+- Donor `libwinlator_11.so` must not be adopted as a blind binary upgrade.
+  If donor-native behavior appears stronger, first record the source-backed
+  reconstruction status in `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md`,
+  then transfer only the reconstructible pieces into local source/assets.
+- Before the first honest post-transfer compile, rerun a file-level donor
+  inventory under `GameNative/app/src/main/java/com/winlator` versus
+  `aesolator/app/src/main/java/com/winlator/cmod` and record the result in
+  `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md`.
+- Before the first honest post-transfer compile after the broad
+  `app/gamenative/*` sweep, record which second-sweep donor foundations are
+  already staged locally versus still open. At minimum classify:
+  widened `Container` state, `TouchGestureConfig`,
+  `PhysicalControllerHandler`, and the external-display foundation separately
+  from the donor app-routing layer
+  (`ContainerUtils`, `IntentLaunchManager`, `ContainerMigrator`,
+  `ContainerConfigTransfer`).
+- When donor container-routing code expects storefront-style string `appId`
+  identities but the local tree still uses numeric `ContainerManager` IDs, do
+  not mutate the local identity model blindly. Bridge donor `appId` semantics
+  through `Container.sessionMetadata` first, then document the adaptation in
+  the runtime gap inventory and second-sweep inventory.
 
 ## Execution Priority
 
@@ -217,6 +303,15 @@ runtime-binding, documentation alignment, and repository contract integrity.
   not as an unknown launch crash. Recover the config from the best locally
   installed `Proton`/`Wine` runtime, persist a new `.container`, and record a
   forensic event before revisiting desktop/input code.
+- During donor native transfer, do not blindly replace local source-backed
+  `libwinlator.so` behavior with donor `libwinlator_11.so`. That donor library
+  is binary-only in-repo, maps to the older native
+  `XInputStream`/`XOutputStream` path, and should stay classified as an opaque
+  reference unless a source-backed equivalence is proven.
+- For donor runtime parity, track helper libraries explicitly:
+  `libevshim.so`, `libdummyvk.so`, `libvirglrenderer.so`,
+  `libvortekrenderer.so`. Record whether each belongs in APK `jniLibs`,
+  guest `usr/lib`, or both before calling the lane closed.
 
 ## Main Docs
 
@@ -230,6 +325,7 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - `docs/DONOR_THE412BANNER_REPO_MAP.md`
 - `docs/FREEWINE_BUILD_AGENT_HANDOFF.md`
 - `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md`
+- `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md`
 - `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md`
 - `docs/IMAGEFS_REVERSE_MAP.md`
 - `docs/IMAGEFS_HYBRID_PLAN.md`

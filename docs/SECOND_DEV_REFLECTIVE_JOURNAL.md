@@ -1605,3 +1605,771 @@
 - Next step: continue with donor `WineRequestComponent` versus local
   `WineRequestHandler`, then decide whether to fold request handling fully into
   `XEnvironment` or keep a hybrid bridge with donor socket behavior.
+
+### Entry 69: donor request routing was folded into `XEnvironment`
+
+- Goal: remove another non-donor execution tail by replacing the old standalone
+  `WineRequestHandler` with an environment-managed request component.
+- Context: local `Ae.solator` still handled browser/clipboard requests through a
+  separate `WineRequestHandler` field in `XServerDisplayActivity`, while
+  `GameNative` keeps URL request routing inside `XEnvironment` as
+  `WineRequestComponent`. That split left lifecycle and socket ownership
+  outside the same environment model as X11/audio/network components.
+- Decision: add a local `WineRequestComponent` under
+  `xenvironment/components`, move request-server lifecycle into
+  `XEnvironment`, delete the old `core/WineRequestHandler.java`, and keep a
+  hybrid request surface: donor-style socket/lifecycle structure plus the local
+  Android clipboard import/export bridge.
+- Tradeoff: the donor's Epic/auth-specific branch was not copied blindly,
+  because there is no equivalent local auth activity in `Ae.solator`. The
+  request lane is therefore materially transferred, but donor-specific
+  storefront/auth hooks remain consciously open rather than fake-imported.
+- Verification: static code transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by design.
+- Next step: continue into the next launcher-lane holdouts,
+  `SteamClientComponent` and any remaining auth/request branches that are worth
+  adapting, then resume donor archive diffing for the hybrid rootfs lane.
+
+### Entry 70: commit discipline was re-aligned to a single donor-transfer batch
+
+- Goal: align the work process with the user's new rule that the full donor
+  transfer should land as one batch commit instead of a series of subsystem
+  commits.
+- Context: earlier in the transfer lane, launcher/runtime, imagefs/rootfs, and
+  network/runtime environment passes had been committed separately as the work
+  advanced. The user then clarified that the intended discipline is one
+  cumulative transfer batch, not fragmented commit history during the lane.
+- Decision: from this point forward, keep the remaining donor-transfer work as
+  one cumulative staged batch until the lane reaches a real closure point.
+  Continue syncing docs and staging transfer files, but do not cut another
+  transfer commit mid-lane unless the user changes the rule again.
+- Tradeoff: this keeps the batch semantically cleaner for the user, but it also
+  means intermediate transfer steps remain less independently checkpointed in
+  git while the lane is open.
+- Verification: process/documentation update only. No compile, APK install, or
+  device pass was run in this sub-pass.
+- Next step: continue the remaining donor execution stack under the new batch
+  rule, starting with `WineRequestComponent` closure and then the next
+  launcher/runtime holdouts.
+
+### Entry 71: donor Steam pipe foundation was staged without pretending storefront wiring exists
+
+- Goal: keep the launcher/runtime donor lane moving by importing the small,
+  self-contained Steam-side runtime foundation instead of leaving it as a
+  permanent TODO.
+- Context: donor `SteamClientComponent` turned out to be thin wrapper logic over
+  `SteamPipeServer`, not a giant storefront subsystem. Local `Ae.solator` did
+  not have any equivalent classes in-tree, but it also does not yet have a
+  donor-style Steam source lane that would exercise the component.
+- Decision: import local adaptations of donor `RequestCodes`,
+  `SteamPipeServer`, and `SteamClientComponent`, but keep them unwired for now.
+  This treats them as staged runtime infrastructure rather than falsely calling
+  Steam integration complete.
+- Tradeoff: this adds dormant donor foundation code before the local product has
+  a consumer for it. That is acceptable because the component is small and
+  isolated, and the alternative was to keep lying to the transfer matrix about
+  the remaining scope.
+- Verification: static code transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by design.
+- Next step: continue the launcher/runtime lane with the next real consumers:
+  launch-request/container-routing helpers and donor rootfs archive diffing.
+
+### Entry 72: donor rootfs delivery sources were pinned down beyond archive names
+
+- Goal: close another rootfs-tail in the docs by recording where donor imagefs
+  artifacts actually come from, not just what they are called.
+- Context: earlier rootfs notes already identified the donor archive names and
+  overlay files, but the delivery side was still fuzzy. A targeted grep through
+  donor `SteamService` showed the real download contract:
+  `fetchFileWithFallback()` serves rootfs artifacts from a GameNative primary
+  host plus an R2 fallback bucket, and also exposes
+  `imagefs_patches_gamenative.tzst` beyond the base archives.
+- Decision: update the hybrid-rootfs docs and transfer matrix to record the
+  primary/fallback URLs and the existence of the extra patches archive, so the
+  next archive-diff pass has an explicit source map.
+- Tradeoff: this is still documentation/forensics, not the archive diff itself.
+  That tradeoff is correct because knowing the real delivery contract is a
+  prerequisite for a defensible hybrid-rootfs lane.
+- Verification: source grep only. No compile, APK install, or device pass was
+  run in this sub-pass.
+- Next step: either stage the donor rootfs archives locally for actual diffing,
+  or continue container-routing/request-transfer work in parallel until the
+  archive inputs are available.
+
+### Entry 73: donor rootfs delivery was confirmed live, not just inferred from code
+
+- Goal: upgrade the rootfs lane from code-only delivery assumptions to verified
+  remote artifact facts.
+- Context: after Entry 72, the docs already knew the primary/fallback URLs, but
+  they still lacked proof that the primary host was serving the expected rootfs
+  artifacts right now.
+- Decision: perform live `HEAD` checks against the primary donor host for
+  `imagefs_gamenative.txz`, `imagefs_bionic.txz`,
+  `imagefs_patches_gamenative.tzst`, and `extras.tzst`, then write the
+  observed sizes and modification dates into the rootfs documents.
+- Tradeoff: this still does not unpack or diff the archives. It simply removes
+  another layer of uncertainty before the expensive archive-analysis pass.
+- Verification: live remote `HEAD` checks completed on `2026-03-15`; no build,
+  APK install, or device pass was run.
+- Next step: either bring the donor rootfs archives into local analysis for an
+  actual file-level diff, or continue closing launch-routing/storefront tails
+  while the archive analysis lane is prepared.
+
+### Entry 74: subclass-aware environment lookup fixed a transfer-induced runtime tail
+
+- Goal: close a subtle logic regression introduced by the launcher split before
+  it became another hidden runtime failure later.
+- Context: after adapting local `BionicProgramLauncherComponent` and
+  `GlibcProgramLauncherComponent`, `XEnvironment.onPause()` / `onResume()`
+  still looked up `GuestProgramLauncherComponent` by exact class equality.
+  That meant the new launcher subclasses would not be found for
+  suspend/resume, even though the donor transfer itself had succeeded.
+- Decision: change `XEnvironment.getComponent()` to use
+  `componentClass.isInstance(component)` and a typed cast instead of exact class
+  comparison.
+- Tradeoff: none worth keeping. The old exact-class lookup was now simply wrong
+  for the transferred launcher model.
+- Verification: static code correction only. No compile, APK install, or device
+  pass was run in this sub-pass.
+- Next step: keep scanning the transferred execution stack for similar
+  donor-induced integration tails while container-routing and request wiring
+  continue.
+
+### Entry 75: donor container-routing lane was explicitly put on hold instead of fake-imported
+
+- Goal: close a planning tail in the transfer matrix by stating clearly what is
+  actually blocked in donor container-routing, instead of leaving Lane 4 as a
+  vague "not yet transferred".
+- Context: a fresh pass over donor `IntentLaunchManager`, `ContainerMigrator`,
+  and `ContainerUtils` showed that the lane is tightly coupled to storefront
+  `appId` strings, donor `ContainerData`, and temporary config overrides. Local
+  `Ae.solator` currently has only direct `selected_menu_item_id` routing and no
+  equivalent DTO/override model.
+- Decision: mark Lane 4 as an explicit `hold` in the matrix. That preserves
+  honesty in the full-transfer plan and avoids cargo-culting donor routing code
+  into a data model that does not exist locally yet.
+- Tradeoff: this leaves a visible open lane in the transfer matrix, but it is a
+  truthful open lane rather than a fake closed one.
+- Verification: donor-code audit only. No compile, APK install, or device pass
+  was run in this sub-pass.
+- Next step: keep pushing the lanes that do have a compatible local substrate
+  now: launcher/runtime, request routing, and rootfs analysis.
+
+### Entry 76: rootfs transfer stopped being theoretical and gained a real donor install chain
+
+- Goal: close the biggest remaining honesty gap in the rootfs lane before any
+  future compile: the code already knew donor archive names, but it still did
+  not behave like donor delivery/runtime patching actually existed.
+- Context: local `ImageFsInstaller` had variant-aware names and overlay hooks,
+  but still assumed the archive was somehow already present in `filesDir` or
+  assets. On top of that, glibc support still lacked the donor patch layer,
+  donor main-runtime container pattern, donor pulseaudio overlay, and
+  `prefixPack.tzst` fallback parity.
+- Decision: extend `ImageFsInstaller` with donor-style primary/fallback remote
+  delivery for `imagefs_gamenative.txz`, `imagefs_bionic.txz`, and
+  `imagefs_patches_gamenative.tzst`; stage donor
+  `container_pattern_gamenative.tzst` and `pulseaudio-gamenative.tzst`
+  locally; route glibc `applyGeneralPatches()` through the donor patch/audio
+  path; and let `ContainerManager` accept both `prefixPack.tzst` and
+  `prefixPack.txz`.
+- Tradeoff: this is still not the full archive-diff/rebuild stage. It closes
+  the delivery/runtime-contract tail first, while the heavier library-level
+  rootfs analysis remains open.
+- Verification: code-and-doc transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by rule.
+- Next step: continue Lane 8 by unpacking and classifying donor rootfs
+  archives/payloads, then keep folding the remaining runtime/container tails
+  into the same batch until it reaches an honest compile point.
+
+### Entry 77: X11/input payload selection stopped treating every runtime like one generic archive
+
+- Goal: close a small but real donor tail in the X11/input lane before compile:
+  input DLL bootstrap payload should follow runtime arch instead of always
+  unpacking the same legacy archive.
+- Context: donor `GameNative` `XServerScreen.kt` already split this payload by
+  runtime arch (`arm64ec_input_dlls.tzst`, `x86_64_input_dlls.tzst`), while
+  local `XServerDisplayActivity` still always extracted one generic
+  `input_dlls.tzst`.
+- Decision: stage both donor input DLL archives locally and adapt
+  `extractInputDLLs()` to prefer the arch-specific asset when the active
+  runtime is `arm64ec` or `x86_64`, falling back to the legacy archive only
+  when no matching donor asset is bundled.
+- Tradeoff: this is a narrow import, not a full donor gesture-stack merge.
+  That is intentional; payload selection is stable low-risk infrastructure,
+  while broader touch/gesture logic is still a separate closure problem.
+- Verification: code-and-doc transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by rule.
+- Next step: keep scanning the donor execution stack for other small but
+  runtime-critical payload mismatches that can be closed before the honest
+  compile point.
+
+### Entry 78: main runtime pathing and archive inventory were brought closer to donor reality
+
+- Goal: close the next class of hidden rootfs/runtime mismatches before compile:
+  not just named donor archives, but the actual runtime layout assumptions they
+  carry.
+- Context: donor `ImageFs` and several donor helpers assume `/opt/wine` for the
+  main runtime, while local code still had scattered fallback checks for only
+  `/opt/<main-runtime-id>`. At the same time, streamed donor archive inventory
+  showed a real split in archive character: `glibc` carries a heavy `opt/`
+  tooling/runtime layer plus host-metadata noise, while `bionic` looks much
+  closer to a clean userland/Vulkan/OpenAL surface.
+- Decision: add a local `getMainWineDir()` bridge so core runtime/profile/UI
+  paths accept both `/opt/wine` and `/opt/<main-runtime-id>`; update main
+  runtime fallback checks in `WineInfo`, `WineRuntimePresenceDependency`, and
+  `ContainerDetailFragment`; add donor-derived
+  `ImageFsInstaller.generateCompactContainerPattern()` adapted to the bridged
+  layout; and write the archive findings into the rootfs docs/transfer matrix.
+- Tradeoff: this still does not resolve the full archive-adoption table. It
+  does remove another class of silent false negatives before the first honest
+  compile.
+- Verification: code-and-doc transfer only, plus streamed archive inventory
+  from donor hosts. No compile, APK install, or device pass was run in this
+  sub-pass by rule.
+- Next step: continue closing remaining donor/runtime tails until the batch is
+  ready for the first honest compile, then only move into build verification.
+
+### Entry 79: installed runtime packages stopped pretending install dir is always the runtime root
+
+- Goal: close another silent runtime-placement mismatch before the first honest
+  compile: imported `Wine` / `Proton` packages can carry a wrapper directory,
+  while launcher/container code historically treated the install dir itself as
+  the runtime root.
+- Context: local `ContentsManager` already carried `wineBinPath`,
+  `wineLibPath`, and `winePrefixPack`, but `WineInfo.fromIdentifier()` still
+  handed `ContainerManager` and launcher code only the plain install path.
+  That left nested runtime layouts vulnerable to false missing-file behavior
+  even when the package metadata itself was correct.
+- Decision: make `ContentsManager` derive an effective runtime root from the
+  shared parent of `wineBinPath` / `wineLibPath` / `winePrefixPack`; make
+  `WineInfo` consume that resolved root; and add donor-style post-install
+  runtime cleanup so imported packages also normalize `lib/wine`, guarantee a
+  runtime-root `prefixPack.*` path for legacy container consumers, and restore
+  executable bits on installed binaries.
+- Tradeoff: this still assumes donor-style runtime packages keep
+  `bin` / `lib` / `prefixPack` under one shared payload root. That is the right
+  pre-compile assumption because the donor and local runtime consumers already
+  depend on that contract.
+- Verification: static code and documentation pass only. No compile, APK
+  install, or device run was performed in this sub-pass by rule.
+- Next step: keep closing the remaining donor/runtime tails until the batch
+  reaches the first honest compile point, then move into real build
+  verification.
+
+### Entry 80: donor Steam-side runtime plumbing stopped being a dead transfer artifact
+
+- Goal: close another small but real donor tail before compile: `SteamPipeServer`
+  and `SteamClientComponent` were already imported, but the local environment
+  stack still never started them.
+- Context: donor `GameNative` wires `SteamClientComponent()` into the live
+  X-server environment next to `NetworkInfoUpdateComponent`, while local code
+  still left the component staged but disconnected.
+- Decision: attach `SteamClientComponent` to local `XServerDisplayActivity`
+  during `XEnvironment` construction so the Steam-side donor plumbing is part
+  of the runtime stack, not just code parked in-tree.
+- Tradeoff: this is still only the infrastructure wiring step, not a verified
+  Steam runtime flow. That is acceptable before compile because the open tail
+  has narrowed from “not wired at all” to “needs real runtime verification”.
+- Verification: static code and documentation pass only. No compile, APK
+  install, or device run was performed in this sub-pass by rule.
+- Next step: keep closing the remaining donor/runtime/rootfs tails until the
+  batch reaches the first honest compile point.
+
+### Entry 81: rootfs archive diffing stopped treating donor bionic and donor glibc as one blur
+
+- Goal: move the rootfs lane one step closer to an honest compile by replacing
+  vague “donor rootfs is newer” language with subsystem-level archive facts.
+- Context: code and docs already knew the donor archive names and delivery
+  chain, but the adoption strategy was still too hand-wavy about which archive
+  actually carries userland libraries and which one carries utility overlays.
+- Decision: stream-inspect local `imagefs.txz`, donor `imagefs_bionic.txz`,
+  donor `imagefs_gamenative.txz`, and donor
+  `imagefs_patches_gamenative.tzst`; record that local/base and donor `bionic`
+  are close on userland surfaces (GStreamer, Pulse, DBus, fonts, Vulkan,
+  OpenAL, winetricks, CLI tooling), while donor patch/glibc layers own the
+  extra `opt/system32` / `opt/apps` / `Steamless` / `7-Zip` utility surface
+  and also carry macOS archive noise that must not leak into a rebuilt rootfs.
+- Tradeoff: this is still streamed manifest evidence, not a fully unpacked
+  library-by-library adoption table. That is acceptable at this stage because
+  it closes the false equivalence between donor `bionic` and donor `glibc`
+  before compile.
+- Verification: source/archive inspection only. No compile, APK install, or
+  device run was performed in this sub-pass by rule.
+- Next step: keep folding the remaining rootfs/runtime tails into the same
+  donor-transfer batch until the tree reaches the first honest compile point.
+
+### Entry 82: staged donor overlays stopped being anonymous blobs
+
+- Goal: close another rootfs tail before compile by classifying the already
+  imported donor overlays instead of leaving `extras.tzst` and `redirect.tzst`
+  as opaque assets.
+- Context: the donor overlay archives were already present locally, but docs
+  still treated them mostly as names rather than owned subsystem layers.
+- Decision: inspect both staged archives directly and record that
+  `extras.tzst` is the utility overlay (`Steamless`, `7-Zip`, `GPUInfo.exe`,
+  `TestD3D.exe`, `generate_interfaces_file.exe`, `wine-mono`) while
+  `redirect.tzst` is the redirect-hook layer
+  (`usr/lib/libredirect.so`, `usr/lib/libredirect-bionic.so`); also record that
+  both overlays still carry macOS packaging noise and therefore need cleanup
+  before any rebuilt rootfs lane.
+- Tradeoff: this still does not answer whether each utility should live in base
+  rootfs, overlay, or package/runtime space long-term. It does remove the
+  ambiguity about what the imported archives actually contain.
+- Verification: archive inspection only. No compile, APK install, or device run
+  was performed in this sub-pass by rule.
+- Next step: keep closing the remaining donor/runtime/rootfs tails until the
+  batch reaches the first honest compile point.
+
+### Entry 83: donor runtime payload parity stopped having obvious holes
+
+- Goal: close the remaining easy donor-runtime gap before the first compile by
+  staging the missing payload assets rather than leaving half the donor lanes
+  present only on paper.
+- Context: a focused asset inventory showed local runtime payload coverage was
+  still visibly behind donor `GameNative` in `graphics_driver`, `dxwrapper`,
+  `fexcore`, `wowbox64`, `steampipe`, `wincomponents`, `box86_64`, and
+  `steaminput`, plus root-level `steam_regions.json` and
+  `box86_env_vars.json`.
+- Decision: copy the missing donor runtime assets into the local tree without
+  overwriting already existing local payloads, then rerun the focused asset
+  inventory to confirm that the selected donor runtime lanes no longer had
+  missing files on the local side.
+- Tradeoff: this closes payload parity faster than code parity. That is the
+  right order here because payload absence would invalidate later runtime
+  verification even if the surrounding Java glue looked complete.
+- Verification: static asset transfer plus focused donor/local inventory diff.
+  No compile, APK install, or device run was performed in this sub-pass by
+  rule.
+- Next step: continue with the remaining code-side donor gaps, not payload
+  staging.
+
+### Entry 84: donor bionic helper libraries stopped being implicit runtime assumptions
+
+- Goal: close another pre-compile donor/runtime tail by making the donor helper
+  libs explicit instead of assuming they magically appear in the guest rootfs.
+- Context: donor `GameNative` expects `libevshim.so` and
+  `libredirect-bionic.so` in guest `usr/lib`, while renderer-side donor lanes
+  expect APK-native `libvirglrenderer.so` / `libvortekrenderer.so`. Local tree
+  had part of that story in overlays, but not the full ownership rule.
+- Decision: stage donor `libdummyvk.so`, `libevshim.so`,
+  `libvirglrenderer.so`, and `libvortekrenderer.so` into local `jniLibs`,
+  mirror `libevshim.so` and `libdummyvk.so` into guest `usr/lib` during
+  `ImageFsInstaller.installGuestLibs()`, and teach the bionic launcher to
+  append `libevshim.so` plus `libredirect-bionic.so` into `LD_PRELOAD` when
+  present.
+- Tradeoff: this still stops short of a full source-backed `evshim` build
+  because donor repo exposes `evshim.c` without the SDL2 header/toolchain
+  needed for an immediate honest local compile. Pre-compile parity therefore
+  uses staged donor binaries with explicit ownership docs.
+- Verification: code-and-doc transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by rule.
+- Next step: keep closing the remaining donor utility/input gaps before the
+  first honest compile.
+
+### Entry 85: donor Vortek stopped being just an audit note
+
+- Goal: close the last obvious renderer-subsystem gap before compile by moving
+  donor `Vortek` from “documented missing lane” to staged local foundation.
+- Context: earlier audit already showed `Vortek` was a real donor subsystem:
+  socket transport, HardwareBuffer-backed window content, native
+  `libvortekrenderer.so`, and graphics-driver coupling. Leaving it out would
+  keep the transfer batch in a half-documented state.
+- Decision: stage local `VortekRendererComponent`, local `VortekConfigDialog`,
+  add donor parity socket constants for `VORTEK_SERVER_PATH`, and stage the
+  donor APK native library plus graphics-driver assets.
+- Tradeoff: the lane is now present in-tree, but not yet wired into the live
+  runtime path or build-verified. That is acceptable in this no-compile phase:
+  the missing-subsystem tail is closed, while runtime wiring remains an
+  explicitly documented later step.
+- Verification: code-and-doc transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by rule.
+- Next step: run one more donor inventory pass and close whatever remains
+  before the first honest compile.
+
+### Entry 86: donor libwinlator_11 stopped looking like a mysterious upgrade button
+
+- Goal: answer the donor `libwinlator_11.so` question before compile so the
+  batch does not accidentally pivot onto a binary-only native lane.
+- Context: the donor repo ships `libwinlator_11.so` only as a prebuilt APK
+  native library, while the visible donor source tree still builds `winlator`
+  from source. That smelled like a trap unless the exported JNI surface was
+  inventoried explicitly.
+- Decision: inspect donor `libwinlator_11.so` symbol exports and compare them
+  against donor `libwinlator.so` and local source-backed native code. The
+  result: `libwinlator_11.so` maps to the donor `XInputStream` /
+  `XOutputStream` JNI path, while local `cmod` already uses Java-side stream
+  classes plus richer source-backed native `GPUInformation`.
+- Tradeoff: this means the donor binary is useful as a reference artifact, not
+  as a drop-in source-of-truth. That is the correct conservative conclusion
+  before the first honest compile.
+- Verification: binary symbol inventory only. No compile, APK install, or
+  device pass was run in this sub-pass by rule.
+- Next step: keep transfer focus on source-backed donor improvements and leave
+  binary-only donor lanes explicitly classified instead of half-imported.
+
+### Entry 87: donor compatibility perimeter shrank to the genuinely nontrivial tail
+
+- Goal: reduce the remaining donor gap list again before the first honest
+  compile without dragging in app-specific Compose/DataStore debt.
+- Context: after the second inventory pass, the remaining donor code files were
+  already mostly down to `box86_64` management, donor input-model classes, and
+  a few utility wrappers. Some of those were pure compatibility shells rather
+  than deep subsystem work.
+- Decision: stage `core.envvars.EnvVars` compatibility wrapper, donor
+  `Box86_64Preset`, and a lightweight local `Win32AppWorkarounds` shell so the
+  remaining donor list reflects only genuinely nontrivial lanes.
+- Tradeoff: this still leaves donor `Box86_64PresetManager` / rc parser, donor
+  input-model classes, and donor app-wrapper classes open. That is acceptable:
+  those are now the honest edge of the transfer batch, not forgotten easy
+  wins.
+- Verification: inventory diff only. The remaining donor code-file gap count
+  dropped again, now to the compatibility/input perimeter. No compile, APK
+  install, or device pass was run in this sub-pass by rule.
+- Next step: decide whether the pre-compile boundary is strong enough for the
+  first honest compile, or whether the remaining 12 donor files justify one
+  more compatibility/import pass first.
+
+### Entry 88: donor gap list collapsed to six non-foundational files
+
+- Goal: close one more chunk of donor compatibility debt before the first
+  honest compile so the remaining delta is clearly outside the core runtime
+  stack.
+- Context: after the previous pass, the donor gap list still contained the
+  whole `box86_64` manager/rc package even though the payload assets were
+  already local and the remaining work was mostly compatibility scaffolding.
+- Decision: stage donor `Box86_64PresetManager` plus the `box86_64.rc` package
+  locally, adapting storage to local `SharedPreferences` and local env-var
+  wrappers instead of donor `PrefManager`.
+- Tradeoff: this still leaves donor `PrefManager`, `ContainerData`,
+  `NavigationDialog`, and the donor input-model classes out of tree. That is
+  now acceptable: those six files form a bounded donor-app/input perimeter and
+  no longer block the runtime-transfer claim.
+- Verification: donor/local inventory diff only. The remaining donor code-file
+  delta is now six files. No compile, APK install, or device pass was run in
+  this sub-pass by rule.
+- Next step: the tree is now at a defensible pre-compile boundary; the next
+  rational move is the first honest compile rather than another bulk donor
+  import.
+
+### Entry 89: donor wrapper lane staged to zero file-gap
+
+- Goal: close the remaining donor Java/Kotlin filename delta before the first
+  honest compile.
+- Context: the transfer batch had already absorbed most runtime foundation, but
+  a small wrapper/app-model perimeter still remained visible in the inventory.
+- Decision: stage local-compatible versions of `PrefManager.kt`,
+  `container/ContainerData.kt`, `contentdialog/NavigationDialog.java`, and
+  replace `xserver/XKeycode.java` with donor-shaped `xserver/XKeycode.kt`
+  while preserving Java field access semantics.
+- Tradeoff: `ContainerData.kt` is intentionally adapted without Compose
+  saveable dependencies for now, because the local tree is not using the donor
+  Compose editor surface before the first honest compile.
+- Verification: file-level donor inventory now reports `MISSING_COUNT 0` under
+  `GameNative/app/src/main/java/com/winlator` versus local
+  `app/src/main/java/com/winlator/cmod`.
+- Next step: record the zero-gap state in the transfer matrix and keep the
+  remaining open tail focused on compile/runtime proof, not file presence.
+
+### Entry 90: Kotlin build perimeter closure
+
+- Goal: avoid a fake transfer closure where staged donor Kotlin files exist in
+  tree but the app module is not even configured to compile them.
+- Context: the donor-transfer lane now includes multiple Kotlin files, and the
+  pre-compile state would stay dishonest if the module still exposed only a
+  Java/Android plugin surface.
+- Decision: enable `org.jetbrains.kotlin.android` in the app module and pin
+  `kotlinOptions.jvmTarget = 17` to the existing Java level.
+- Tradeoff: this widens the future build surface, but it is a necessary
+  pre-compile closure step once donor Kotlin is staged locally.
+- Verification: static diff pass clean; no build run yet by current rule.
+- Next step: keep all remaining tails code/docs only until the user reopens the
+  first honest compile.
+
+### Entry 91: libwinlator_11 source-backed boundary written down
+
+- Goal: make donor `libwinlator_11.so` handling explicit so the batch does not
+  quietly slide into opaque binary adoption.
+- Context: the donor binary clearly looks broader, but the reconstructible part
+  of that breadth is already increasingly represented in local source and
+  staged native helpers.
+- Decision: add a dedicated audit note
+  `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md` and classify the donor binary
+  as an audit/reference surface only. Source-backed imports stay preferred:
+  `GPUHelper`, `xconnector_epoll`, `GPUImage`, helper libs, Vortek foundation,
+  and stream-path parity.
+- Tradeoff: slower than dropping in the donor library, but keeps `Ae.solator`
+  maintainable and reviewable.
+- Verification: docs updated and linked from the main transfer matrix and gap
+  inventory; no compile run yet.
+- Next step: finish the remaining documentation sync and then reopen the donor
+  inventory one more time before the first honest compile.
+
+### Entry 92: second broad GameNative sweep confirmed the remaining edge
+
+- Goal: verify that the transfer batch had not quietly missed a useful donor
+  runtime lane outside the classic `com/winlator/*` tree.
+- Context: after the file-level parity pass reached `MISSING_COUNT 0`, the next
+  realistic risk was not a missing `com/winlator` file but an overlooked
+  `app/gamenative/*` subsystem tied to runtime/container delivery.
+- Decision: run a second sweep across `app/gamenative/*`, `ubuntufs`, and donor
+  build files; record the result in
+  `docs/GAMENATIVE_SECOND_SWEEP_INVENTORY.md`.
+- Tradeoff: this is inventory/documentation closure, not another blind import
+  burst. That is intentional, because the remaining donor surfaces are now
+  architectural lanes:
+  storefront-aware routing, external display, Compose gesture UX, and
+  dynamic-feature rootfs delivery.
+- Verification: second sweep completed and written down; no compile run yet.
+- Next step: carry the batch to the first honest compile boundary with these
+  remaining lanes explicitly classified instead of hidden.
+
+### Entry 93: donor Container contract was widened before the first honest compile
+
+- Goal: remove the quiet mismatch where staged donor wrappers/data models
+  expected a richer container contract than the live local `Container`
+  actually provided.
+- Context: `ContainerData.kt` and the second donor sweep both showed the same
+  problem: local `Container.java` still lacked many donor runtime fields and
+  JSON keys, so the batch looked broader on paper than in live state.
+- Decision: rewrite local `Container.java` into a donor-compatible hybrid while
+  preserving local `int id`, local manager wiring, local fullscreen flag, and
+  local default values where they still matter.
+- Tradeoff: this is a large source patch before compile, but it is still safer
+  than compiling against a half-width container contract and discovering the
+  break only after the batch is declared "done".
+- Verification: static contract sweep only. The widened class now exposes the
+  previously missing donor state and `git diff --check` stayed clean. No build
+  run yet by rule.
+- Next step: stage the low-dependency second-sweep donor classes that depend on
+  this wider contract, then rerun inventory.
+
+### Entry 94: low-dependency second-sweep donor foundation moved from paper to code
+
+- Goal: reduce the second-sweep donor tail again before the first honest
+  compile by staging the donor pieces that are runtime-relevant but not tightly
+  coupled to donor storefront routing.
+- Context: after the `Container` closure, the cleanest remaining donor pieces
+  were gesture data, physical-controller handling, and the external-display
+  input/swap/IME surface.
+- Decision: stage local-compatible versions of `TouchGestureConfig`,
+  `PhysicalControllerHandler`, `ExternalDisplayInputController`,
+  `ExternalDisplaySwapController`, `ExternalOnScreenKeyboardView`,
+  `IMEInputReceiver`, and `SwapInputOverlayView`, plus the supporting
+  colors/strings.
+- Tradeoff: these classes are staged as foundation only. They are not yet
+  wired into the live app flow, because the current rule is still
+  transfer-first, compile later.
+- Verification: repeated donor parity under `com/winlator/*` remains
+  `MISSING_COUNT 0`; second-sweep status now shows those low-dependency donor
+  files as `STAGED`, with the remaining open tail reduced to
+  `ContainerUtils`, `IntentLaunchManager`, `ContainerMigrator`, and
+  `ContainerConfigTransfer`. `git diff --check` stayed clean.
+- Next step: keep moving only on the genuinely high-coupled donor app-routing
+  layer before the first honest compile.
+
+### Entry 95: donor app-routing layer was staged through a local appId bridge
+
+- Goal: close the last obvious second-sweep donor filename gap before the first
+  honest compile.
+- Context: donor `ContainerUtils`, `IntentLaunchManager`,
+  `ContainerMigrator`, and `ContainerConfigTransfer` were the only explicit
+  second-sweep files still marked open, but the real blocker was structural:
+  donor code assumes storefront-style string `appId` identities while
+  `Ae.solator` still uses numeric `ContainerManager` IDs.
+- Decision: widen local `PrefManager` into a donor-compatible property
+  surface, then stage local-adapted versions of the donor routing/config files
+  on top of a `Container.sessionMetadata` bridge instead of mutating the local
+  container identity model blindly.
+- Tradeoff: this is a compatibility adaptation, not a verbatim donor copy.
+  That is correct here because fake string-ID replacement would create more
+  fragility than parity.
+- Verification: new staged files are in tree, the second-sweep routing layer is
+  no longer missing by filename, and `git diff --check` stayed clean. Build
+  verification is still intentionally deferred by rule.
+- Next step: rerun the written donor inventories and convert the remaining tail
+  from "missing source files" into "compile/runtime proof plus rootfs archive
+  ownership mapping".
+
+### Entry 96: donor inventory moved from missing files to proof burden
+
+- Goal: rewrite the donor status docs so they describe the actual remaining
+  risk rather than stale pre-import gaps.
+- Context: after staging the app-routing layer, the old docs still described
+  `ContainerUtils`, `IntentLaunchManager`, `ContainerMigrator`, and
+  `ContainerConfigTransfer` as open, which was no longer true.
+- Decision: update the runtime gap inventory, second-sweep inventory, transfer
+  matrix, roadmap, and `AGENTS.md` to mark the routing layer as staged, record
+  the `sessionMetadata` bridge explicitly, and move the remaining tail to
+  honest compile/runtime proof plus donor rootfs ownership work.
+- Tradeoff: the written state is now stricter: it no longer flatters progress
+  with fake closure, but it also stops pretending there are still missing donor
+  files where there are none.
+- Verification: documentation updated locally after a fresh staged-file sweep
+  and clean `git diff --check`.
+- Next step: if the user keeps the build lock in place, continue with donor
+  rootfs archive ownership mapping; if the user reopens compilation, move to
+  the first honest compile and runtime verification pass.
+
+### Entry 97: rootfs ownership moved from archive folklore to an explicit table
+
+- Goal: close the last non-code tail before the first honest compile by making
+  the hybrid `imagefs` lane explicit about what each archive actually is.
+- Context: the donor transfer batch had already staged installer, overlay,
+  prefix, audio, and runtime-placement logic, but the written state still let
+  `imagefs_*`, `extras.tzst`, and `redirect.tzst` blur together as if they were
+  interchangeable rootfs pieces.
+- Decision: add `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md`, link it from the
+  reverse map and hybrid plan, and classify `imagefs.txz`, donor `bionic`,
+  donor `glibc`, patch/utility overlays, prefix/audio overlays, and the local
+  `imagefs.txz.02` fragment.
+- Tradeoff: this is documentation/inventory closure, not another code import.
+  That is correct here because the remaining honest burden is compile/runtime
+  proof and per-library adoption decisions, not more speculative transfer.
+- Verification: ownership table written, roadmap/hybrid docs synced, and the
+  orphan state of `imagefs.txz.02` is now explicit instead of implicit.
+- Next step: rerun the donor/rootfs inventory one more time, then hold the lane
+  at compile-boundary until the user reopens the first honest build.
+
+### Entry 98: control inventory confirmed the rootfs lane is now compile-boundary honest
+
+- Goal: verify that the new ownership write-up matched the live tree instead of
+  becoming another optimistic doc layer.
+- Context: after the ownership table landed, the remaining risk was simple but
+  ugly: a stale asset list or a fake statement about `imagefs.txz.02`.
+- Decision: rerun control inventory against local assets, grep the tree for
+  `imagefs.txz.02`, and validate both archives with `xz -t` before declaring
+  the documentation pass closed.
+- Tradeoff: this is still not a compile. It is intentionally the last factual
+  shell-level closure step before the first honest build is reopened.
+- Verification: local asset inventory confirms
+  `imagefs.txz`, `imagefs.txz.02`, `extras.tzst`, `redirect.tzst`,
+  `container_pattern_common.tzst`, `container_pattern_gamenative.tzst`,
+  `pulseaudio.tzst`, and `pulseaudio-gamenative.tzst`; `imagefs.txz` passes
+  `xz -t`, `imagefs.txz.02` fails, and no live source references
+  `imagefs.txz.02`.
+- Next step: hold at compile-boundary and reopen only the first honest compile
+  or the per-library hybrid rootfs adoption table, depending on user priority.
+
+### Entry 99: donor rootfs became canonical and the hybrid split moved upward
+
+- Goal: stop treating donor rootfs as a documentation idea and make the app
+  itself speak the new contract before the first honest compile.
+- Context: after the ownership and control-inventory passes, the biggest
+  remaining lie would have been leaving `Ae.solator` on legacy `imagefs`
+  assumptions while claiming that `GameNative` rootfs was the canonical base.
+- Decision: stage donor-rootfs-first code paths:
+  canonical donor archive downloads, `:ubuntufs` dynamic-feature scaffold,
+  rootfs provider/layout markers, canonical `/tmp`, shared `imagefs/opt` for
+  `Wine` / `Proton`, canonical `usr/local/bin/box64`, and compatibility
+  bridges for `/usr/tmp` and `usr/bin/box64`. At the same time, add
+  `docs/IMAGEFS_PER_LIBRARY_ADOPTION_TABLE.md` so the base/overlay/helper/hold
+  split is explicit at library level.
+- Tradeoff: this is a broad structural patch before compile. That is
+  intentional, because the user asked for full donor-rootfs adoption before the
+  first honest build, not another half-step with legacy paths still baked in.
+- Verification: static/documentation closure only; no build run yet by active
+  rule.
+- Next step: run the first honest compile/runtime proof for the donor-rootfs-
+  first lane once the user reopens build verification.
+
+### Entry 100: static audit cut through the donor-rootfs-first optimism
+
+- Goal: answer the hard question before compile: did the donor-rootfs-first
+  pass actually close the runtime split, or only move the code closer.
+- Context: after the rootfs-first transfer, the repo could easily drift into a
+  dangerous half-state where docs say `glibc` and `bionic` are cleanly split,
+  while launch/runtime resolution still quietly operate on one mutable rootfs.
+- Decision: run a static audit across assets, installer, container launch,
+  launcher factory, `Contents` runtime resolution, and local feed metadata; add
+  `docs/ROOTFS_RUNTIME_STATIC_AUDIT.md`; and record the honest blockers instead
+  of pretending compile is already justified.
+- Tradeoff: this slowed the push toward the first build, but it prevented a
+  worse mistake: compiling a repo that still packages old `imagefs` baggage and
+  still chooses launcher model from rootfs state rather than selected runtime
+  contract.
+- Verification: asset inventory confirms `imagefs.txz` and invalid
+  `imagefs.txz.02` are still physically present; installer still hides legacy
+  behind a marker rather than removing it; launch still does not call the
+  variant-aware installer path with container context; `Contents` runtime
+  resolution still scores by family/arch only.
+- Next step: close those blockers in code, then rerun the inventory before the
+  first honest compile.
+
+### Entry 101: runtime model became a real contract instead of a naming habit
+
+- Goal: close the static blockers without jumping prematurely into compile by
+  making `runtimeModel` authoritative from feed normalization all the way to
+  launch.
+- Context: before this pass, donor-rootfs-first code still had one dangerous
+  split-brain pattern: installer logic knew about `glibc` / `bionic`, but
+  `Contents`, `WineInfo`, launcher selection, and container launch still had
+  enough old heuristics to drift apart.
+- Decision: add explicit `runtimeModel` handling to `ContentProfile`,
+  `ContentsManager`, `GamehubFeedNormalizer`, and local `contents.json`; make
+  `Wine` / `Proton` install roots canonical under
+  `runtime-<model>-<family>-<version>-<verCode>`; enforce variant-aware rootfs
+  preparation before `XServerDisplayActivity` continues; and make launcher
+  creation depend on requested runtime model instead of ambient `imagefs`
+  state.
+- Tradeoff: this deliberately tightened behavior. Silent cross-family fallback
+  between `Wine` and `Proton` was removed, which is harsher than the old
+  resolver, but it is the correct tradeoff because the old behavior caused
+  ambiguity and package duplication.
+- Verification: `git diff --check` stayed clean; direct single-arg resolver
+  tails were removed from the critical launch/dependency path; and the static
+  audit findings for launch enforcement, runtime-model metadata, launcher
+  routing, and `/opt` collision risk are now closed in code.
+- Next step: rerun the inventory one more time, document the now-narrower
+  residuals, and hold the batch at the first honest compile boundary.
+
+### Entry 102: payload lanes and legacy rootfs baggage were cut to the real compile boundary
+
+- Goal: close the remaining static tails before the first honest compile by
+  fixing payload families outside `Wine/Proton` and physically removing legacy
+  rootfs baggage from the live asset tree.
+- Context: after Entry 101, the runtime-model lane was coherent, but two soft
+  spots remained: `Vulkan SDK` could still be selected as unrelated per-arch
+  crumbs, and `dgVoodoo` still depended on a weaker “some package exists”
+  contract. At the same time, the old `imagefs` blobs were still physically
+  sitting in `app/src/main/assets`, which is the kind of ugly residue that
+  quietly crawls back into a build.
+- Decision: move legacy `imagefs.txz` and `imagefs.txz.02` out of the asset
+  tree into `.legacy_rootfs/`, remove live installer fallback to legacy
+  rootfs, teach `ContentProfile` / `ContentsFragment` explicit architecture and
+  bundle semantics, make `Vulkan SDK` selection group-aware in
+  `XServerDisplayActivity`, synthesize `Vulkan SDK` / `dgVoodoo` profiles from
+  extracted package structure, and tighten `dgVoodoo` dependency checks to the
+  stage arch that will actually be used.
+- Tradeoff: this is stricter than the old permissive path. That is the point.
+  The previous behavior was tolerant in exactly the wrong places: mixed SDK
+  groups, vague wrapper presence checks, and stale rootfs baggage parked inside
+  live assets.
+- Verification: static-only closure; legacy rootfs files are no longer under
+  `app/src/main/assets`, runtime code no longer references legacy base
+  archives, `git diff --check` remains clean, and payload lanes now have
+  explicit static contracts instead of “works if profile.json happens to be
+  there”.
+- Next step: rerun the inventory one more time and then stop at the first
+  honest compile/runtime proof boundary.
+
+### Entry 103: the last live legacy rootfs marker path was removed
+
+- Goal: eliminate the last code-level path where old rootfs metadata could
+  still write or re-activate `legacy` provider/layout markers at launch time.
+- Context: after Entry 102, base archives and installer logic were already
+  donor-only, but `XServerDisplayActivity` still wrote provider/layout through
+  a stale `isGameNativeRootfs()` branch, and `ImageFs` still had a read-time
+  fallback that could surface `legacy` markers from old container metadata.
+- Decision: make `XServerDisplayActivity` always write
+  `gamenative` / `ubuntufs`, remove public legacy marker constants from
+  `ImageFs`, and normalize any old `.provider` / `.layout` file values back to
+  donor markers on read/write.
+- Tradeoff: this is intentionally uncompromising. Old container metadata no
+  longer preserves an observable “legacy mode” distinction. That is the right
+  trade because the old distinction no longer matches the new rootfs contract.
+- Verification: grep over app code no longer finds
+  `ROOTFS_PROVIDER_LEGACY` / `ROOTFS_LAYOUT_LEGACY`, `git diff --check`
+  remains clean, and the static inventory now records rootfs marker
+  normalization as closed.
+- Next step: stop the static lane here and treat the remaining work as
+  compile/runtime proof rather than another paper cleanup pass.
