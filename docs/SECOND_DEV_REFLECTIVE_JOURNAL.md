@@ -1364,3 +1364,28 @@
 - Next step: validate the manual two-tap `Computer` gesture on device, then
   keep the same anchored-tap contract for any remaining desktop icon or
   explorer-shell tails before revisiting broader runtime payload work.
+
+### Entry 60: Anchored tap targeting was rolled back after it degraded normal desktop clicks
+
+- Goal: recover the previously stable desktop click path after the first
+  `Computer`-focused fix attempt made ordinary interaction feel dead on device.
+- Context: the `Computer` probe sweep was useful, but the first follow-up fix
+  went too far. Anchoring taps to the cursor position captured at finger-down
+  improved desktop-icon target stability in theory, yet the live device report
+  immediately regressed to "stopped reacting". That was enough evidence to
+  treat the change as a bad experiment rather than keep rationalizing it.
+- Decision: revert only the `TouchpadView` anchor-tap portion and keep the
+  new debug probe infrastructure in `XServerDisplayActivity`. That restores the
+  previously working click contract while preserving the forensic tooling that
+  proved `Computer` itself is not a missing-binary problem.
+- Tradeoff: the narrow `Computer` convenience tail stays open a little longer,
+  but ordinary desktop interaction returns to the known-good state. That is the
+  right priority order; a partially helpful icon tweak is not worth breaking
+  the base desktop.
+- Verification: rebuilt and reinstalled the rollback build, then reran a clean
+  cold start. `am start -W` returned `Status: ok`, followed by
+  `PRELOADER_MAP_FALLBACK`, two `XSERVER_APP_WINDOW_MAPPED` events, and
+  `XSERVER_WINDOW_FOCUS_CHANGED has_focus:true`, which put the shell back into
+  the stable state that existed before the anchored-tap experiment.
+- Next step: pursue `Computer` convenience via a safer shell/UI route instead
+  of modifying the base tap contract again without stronger device evidence.

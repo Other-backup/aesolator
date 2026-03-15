@@ -176,16 +176,12 @@ public class TouchpadView extends View {
         private int lastX;
         private int lastY;
         private final long touchTime;
-        private final int anchorCursorX;
-        private final int anchorCursorY;
 
         public Finger(float x, float y) {
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             this.x = this.startX = this.lastX = (int)transformedPoint[0];
             this.y = this.startY = this.lastY = (int)transformedPoint[1];
             touchTime = System.currentTimeMillis();
-            anchorCursorX = logicalCursorX;
-            anchorCursorY = logicalCursorY;
         }
 
         public void update(float x, float y) {
@@ -566,10 +562,6 @@ public class TouchpadView extends View {
                     postDelayed(clickDelay, CLICK_DELAYED_TIME);
                 }
                 else if (finger1.isTap()) {
-                    if (!tapToClickMovesCursor
-                            && queueCursorTapLeftClickAt(finger1.anchorCursorX, finger1.anchorCursorY, true)) {
-                        break;
-                    }
                     if (tapToClickMovesCursor) {
                         dispatchPointerMoveAbsolute(finger1.x, finger1.y);
                     }

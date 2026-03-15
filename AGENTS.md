@@ -130,10 +130,10 @@ runtime-binding, documentation alignment, and repository contract integrity.
   `TouchpadView` path as well.
 - If desktop icons such as `Computer` fail while `Start` and ordinary windows
   still open, treat that first as a desktop-icon double-click contract issue,
-  not as a missing runtime/package issue. Verify it with an anchored two-tap
-  probe against the live shell before touching `Contents`, and keep tap clicks
-  anchored to the cursor position captured at finger-down so micro-jitter does
-  not move the target between taps.
+  not as a missing runtime/package issue. Verify it with a two-tap probe
+  against the live shell before touching `Contents`. Do not keep experimental
+  anchored-tap targeting in `TouchpadView` unless it survives a live device
+  pass without degrading ordinary desktop clicks.
 - Treat duplicate-cursor reports as cursor-ownership bugs, not mere cosmetics.
   Inspect at least these layers before changing behavior:
   Android/system pointer icon, `GLRenderer` root/X11 cursor fallback, and any

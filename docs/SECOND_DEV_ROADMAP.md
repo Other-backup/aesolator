@@ -237,9 +237,10 @@ Second autonomous developer lane for `aesolator`:
   pointer-state drift that might still appear on device.
 - The `Computer`/file-manager tail is now classified as a desktop-icon
   interaction issue, not a missing runtime binary: the shell probe sweep found
-  a working icon region, and the remaining manual-path hardening is the new
-  anchored tap target contract in `TouchpadView`, which still needs one short
-  live user pass to close completely.
+  a working icon region, but the first anchored-tap experiment regressed normal
+  desktop clicks and was rolled back. The remaining closure item is a safer
+  `Computer` convenience path that does not destabilize the default cursor
+  contract.
 - Device-led desktop screenshot proof is still partially blocked by the fact
   that this Termux session shares the same physical phone: `am start -W`
   succeeds, but `Termux` can immediately retake foreground and invalidate the
