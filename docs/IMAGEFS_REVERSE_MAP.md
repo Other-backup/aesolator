@@ -1,6 +1,6 @@
 # ImageFS Reverse Map
 
-Updated: `2026-03-14`
+Updated: `2026-03-15`
 
 ## Scope
 
@@ -18,13 +18,20 @@ This document separates:
 
 ## Base Install Contract
 
-- `ImageFsInstaller.LATEST_VERSION = 21`
-- `installFromAssets()` clears the rootfs, extracts `imagefs.txz`, then
-  installs bundled Wine assets and bundled graphics-driver assets
+Current local contract after the donor-rootfs foundation pass:
+
+- `ImageFsInstaller.LATEST_VERSION = 26`
+- installer is now variant-aware at the foundation layer:
+  `imagefs_gamenative.txz` for `glibc`,
+  `imagefs_bionic.txz` for `bionic`,
+  with fallback to legacy `imagefs.txz`
 - installer writes `.winlator/.img_version`
+- launch/runtime flow now also writes `.winlator/.variant` and `.winlator/.arch`
 - `clearRootDir()` preserves `home/` across reinstalls
-- `clearOptDir()` preserves `opt/installed-wine` while clearing other
-  `opt/*` payloads during targeted cleanup paths
+- `clearOptDir()` now preserves imported `Wine` / `Proton` payloads in `opt/`
+  more like the donor contract instead of clearing every runtime payload
+- donor overlay archives are now part of the local installer surface:
+  `redirect.tzst`, `extras.tzst`
 
 ## Top-Level Layout
 
@@ -239,8 +246,10 @@ Additional donor findings from `GameNative`:
 Interpretation:
 
 - the right next step is not a blind donor swap
-- `Ae.solator` needs a hybrid rootfs plan that combines newer donor libraries
-  with our stronger `Contents` / runtime / forensic contracts
+- `Ae.solator` now has the donor installer/overlay foundation locally, but not
+  the donor base archives themselves
+- the next hard requirement is archive-level diffing and library classification,
+  not more speculative UI/runtime guesses around rootfs behavior
 
 See also:
 

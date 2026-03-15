@@ -406,6 +406,14 @@
     </string-array>
     <string-array name="wine_entries">
     </string-array>
+    <string-array name="glibc_wine_entries">
+    </string-array>
+    <string-array name="bionic_wine_entries">
+    </string-array>
+    <string-array name="container_variant_entries">
+        <item>glibc</item>
+        <item>bionic</item>
+    </string-array>
     <string-array name="upscaler_preset_entries">
         <item>auto</item>
         <item>conservative</item>

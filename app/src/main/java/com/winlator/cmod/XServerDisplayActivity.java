@@ -1859,6 +1859,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         // Additional container checks and environment configuration
         if (container != null) {
+            imageFs.createVariantFile(container.getContainerVariant());
+            imageFs.createArchFile(container.getWineVersion());
             if (Byte.parseByte(startupSelection) == Container.STARTUP_SELECTION_AGGRESSIVE) {
                 winHandler.killProcess("services.exe");
             }

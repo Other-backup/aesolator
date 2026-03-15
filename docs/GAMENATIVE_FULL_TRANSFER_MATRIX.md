@@ -93,7 +93,7 @@ Primary donor files:
 Status:
 
 - donor path identified
-- hybridization plan documented
+- installer/overlay foundation imported into the local tree
 - archive diff/extraction pass still open
 
 Why it matters:
@@ -107,6 +107,26 @@ Why it matters:
 Canonical doc:
 
 - [IMAGEFS_HYBRID_PLAN.md](/data/data/com.termux/files/home/aesolator/docs/IMAGEFS_HYBRID_PLAN.md)
+
+Current imported status:
+
+- local `ImageFsInstaller` now tracks donor-style `LATEST_VERSION = 26`
+- installer is now variant-aware at the foundation level:
+  `imagefs_gamenative.txz`, `imagefs_bionic.txz`, with fallback to legacy
+  `imagefs.txz`
+- donor overlay assets `redirect.tzst` and `extras.tzst` are staged locally
+  and deployed after base extraction when present
+- imported `Wine` / `Proton` payloads in `opt/` are now preserved more like the
+  donor path instead of being wiped on every reinstall
+- local `Container` now carries `containerVariant`, and launch-time code writes
+  `imagefs` `.variant` / `.arch` markers before runtime bootstrap
+
+Still open inside this lane:
+
+- extract and diff donor `imagefs_gamenative.txz` and `imagefs_bionic.txz`
+- classify donor `extras.tzst` contents by subsystem and ownership
+- decide which donor rootfs files become base-layer imports versus runtime
+  payload or overlay-only assets
 
 ### Lane 2: Guest Program Launchers
 

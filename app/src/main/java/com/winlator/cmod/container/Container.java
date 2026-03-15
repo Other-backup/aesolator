@@ -32,6 +32,9 @@ public class Container {
     public static final String DEFAULT_AUDIO_DRIVER = "alsa";
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
+    public static final String GLIBC = "glibc";
+    public static final String BIONIC = "bionic";
+    public static final String DEFAULT_VARIANT = BIONIC;
     public static final String DEFAULT_DXWRAPPERCONFIG = "version=" + DefaultVersion.DXVK + ",framerate=0,async=0,asyncCache=0" + ",vkd3dVersion=" + DefaultVersion.VKD3D + ",vkd3dLevel=12_1" + ",csmt=3" + ",gpuName=NVIDIA GeForce GTX 480" + ",videoMemorySize=2048" + ",strict_shader_math=1" + ",OffscreenRenderingMode=fbo" + ",renderer=gl";
     public static final String DEFAULT_GRAPHICSDRIVERCONFIG =
             "vulkanVersion=1.4" + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=mailbox" + ";syncFrame=0" + ";disablePresentWait=0" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
@@ -73,6 +76,7 @@ public class Container {
     private String controllerMapping = new String(new char[XrControllerMapping.values().length]);
     private String box64Version;
     private String emulator;
+    private String containerVariant = DEFAULT_VARIANT;
 
     private ContainerManager containerManager;
 
@@ -280,6 +284,20 @@ public class Container {
         return emulator;
     }
 
+    public void setContainerVariant(String containerVariant) {
+        if (containerVariant == null || containerVariant.trim().isEmpty()) {
+            this.containerVariant = DEFAULT_VARIANT;
+        } else if (GLIBC.equalsIgnoreCase(containerVariant)) {
+            this.containerVariant = GLIBC;
+        } else {
+            this.containerVariant = BIONIC;
+        }
+    }
+
+    public String getContainerVariant() {
+        return containerVariant == null || containerVariant.trim().isEmpty() ? DEFAULT_VARIANT : containerVariant;
+    }
+
     public File getRootDir() {
         return rootDir;
     }
@@ -414,6 +432,7 @@ public class Container {
             data.put("fexcoreVersion", fexcoreVersion);
             data.put("box64Preset", box64Preset);
             data.put("desktopTheme", desktopTheme);
+            data.put("containerVariant", getContainerVariant());
             data.put("extraData", extraData);
             data.put("midiSoundFont", midiSoundFont);
             data.put("lc_all", lc_all);
@@ -457,6 +476,9 @@ public class Container {
                     break;
                 case "emulator":
                     setEmulator(data.getString(key));
+                    break;
+                case "containerVariant" :
+                    setContainerVariant(data.getString(key));
                     break;
                 case "wincomponents" :
                     setWinComponents(data.getString(key));

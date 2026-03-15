@@ -1551,3 +1551,32 @@
 - Next step: continue directly into donor `ImageFsInstaller` / runtime
   placement and launcher-request plumbing, then sync the transfer matrix again
   before reopening any build pass.
+
+### Entry 67: donor `ImageFsInstaller` and rootfs placement foundation were transferred without reopening builds
+
+- Goal: move the `GameNative` rootfs lane from planning docs into actual local
+  code so the launcher/runtime split now lands on a donor-style installer and
+  payload-preservation contract instead of the old monolithic `imagefs.txz`
+  assumption.
+- Context: after Entry 66, the app already knew about launcher libc models, but
+  the rootfs install path still lived on the old local contract:
+  one `imagefs.txz`, no donor overlay deployment, no `containerVariant`, and no
+  donor-style preservation of imported `Wine` / `Proton` payloads in `opt/`.
+- Decision: adapt the donor `ImageFsInstaller` foundation into the local tree:
+  raise `LATEST_VERSION` to `26`, add variant-aware archive selection with
+  legacy fallback, preserve imported runtimes in `opt/`, deploy donor
+  `redirect.tzst` / `extras.tzst` overlays when present, add
+  `Container.containerVariant`, and write `.variant` / `.arch` markers into
+  `imagefs` at launch time.
+- Tradeoff: this is still not a rebuilt hybrid rootfs. The donor base archives
+  are not yet staged locally, so the install path can only use them when they
+  are later supplied via assets/downloads. That is acceptable because the user
+  explicitly asked for the full transfer lane to stay build-free until more of
+  the donor stack is in place.
+- Verification: static code and asset transfer only. No compile, APK install,
+  or device pass was run in this sub-pass by design.
+- Next step: inspect and diff actual donor base archives
+  `imagefs_gamenative.txz` / `imagefs_bionic.txz`, then continue into donor
+  request/runtime routing (`WineRequestComponent` / related launcher helpers)
+  so rootfs placement, runtime launch, and payload intake converge on one
+  execution model.

@@ -43,6 +43,16 @@ Current local baseline:
 - less explicit separation between:
   base rootfs, post-extract overlays, and imported runtime preservation
 
+Local transfer status as of `2026-03-15`:
+
+- `Ae.solator` now has the donor-style installer foundation in-tree:
+  variant-aware archive selection, overlay deployment hooks, preserved imported
+  runtimes in `opt/`, and persisted `containerVariant` / `imagefs` markers
+- donor overlays `redirect.tzst` and `extras.tzst` are now staged in local
+  assets for later diffing and controlled deployment
+- the actual donor base archives are still not staged locally, so the next work
+  remains archive extraction/diff, not pretending the rootfs transfer is done
+
 ## Why A Blind Replacement Is Wrong
 
 Blindly swapping our `imagefs.txz` for donor `imagefs_gamenative.txz` /

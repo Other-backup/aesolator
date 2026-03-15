@@ -122,6 +122,10 @@ Second autonomous developer lane for `aesolator`:
   - build a hybrid plan that keeps our `Contents` / runtime / forensic
     contracts while replacing stale userland libraries with better donor ones
   - document every adopted rootfs delta by subsystem before any archive rebuild
+  - current foundation already imported:
+    variant-aware `ImageFsInstaller`, donor overlay deployment, preserved
+    imported runtimes in `opt/`, and `Container.containerVariant` /
+    `imagefs .variant/.arch` markers
 
 ## Phase Plan
 
@@ -188,6 +192,8 @@ Second autonomous developer lane for `aesolator`:
 
 - inventory donor `GameNative` rootfs delivery path:
   dynamic feature shell, real archive names, overlay payloads, and versioning
+- keep this phase build-free until the rootfs transfer matrix says the base
+  installer/overlay/runtime-placement foundation is in place
 - diff donor `imagefs_gamenative.txz` / `imagefs_bionic.txz` against local
   `imagefs.txz`
 - classify rootfs deltas by subsystem and ownership:
