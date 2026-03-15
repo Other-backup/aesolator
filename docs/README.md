@@ -19,6 +19,9 @@ This repo stores only application-layer documentation.
 - `docs/TERMUX_LOCAL_BUILD.md` - verified Termux ARM64 local build and Wi-Fi ADB install runbook.
 - `docs/DONOR_REFLECTIVE_ROADMAP.md` - donor extraction roadmap with pre/during/post reflective gates.
 - `docs/DONOR_ROUND_QUEUE.md` - strict donor execution queue (`1 round = 1 donor`) and closure checklist.
+- `docs/R10_R14_STATUS_SNAPSHOT.md` - normalized closure state for frame-generation donor rounds `R10-R14` (`integrated in tree` vs `still gate_hold`).
+- `docs/DUAL_DEV_OPERATING_MODEL.md` - mixed-mode two-Codex operating contract for runtime owner vs app owner.
+- `docs/ACTIVE_OWNERSHIP_MAP.md` - live ownership split for active work areas and overlap policy.
 - `docs/rounds/R1_GAMENATIVE_MATRIX.md` - Round 1 donor transfer matrix (`GameNative`) currently in `gate_hold`.
 - `docs/rounds/R1_GAMENATIVE_FILE_COVERAGE.md` - file-level coverage control for full donor exhaustion in Round 1.
 - `docs/rounds/R1_GAMENATIVE_GATE.md` - Round 1 gate checklist (`gate -> closed`) and mandatory CI/runtime checks.

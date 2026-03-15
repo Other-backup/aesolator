@@ -15,6 +15,8 @@ public final class UpscalerProfileStore {
 
     public static final String DEFAULT_PROFILE_ID = "global_default";
     public static final String DEFAULT_PROFILE_NAME = "Global Default";
+    public static final String SD662_SAFE_PROFILE_ID = "sd662_safe";
+    public static final String SD662_BALANCED_PROFILE_ID = "sd662_balanced";
 
     private UpscalerProfileStore() {}
 
@@ -125,9 +127,13 @@ public final class UpscalerProfileStore {
     }
 
     public static List<Profile> loadProfiles(SharedPreferences preferences) {
-        ArrayList<Profile> profiles = new ArrayList<>();
+        ArrayList<Profile> userProfiles = new ArrayList<>();
+        Profile defaultProfile = null;
         if (preferences == null) {
+            ArrayList<Profile> profiles = new ArrayList<>();
             profiles.add(defaults());
+            profiles.add(sd662Safe());
+            profiles.add(sd662Balanced());
             return profiles;
         }
         String raw = preferences.getString(PREF_UPSCALER_PROFILES_JSON, "[]");
@@ -137,13 +143,20 @@ public final class UpscalerProfileStore {
                 JSONObject obj = array.optJSONObject(i);
                 if (obj == null) continue;
                 Profile profile = Profile.fromJson(obj);
-                if (!containsId(profiles, profile.id)) profiles.add(profile);
+                if (isBuiltInProfileId(profile.id)) continue;
+                if (DEFAULT_PROFILE_ID.equals(profile.id)) {
+                    if (defaultProfile == null) defaultProfile = profile;
+                    continue;
+                }
+                if (!containsId(userProfiles, profile.id)) userProfiles.add(profile);
             }
         } catch (Exception ignored) {
         }
-        if (!containsId(profiles, DEFAULT_PROFILE_ID)) {
-            profiles.add(0, defaults());
-        }
+        ArrayList<Profile> profiles = new ArrayList<>();
+        profiles.add(normalize(defaultProfile != null ? defaultProfile : defaults()));
+        profiles.add(sd662Safe());
+        profiles.add(sd662Balanced());
+        profiles.addAll(userProfiles);
         return profiles;
     }
 
@@ -154,6 +167,7 @@ public final class UpscalerProfileStore {
             for (Profile profile : profiles) {
                 if (profile == null) continue;
                 Profile normalized = normalize(profile);
+                if (isBuiltInProfileId(normalized.id)) continue;
                 out.put(normalized.toJson());
             }
         }
@@ -182,6 +196,61 @@ public final class UpscalerProfileStore {
             }
         }
         return defaults();
+    }
+
+    public static boolean isBuiltInProfileId(String profileId) {
+        String normalized = sanitizeId(profileId);
+        return SD662_SAFE_PROFILE_ID.equals(normalized) || SD662_BALANCED_PROFILE_ID.equals(normalized);
+    }
+
+    public static Profile sd662Safe() {
+        Profile out = defaults();
+        out.id = SD662_SAFE_PROFILE_ID;
+        out.name = "Snapdragon 662 (Safe)";
+        out.preset = "conservative";
+        out.backend = "mobfgsr";
+        out.effect = "fsr";
+        out.scalePercent = 100;
+        out.frameGeneration = false;
+        out.generatedFrames = 1;
+        out.fgSource = "native";
+        out.fgOutput = "mobfgsr";
+        out.framegenMode = "balanced";
+        out.thermalGuard = true;
+        out.targetFps = 40;
+        out.interpolationFactor = 30;
+        out.debugOverlay = false;
+        out.debugTearLines = false;
+        out.interpolatedOnly = false;
+        out.vulkanValidationLayer = false;
+        out.sharpness = 70;
+        out.denoise = 80;
+        return normalize(out);
+    }
+
+    public static Profile sd662Balanced() {
+        Profile out = defaults();
+        out.id = SD662_BALANCED_PROFILE_ID;
+        out.name = "Snapdragon 662 (Balanced)";
+        out.preset = "balanced";
+        out.backend = "mobfgsr";
+        out.effect = "fsr";
+        out.scalePercent = 100;
+        out.frameGeneration = true;
+        out.generatedFrames = 1;
+        out.fgSource = "native";
+        out.fgOutput = "mobfgsr";
+        out.framegenMode = "balanced";
+        out.thermalGuard = true;
+        out.targetFps = 45;
+        out.interpolationFactor = 35;
+        out.debugOverlay = false;
+        out.debugTearLines = false;
+        out.interpolatedOnly = false;
+        out.vulkanValidationLayer = false;
+        out.sharpness = 60;
+        out.denoise = 90;
+        return normalize(out);
     }
 
     public static Profile normalize(Profile profile) {
