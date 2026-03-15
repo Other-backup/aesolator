@@ -1580,3 +1580,28 @@
   request/runtime routing (`WineRequestComponent` / related launcher helpers)
   so rootfs placement, runtime launch, and payload intake converge on one
   execution model.
+
+### Entry 68: donor network/runtime environment helpers were staged into the local execution stack
+
+- Goal: keep the launcher/runtime transfer moving past rootfs and into the
+  surrounding environment components that real Wine/Proton sessions depend on
+  at boot.
+- Context: `GameNative` does not just launch Wine; it also refreshes
+  network-facing runtime files under `imagefs/usr/tmp` and `etc/hosts` through
+  donor `NetworkHelper` and `NetworkInfoUpdateComponent`. Local `Ae.solator`
+  still had a more limited Wi-Fi-only helper and no environment component for
+  `ifaddrs` / hosts refresh.
+- Decision: adapt donor-style `IFAddress`, active-network probing, and IPv4
+  discovery into local `NetworkHelper`, add a local
+  `NetworkInfoUpdateComponent`, and stage that component into
+  `XServerDisplayActivity`'s environment stack next to the existing X11/audio
+  components.
+- Tradeoff: `WineRequestComponent` is still open, so request-path parity is not
+  closed yet. This pass intentionally targeted the simpler network/runtime
+  foundation first instead of mixing URL/clipboard request routing into the
+  same patch.
+- Verification: static code transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by design.
+- Next step: continue with donor `WineRequestComponent` versus local
+  `WineRequestHandler`, then decide whether to fold request handling fully into
+  `XEnvironment` or keep a hybrid bridge with donor socket behavior.

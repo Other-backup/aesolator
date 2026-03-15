@@ -172,11 +172,14 @@ Current imported status:
   `ImageFs` runtime libc model
 - `XServerDisplayActivity` no longer hardcodes one launcher type and now writes
   runtime libc markers dynamically
+- `NetworkHelper` now exposes donor-style `IFAddress`, active-link probing, and
+  IPv4 discovery, and `NetworkInfoUpdateComponent` is now part of the local
+  runtime environment component set
 
 Still open inside this lane:
 
 - compare donor `WineRequestComponent`
-- compare donor network/request helpers around runtime boot
+- finish donor network/request parity around runtime boot
 - wire launcher/runtime placement deeper into payload install and rootfs
   hybridization work
 

@@ -112,6 +112,9 @@ Second autonomous developer lane for `aesolator`:
     `ImageFs` runtime markers, launcher factory, and local Bionic/glibc
     launcher split are imported; the next closure step is `ImageFsInstaller`
     / runtime placement and request-path parity
+  - donor network/runtime environment parity has started too:
+    `NetworkHelper` now carries donor IF-address probing and
+    `NetworkInfoUpdateComponent` is staged into the local environment stack
 11. Hybrid `ImageFS` refresh lane
   - treat `GameNative` `ubuntufs` as a donor source map, not as the final
     product rootfs

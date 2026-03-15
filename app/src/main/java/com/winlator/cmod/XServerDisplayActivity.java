@@ -113,6 +113,7 @@ import com.winlator.cmod.xenvironment.XEnvironment;
 import com.winlator.cmod.xenvironment.components.ALSAServerComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherFactory;
+import com.winlator.cmod.xenvironment.components.NetworkInfoUpdateComponent;
 import com.winlator.cmod.xenvironment.components.PulseAudioComponent;
 import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
 import com.winlator.cmod.xenvironment.components.XServerComponent;
@@ -1914,6 +1915,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)
                 )
         );
+        environment.addComponent(new NetworkInfoUpdateComponent());
 
         // Audio driver logic
         if (audioDriver.equals("alsa")) {
