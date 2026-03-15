@@ -11,6 +11,9 @@ DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLEC
 : "${WINLATOR_APK_BASENAME:=by.aero.so.benchmark-debug}"
 : "${AEO_ADRENOTOOLS_REPO:=https://github.com/Pipetto-crypto/libadrenotools.git}"
 : "${AEO_ADRENOTOOLS_REF:=master}"
+: "${AEO_ROOTFS_BIONIC_URL:=https://downloads.gamenative.app/imagefs_bionic.txz}"
+: "${AEO_ROOTFS_GAMENATIVE_URL:=https://downloads.gamenative.app/imagefs_gamenative.txz}"
+: "${AEO_ROOTFS_PATCHES_URL:=https://downloads.gamenative.app/imagefs_patches_gamenative.tzst}"
 
 log() { printf '[winlator-ci] %s\n' "$*"; }
 fail() { printf '[winlator-ci][error] %s\n' "$*" >&2; exit 1; }
@@ -72,6 +75,35 @@ ensure_adrenotools_tree() {
   [[ -f "${adrenotools_dir}/CMakeLists.txt" ]] || fail "Fetched adrenotools tree is invalid (missing CMakeLists.txt)"
 }
 
+ensure_rootfs_assets() {
+  local asset_dir
+  asset_dir="${SRC_DIR}/app/src/main/assets"
+  mkdir -p "${asset_dir}"
+
+  ensure_rootfs_asset "${AEO_ROOTFS_BIONIC_URL}" "${asset_dir}/imagefs_bionic.txz"
+  ensure_rootfs_asset "${AEO_ROOTFS_GAMENATIVE_URL}" "${asset_dir}/imagefs_gamenative.txz"
+  ensure_rootfs_asset "${AEO_ROOTFS_PATCHES_URL}" "${asset_dir}/imagefs_patches_gamenative.tzst"
+}
+
+ensure_rootfs_asset() {
+  local url destination tmp
+  url="$1"
+  destination="$2"
+  tmp="${destination}.part"
+
+  if [[ -s "${destination}" ]]; then
+    log "rootfs asset present: ${destination}"
+    return 0
+  fi
+
+  log "fetching rootfs asset ${url}"
+  rm -f "${tmp}"
+  curl --fail --location --retry 5 --retry-delay 3 --output "${tmp}" "${url}" \
+    || fail "Unable to download rootfs asset from ${url}"
+  [[ -s "${tmp}" ]] || fail "Downloaded rootfs asset is empty: ${url}"
+  mv -f "${tmp}" "${destination}"
+}
+
 capture_source_metadata() {
   if git -C "${SRC_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     SOURCE_COMMIT="$(git -C "${SRC_DIR}" rev-parse HEAD)"
@@ -123,12 +155,14 @@ build_apk() {
 
 main() {
   require_cmd bash
+  require_cmd curl
   require_cmd git
   require_cmd sha256sum
 
   require_native_tree
   prepare_layout
   ensure_adrenotools_tree
+  ensure_rootfs_assets
   capture_source_metadata
   configure_app_version_env
   build_apk
