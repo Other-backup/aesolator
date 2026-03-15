@@ -46,6 +46,33 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - When a donor repo appears to expose more package links than the current app,
   document the delta first, then integrate it behind explicit source labeling
   and install verification instead of silently reshaping existing lanes.
+- Treat `GameNative` donor work as a layered audit, not a bulk merge. For any
+  X11 / renderer / driver pass, classify donor code into three buckets first:
+  `import now`, `adapt later`, and `do not blind-copy`, then record that in
+  `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md` before widening the patch.
+- For `GameNative` imports, prefer foundational infrastructure over surface
+  churn: GPU/Vulkan probe helpers, fd/socket hygiene, renderer plumbing, and
+  component install routing come before wholesale UI or gesture-stack copying.
+- Donor manifest-driven package installs must reuse the local trusted install
+  bridges:
+  `ContentsManager.extraContentFile -> finishInstallContent` for content
+  payloads and `AdrenotoolsManager.installDriver()` for graphics drivers.
+  Do not introduce a parallel raw-extract path that bypasses existing trust,
+  staging, or metadata persistence.
+- A broad `GameNative` transfer request must first become a written transfer
+  matrix in `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md`. Track donor subsystems
+  there by exact source files and one of:
+  `already imported`, `next import`, `adapt later`, `hold`.
+- When the user asks for a "full transfer", treat that as a runtime-wide scope:
+  payload/install logic, package placement, container routing, launcher flow,
+  Wine/Proton handling, X11/renderer/driver policy, and supporting docs.
+  Do not collapse that request into just UI or just X11.
+- Treat donor rootfs work as its own lane. `GameNative` `ubuntufs` /
+  `imagefs_*` archives are input for a hybrid `Ae.solator` rootfs, not a blind
+  replacement. Before changing `imagefs`, record:
+  donor archive source, overlay archives, preserved paths, library deltas, and
+  which layer each file belongs to: base rootfs, overlay, runtime payload, or
+  container-time mutable state.
 
 ## Execution Priority
 
@@ -193,6 +220,9 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - `docs/DONOR_BANNERS_COMPONENT_INJECTOR_AUDIT.md`
 - `docs/DONOR_THE412BANNER_REPO_MAP.md`
 - `docs/FREEWINE_BUILD_AGENT_HANDOFF.md`
+- `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md`
+- `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md`
 - `docs/IMAGEFS_REVERSE_MAP.md`
+- `docs/IMAGEFS_HYBRID_PLAN.md`
 - `docs/SECOND_DEV_ROADMAP.md`
 - `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`

@@ -10,18 +10,84 @@
 #include <malloc.h>
 #include <jni.h>
 #include <android/log.h>
+#include <android/fdsan.h>
+#include <sys/resource.h>
+#include <errno.h>
+#include <stdbool.h>
 
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "System.out", __VA_ARGS__);
 #define MAX_EVENTS 10
 #define MAX_FDS 32
+#define MAX_TRACKED_FDS 1024
 
 struct epoll_event events[MAX_EVENTS];
+
+typedef struct {
+    int fd;
+    bool owned;
+} FdTracker;
+
+static FdTracker fd_tracking[MAX_TRACKED_FDS] = {{0}};
+
+static void track_fd(jint fd) {
+    if (fd < 0) return;
+    for (int i = 0; i < MAX_TRACKED_FDS; i++) {
+        if (fd_tracking[i].fd == fd) {
+            fd_tracking[i].owned = true;
+            return;
+        }
+        if (fd_tracking[i].fd == 0) {
+            fd_tracking[i].fd = fd;
+            fd_tracking[i].owned = true;
+            return;
+        }
+    }
+}
+
+static bool release_fd_ownership(jint fd) {
+    if (fd < 0) return false;
+    for (int i = 0; i < MAX_TRACKED_FDS; i++) {
+        if (fd_tracking[i].fd == fd) {
+            bool owned = fd_tracking[i].owned;
+            fd_tracking[i].fd = 0;
+            fd_tracking[i].owned = false;
+            return owned;
+        }
+    }
+    return false;
+}
+
+static void close_tracked_fd(jint fd) {
+    if (fd < 0) return;
+    if (release_fd_ownership(fd)) {
+        close(fd);
+        printf("XConnectorEpoll close %d", fd);
+    } else {
+        printf("XConnectorEpoll skip close for untracked fd %d", fd);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_winlator_cmod_xconnector_XConnectorEpoll_setRLimitToMax(JNIEnv *env, jclass clazz) {
+    (void) env;
+    (void) clazz;
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_NOFILE, &limit) < 0) {
+        printf("XConnectorEpoll getrlimit failed: %s", strerror(errno));
+        return;
+    }
+    limit.rlim_cur = limit.rlim_max;
+    if (setrlimit(RLIMIT_NOFILE, &limit) < 0) {
+        printf("XConnectorEpoll setrlimit failed: %s", strerror(errno));
+    }
+}
 
 JNIEXPORT jint JNICALL
 Java_com_winlator_cmod_xconnector_XConnectorEpoll_createAFUnixSocket(JNIEnv *env, jobject obj,
                                                                 jstring path) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return -1;
+    track_fd(fd);
 
     struct sockaddr_un serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
@@ -40,18 +106,28 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_createAFUnixSocket(JNIEnv *env
 
     return fd;
     error:
-    close(fd);
+    close_tracked_fd(fd);
     return -1;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_winlator_cmod_xconnector_XConnectorEpoll_createEpollFd(JNIEnv *env, jobject obj) {
-    return epoll_create(MAX_EVENTS);
+    int fd = epoll_create(MAX_EVENTS);
+    track_fd(fd);
+    return fd;
 }
 
 JNIEXPORT void JNICALL
 Java_com_winlator_cmod_xconnector_XConnectorEpoll_closeFd(JNIEnv *env, jobject obj, jint fd) {
-    close(fd);
+    (void) env;
+    (void) obj;
+    close_tracked_fd(fd);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_winlator_cmod_xconnector_XConnectorEpoll_signalFd(JNIEnv *env, jclass clazz, jint fd) {
+    eventfd_t value = 1;
+    return eventfd_write(fd, value) == 0 ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -67,6 +143,7 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_doEpollIndefinitely(JNIEnv *en
         if (events[i].data.fd == serverFd) {
             int clientFd = accept(serverFd, NULL, NULL);
             if (clientFd >= 0) {
+                track_fd(clientFd);
                 if (addClientToEpoll) {
                     struct epoll_event event;
                     event.data.fd = clientFd;
@@ -120,7 +197,9 @@ Java_com_winlator_cmod_xconnector_ClientSocket_write(JNIEnv *env, jobject obj, j
 
 JNIEXPORT jint JNICALL
 Java_com_winlator_cmod_xconnector_XConnectorEpoll_createEventFd(JNIEnv *env, jobject obj) {
-    return eventfd(0, EFD_NONBLOCK);
+    int fd = eventfd(0, EFD_NONBLOCK);
+    track_fd(fd);
+    return fd;
 }
 
 JNIEXPORT jint JNICALL
@@ -155,6 +234,7 @@ Java_com_winlator_cmod_xconnector_ClientSocket_recvAncillaryMsg(JNIEnv *env, job
                     jmethodID addAncillaryFd = (*env)->GetMethodID(env, cls, "addAncillaryFd", "(I)V");
                     for (int i = 0; i < numFds; i++) {
                         int ancillaryFd = ((int*)CMSG_DATA(cmsg))[i];
+                        track_fd(ancillaryFd);
                         (*env)->CallVoidMethod(env, obj, addAncillaryFd, ancillaryFd);
                     }
                 }

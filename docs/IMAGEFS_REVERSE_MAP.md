@@ -221,3 +221,27 @@ Contract-sensitive zones:
 - any future optimization or artifact migration for `imagefs` should first be
   classified as:
   base image content, Wine runtime payload, or boot-time overlay content
+
+## Donor Delta: `GameNative` / `UbuntuFS`
+
+Additional donor findings from `GameNative`:
+
+- donor `ImageFsInstaller.LATEST_VERSION = 26` versus our current `21`
+- donor rootfs is variant-aware:
+  `imagefs_gamenative.txz` for `glibc`,
+  `imagefs_bionic.txz` for `bionic`
+- donor deploys `redirect.tzst` and `extras.tzst` after base extraction
+- donor preserves imported `Wine` / `Proton` installations under `opt/`
+- donor strings identify the base as `Ubuntu RootFs - releases.ubuntu.com/focal`
+- donor `:ubuntufs` module is only a delivery shell; actual rootfs ownership
+  still sits in `ImageFsInstaller`
+
+Interpretation:
+
+- the right next step is not a blind donor swap
+- `Ae.solator` needs a hybrid rootfs plan that combines newer donor libraries
+  with our stronger `Contents` / runtime / forensic contracts
+
+See also:
+
+- [IMAGEFS_HYBRID_PLAN.md](/data/data/com.termux/files/home/aesolator/docs/IMAGEFS_HYBRID_PLAN.md)

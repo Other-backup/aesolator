@@ -53,6 +53,9 @@ This repo stores only application-layer documentation.
 - `docs/rounds/R15_EDENAPK_HEX_ASM_NOTES.md` - IDE/HEX/ASM extraction notes and transfer boundary decisions for Round 15.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
+- `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md` - focused donor audit for `GameNative` X11 / renderer / driver layers.
+- `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md` - full donor transfer matrix for `GameNative` runtime, payload, container, launcher, Wine/Proton, and renderer lanes.
+- `docs/IMAGEFS_HYBRID_PLAN.md` - hybrid rootfs plan for combining the freshest `GameNative` UbuntuFS/imagefs pieces with `Ae.solator` runtime and forensic contracts.
 
 ## Generated In CI
 

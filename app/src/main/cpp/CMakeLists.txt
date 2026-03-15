@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(Winlator)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration -mno-outline-atomics")
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
@@ -18,7 +18,9 @@ endif()
 set(WINLATOR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlator.exports.map.txt")
 
 add_library(winlator SHARED
+        winlator/getauxval_shim.c
         winlator/drawable.c
+        winlator/gpu_helper.c
         winlator/gpu_image.c
         winlator/sysvshared_memory.c
         winlator/xconnector_epoll.c
@@ -36,7 +38,6 @@ target_link_libraries(winlator
         log
         android
         jnigraphics
-        c++_shared
         aaudio
         EGL
         GLESv2
@@ -48,6 +49,7 @@ if (HAS_ADRENOTOOLS)
 endif()
 
 add_library(winlatorxr SHARED
+        winlator/getauxval_shim.c
         xr/engine.c
         xr/framebuffer.c
         xr/input.c
@@ -65,7 +67,6 @@ target_link_libraries(winlatorxr
         log
         android
         openxr_loader
-        c++_shared
         EGL
         GLESv2
         GLESv3

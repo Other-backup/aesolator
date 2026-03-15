@@ -1113,6 +1113,9 @@
     <string name="no_files_in_folder">No files in folder</string>
     <string name="no_png_files_found">No PNG files found in this folder</string>
     <string name="invalid_directory_selected">Invalid directory selected</string>
+    <string name="manifest_download_failed">Download failed: %1$s</string>
+    <string name="manifest_install_failed">Failed to install %1$s</string>
+    <string name="manifest_install_success">%1$s installed</string>
     <string name="task_manager_cpu_title_empty">CPU (--%%)</string>
     <string name="task_manager_cpu_title_value">CPU (%1$d%%)</string>
     <string name="task_manager_host_load_empty">CPU -- | Load -- -- --</string>

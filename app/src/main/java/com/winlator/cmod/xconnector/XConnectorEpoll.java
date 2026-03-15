@@ -1,13 +1,16 @@
 package com.winlator.cmod.xconnector;
 
+import android.util.Log;
 import android.util.SparseArray;
 
 import androidx.annotation.Keep;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 public class XConnectorEpoll implements Runnable {
+    private static final String TAG = "XConnectorEpoll";
+    private static final long STOP_JOIN_TIMEOUT_MS = 1500;
+    private static final long STOP_JOIN_SLICE_MS = 50;
     private final ConnectionHandler connectionHandler;
     private final RequestHandler requestHandler;
     private final int epollFd;
@@ -28,6 +31,7 @@ public class XConnectorEpoll implements Runnable {
     public XConnectorEpoll(UnixSocketConfig socketConfig, ConnectionHandler connectionHandler, RequestHandler requestHandler) {
         this.connectionHandler = connectionHandler;
         this.requestHandler = requestHandler;
+        setRLimitToMax();
 
         serverFd = createAFUnixSocket(socketConfig.path);
         if (serverFd < 0) {
@@ -64,17 +68,33 @@ public class XConnectorEpoll implements Runnable {
     }
 
     public synchronized void stop() {
-        if (!running || epollThread == null) return;
+        Thread thread = epollThread;
+        if (!running || thread == null) return;
         running = false;
         requestShutdown();
 
-        while (epollThread.isAlive()) {
-            try {
-                epollThread.join();
+        if (thread == Thread.currentThread()) {
+            epollThread = null;
+            return;
+        }
+
+        boolean interrupted = false;
+        long deadline = System.currentTimeMillis() + STOP_JOIN_TIMEOUT_MS;
+        while (thread.isAlive()) {
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) {
+                Log.w(TAG, "Timed out waiting for epoll thread to stop; continuing teardown asynchronously");
+                break;
             }
-            catch (InterruptedException e) {}
+            try {
+                thread.join(Math.min(remaining, STOP_JOIN_SLICE_MS));
+            }
+            catch (InterruptedException e) {
+                interrupted = true;
+            }
         }
         epollThread = null;
+        if (interrupted) Thread.currentThread().interrupt();
     }
 
     @Override
@@ -194,15 +214,16 @@ public class XConnectorEpoll implements Runnable {
     }
 
     private void requestShutdown() {
-        try {
-            ByteBuffer data = ByteBuffer.allocateDirect(8);
-            data.asLongBuffer().put(1);
-            (new ClientSocket(shutdownFd)).write(data);
+        if (!signalFd(shutdownFd)) {
+            Log.w(TAG, "Failed to signal shutdown event fd");
         }
-        catch (IOException e) {}
     }
 
     public static native void closeFd(int fd);
+
+    private static native void setRLimitToMax();
+
+    static native boolean signalFd(int fd);
 
     private native int createEpollFd();
 

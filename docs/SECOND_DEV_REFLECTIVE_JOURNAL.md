@@ -1389,3 +1389,138 @@
   the stable state that existed before the anchored-tap experiment.
 - Next step: pursue `Computer` convenience via a safer shell/UI route instead
   of modifying the base tap contract again without stronger device evidence.
+
+### Entry 61: `GameNative` donor audit was narrowed to foundation imports instead of a blind merge
+
+- Goal: turn the user's broad `GameNative` request into a usable import lane
+  for `x11`, renderer, and driver work without collapsing `aesolator` into a
+  donor code dump.
+- Context: the donor repository mixes several layers together:
+  shared Winlator/X11 code, richer Vulkan probe helpers, alternate renderer
+  plumbing, launch-time graphics policy, gesture UX, and app-specific UI. A
+  naive copy would blur ownership and destabilize the most fragile paths.
+- Decision: classify the donor into `import now`, `adapt later`, and
+  `do not blind-copy`, then land only the foundation pieces that materially
+  strengthen our stack:
+  `GPUHelper`, native Vulkan extension/API probe, GPU classification helpers,
+  `GPUImage` hardware-buffer exposure, and `XConnectorEpoll` fd/rlimit
+  hygiene. The written system map now lives in
+  `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md`.
+- Tradeoff: this is slower than cargo-culting whole donor subsystems such as
+  `TouchGestureConfig` or Vortek launch policy. That tradeoff is correct
+  because `aesolator` already exceeds the donor in forensics, contents
+  contracts, and driver-package metadata, so bulk merging would add churn
+  faster than value.
+- Verification: the donor inventory was completed across
+  `xserver/*`, `renderer/*`, `TouchpadView`, `GPUInformation`,
+  `GPUHelper`, `GeneralComponents`, `XConnectorEpoll`, native `cpp/winlator/*`,
+  and `app/gamenative/ui/screen/xserver/XServerScreen.kt`. The resulting
+  import queue was then written down and the first donor-derived code blocks
+  were added to the local tree without compiling yet, per the user's request.
+- Next step: wire the new foundation helpers into graphics/runtime policy,
+  then resume the live desktop/input lane on top of a cleaner X11/renderer
+  base instead of ad-hoc patches.
+
+### Entry 62: the `GameNative` transfer scope was widened from X11-only to the full runtime stack
+
+- Goal: respond to the user's instruction to prepare a full donor transfer
+  covering runtime, payloads, placement, containerization, launch flow, and
+  Wine/Proton handling, not just X11/renderer.
+- Context: the first donor audit closed only the `x11` / renderer / driver
+  foundation. A broader grep across `app/gamenative/*` and `com/winlator/*`
+  then showed the real heavyweight donor layers:
+  `XServerScreen.kt`, `ContainerUtils.kt`, `IntentLaunchManager.kt`,
+  `ManifestInstaller.kt`, `ManifestComponentHelper.kt`, `PreInstallSteps.kt`,
+  launcher components, and Wine/Proton manager surfaces.
+- Decision: add a second donor document,
+  `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md`, that treats `GameNative` as a
+  multi-lane runtime transfer instead of a single X11 donor. The matrix now
+  tracks already imported foundation pieces and the next three major import
+  queues:
+  launcher/runtime execution, payload/manifest install, and container routing.
+- Tradeoff: the transfer is now explicitly staged instead of pretending we can
+  safely absorb every donor subsystem in one opaque patch. That is the only
+  defensible way to preserve `aesolator` provenance and forensic contracts
+  while still honoring the user's "full transfer" direction.
+- Verification: completed broad grep passes over both `app/gamenative/*` and
+  `com/winlator/*`, ranked the highest-signal runtime files, wrote the global
+  transfer matrix, and synchronized `AGENTS.md` plus the roadmap to treat the
+  full transfer as an active top-level lane.
+- Next step: start the next code lane with donor launcher/runtime components
+  and the payload/manifest install stack, because those are the biggest
+  remaining gaps between package intake and actual execution.
+
+### Entry 63: helper-level donor transfers were expanded beyond Vulkan probe only
+
+- Goal: keep the donor transfer moving in code, not just in planning docs, by
+  importing low-risk runtime helpers that will support the next large launcher
+  and payload passes.
+- Context: after the broader grep, three small but useful donor helpers stood
+  out as portable enough to land immediately:
+  `DXVKHelper`, `GeneralComponents`, and `PatchElf`. None of them solve the
+  big runtime lane alone, but all three reduce future pressure on
+  `XServerDisplayActivity` and component-placement logic.
+- Decision: add adapted `cmod` versions of
+  `core/DXVKHelper.java`, `core/GeneralComponents.java`, and
+  `core/PatchElf.java` to the local tree, and mark them as already imported in
+  the full transfer matrix. They are not yet wired into the active launch path;
+  this pass was about staging reusable helpers first.
+- Tradeoff: these imports add more dormant code before the next big runtime
+  execution transfer lands. That is acceptable because they are small,
+  self-contained, and directly support upcoming work on payload placement and
+  environment shaping.
+- Verification: static integration only. No build or device pass was run in
+  this sub-pass.
+- Next step: move from helper imports to the actual launcher/runtime layer:
+  donor `GuestProgramLauncherComponent`, `BionicProgramLauncherComponent`,
+  `GlibcProgramLauncherComponent`, and the payload/manifest install lane.
+
+### Entry 64: donor manifest and install foundation was adapted onto the local contents contract
+
+- Goal: turn the `GameNative` payload/manifest donor lane into real local code
+  instead of leaving it as a grep-only plan.
+- Context: `GameNative` already had a stronger donor layer for package
+  availability, manifest caching, version-option building, and post-download
+  install routing. `aesolator` had the low-level install primitives already,
+  but no dedicated donor-style manifest abstraction above them.
+- Decision: add local Java adaptations of donor
+  `ManifestModels`, `ManifestRepository`, `ManifestInstaller`, and
+  `ManifestComponentHelper` under `app/src/main/java/com/winlator/cmod/contents`.
+  The crucial constraint was to keep `Ae.solator` on a single trusted install
+  path:
+  content payloads still go through
+  `ContentsManager.extraContentFile -> finishInstallContent`,
+  and graphics-driver payloads still go through
+  `AdrenotoolsManager.installDriver()`.
+- Tradeoff: this is foundation only. The new manifest layer is not wired into a
+  visible dialog or screen yet, and it was intentionally ported in Java rather
+  than by turning on Kotlin for the whole module.
+- Verification: static integration only. No build or device pass was run in
+  this donor-transfer sub-pass.
+- Next step: continue with launcher/runtime execution import
+  (`GuestProgramLauncherComponent` diff against donor), then wire this manifest
+  layer into a visible runtime/package-management surface without breaking
+  provenance labels or existing `Contents` rules.
+
+### Entry 65: donor `ubuntufs` path was reframed into a hybrid `imagefs` plan
+
+- Goal: turn the user's rootfs request into a real engineering lane instead of
+  vaguely "using the donor UbuntuFS".
+- Context: a direct donor grep showed that `GameNative` `:ubuntufs` is only an
+  on-demand dynamic-feature shell. The real rootfs ownership still lives in
+  `ImageFsInstaller`, which selects variant-specific archives
+  (`imagefs_gamenative.txz`, `imagefs_bionic.txz`), tracks a newer rootfs
+  version (`26`), deploys `redirect.tzst` / `extras.tzst`, and preserves
+  imported `Wine` / `Proton` payloads under `opt/`.
+- Decision: add a dedicated hybrid-rootfs document,
+  `docs/IMAGEFS_HYBRID_PLAN.md`, and elevate `imagefs` refresh to its own
+  roadmap lane. The chosen direction is not donor replacement; it is a hybrid
+  `Ae.solator` rootfs that keeps our `Contents` / runtime / forensic contracts
+  while harvesting fresher donor userland pieces.
+- Tradeoff: this adds another explicit lane before any archive rebuild can
+  happen. That extra discipline is necessary because rootfs mistakes are more
+  expensive than ordinary UI or package-feed regressions.
+- Verification: source-path audit only. No archive extraction or build was run
+  in this sub-pass.
+- Next step: unpack donor `imagefs_gamenative.txz` and `imagefs_bionic.txz`,
+  diff them against our `imagefs.txz`, and build a per-library adoption table.

@@ -76,6 +76,10 @@ public class GPUImage extends Texture {
         return virtualData;
     }
 
+    public long getHardwareBufferPtr() {
+        return hardwareBufferPtr;
+    }
+
     @Override
     public void destroy() {
         if (imageKHRPtr != 0) {
