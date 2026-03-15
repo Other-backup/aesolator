@@ -1524,3 +1524,30 @@
   in this sub-pass.
 - Next step: unpack donor `imagefs_gamenative.txz` and `imagefs_bionic.txz`,
   diff them against our `imagefs.txz`, and build a per-library adoption table.
+
+### Entry 66: donor launcher/runtime execution split was transferred without reopening builds
+
+- Goal: move the `GameNative` transfer from helper-only groundwork into the
+  real runtime execution path while honoring the user's new rule not to
+  compile until the broader transfer lane is materially in place.
+- Context: the previous pass had already imported manifest/install helpers and
+  runtime infrastructure, but `Ae.solator` still hardcoded a single launcher
+  model and did not expose donor-style runtime libc markers inside `ImageFs`.
+  That made it impossible to carry donor `bionic` / `glibc` execution policy
+  into the live launch stack cleanly.
+- Decision: extend local `ImageFs` with donor-style variant/runtime helpers,
+  open `GuestProgramLauncherComponent` for subclass-based launcher models, add
+  local `BionicProgramLauncherComponent`, `GlibcProgramLauncherComponent`, and
+  `GuestProgramLauncherFactory`, then switch `XServerDisplayActivity` to pick
+  the launcher from the active runtime libc model instead of hardcoding one
+  path.
+- Tradeoff: this is still a foundation transfer, not full closure. It adds new
+  launcher/runtime structure before `ImageFsInstaller`, request-path parity,
+  and payload-placement parity are imported. That is acceptable because the
+  user's rule currently prefers a complete staged transfer over premature build
+  verification.
+- Verification: static code transfer only. No compile, APK install, or device
+  pass was run in this sub-pass by design.
+- Next step: continue directly into donor `ImageFsInstaller` / runtime
+  placement and launcher-request plumbing, then sync the transfer matrix again
+  before reopening any build pass.

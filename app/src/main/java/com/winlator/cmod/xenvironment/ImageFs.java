@@ -70,6 +70,40 @@ public class ImageFs {
         }
     }
 
+    public String getVariant() {
+        File variantFile = getVariantFile();
+        return variantFile.exists() ? FileUtils.readLines(variantFile).get(0) : "";
+    }
+
+    public void createVariantFile(String variant) {
+        getConfigDir().mkdirs();
+        File file = getVariantFile();
+        try {
+            file.createNewFile();
+            FileUtils.writeString(file, variant);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String getArch() {
+        File archFile = getArchFile();
+        return archFile.exists() ? FileUtils.readLines(archFile).get(0) : "";
+    }
+
+    public void createArchFile(String arch) {
+        getConfigDir().mkdirs();
+        File file = getArchFile();
+        try {
+            file.createNewFile();
+            FileUtils.writeString(file, arch);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public String getWinePath() {
         return winePath;
     }
@@ -86,6 +120,14 @@ public class ImageFs {
         return new File(getConfigDir(), ".img_version");
     }
 
+    public File getVariantFile() {
+        return new File(getConfigDir(), ".variant");
+    }
+
+    public File getArchFile() {
+        return new File(getConfigDir(), ".arch");
+    }
+
     public File getInstalledWineDir() {
         return new File(rootDir, "/opt/installed-wine");
     }
@@ -98,7 +140,27 @@ public class ImageFs {
         return new File(rootDir, "/usr/lib");
     }
 
+    public File getLib32Dir() {
+        return new File(rootDir, "/usr/lib/arm-linux-gnueabihf");
+    }
+
+    public File getLib64Dir() {
+        return new File(rootDir, "/usr/lib");
+    }
+
     public File getBinDir() { return new File(rootDir, "/usr/bin"); }
+
+    public File getGlibcBinDir() {
+        return new File(rootDir, "/usr/glibc/bin");
+    }
+
+    public File getGlibc32Dir() {
+        return new File(rootDir, "/usr/lib/arm-linux-gnueabihf");
+    }
+
+    public File getGlibc64Dir() {
+        return new File(rootDir, "/usr/lib");
+    }
 
     public File getShareDir() {
         return new File(rootDir, "/usr/share");
@@ -106,6 +168,25 @@ public class ImageFs {
 
     public File getEtcDir() {
         return new File(rootDir, "/usr/etc");
+    }
+
+    public File getStorageDir() {
+        return new File(rootDir, "/storage");
+    }
+
+    public File getFilesDir() {
+        return rootDir.getParentFile();
+    }
+
+    public boolean isGlibcRuntimeAvailable() {
+        File glibcBinDir = getGlibcBinDir();
+        if (glibcBinDir.isDirectory()) return true;
+        String variant = getVariant();
+        return "glibc".equalsIgnoreCase(variant) || "gamenative".equalsIgnoreCase(variant);
+    }
+
+    public String getRuntimeLibcModel() {
+        return isGlibcRuntimeAvailable() ? "glibc" : "bionic";
     }
 
     @NonNull

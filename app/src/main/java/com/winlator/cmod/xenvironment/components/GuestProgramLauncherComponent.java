@@ -19,6 +19,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.ProcessHelper;
@@ -45,6 +46,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 
 public class GuestProgramLauncherComponent extends EnvironmentComponent {
@@ -72,7 +74,33 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     public Container getContainer() { return this.container; }
     public void setContainer(Container container) { this.container = container; }
 
-    private void extractBox64Files() {
+    protected ContentsManager getContentsManager() {
+        return contentsManager;
+    }
+
+    protected ContentProfile getWineProfile() {
+        return wineProfile;
+    }
+
+    protected Shortcut getShortcut() {
+        return shortcut;
+    }
+
+    private boolean needsFileRefresh(File... files) {
+        for (File file : files) {
+            if (file == null || !file.isFile()) return true;
+        }
+        return false;
+    }
+
+    private ContentProfile resolveInstalledContentProfile(ContentProfile.ContentType type, String versionName) {
+        if (type == null || versionName == null || versionName.trim().isEmpty()) return null;
+        ContentProfile profile = contentsManager.findProfileByVersion(type, versionName, true);
+        if (profile != null) return profile;
+        return contentsManager.findProfileByVersion(type, versionName, false);
+    }
+
+    protected void extractBox64Files() {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
 
@@ -85,9 +113,25 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Log.d("GuestProgramLauncherComponent", "box64Version: " + box64Version);
 
         File rootDir = imageFs.getRootDir();
+        File box64Binary = new File(rootDir, "/usr/bin/box64");
+        boolean payloadMissing = needsFileRefresh(box64Binary);
 
-        if (!box64Version.equals(container.getExtra("box64Version"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("box64-" + box64Version);
+        if (payloadMissing || !box64Version.equals(container.getExtra("box64Version"))) {
+            ContentProfile profile = resolveInstalledContentProfile(ContentProfile.ContentType.CONTENT_TYPE_BOX64, box64Version);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "BOX64_PAYLOAD_REFRESH",
+                    null,
+                    "launch_dependency",
+                    "box64_payload_refresh",
+                    ForensicLogger.fields(
+                            "version", box64Version,
+                            "payload_missing", payloadMissing,
+                            "profile_found", profile != null,
+                            "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
+                    )
+            );
             if (profile != null)
                 contentsManager.applyContent(profile);
             else
@@ -97,13 +141,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
 
         // Set execute permissions for box64 just in case
-        File box64File = new File(rootDir, "/usr/bin/box64");
-        if (box64File.exists()) {
-            FileUtils.chmod(box64File, 0755);
+        if (box64Binary.exists()) {
+            FileUtils.chmod(box64Binary, 0755);
         }
     }
 
-    private void extractEmulatorsDlls() {;
+    protected void extractEmulatorsDlls() {;
         Context context = environment.getContext();
         File rootDir = environment.getImageFs().getRootDir();
         File system32dir = new File(rootDir + "/home/xuser/.wine/drive_c/windows/system32");
@@ -119,8 +162,24 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
         Log.d("GuestProgramLauncherComponent", "fexcoreVersion in use: " + fexcoreVersion);
 
-        if (!wowbox64Version.equals(container.getExtra("box64Version"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("wowbox64-" + wowbox64Version);
+        File wowbox64Dll = new File(system32dir, "wowbox64.dll");
+        boolean wowbox64Missing = needsFileRefresh(wowbox64Dll);
+        if (wowbox64Missing || !wowbox64Version.equals(container.getExtra("box64Version"))) {
+            ContentProfile profile = resolveInstalledContentProfile(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64, wowbox64Version);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "WOWBOX64_PAYLOAD_REFRESH",
+                    null,
+                    "launch_dependency",
+                    "wowbox64_payload_refresh",
+                    ForensicLogger.fields(
+                            "version", wowbox64Version,
+                            "payload_missing", wowbox64Missing,
+                            "profile_found", profile != null,
+                            "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
+                    )
+            );
             if (profile != null)
                 contentsManager.applyContent(profile);
             else
@@ -129,8 +188,25 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             containerDataChanged = true;
         }
 
-        if (!fexcoreVersion.equals(container.getExtra("fexcoreVersion"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("fexcore-" + fexcoreVersion);
+        File fexArm64ecDll = new File(system32dir, "libarm64ecfex.dll");
+        File fexWow64Dll = new File(system32dir, "libwow64fex.dll");
+        boolean fexPayloadMissing = needsFileRefresh(fexArm64ecDll, fexWow64Dll);
+        if (fexPayloadMissing || !fexcoreVersion.equals(container.getExtra("fexcoreVersion"))) {
+            ContentProfile profile = resolveInstalledContentProfile(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, fexcoreVersion);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "FEXCORE_PAYLOAD_REFRESH",
+                    null,
+                    "launch_dependency",
+                    "fexcore_payload_refresh",
+                    ForensicLogger.fields(
+                            "version", fexcoreVersion,
+                            "payload_missing", fexPayloadMissing,
+                            "profile_found", profile != null,
+                            "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
+                    )
+            );
             if (profile != null)
                 contentsManager.applyContent(profile);
             else
@@ -161,11 +237,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             LaunchDependencyRegistry.DependencyRunResult dependencyResult =
                     LaunchDependencyRegistry.runDependencies(environment.getContext(), container, shortcut, appId);
             if (!dependencyResult.success) {
-                Log.w("GuestProgramLauncherComponent", "Launch dependencies failed: " + dependencyResult.dependencyId + " / " + dependencyResult.message);
+                Log.e("GuestProgramLauncherComponent", "Launch dependencies failed: " + dependencyResult.dependencyId + " / " + dependencyResult.message);
                 String failMessage = dependencyResult.message == null || dependencyResult.message.trim().isEmpty()
                         ? "Missing launch dependency: " + dependencyResult.dependencyId
                         : dependencyResult.message;
                 AppUtils.showToast(environment.getContext(), failMessage);
+                if (terminationCallback != null) terminationCallback.call(-1);
                 return;
             }
             if (wineInfo.isArm64EC())
@@ -175,6 +252,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             LaunchDependencyRegistry.runPreLaunchSteps(environment.getContext(), container, shortcut, appId, this);
             checkDependencies();
             pid = execGuestProgram();
+            if (pid == -1) {
+                Log.e("GuestProgramLauncherComponent", "Guest runtime process failed to start for " + appId);
+                AppUtils.showToast(environment.getContext(), "Failed to start Wine runtime process");
+                if (terminationCallback != null) terminationCallback.call(-1);
+            }
         }
     }
 
@@ -258,7 +340,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         this.bindingPaths = normalized.isEmpty() ? null : normalized.toArray(new String[0]);
     }
 
-    private String buildRuntimePath(File rootDir, String winePath) {
+    protected String buildRuntimePath(File rootDir, String winePath) {
         LinkedHashSet<String> segments = new LinkedHashSet<>();
         if (winePath != null && !winePath.trim().isEmpty()) {
             segments.add(winePath.trim());
@@ -278,7 +360,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return String.join(":", segments);
     }
 
-    private void applyMoboxRuntimeContracts(EnvVars launchEnv, File rootDir, String winePath) {
+    protected void applyMoboxRuntimeContracts(EnvVars launchEnv, File rootDir, String winePath) {
         launchEnv.put("PATH", buildRuntimePath(rootDir, winePath));
 
         File runtimeTmpDir = new File(rootDir, "/usr/tmp");
@@ -321,7 +403,67 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     public void setFEXCorePreset (String fexcorePreset) { this.fexcorePreset = fexcorePreset; }
 
-    private int execGuestProgram() {
+    private boolean isDesktopShellBootstrap() {
+        if (shortcut != null || guestExecutable == null) return false;
+        String lowered = guestExecutable.toLowerCase(Locale.ROOT);
+        return lowered.contains("explorer /desktop=shell");
+    }
+
+    private String resolveRequestedEmulator() {
+        String emulator = container.getEmulator();
+        if (shortcut != null) {
+            emulator = shortcut.getExtra("emulator", container.getEmulator());
+        }
+        return emulator == null ? "" : emulator;
+    }
+
+    protected String getLauncherModel(ImageFs imageFs) {
+        return imageFs != null ? imageFs.getRuntimeLibcModel() : "bionic";
+    }
+
+    protected void applyLauncherSpecificEnvVars(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
+        launchEnv.put("AERO_RUNTIME_LAUNCHER_MODEL", getLauncherModel(imageFs));
+    }
+
+    protected String buildGuestCommand(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv,
+                                       String winePath, String effectiveEmulator, boolean desktopShellBootstrap) {
+        String command = "";
+        String overriddenCommand = launchEnv.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
+        if (!overriddenCommand.isEmpty()) {
+            String[] parts = overriddenCommand.split(";");
+            for (String part : parts) command += part + " ";
+            return command.trim();
+        }
+
+        if (wineInfo.isArm64EC()) {
+            String hodll;
+            if (effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore")) {
+                hodll = desktopShellBootstrap ? "wowbox64.dll" : "libwow64fex.dll";
+            } else {
+                hodll = "wowbox64.dll";
+            }
+            launchEnv.put("HODLL", hodll);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "WINHANDLER_EMULATOR_FALLBACK",
+                    null,
+                    "guest_program_launcher",
+                    "winhandler_emulator_fallback",
+                    ForensicLogger.fields(
+                            "requested_emulator", resolveRequestedEmulator(),
+                            "effective_emulator", effectiveEmulator,
+                            "desktop_shell_bootstrap", desktopShellBootstrap,
+                            "guest_executable", guestExecutable != null ? guestExecutable : "",
+                            "hodll", hodll
+                    )
+            );
+            return winePath + "/" + guestExecutable;
+        }
+        return imageFs.getBinDir() + "/box64 " + guestExecutable;
+    }
+
+    protected int execGuestProgram() {
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
         File rootDir = imageFs.getRootDir();
@@ -332,9 +474,38 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         boolean shareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
 
         EnvVars launchEnv = new EnvVars();
+        String requestedEmulator = resolveRequestedEmulator();
+        boolean desktopShellBootstrap = wineInfo.isArm64EC() && isDesktopShellBootstrap();
+        boolean fexRequested = "fexcore".equalsIgnoreCase(requestedEmulator);
+        String effectiveEmulator = desktopShellBootstrap && fexRequested ? "wowbox64" : requestedEmulator;
 
         addBox64EnvVars(launchEnv, enableBox64Logs);
-        launchEnv.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
+        if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
+            launchEnv.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
+        } else {
+            launchEnv.remove("FEX_TSOENABLED");
+            launchEnv.remove("FEX_VECTORTSOENABLED");
+            launchEnv.remove("FEX_MEMCPYSETTSOENABLED");
+            launchEnv.remove("FEX_HALFBARRIERTSOENABLED");
+            launchEnv.remove("FEX_X87REDUCEDPRECISION");
+            launchEnv.remove("FEX_MULTIBLOCK");
+            launchEnv.remove("FEX_MAXINST");
+            launchEnv.remove("FEX_FORCESVEWIDTH");
+            launchEnv.remove("FEX_HOSTFEATURES");
+            launchEnv.remove("FEX_SMALLTSCSCALE");
+            launchEnv.remove("FEX_SMC_CHECKS");
+            launchEnv.remove("FEX_SMCCHECKS");
+            launchEnv.remove("FEX_VOLATILEMETADATA");
+            launchEnv.remove("FEX_MONOHACKS");
+            launchEnv.remove("FEX_HIDEHYPERVISORBIT");
+            launchEnv.remove("FEX_DISABLEL2CACHE");
+            launchEnv.remove("FEX_DYNAMICL1CACHE");
+            launchEnv.remove("FEX_LOG_LEVEL");
+            launchEnv.remove("FEX_OUTPUTLOG");
+            launchEnv.remove("FEX_PROFILESTATS");
+            launchEnv.remove("FEX_SILENTLOG");
+            launchEnv.remove("FEX_DEBUG");
+        }
 
         String renderer = GPUInformation.getRenderer(null, null);
 
@@ -369,7 +540,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
         launchEnv.put("WRAPPER_LAYER_PATH", rootDir.getPath() + "/usr/lib");
         launchEnv.put("WRAPPER_CACHE_PATH", rootDir.getPath() + "/usr/var/cache");
-        launchEnv.put("WINE_NO_DUPLICATE_EXPLORER", "1");
+        if (desktopShellBootstrap) {
+            launchEnv.remove("WINE_NO_DUPLICATE_EXPLORER");
+        } else {
+            launchEnv.put("WINE_NO_DUPLICATE_EXPLORER", "1");
+        }
         launchEnv.put("PREFIX", rootDir.getPath() + "/usr");
         launchEnv.put("DISPLAY", ":0");
         if (shouldDisableFullscreenHack()) {
@@ -435,6 +610,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
         launchEnv.put("AERO_RUNTIME_BROWSER_BRIDGE", openWithAndroidBrowser ? "1" : "0");
         launchEnv.put("AERO_RUNTIME_CLIPBOARD_SYNC", shareAndroidClipboard ? "1" : "0");
+        applyLauncherSpecificEnvVars(context, imageFs, rootDir, launchEnv);
 
         if (launchEnv.has("MANGOHUD")) {
             launchEnv.remove("MANGOHUD");
@@ -448,30 +624,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             launchEnv.put("AESO_BIND_PATH_COUNT", String.valueOf(bindingPaths.length));
         }
 
-        String emulator = container.getEmulator();
-        if (shortcut != null)
-            emulator = shortcut.getExtra("emulator", container.getEmulator());
-
-        // Construct the command without Box64 to the Wine executable
-        String command = "";
-        String overriddenCommand = launchEnv.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
-        if (!overriddenCommand.isEmpty()) {
-            String[] parts = overriddenCommand.split(";");
-            for (String part : parts)
-                command += part + " ";
-            command = command.trim();
-        }
-        else {
-            if (wineInfo.isArm64EC()) {
-                command = winePath + "/" + guestExecutable;
-                if (emulator.toLowerCase().equals("fexcore"))
-                    launchEnv.put("HODLL", "libwow64fex.dll");
-                else
-                    launchEnv.put("HODLL", "wowbox64.dll");
-            }
-            else
-                command = imageFs.getBinDir() + "/box64 " + guestExecutable;
-        }
+        String command = buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
 
         // **Maybe remove this: Set execute permissions for box64 if necessary (Glibc/Proot artifact)
         File box64File = new File(rootDir, "/usr/bin/box64");
@@ -489,7 +642,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         });
     }
 
-    private void addBox64EnvVars(EnvVars envVars, boolean enableLogs) {
+    protected void addBox64EnvVars(EnvVars envVars, boolean enableLogs) {
         envVars.put("BOX64_DYNAREC", "1");
         envVars.putAll(Box64PresetManager.getEnvVars("box64", environment.getContext(), box64Preset));
         if (!envVars.has("BOX64_NOBANNER")) {

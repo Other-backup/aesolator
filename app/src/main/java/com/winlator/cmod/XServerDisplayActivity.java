@@ -112,6 +112,7 @@ import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.XEnvironment;
 import com.winlator.cmod.xenvironment.components.ALSAServerComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent;
+import com.winlator.cmod.xenvironment.components.GuestProgramLauncherFactory;
 import com.winlator.cmod.xenvironment.components.PulseAudioComponent;
 import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
 import com.winlator.cmod.xenvironment.components.XServerComponent;
@@ -1849,7 +1850,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         desktopShellBootstrapStartedAtMs = 0L;
         cancelDeferredGuestTermination("setup_xenvironment");
 
-        guestProgramLauncherComponent = new GuestProgramLauncherComponent(
+        guestProgramLauncherComponent = GuestProgramLauncherFactory.create(
+                imageFs,
                 contentsManager,
                 contentsManager.resolveBestRuntimeProfile(container.getWineVersion()),
                 shortcut
@@ -3170,8 +3172,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void applyBionicRuntimeMarkers(EnvVars targetEnv) {
         if (targetEnv == null) return;
-        targetEnv.put("AERO_RUNTIME_LIBC", "bionic");
-        targetEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
+        String runtimeLibc = imageFs != null ? imageFs.getRuntimeLibcModel() : "bionic";
+        targetEnv.put("AERO_RUNTIME_LIBC", runtimeLibc);
+        targetEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "glibc".equalsIgnoreCase(runtimeLibc) ? "0" : "1");
         targetEnv.put("AERO_RUNTIME_ANDROID_SDK", String.valueOf(Build.VERSION.SDK_INT));
         targetEnv.put("AERO_RUNTIME_ANDROID_RELEASE", Build.VERSION.RELEASE == null ? "" : Build.VERSION.RELEASE);
         targetEnv.put("AERO_RUNTIME_HOST_ARCH", System.getProperty("os.arch", ""));

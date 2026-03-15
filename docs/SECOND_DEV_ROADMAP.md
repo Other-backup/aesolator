@@ -15,6 +15,10 @@ Second autonomous developer lane for `aesolator`:
 
 - Convert multi-goal user messages into one ordered backlog and keep that order
   visible instead of bouncing between fresh requests ad hoc.
+- When the user explicitly says "do not compile until the full transfer is
+  done", keep the active donor-transfer lane build-free. Land code, docs, and
+  commits first; reopen `assembleDebug` / APK verification only after that
+  lane reaches a written closure point or the user changes the rule.
 - Default lane order for this repo:
   requested product/UI/content work first, documentation sync second,
   debugging/forensics third.
@@ -104,6 +108,10 @@ Second autonomous developer lane for `aesolator`:
   - transfer foundation before surface UX:
     launcher/runtime stack first, payload/manifest stack second,
     routing/config stack third
+  - current donor-launcher foundation is already in tree:
+    `ImageFs` runtime markers, launcher factory, and local Bionic/glibc
+    launcher split are imported; the next closure step is `ImageFsInstaller`
+    / runtime placement and request-path parity
 11. Hybrid `ImageFS` refresh lane
   - treat `GameNative` `ubuntufs` as a donor source map, not as the final
     product rootfs

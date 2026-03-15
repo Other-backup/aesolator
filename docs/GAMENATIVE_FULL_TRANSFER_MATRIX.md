@@ -121,8 +121,10 @@ Primary donor files:
 
 Status:
 
-- not yet transferred
-- high-value lane for runtime execution and Wine/Proton launch behavior
+- foundation imported into the local tree
+- still not wired through the whole runtime stack yet
+- high-value lane remains active because execution policy and payload/runtime
+  placement still need the next donor passes
 
 Why it matters:
 
@@ -136,6 +138,27 @@ Planned order:
 2. compare Bionic / glibc launchers
 3. extract reusable runtime/env logic
 4. only then evaluate donor-specific Steam extras
+
+Current imported status:
+
+- `ImageFs` now exposes donor-style runtime markers:
+  `.variant`, `.arch`, glibc/bin/lib accessors, storage/files roots, and
+  `getRuntimeLibcModel()`
+- `GuestProgramLauncherComponent` now has donor-style extension hooks for
+  launcher model, env shaping, command building, and runtime-path contracts
+- local `BionicProgramLauncherComponent` and `GlibcProgramLauncherComponent`
+  are present as donor-derived execution models
+- `GuestProgramLauncherFactory` now chooses the launcher from the active
+  `ImageFs` runtime libc model
+- `XServerDisplayActivity` no longer hardcodes one launcher type and now writes
+  runtime libc markers dynamically
+
+Still open inside this lane:
+
+- compare donor `WineRequestComponent`
+- compare donor network/request helpers around runtime boot
+- wire launcher/runtime placement deeper into payload install and rootfs
+  hybridization work
 
 ### Lane 3: Payload / Manifest / Install Logic
 

@@ -20,6 +20,10 @@ runtime-binding, documentation alignment, and repository contract integrity.
   files such as `AGENTS.md`.
 - Every coherent implementation pass should end with a git commit unless the
   user explicitly asks to keep the tree uncommitted.
+- If the user explicitly says not to compile or build until a transfer lane is
+  complete, do not run `gradlew`, Android builds, or APK installs in the
+  middle of that lane. Keep transfer passes code-and-docs only until the user
+  reopens verification.
 
 ## Working Contract
 
@@ -53,6 +57,11 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - For `GameNative` imports, prefer foundational infrastructure over surface
   churn: GPU/Vulkan probe helpers, fd/socket hygiene, renderer plumbing, and
   component install routing come before wholesale UI or gesture-stack copying.
+- Treat a user request for a "full transfer" as a no-partial-closure lane:
+  keep moving subsystem by subsystem, but do not reset the lane to
+  UI-only/device-debug-only work until the written transfer matrix says the
+  requested donor execution stack has actually been imported or consciously
+  held.
 - Donor manifest-driven package installs must reuse the local trusted install
   bridges:
   `ContentsManager.extraContentFile -> finishInstallContent` for content
