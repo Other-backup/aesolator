@@ -128,6 +128,12 @@ runtime-binding, documentation alignment, and repository contract integrity.
   readiness: a direct `xServer.injectPointer*` probe proving `Start` opens is
   not enough. Closure requires the same hit target to open through the live
   `TouchpadView` path as well.
+- If desktop icons such as `Computer` fail while `Start` and ordinary windows
+  still open, treat that first as a desktop-icon double-click contract issue,
+  not as a missing runtime/package issue. Verify it with an anchored two-tap
+  probe against the live shell before touching `Contents`, and keep tap clicks
+  anchored to the cursor position captured at finger-down so micro-jitter does
+  not move the target between taps.
 - Treat duplicate-cursor reports as cursor-ownership bugs, not mere cosmetics.
   Inspect at least these layers before changing behavior:
   Android/system pointer icon, `GLRenderer` root/X11 cursor fallback, and any

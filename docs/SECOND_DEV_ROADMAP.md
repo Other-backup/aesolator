@@ -230,6 +230,16 @@ Second autonomous developer lane for `aesolator`:
   compositor cursor entirely, not just the root fallback, so duplicate cursor
   reports are now narrowed to classification/owner detection rather than the
   old unconditional draw path.
+- Manual trackpad taps now share the same queued left-click transport as the
+  already proven `DESKTOP_DEBUG_START_PROBE_DISPATCHED` path. The remaining
+  click risk is no longer "debug probe works but finger tap uses another code
+  path"; it is now limited to tap recognition thresholds and any later
+  pointer-state drift that might still appear on device.
+- The `Computer`/file-manager tail is now classified as a desktop-icon
+  interaction issue, not a missing runtime binary: the shell probe sweep found
+  a working icon region, and the remaining manual-path hardening is the new
+  anchored tap target contract in `TouchpadView`, which still needs one short
+  live user pass to close completely.
 - Device-led desktop screenshot proof is still partially blocked by the fact
   that this Termux session shares the same physical phone: `am start -W`
   succeeds, but `Termux` can immediately retake foreground and invalidate the

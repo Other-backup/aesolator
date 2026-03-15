@@ -1328,3 +1328,39 @@
   the picture. The remaining suspects are true post-bootstrap interaction
   defects or native/process death after the shell is already live, not the old
   first-window termination race.
+
+### Entry 59: `Computer` was a desktop-icon double-click tail, not a broken file-manager package
+
+- Goal: explain why the desktop reacted to `Start` and other shell actions but
+  still appeared not to open the file manager when the user clicked
+  `Computer`.
+- Context: device reports narrowed the issue to one target only: shell clicks
+  generally worked, but `Computer` did not appear to open. Fresh shell
+  inspection already showed `explorer.exe` and `winefile.exe` present in both
+  the runtime payload and the live prefix, so the remaining suspect was the
+  desktop icon interaction contract rather than missing binaries. To remove
+  guesswork, `XServerDisplayActivity` gained a debug probe that can send
+  anchored single- or multi-tap sequences to arbitrary logical desktop
+  coordinates after shell bootstrap.
+- Decision: use that probe to sweep the upper-left desktop icon lane. The
+  targeted two-tap probe at `x=60, y=72/96` changed only the upper desktop
+  region relative to a clean baseline, which matches a `Computer`/explorer
+  window opening path rather than a global shell failure. With the shell path
+  proven alive, the manual-input defect reduced to tap stability: our normal
+  tap path clicked at the current logical cursor, which could drift a few
+  pixels during micro-jitter between finger-down and finger-up. `TouchpadView`
+  now anchors tap clicks to the cursor position captured at finger-down, so a
+  two-tap desktop icon gesture stays on one target even if the finger jitters.
+- Tradeoff: tap clicks now favor target stability over preserving tiny cursor
+  drift during a tap-sized gesture. That is the correct tradeoff for desktop
+  semantics: a real move still works once the gesture exceeds tap slop, while
+  icon activation becomes far less fragile.
+- Verification: the debug probe build compiled and installed successfully, the
+  coordinate sweep isolated a stable `Computer` icon region, and the follow-up
+  anchor-click patch rebuilt and installed cleanly. The shared-device capture
+  environment still contaminates some post-probe screenshots, so final closure
+  needs a short live user pass on the new build rather than more ADB-only
+  screenshots.
+- Next step: validate the manual two-tap `Computer` gesture on device, then
+  keep the same anchored-tap contract for any remaining desktop icon or
+  explorer-shell tails before revisiting broader runtime payload work.

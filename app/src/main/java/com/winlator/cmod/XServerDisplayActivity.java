@@ -245,6 +245,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean deferredDesktopPauseScheduled = false;
     private boolean deferredGuestTerminationScheduled = false;
     private long desktopShellBootstrapStartedAtMs = 0L;
+    private int debugStartProbeTargetX = Integer.MIN_VALUE;
+    private int debugStartProbeTargetY = Integer.MIN_VALUE;
+    private int debugStartProbeTapCount = 1;
+    private int debugStartProbeTapIntervalMs = 110;
     private final Runnable deferredDesktopPauseRunnable = new Runnable() {
         @Override
         public void run() {
@@ -455,9 +459,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         Intent launchIntent = getIntent();
-        debugStartProbeArmed = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        boolean debugBuild = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        boolean hasExplicitProbeTarget = launchIntent != null
+                && launchIntent.hasExtra("aeso_debug_probe_tap_x")
+                && launchIntent.hasExtra("aeso_debug_probe_tap_y");
+        debugStartProbeArmed = debugBuild
                 && launchIntent != null
-                && launchIntent.getBooleanExtra("aeso_debug_probe_start_tap", false);
+                && (launchIntent.getBooleanExtra("aeso_debug_probe_start_tap", false) || hasExplicitProbeTarget);
+        if (debugBuild && launchIntent != null) {
+            if (hasExplicitProbeTarget) {
+                debugStartProbeTargetX = launchIntent.getIntExtra("aeso_debug_probe_tap_x", Integer.MIN_VALUE);
+                debugStartProbeTargetY = launchIntent.getIntExtra("aeso_debug_probe_tap_y", Integer.MIN_VALUE);
+            }
+            debugStartProbeTapCount = Math.max(1, Math.min(4, launchIntent.getIntExtra("aeso_debug_probe_tap_count", 1)));
+            debugStartProbeTapIntervalMs = Math.max(40, Math.min(400, launchIntent.getIntExtra("aeso_debug_probe_tap_interval_ms", 110)));
+        }
         String launchTrustState = LaunchSecurity.getXServerLaunchTrustState(this, launchIntent);
         ForensicLogger.logEvent(
                 this,
@@ -470,6 +486,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "container_id", launchIntent != null ? launchIntent.getIntExtra("container_id", 0) : 0,
                         "shortcut_path", launchIntent != null ? launchIntent.getStringExtra("shortcut_path") : "",
                         "debug_start_probe_armed", debugStartProbeArmed,
+                        "debug_probe_target_x", debugStartProbeTargetX,
+                        "debug_probe_target_y", debugStartProbeTargetY,
+                        "debug_probe_tap_count", debugStartProbeTapCount,
+                        "debug_probe_tap_interval_ms", debugStartProbeTapIntervalMs,
                         "requires_signature", requiresSignedLaunchIntent(launchIntent),
                         "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent),
                         "trust_state", launchTrustState
@@ -1547,6 +1567,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (trackedCount < 2) return;
 
         debugStartProbeExecuted = true;
+        final int probeX = debugStartProbeTargetX != Integer.MIN_VALUE
+                ? debugStartProbeTargetX
+                : 28;
+        final int probeY = debugStartProbeTargetY != Integer.MIN_VALUE
+                ? debugStartProbeTargetY
+                : (xServer != null ? Math.max(0, xServer.screenInfo.height - 14) : 0);
+        final int tapCount = Math.max(1, debugStartProbeTapCount);
+        final int tapIntervalMs = Math.max(40, debugStartProbeTapIntervalMs);
         ForensicLogger.logEvent(
                 this,
                 "info",
@@ -1554,39 +1582,50 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 null,
                 "xserver",
                 "desktop_debug_start_probe_armed",
-                        ForensicLogger.fields(
+                ForensicLogger.fields(
                         "tracked_count", trackedCount,
-                        "target_x", 28,
-                        "target_y", xServer != null ? Math.max(0, xServer.screenInfo.height - 14) : 0
+                        "target_x", probeX,
+                        "target_y", probeY,
+                        "tap_count", tapCount,
+                        "tap_interval_ms", tapIntervalMs
                 )
         );
 
-        final int probeX = 28;
-        final int probeY = Math.max(0, xServer.screenInfo.height - 14);
-        handler.postDelayed(() -> {
-            boolean accepted = false;
-            if (touchpadView != null) {
-                accepted = touchpadView.debugPerformCursorTap(probeX, probeY);
-            }
-            if (!accepted && xServer != null) {
-                xServer.injectPointerMove(probeX, probeY);
-                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-            }
-            ForensicLogger.logEvent(
-                    this,
-                    "info",
-                    "DESKTOP_DEBUG_START_PROBE_DISPATCHED",
-                    null,
-                    "xserver",
-                    "desktop_debug_start_probe_dispatched",
-                    ForensicLogger.fields(
-                            "target_x", probeX,
-                            "target_y", probeY,
-                            "transport", accepted ? "touchpad_view" : "xserver_fallback"
-                    )
-            );
-        }, 180L);
+        handler.postDelayed(() -> dispatchDebugStartProbeTaps(probeX, probeY, tapCount, tapIntervalMs), 180L);
+    }
+
+    private void dispatchDebugStartProbeTaps(int probeX, int probeY, int tapCount, int tapIntervalMs) {
+        for (int i = 0; i < tapCount; i++) {
+            final int tapIndex = i + 1;
+            handler.postDelayed(() -> dispatchSingleDebugStartProbeTap(probeX, probeY, tapIndex, tapCount), (long) i * tapIntervalMs);
+        }
+    }
+
+    private void dispatchSingleDebugStartProbeTap(int probeX, int probeY, int tapIndex, int tapCount) {
+        boolean accepted = false;
+        if (touchpadView != null) {
+            accepted = touchpadView.debugPerformCursorTap(probeX, probeY);
+        }
+        if (!accepted && xServer != null) {
+            xServer.injectPointerMove(probeX, probeY);
+            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_START_PROBE_DISPATCHED",
+                null,
+                "xserver",
+                "desktop_debug_start_probe_dispatched",
+                ForensicLogger.fields(
+                        "target_x", probeX,
+                        "target_y", probeY,
+                        "tap_index", tapIndex,
+                        "tap_count", tapCount,
+                        "transport", accepted ? "touchpad_view" : "xserver_fallback"
+                )
+        );
     }
 
     private void noteApplicationWindowUnmapped(Window window) {
