@@ -1,7 +1,0 @@
-app.ubuntufs-pngs-0 /data/data/com.termux/files/home/aesolator/ubuntufs/build/generated/res/pngs/debug
-app.ubuntufs-resValues-1 /data/data/com.termux/files/home/aesolator/ubuntufs/build/generated/res/resValues/debug
-app.ubuntufs-packageDebugResources-2 /data/data/com.termux/files/home/aesolator/ubuntufs/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-app.ubuntufs-packageDebugResources-3 /data/data/com.termux/files/home/aesolator/ubuntufs/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-app.ubuntufs-debug-4 /data/data/com.termux/files/home/aesolator/ubuntufs/build/intermediates/merged_res/debug/mergeDebugResources
-app.ubuntufs-debug-5 /data/data/com.termux/files/home/aesolator/ubuntufs/src/debug/res
-app.ubuntufs-main-6 /data/data/com.termux/files/home/aesolator/ubuntufs/src/main/res
