@@ -33,6 +33,16 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - GitHub authentication must come from local runtime state only
   (`GITHUB_TOKEN`/credential helper/local shell session), never from repository
   files such as `AGENTS.md`.
+- Local host compiler lane is pinned to `LLVM 22.1.1` when a dedicated
+  source-built toolchain is present under
+  `/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux`.
+  Treat older Termux LLVM packages only as bootstrap tools, not the target
+  compiler baseline for future local `wine` or runtime builds.
+- The preferred heavy build path for the host compiler lane is GitHub Actions,
+  not on-device compile. Publish `LLVM 22.1.1` as a separate host-toolchain
+  release asset and hydrate it locally through
+  `tools/fetch-host-llvm-release.sh` using `GITHUB_TOKEN` or
+  `AEO_GITHUB_TOKEN` from runtime state, never from tracked files.
 - Every coherent implementation pass should end with a git commit unless the
   user explicitly asks to keep the tree uncommitted.
 - If the user explicitly says not to compile or build until a transfer lane is
@@ -300,6 +310,13 @@ runtime-binding, documentation alignment, and repository contract integrity.
   injection on the active UI thread, prefer matching that proven contract over
   background move/button queues unless fresh device forensics prove the direct
   path is the source of the freeze.
+- On this shared device, do not debug desktop regressions by repeatedly
+  foreground-launching `Ae.solator` from the same Termux/Codex session.
+  Prefer passive ADB forensics, `run-as` inspection, and rebuild/install loops
+  that do not steal focus from Termux.
+- Treat `wfm.exe` as optional, not canonical. Before routing shell bootstrap or
+  the `Computer` menu entry through it, verify that the active container rootfs
+  actually ships `wfm.exe`; otherwise fall back to `explorer.exe`.
 - If a download completes but install state does not materialize, treat that as
   a first-class contract failure between intake UI and local package indexing,
   not as a cosmetic device quirk.
@@ -308,6 +325,17 @@ runtime-binding, documentation alignment, and repository contract integrity.
   consumers must resolve that entry through `ContentsManager` profile metadata
   before falling back to generic runtime parsing. Do not assume the visible
   picker string is already a canonical `wine-...` / `proton-...` identifier.
+- Default device-debug posture is now full autonomous forensics first. When the
+  user reports a runtime/container/UI failure, capture a complete ADB forensic
+  bundle (`ci/winlator/forensic-adb-issue-capture.sh`) plus immediate
+  crash/logcat/app-private evidence before asking the user for more detail.
+  Only ask for another manual reproduce after the current bundle has already
+  been harvested and analyzed.
+- On the shared phone, autonomous forensics must still respect environment
+  contamination: do not repeatedly foreground-launch `Ae.solator` from the same
+  Termux/Codex session if that destroys the observation surface. Prefer
+  passive bundle capture, `run-as` inspection, quiet rebuild/install, and then
+  a single targeted reproduce on the freshly installed build.
 - For `New Container` regressions, capture both events
   `NEW_CONTAINER_RUNTIME_SCAN` and `NEW_CONTAINER_RUNTIME_RESOLVE`, then
   verify the selected entry, resolved runtime path, and resulting
