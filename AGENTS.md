@@ -353,6 +353,43 @@ runtime-binding, documentation alignment, and repository contract integrity.
   crash/logcat/app-private evidence before asking the user for more detail.
   Only ask for another manual reproduce after the current bundle has already
   been harvested and analyzed.
+- Treat "full forensics", "full logging", "every layer", or similar user
+  wording as a request for the maximum adb-available contract, not as permission
+  to stop at filtered `logcat`. Default deliverables are:
+  - one historical/full bundle
+  - one clean-session bundle with `adb logcat -b all -c`, force-stop, single
+    relaunch, and fresh `adb logcat -b all -v threadtime`
+  - pulled runtime stream files for the reproduced launch
+  - app-private `run-as` evidence
+  - `dumpsys` state for process, package, window, graphics, memory, thermal,
+    battery, usage, and dropbox surfaces
+  - current privilege/appops/whitelist state actually accepted by the device
+- Default parser stack for forensic interpretation is:
+  - `ci/winlator/forensic-runtime-log-assembler.py`
+  - `ci/winlator/forensic-issue-bundle.py`
+  - `ci/winlator/forensic-runtime-mismatch-matrix.py`
+  - `ci/winlator/forensic-runtime-conflict-contour.py`
+  Prefer these over one-off grep summaries whenever the artifacts are present.
+- Treat runtime debugging as a full stack walk across all live layers:
+  app/UI, Java, JNI, `libwinlator`, Wine/Proton, Box64/FEX, DXVK/VKD3D,
+  Vulkan loader/ICD/layers, wrapper/provider selection, Mesa/Turnip/Zink,
+  audio, container/rootfs/prefix/bootstrap layout, and Android framework/vendor
+  ROM behavior. Do not close a defect on a top-layer symptom alone if a lower
+  failing layer is visible in the bundle.
+- When the graphics/runtime lane is active, inspect the exact driver/ICD/layer
+  tree, not just the selected label. Follow the concrete on-device path through:
+  APK `jniLibs`, app-private staged files, rootfs `usr/lib`, runtime payload,
+  overlay, prefix/bootstrap layer, and any donor residue. Record whether a
+  failing library is missing, incompatible, mislayered, or resolved from the
+  wrong owner.
+- If a log shows a dependency-edge failure such as `dlopen failed`,
+  `undefined symbol`, `vkCreateInstance`, `Found no drivers`, `nodrv_CreateWindow`,
+  or runtime self-exit after bootstrap, write the causal chain explicitly:
+  symptom -> failing layer -> concrete file/path -> blocking dependency ->
+  resulting exit behavior -> next probe or patch.
+- Forensic depth on this repo should be engine-grade and parser-first. The goal
+  is not "collect many logs"; the goal is to leave every meaningful failure with
+  a rooted explanation across the full runtime tree and all downstream effects.
 - On the shared phone, autonomous forensics must still respect environment
   contamination: do not repeatedly foreground-launch `Ae.solator` from the same
   Termux/Codex session if that destroys the observation surface. Prefer
