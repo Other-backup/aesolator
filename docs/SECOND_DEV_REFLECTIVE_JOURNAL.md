@@ -2583,3 +2583,36 @@
 - Next step: rebuild, install, reproduce once, and inspect the new synchronous
   checkpoints to see whether the process dies inside `WINLATOR_NATIVE_LOAD_*`
   or after a specific `XSERVER_CONSTRUCTOR_*` milestone.
+
+## 2026-03-18
+
+### Entry 108: new-device bootstrap exposed host-LLVM drift and missing Wi-Fi ADB ergonomics
+
+- Goal: make the freshly migrated Termux device use the pinned host compiler
+  lane immediately and stop relying on remembered ADB-over-Wi-Fi command
+  fragments.
+- Context: the new device bootstrap succeeded only after manual intervention:
+  the published host LLVM release tag had moved to
+  `host-llvm-22.1.1-latest`, the archive unpacked into
+  `llvm-22.1.1-termux-android-aarch64` instead of the local contract path, the
+  bootstrap script skipped host LLVM fetch because it tested the fetch script
+  with `-x` even though it was invoked through `sh`, and there was no local
+  repo helper for `adb pair` / `adb connect` / debug APK install.
+- Decision: harden the consumer fetch script around the latest release tag and
+  archive-root normalization, teach the Termux bootstrap path to hydrate SDK
+  command-line tools automatically when `sdkmanager` is absent, relax the host
+  LLVM fetch check from executable-only to file presence, and add a dedicated
+  `tools/adb-wifi-debug.sh` plus `docs/ADB_WIFI_DEBUG.md` for pairing,
+  reconnect, install, and launch.
+- Tradeoff: bootstrap now downloads a larger public Android SDK bundle on a
+  truly fresh device, but the migration path is more honest and no longer
+  depends on shell archaeology.
+- Verification: the new device now has live `platform-tools`,
+  `platforms;android-34`, `build-tools;35.0.0`, `ndk;29.0.14206865`, and a
+  working host LLVM `22.1.1` lane under
+  `/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux`; local
+  `adb start-server` / `adb devices -l` succeeds; and the new helper/docs are
+  staged in repo.
+- Next step: build a fresh debug APK on this migrated device, pair or reconnect
+  the phone over Wi-Fi ADB through the helper script, then resume the live
+  XServer bootstrap blocker with fresh on-device forensics.

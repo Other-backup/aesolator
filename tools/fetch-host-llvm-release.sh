@@ -4,7 +4,7 @@ set -eu
 LLVM_VERSION="${LLVM_VERSION:-22.1.1}"
 ROOT="/data/data/com.termux/files/home"
 REPO="${AEO_HOST_LLVM_REPO:-kosoymiki/wcp-runtime-lanes}"
-RELEASE_TAG="${AEO_HOST_LLVM_RELEASE_TAG:-host-llvm-${LLVM_VERSION}}"
+RELEASE_TAG="${AEO_HOST_LLVM_RELEASE_TAG:-host-llvm-${LLVM_VERSION}-latest}"
 ASSET_NAME="${AEO_HOST_LLVM_ASSET_NAME:-llvm-${LLVM_VERSION}-termux-android-aarch64.tar.zst}"
 TMP_DIR="${ROOT}/.tmp_host_llvm_release"
 TARGET_ROOT="${ROOT}/.toolchains"
@@ -51,6 +51,10 @@ asset_api_url() {
   ' "${RELEASE_JSON}"
 }
 
+archive_root_name() {
+  tar --zstd -tf "${ASSET_PATH}" | sed -n '1{s#/.*##;p;q;}'
+}
+
 mkdir -p "${TMP_DIR}" "${TARGET_ROOT}"
 rm -rf "${TARGET_DIR}"
 rm -f "${ASSET_PATH}" "${RELEASE_JSON}"
@@ -64,7 +68,23 @@ if [ -z "${DOWNLOAD_URL}" ]; then
 fi
 
 curl_asset "${DOWNLOAD_URL}" -o "${ASSET_PATH}"
+ARCHIVE_ROOT_NAME="$(archive_root_name)"
+
+if [ -z "${ARCHIVE_ROOT_NAME}" ]; then
+  echo "failed to determine extracted archive root for ${ASSET_NAME}" >&2
+  exit 1
+fi
+
+EXTRACTED_DIR="${TARGET_ROOT}/${ARCHIVE_ROOT_NAME}"
+if [ "${EXTRACTED_DIR}" != "${TARGET_DIR}" ]; then
+  rm -rf "${EXTRACTED_DIR}"
+fi
+
 tar --zstd -xf "${ASSET_PATH}" -C "${TARGET_ROOT}"
+
+if [ "${EXTRACTED_DIR}" != "${TARGET_DIR}" ]; then
+  mv "${EXTRACTED_DIR}" "${TARGET_DIR}"
+fi
 
 "${TARGET_DIR}/bin/clang" --version | sed -n '1,4p'
 "${TARGET_DIR}/bin/llvm-strip" --version | sed -n '1,4p'

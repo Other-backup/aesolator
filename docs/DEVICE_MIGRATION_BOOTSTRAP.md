@@ -1,6 +1,6 @@
 # Device Migration Bootstrap
 
-Updated: `2026-03-17`
+Updated: `2026-03-18`
 
 This document is the repo-tracked bootstrap path for moving `Ae.solator`
 development onto a new `Termux/Android` device without reopening old setup
@@ -56,7 +56,8 @@ main
 
 - installs the baseline `Termux` packages used by the current build lane
 - creates Android SDK directories if missing
-- installs Android SDK packages when `sdkmanager` is already available
+- installs Android SDK command-line tools if missing
+- installs Android SDK packages through `sdkmanager`
 - writes `local.properties`
 - fetches the shared `LLVM 22.1.1` host toolchain release if GitHub auth is
   present in the shell
@@ -132,6 +133,7 @@ Primary forensic sources on-device:
 
 ## Related Docs
 
+- `docs/ADB_WIFI_DEBUG.md`
 - `docs/HOST_LLVM_22_1_1_TOOLCHAIN.md`
 - `docs/TERMUX_LOCAL_BUILD.md`
 - `docs/ROOTFS_RUNTIME_STATIC_AUDIT.md`

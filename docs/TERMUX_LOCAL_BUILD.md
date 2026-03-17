@@ -78,6 +78,13 @@ source-of-truth.
 
 ## Wi-Fi ADB Install
 
+Reusable helper:
+
+```sh
+sh tools/adb-wifi-debug.sh connect <device-ip:port>
+sh tools/adb-wifi-debug.sh install-debug <device-ip:port>
+```
+
 Verified install command:
 
 ```sh
@@ -86,6 +93,9 @@ adb -s 10.0.0.1:42363 install -r -d app/build/outputs/apk/debug/app-debug.apk
 
 `-d` was required because the device already had a higher `versionCode`
 installed (`200265`), while the local debug APK uses `versionCode=20`.
+
+Full pairing/connect helper runbook lives in:
+`docs/ADB_WIFI_DEBUG.md`
 
 ## Quick Verification
 

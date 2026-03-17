@@ -7,8 +7,12 @@ SDK_ROOT="${ANDROID_SDK_ROOT:-$ROOT/android-sdk}"
 NDK_VERSION="${AEO_ANDROID_NDK_VERSION:-29.0.14206865}"
 ANDROID_PLATFORM="${AEO_ANDROID_PLATFORM:-android-34}"
 BUILD_TOOLS_VERSION="${AEO_ANDROID_BUILD_TOOLS:-35.0.0}"
+CMDLINE_TOOLS_REVISION="${AEO_ANDROID_CMDLINE_TOOLS_REVISION:-14742923}"
+CMDLINE_TOOLS_ZIP="commandlinetools-linux-${CMDLINE_TOOLS_REVISION}_latest.zip"
+CMDLINE_TOOLS_URL="${AEO_ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/${CMDLINE_TOOLS_ZIP}}"
 HOST_LLVM_VERSION="${AEO_HOST_LLVM_VERSION:-22.1.1}"
 LOCAL_PROPERTIES="$REPO_ROOT/local.properties"
+BOOTSTRAP_TMP_DIR="${ROOT}/.tmp_android_sdk"
 
 log() {
   printf '[bootstrap-termux-host] %s\n' "$*"
@@ -16,6 +20,24 @@ log() {
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+download_file() {
+  url="$1"
+  output="$2"
+
+  if need_cmd wget; then
+    wget -O "$output" "$url"
+    return 0
+  fi
+
+  if need_cmd curl; then
+    curl -fL "$url" -o "$output"
+    return 0
+  fi
+
+  log "Neither wget nor curl is available for downloading $url"
+  return 1
 }
 
 install_termux_packages() {
@@ -33,7 +55,23 @@ install_termux_packages() {
 
 prepare_sdk_dirs() {
   log "Preparing Android SDK directories"
-  mkdir -p "$SDK_ROOT"
+  mkdir -p "$SDK_ROOT" "$BOOTSTRAP_TMP_DIR"
+}
+
+install_sdk_cmdline_tools() {
+  SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  ZIP_PATH="$BOOTSTRAP_TMP_DIR/$CMDLINE_TOOLS_ZIP"
+
+  if [ -x "$SDKMANAGER" ]; then
+    return 0
+  fi
+
+  log "Installing Android SDK command-line tools"
+  download_file "$CMDLINE_TOOLS_URL" "$ZIP_PATH"
+  unzip -tq "$ZIP_PATH" >/dev/null
+  rm -rf "$SDK_ROOT/cmdline-tools/latest" "$SDK_ROOT/cmdline-tools/cmdline-tools"
+  unzip -q -o "$ZIP_PATH" -d "$SDK_ROOT/cmdline-tools"
+  mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
 }
 
 install_sdk_packages() {
@@ -66,7 +104,7 @@ write_local_properties() {
 
 fetch_host_llvm() {
   FETCH_SCRIPT="$REPO_ROOT/tools/fetch-host-llvm-release.sh"
-  if [ ! -x "$FETCH_SCRIPT" ]; then
+  if [ ! -f "$FETCH_SCRIPT" ]; then
     log "Host LLVM fetch script not present; skipping"
     return 0
   fi
@@ -98,6 +136,7 @@ print_next_steps() {
 main() {
   install_termux_packages
   prepare_sdk_dirs
+  install_sdk_cmdline_tools
   install_sdk_packages
   write_local_properties
   fetch_host_llvm

@@ -3,12 +3,14 @@
 Consumer-side notes for the shared host LLVM lane used by `Ae.solator` local
 builds on `Termux/Android`, separate from rootfs.
 
+Updated: `2026-03-18`
+
 ## Ownership
 
 - canonical CI/release host: `wcp-runtime-lanes`
 - canonical workflow: `.github/workflows/ci-host-llvm-toolchain.yml`
 - canonical build script: `ci/toolchains/build-host-llvm-android.sh`
-- canonical release tag: `host-llvm-22.1.1`
+- canonical release tag: `host-llvm-22.1.1-latest`
 
 `Ae.solator` must only fetch and use the published toolchain artifact. It must
 not carry a second owner-side host-LLVM GitHub Actions lane.
@@ -38,7 +40,7 @@ Separate GitHub Actions lane:
 - repo: `wcp-runtime-lanes`
 - workflow: `.github/workflows/ci-host-llvm-toolchain.yml`
 - build script: `ci/toolchains/build-host-llvm-android.sh`
-- release tag: `host-llvm-22.1.1`
+- release tag: `host-llvm-22.1.1-latest`
 
 The CI lane builds an Android ARM64 host-toolchain artifact from source and
 publishes it as a separate release asset, so local device work can continue
@@ -60,6 +62,13 @@ sh /data/data/com.termux/files/home/aesolator/tools/fetch-host-llvm-release.sh
 For private repositories, `tools/fetch-host-llvm-release.sh` uses the GitHub
 API directly and expects `GITHUB_TOKEN` or `AEO_GITHUB_TOKEN` in the local
 shell environment.
+
+The current consumer fetch path normalizes the published archive layout back to
+the local contract path:
+
+```text
+/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux
+```
 
 If the local LLVM lane exists, the env helper prepends it to `PATH` and exports:
 

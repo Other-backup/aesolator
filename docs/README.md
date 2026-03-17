@@ -15,6 +15,7 @@ This repo stores only application-layer documentation.
 - `docs/REPO_SPLIT_TOPOLOGY.md` - split repository contract and ownership.
 - `docs/CONTENTS_QA_CHECKLIST.md` - active Contents/UI closure checklist.
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md` - device forensic runbook.
+- `docs/ADB_WIFI_DEBUG.md` - local Termux Wi-Fi ADB pairing, reconnect, install, and launch helper runbook.
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md` - forensic sync contract for app/runtime diagnostics.
 - `docs/TERMUX_LOCAL_BUILD.md` - verified Termux ARM64 local build and Wi-Fi ADB install runbook.
 - `docs/DONOR_REFLECTIVE_ROADMAP.md` - donor extraction roadmap with pre/during/post reflective gates.
