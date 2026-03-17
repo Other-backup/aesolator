@@ -1,0 +1,25 @@
+{
+    global:
+        access;
+        chdir;
+        dlopen;
+        execv;
+        execve;
+        execvp;
+        fopen;
+        fopen64;
+        lstat;
+        mkdir;
+        open;
+        open64;
+        openat;
+        opendir;
+        posix_spawn;
+        posix_spawnp;
+        rename;
+        rmdir;
+        stat;
+        unlink;
+    local:
+        *;
+};

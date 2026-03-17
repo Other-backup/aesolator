@@ -1,0 +1,12 @@
+{
+    global:
+        fstatat;
+        ioctl;
+        open;
+        open64;
+        openat;
+        read;
+        readlink;
+    local:
+        *;
+};

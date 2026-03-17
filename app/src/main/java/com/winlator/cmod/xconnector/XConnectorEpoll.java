@@ -5,6 +5,8 @@ import android.util.SparseArray;
 
 import androidx.annotation.Keep;
 
+import com.winlator.cmod.core.WinlatorNative;
+
 import java.io.IOException;
 
 public class XConnectorEpoll implements Runnable {
@@ -25,7 +27,7 @@ public class XConnectorEpoll implements Runnable {
     private final SparseArray<Client> connectedClients = new SparseArray<>();
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("XConnectorEpoll");
     }
 
     public XConnectorEpoll(UnixSocketConfig socketConfig, ConnectionHandler connectionHandler, RequestHandler requestHandler) {

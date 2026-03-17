@@ -1,6 +1,17 @@
 # Host LLVM 22.1.1
 
-Local source-built host LLVM lane for `Termux/Android`, separate from rootfs.
+Consumer-side notes for the shared host LLVM lane used by `Ae.solator` local
+builds on `Termux/Android`, separate from rootfs.
+
+## Ownership
+
+- canonical CI/release host: `wcp-runtime-lanes`
+- canonical workflow: `.github/workflows/ci-host-llvm-toolchain.yml`
+- canonical build script: `ci/toolchains/build-host-llvm-android.sh`
+- canonical release tag: `host-llvm-22.1.1`
+
+`Ae.solator` must only fetch and use the published toolchain artifact. It must
+not carry a second owner-side host-LLVM GitHub Actions lane.
 
 ## Purpose
 
@@ -8,7 +19,7 @@ Local source-built host LLVM lane for `Termux/Android`, separate from rootfs.
 - stop depending on mixed `termux 21.1.8` + NDK host binaries
 - prepare a stable host toolchain for future `wine` / runtime builds
 
-## Build
+## Local Build
 
 ```sh
 sh /data/data/com.termux/files/home/aesolator/tools/build-host-llvm-toolchain.sh
@@ -24,6 +35,7 @@ Installs into:
 
 Separate GitHub Actions lane:
 
+- repo: `wcp-runtime-lanes`
 - workflow: `.github/workflows/ci-host-llvm-toolchain.yml`
 - build script: `ci/toolchains/build-host-llvm-android.sh`
 - release tag: `host-llvm-22.1.1`

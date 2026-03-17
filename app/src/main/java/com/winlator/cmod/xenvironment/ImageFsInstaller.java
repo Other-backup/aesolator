@@ -39,11 +39,20 @@ public abstract class ImageFsInstaller {
     private static final String GLIBC_IMAGEFS_ARCHIVE = "imagefs_gamenative.txz";
     private static final String BIONIC_IMAGEFS_ARCHIVE = "imagefs_bionic.txz";
     private static final String GLIBC_PATCH_ARCHIVE = "imagefs_patches_gamenative.tzst";
-    private static final String REDIRECT_ARCHIVE = "redirect.tzst";
     private static final String EXTRAS_ARCHIVE = "extras.tzst";
-    private static final String[] APP_NATIVE_GUEST_LIBS = {
-            "libevshim.so",
-            "libdummyvk.so"
+    private static final String BIONIC_HOST_SUPPORT_ARCHIVE = "bionic_host_support.tzst";
+    private static final String[][] APP_NATIVE_GUEST_LIBS = {
+            {"libaero_redirect_glibc.so", "libredirect.so"},
+            {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
+            {"libandroid-sysvshm.so", "libandroid-sysvshm.so"},
+            {"libaero_evshim.so", "libevshim.so"},
+            {"libdummyvk.so", "libdummyvk.so"}
+    };
+    private static final String[][] APP_NATIVE_ANDROID_HOST_LIBS = {
+            {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
+            {"libandroid-sysvshm.so", "libandroid-sysvshm.so"},
+            {"libaero_evshim.so", "libevshim.so"},
+            {"libdummyvk.so", "libdummyvk.so"}
     };
     private static final String ROOTFS_PRIMARY_BASE_URL = "https://downloads.gamenative.app/";
     private static final String ROOTFS_FALLBACK_BASE_URL = "https://pub-9fcd5294bd0d4b85a9d73615bf98f3b5.r2.dev/";
@@ -159,7 +168,12 @@ public abstract class ImageFsInstaller {
         ensureDirectory(imageFs.getTmpDir(), 0771);
         ensureDirectory(imageFs.getCompatTmpDir().getParentFile(), 0771);
         ensureSymlinkOrDirectory("../tmp", imageFs.getCompatTmpDir(), 0771);
+        ensureSymlinkOrDirectory("usr/etc", new File(rootDir, "etc"), 0771);
+        ensureSymlinkOrDirectory("usr/bin", new File(rootDir, "bin"), 0771);
+        ensureSymlinkOrDirectory("usr/lib", new File(rootDir, "lib"), 0771);
+        ensureSymlinkOrDirectory("usr/lib", new File(rootDir, "lib64"), 0771);
         ensureDirectory(imageFs.getLocalBinDir(), 0771);
+        ensureDirectory(imageFs.getAndroidHostLibDir(), 0771);
 
         File canonicalWine = new File(rootDir, "/opt/wine");
         File mainWineVersionDir = new File(rootDir, "/opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
@@ -401,6 +415,17 @@ public abstract class ImageFsInstaller {
         }
     }
 
+    private static void chmodTree(File root, int mode) {
+        if (root == null || !root.exists()) return;
+        FileUtils.chmod(root, mode);
+        if (!root.isDirectory()) return;
+        File[] children = root.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            chmodTree(child, mode);
+        }
+    }
+
     private static void installAppNativeGuestLibs(Context context, File rootDir) {
         String nativeLibDir = AppUtils.getNativeLibDir(context);
         if (nativeLibDir == null || nativeLibDir.trim().isEmpty()) return;
@@ -410,30 +435,58 @@ public abstract class ImageFsInstaller {
 
         File guestLibDir = new File(rootDir, "usr/lib");
         if (!guestLibDir.exists() && !guestLibDir.mkdirs()) return;
+        File androidHostLibDir = new File(rootDir, "usr/lib/android-host");
+        ensureDirectory(androidHostLibDir, 0771);
 
-        for (String libraryName : APP_NATIVE_GUEST_LIBS) {
-            File source = new File(nativeLibRoot, libraryName);
+        for (String[] librarySpec : APP_NATIVE_GUEST_LIBS) {
+            if (librarySpec == null || librarySpec.length < 2) continue;
+
+            String sourceName = librarySpec[0];
+            String destinationName = librarySpec[1];
+            File source = new File(nativeLibRoot, sourceName);
             if (!source.isFile()) continue;
 
-            File destination = new File(guestLibDir, libraryName);
+            File destination = new File(guestLibDir, destinationName);
             boolean needsCopy = !destination.isFile() || destination.length() != source.length();
             if (needsCopy) {
                 FileUtils.copy(source, destination);
             }
             chmodIfExists(destination);
         }
+
+        for (String[] librarySpec : APP_NATIVE_ANDROID_HOST_LIBS) {
+            if (librarySpec == null || librarySpec.length < 2) continue;
+
+            String sourceName = librarySpec[0];
+            String destinationName = librarySpec[1];
+            File source = new File(nativeLibRoot, sourceName);
+            if (!source.isFile()) continue;
+
+            File destination = new File(androidHostLibDir, destinationName);
+            boolean needsCopy = !destination.isFile() || destination.length() != source.length();
+            if (needsCopy) {
+                FileUtils.copy(source, destination);
+            }
+            chmodIfExists(destination);
+        }
+
     }
 
     private static void installGuestLibs(Context context, File rootDir) {
-        if (assetExists(context, REDIRECT_ARCHIVE)) {
-            if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, REDIRECT_ARCHIVE, rootDir)) {
-                Log.e("ImageFsInstaller", "redirect overlay deploy failed");
-            }
-        }
-
         if (assetExists(context, EXTRAS_ARCHIVE)) {
             if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, EXTRAS_ARCHIVE, rootDir)) {
                 Log.e("ImageFsInstaller", "extras overlay deploy failed");
+            }
+        }
+
+        if (assetExists(context, BIONIC_HOST_SUPPORT_ARCHIVE)) {
+            File androidHostLibDir = new File(rootDir, "usr/lib/android-host");
+            if (androidHostLibDir.exists()) FileUtils.delete(androidHostLibDir);
+            ensureDirectory(androidHostLibDir, 0771);
+            if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, BIONIC_HOST_SUPPORT_ARCHIVE, rootDir)) {
+                Log.e("ImageFsInstaller", "bionic host support overlay deploy failed");
+            } else {
+                chmodTree(androidHostLibDir, 0755);
             }
         }
 
@@ -441,11 +494,80 @@ public abstract class ImageFsInstaller {
 
         chmodIfExists(new File(rootDir, "usr/lib/libredirect.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libredirect-bionic.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/libandroid-sysvshm.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libevshim.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libdummyvk.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/android-host/libredirect-bionic.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/android-host/libandroid-sysvshm.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/android-host/libevshim.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/android-host/libdummyvk.so"));
+        chmodTree(new File(rootDir, "usr/lib/android-host"), 0755);
         chmodIfExists(new File(rootDir, "generate_interfaces_file.exe"));
         chmodIfExists(new File(rootDir, "Steamless/Steamless.CLI.exe"));
         chmodIfExists(new File(rootDir, "opt/mono-gecko-offline/wine-mono-9.0.0-x86.msi"));
+    }
+
+    public static void ensureBionicHostSupport(Context context, ImageFs imageFs) {
+        if (context == null || imageFs == null) return;
+        if (!assetExists(context, BIONIC_HOST_SUPPORT_ARCHIVE)) return;
+
+        File hostLibDir = imageFs.getAndroidHostLibDir();
+        if (hasBionicHostSupportClosure(hostLibDir)) {
+            return;
+        }
+
+        if (hostLibDir.exists()) FileUtils.delete(hostLibDir);
+        ensureDirectory(hostLibDir, 0771);
+        if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, BIONIC_HOST_SUPPORT_ARCHIVE, imageFs.getRootDir())) {
+            Log.e("ImageFsInstaller", "Unable to refresh bionic host support overlay");
+            return;
+        }
+        chmodTree(hostLibDir, 0755);
+    }
+
+    private static boolean hasBionicHostSupportClosure(File hostLibDir) {
+        if (hostLibDir == null || !hostLibDir.isDirectory()) return false;
+        String[] required = {
+                "libX11.so",
+                "libXext.so",
+                "libxcb.so",
+                "libxshmfence.so",
+                "libandroid-support.so",
+                "libfontconfig.so",
+                "libfreetype.so",
+                "libexpat.so.1",
+                "libz.so.1",
+                "libbz2.so.1.0",
+                "libpng16.so",
+                "libbrotlidec.so",
+                "libbrotlicommon.so",
+                "libvulkan.so",
+                "libvulkan.so.1"
+        };
+        for (String name : required) {
+            if (!new File(hostLibDir, name).exists()) return false;
+        }
+        return true;
+    }
+
+    public static void ensureAppNativeGuestLibs(Context context, ImageFs imageFs) {
+        if (context == null || imageFs == null) return;
+        File rootDir = imageFs.getRootDir();
+        if (rootDir == null || !rootDir.isDirectory()) return;
+
+        File guestLibDir = imageFs.getLibDir();
+        ensureDirectory(guestLibDir, 0771);
+        installAppNativeGuestLibs(context, rootDir);
+        chmodIfExists(new File(guestLibDir, "libredirect.so"));
+        chmodIfExists(new File(guestLibDir, "libredirect-bionic.so"));
+        chmodIfExists(new File(guestLibDir, "libandroid-sysvshm.so"));
+        chmodIfExists(new File(guestLibDir, "libevshim.so"));
+        chmodIfExists(new File(guestLibDir, "libdummyvk.so"));
+        File hostLibDir = imageFs.getAndroidHostLibDir();
+        chmodIfExists(new File(hostLibDir, "libredirect-bionic.so"));
+        chmodIfExists(new File(hostLibDir, "libandroid-sysvshm.so"));
+        chmodIfExists(new File(hostLibDir, "libevshim.so"));
+        chmodIfExists(new File(hostLibDir, "libdummyvk.so"));
     }
 
     public static boolean extractSupportArchive(Context context, String archiveName, TarCompressorUtils.Type type, File outputDir) {
@@ -638,14 +760,21 @@ public abstract class ImageFsInstaller {
         return true;
     }
 
+    private static boolean shouldPreserveOptEntry(Context context, File file) {
+        if (file == null) return false;
+        String fileName = file.getName();
+        if (fileName.equals("installed-wine")) return true;
+        if (fileName.startsWith("runtime-")) return true;
+        if (isImportedWineProton(context, fileName)) return true;
+        return new File(file, "profile.json").isFile();
+    }
+
     private static void clearOptDir(Context context, File optDir) {
         File[] files = optDir.listFiles();
         if (files == null) return;
 
         for (File file : files) {
-            String fileName = file.getName();
-            if (fileName.equals("installed-wine")) continue;
-            if (isImportedWineProton(context, fileName)) continue;
+            if (shouldPreserveOptEntry(context, file)) continue;
             FileUtils.delete(file);
         }
     }
@@ -684,7 +813,7 @@ public abstract class ImageFsInstaller {
 
             File containerPatternDir = new File(context.getCacheDir(), "container_pattern_gamenative");
             FileUtils.delete(containerPatternDir);
-            if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, assetManager, "container_pattern_gamenative.tzst", containerPatternDir)) {
+            if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, "container_pattern_gamenative.tzst", containerPatternDir)) {
                 Log.e("ImageFsInstaller", "Failed to extract container_pattern_gamenative.tzst for compaction");
                 return;
             }

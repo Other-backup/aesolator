@@ -1,5 +1,6 @@
 package com.winlator.cmod.alsaserver;
 
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.sysvshm.SysVSharedMemory;
 
 import java.nio.ByteBuffer;
@@ -25,7 +26,7 @@ public class ALSAClient {
     private long streamPtr = 0;
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("ALSAClient");
     }
 
     public void release() {

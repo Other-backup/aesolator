@@ -38,13 +38,33 @@ runtime-binding, documentation alignment, and repository contract integrity.
   `/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux`.
   Treat older Termux LLVM packages only as bootstrap tools, not the target
   compiler baseline for future local `wine` or runtime builds.
-- The preferred heavy build path for the host compiler lane is GitHub Actions,
-  not on-device compile. Publish `LLVM 22.1.1` as a separate host-toolchain
-  release asset and hydrate it locally through
-  `tools/fetch-host-llvm-release.sh` using `GITHUB_TOKEN` or
-  `AEO_GITHUB_TOKEN` from runtime state, never from tracked files.
+- `Ae.solator` is not the owner of the host LLVM CI lane. Heavy `LLVM 22.1.1`
+  workflow/release orchestration belongs in `wcp-runtime-lanes`; this repo may
+  consume the resulting host-toolchain artifact, but must not be treated as
+  the canonical place to build or publish it. Do not add or restore a
+  host-LLVM GitHub Actions build lane in this repo.
+- If host-compiler CI/release work is requested, do it directly in
+  `wcp-runtime-lanes/main`, not in side branches of `aesolator`, and not as a
+  detached experimental lane inside this repo.
+- Default git posture is `main`-first. Do not split ordinary work into side
+  branches, staged merge branches, or temporary integration branches unless
+  the user explicitly asks for that. If a temporary branch exists, treat it as
+  transitional debt and move the real working lane back to `main`.
+- When repository sync or CI dispatch is requested, prefer landing the final
+  state straight onto `main` rather than parking it in a temporary merge
+  branch first.
+- Without `adb`, do not rely on shell `logcat` as the primary app-proof path.
+  On this device it exposes Termux/system noise much better than `Ae.solator`
+  app-UID data. Default local forensic sources are:
+  `/storage/emulated/0/Ae.solator/logs/forensics/*.jsonl`,
+  `fatal_crash_*.txt`, and runtime stream files under
+  `/storage/emulated/0/Ae.solator/logs/`.
 - Every coherent implementation pass should end with a git commit unless the
   user explicitly asks to keep the tree uncommitted.
+- Before moving work to a new device, push the live state to `main`, keep both
+  repos on clean worktrees, and update `docs/DEVICE_MIGRATION_BOOTSTRAP.md`
+  plus any external handoff note together so the next device starts from one
+  consistent bootstrap path.
 - If the user explicitly says not to compile or build until a transfer lane is
   complete, do not run `gradlew`, Android builds, or APK installs in the
   middle of that lane. Keep transfer passes code-and-docs only until the user
@@ -62,6 +82,8 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - Maintain donor binary/source boundary notes in:
   `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md` and
   `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md`.
+- Keep `docs/DEVICE_MIGRATION_BOOTSTRAP.md` current whenever the baseline
+  Termux/SDK/host-LLVM/bootstrap assumptions change.
 - Keep documentation aligned with actual code, runtime contracts, and split repo
   ownership before calling a task complete.
 - Report changes to the first developer as concise implementation notes with:
@@ -355,6 +377,11 @@ runtime-binding, documentation alignment, and repository contract integrity.
   `libevshim.so`, `libdummyvk.so`, `libvirglrenderer.so`,
   `libvortekrenderer.so`. Record whether each belongs in APK `jniLibs`,
   guest `usr/lib`, or both before calling the lane closed.
+- For native bootstrap regressions on this ROM, do not leave
+  `System.loadLibrary("winlator")` scattered across leaf classes. Route
+  `libwinlator` loading through one central loader with synchronous forensic
+  checkpoints, and prefer source fixes that remove host-side binary leakage
+  such as stray `RUNPATH` entries before chasing guest runtime symptoms.
 
 ## Main Docs
 

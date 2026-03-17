@@ -3,6 +3,7 @@ package com.winlator.cmod.xserver;
 import android.graphics.Bitmap;
 
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.Texture;
@@ -21,7 +22,7 @@ public class Drawable extends XResource {
     public final Object renderLock = new Object();
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("Drawable");
     }
 
     public Drawable(int id, int width, int height, Visual visual) {
@@ -179,6 +180,11 @@ public class Drawable extends XResource {
         drawAlphaMaskedBitmap(foreRed, foreGreen, foreBlue, backRed, backGreen, backBlue, srcDrawable.data, maskDrawable.data, this.data);
         this.data.rewind();
 
+        texture.setNeedsUpdate(true);
+        if (onDrawListener != null) onDrawListener.run();
+    }
+
+    public void forceUpdate() {
         texture.setNeedsUpdate(true);
         if (onDrawListener != null) onDrawListener.run();
     }

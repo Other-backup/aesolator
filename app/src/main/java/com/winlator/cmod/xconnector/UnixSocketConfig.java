@@ -19,16 +19,49 @@ public class UnixSocketConfig {
     }
 
     public static UnixSocketConfig createSocket(String rootPath, String relativePath) {
-        File socketFile = new File(rootPath, relativePath);
+        String normalizedRelativePath = normalizeSocketRelativePath(relativePath);
+        File socketFile = new File(rootPath, normalizedRelativePath);
 
-        String dirname = FileUtils.getDirname(relativePath);
-        if (dirname.lastIndexOf("/") > 0) {
-            File socketDir = new File(rootPath, FileUtils.getDirname(relativePath));
+        String dirname = FileUtils.getDirname(normalizedRelativePath);
+        if (dirname.lastIndexOf("/") >= 0) {
+            File socketDir = new File(rootPath, dirname);
             FileUtils.delete(socketDir);
             socketDir.mkdirs();
+            ensureCompatSocketLink(socketDir, socketFile, relativePath);
         }
         else socketFile.delete();
 
         return new UnixSocketConfig(socketFile.getPath());
+    }
+
+    private static String normalizeSocketRelativePath(String path) {
+        if (path == null) return "";
+        String normalized = path.trim().replace('\\', '/');
+        while (normalized.startsWith("/")) normalized = normalized.substring(1);
+        return normalized;
+    }
+
+    private static void ensureCompatSocketLink(File rootedDir, File rootedSocketFile, String originalPath) {
+        if (rootedDir == null || rootedSocketFile == null || originalPath == null || originalPath.isEmpty()) return;
+
+        File compatDir = new File(FileUtils.getDirname(originalPath));
+        if (compatDir.getAbsolutePath().equals(rootedDir.getAbsolutePath())) return;
+
+        File compatParent = compatDir.getParentFile();
+        if (compatParent != null && !compatParent.exists()) {
+            compatParent.mkdirs();
+        }
+
+        if (!compatDir.exists()) {
+            FileUtils.symlink(rootedDir.getAbsolutePath(), compatDir.getAbsolutePath());
+            return;
+        }
+
+        if (!compatDir.isDirectory()) return;
+
+        File compatSocketFile = new File(compatDir, rootedSocketFile.getName());
+        if (!compatSocketFile.exists()) {
+            FileUtils.symlink(rootedSocketFile.getAbsolutePath(), compatSocketFile.getAbsolutePath());
+        }
     }
 }

@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <errno.h>
+#include <string.h>
 
 #include "sys/shm.h"
 
@@ -183,7 +184,7 @@ int shmget(key_t key, size_t size, int flags) {
 void* shmat(int shmid, const void* shmaddr, int shmflg) {
     pthread_mutex_lock(&mutex);
 
-    void* addr;
+    void* addr = NULL;
     int index = find_shmemory_index(shmid);
     if (index != -1) {
         if (shmemories[index].addr == NULL) {

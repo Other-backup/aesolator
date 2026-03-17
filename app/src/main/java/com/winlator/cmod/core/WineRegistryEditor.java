@@ -210,6 +210,7 @@ public class WineRegistryEditor implements Closeable {
                 keyLocation = createKey(key);
             } else return;
         }
+        if (keyLocation == null) return;
 
         Location valueLocation = getValueLocation(keyLocation, name);
         char[] buffer = new char[StreamUtils.BUFFER_SIZE];
@@ -364,6 +365,7 @@ public class WineRegistryEditor implements Closeable {
     }
 
     private Location getValueLocation(Location keyLocation, String name) {
+        if (keyLocation == null) return null;
         if (keyLocation.start == keyLocation.end) return null;
         try (BufferedReader reader = new BufferedReader(new FileReader(cloneFile), StreamUtils.BUFFER_SIZE)) {
             reader.skip(keyLocation.start);

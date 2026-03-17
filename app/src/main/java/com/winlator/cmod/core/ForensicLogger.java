@@ -11,9 +11,11 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.PrintWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -41,6 +43,7 @@ public final class ForensicLogger {
     );
     private static String currentFileSinkId = "";
     private static volatile Context appContext;
+    private static volatile boolean crashHandlerInstalled = false;
 
     private ForensicLogger() {}
 
@@ -52,6 +55,31 @@ public final class ForensicLogger {
 
     public static Context getAppContext() {
         return appContext;
+    }
+
+    public static void installCrashHandler(Context context) {
+        if (context != null) {
+            appContext = context.getApplicationContext();
+        }
+        if (crashHandlerInstalled || appContext == null) return;
+        synchronized (FILE_LOCK) {
+            if (crashHandlerInstalled || appContext == null) return;
+            final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+            Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+                try {
+                    writeFatalCrashSync(appContext, thread, error, "uncaught_exception");
+                } catch (Throwable sinkError) {
+                    Log.e(TAG, "Failed to persist fatal crash forensic", sinkError);
+                }
+
+                if (previous != null) {
+                    previous.uncaughtException(thread, error);
+                } else {
+                    System.exit(10);
+                }
+            });
+            crashHandlerInstalled = true;
+        }
     }
 
     public static String newTraceId() {
@@ -74,6 +102,20 @@ public final class ForensicLogger {
 
     public static void appWarn(String eventId, String stage, String message, JSONObject fields) {
         logEvent(appContext, "warn", eventId, null, stage, message, fields);
+    }
+
+    public static void checkpoint(Context context, String severity, String eventId, String traceId, String stage, String message, JSONObject fields) {
+        String line = buildEventLine(severity, eventId, traceId, stage, message, fields);
+        if (line == null) return;
+        logcat(severity, line);
+        if (context == null) return;
+        synchronized (FILE_LOCK) {
+            appendForensicLine(context.getApplicationContext(), line);
+        }
+    }
+
+    public static void appCheckpoint(String severity, String eventId, String stage, String message, JSONObject fields) {
+        checkpoint(appContext, severity, eventId, null, stage, message, fields);
     }
 
     public static void error(Context context, String eventId, String traceId, String stage, String message, Throwable error, JSONObject fields) {
@@ -106,6 +148,19 @@ public final class ForensicLogger {
     }
 
     public static void logEvent(Context context, String severity, String eventId, String traceId, String stage, String message, JSONObject fields) {
+        String line = buildEventLine(severity, eventId, traceId, stage, message, fields);
+        if (line == null) return;
+        logcat(severity, line);
+        if (context == null) return;
+        Context sinkContext = context.getApplicationContext();
+        FILE_WRITE_EXECUTOR.execute(() -> {
+            synchronized (FILE_LOCK) {
+                appendForensicLine(sinkContext, line);
+            }
+        });
+    }
+
+    private static String buildEventLine(String severity, String eventId, String traceId, String stage, String message, JSONObject fields) {
         JSONObject obj = new JSONObject();
         try {
             obj.put("ts", TS_FORMAT.get().format(new Date()));
@@ -128,18 +183,9 @@ public final class ForensicLogger {
         }
         catch (JSONException e) {
             Log.e(TAG, "Failed to build forensic event", e);
-            return;
+            return null;
         }
-
-        String line = obj.toString();
-        logcat(severity, line);
-        if (context == null) return;
-        Context sinkContext = context.getApplicationContext();
-        FILE_WRITE_EXECUTOR.execute(() -> {
-            synchronized (FILE_LOCK) {
-                appendForensicLine(sinkContext, line);
-            }
-        });
+        return obj.toString();
     }
 
     public static JSONObject fields(Object... keyValues) {
@@ -340,6 +386,60 @@ public final class ForensicLogger {
         }
         catch (IOException e) {
             Log.e(TAG, "Failed writing forensic jsonl to all sinks", e);
+        }
+    }
+
+    private static void writeFatalCrashSync(Context context, Thread thread, Throwable error, String stage) {
+        if (context == null || error == null) return;
+
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("ts", TS_FORMAT.get().format(new Date()));
+            obj.put("event_id", "APP_FATAL_CRASH");
+            obj.put("severity", "error");
+            obj.put("trace_id", JSONObject.NULL);
+            obj.put("stage", stage == null ? "uncaught_exception" : stage);
+            obj.put("message", String.valueOf(error.getMessage()));
+            obj.put("error_class", error.getClass().getName());
+            obj.put("thread_name", thread != null ? thread.getName() : "");
+            obj.put("thread_id", thread != null ? thread.getId() : -1);
+        }
+        catch (JSONException ignored) {}
+
+        String line = obj.toString();
+        logcat("error", line);
+        synchronized (FILE_LOCK) {
+            appendForensicLine(context, line);
+            writeCrashTextFile(context, thread, error);
+        }
+    }
+
+    private static void writeCrashTextFile(Context context, Thread thread, Throwable error) {
+        File out = WinlatorLogUtils.createTimestampedLogFile(context, "fatal_crash");
+        File dir = out.getParentFile();
+        if (dir == null || (!dir.exists() && !dir.mkdirs() && !dir.exists())) {
+            return;
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(out, false))) {
+            writer.write("thread=");
+            writer.write(thread != null ? thread.getName() : "");
+            writer.newLine();
+            writer.write("error_class=");
+            writer.write(error.getClass().getName());
+            writer.newLine();
+            writer.write("error_message=");
+            writer.write(String.valueOf(error.getMessage()));
+            writer.newLine();
+            writer.newLine();
+
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            error.printStackTrace(pw);
+            pw.flush();
+            writer.write(sw.toString());
+        } catch (IOException e) {
+            Log.e(TAG, "Failed writing fatal crash text file", e);
         }
     }
 

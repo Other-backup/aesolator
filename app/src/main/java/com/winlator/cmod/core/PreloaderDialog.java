@@ -14,6 +14,7 @@ import com.winlator.cmod.R;
 public class PreloaderDialog {
     private final Activity activity;
     private Dialog dialog;
+    private CharSequence baseText = "";
 
     public PreloaderDialog(Activity activity) {
         this.activity = activity;
@@ -34,6 +35,7 @@ public class PreloaderDialog {
                     activity,
                     isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
             ));
+            baseText = textView.getText();
         }
 
         Window window = dialog.getWindow();
@@ -48,8 +50,20 @@ public class PreloaderDialog {
         close();
         if (dialog == null) create();
         TextView textView = dialog.findViewById(R.id.TextView);
-        if (textView != null) textView.setText(textResId);
+        if (textView != null) {
+            textView.setText(textResId);
+            baseText = textView.getText();
+        }
         dialog.show();
+    }
+
+    public synchronized void setProgress(int progress) {
+        if (dialog == null) return;
+        TextView textView = dialog.findViewById(R.id.TextView);
+        if (textView == null) return;
+        int boundedProgress = Math.max(0, Math.min(100, progress));
+        CharSequence message = baseText != null && baseText.length() > 0 ? baseText : textView.getText();
+        textView.setText(message + " " + boundedProgress + "%");
     }
 
     public void showOnUiThread(final int textResId) {

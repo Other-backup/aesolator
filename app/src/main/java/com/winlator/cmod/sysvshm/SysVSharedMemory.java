@@ -4,6 +4,7 @@ import android.os.SharedMemory;
 import android.system.ErrnoException;
 import android.util.SparseArray;
 
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.xconnector.XConnectorEpoll;
 
 import java.lang.reflect.InvocationTargetException;
@@ -15,7 +16,7 @@ public class SysVSharedMemory {
     private int maxSHMemoryId = 0;
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("SysVSharedMemory");
     }
 
     private static class SHMemory {

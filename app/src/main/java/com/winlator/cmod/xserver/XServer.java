@@ -3,6 +3,7 @@ package com.winlator.cmod.xserver;
 import android.util.SparseArray;
 
 import com.winlator.cmod.core.CursorLocker;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.extensions.BigReqExtension;
@@ -49,19 +50,34 @@ public class XServer {
 
     public XServer(ScreenInfo screenInfo) {
         this.screenInfo = screenInfo;
-        cursorLocker = new CursorLocker(this);
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_LOCKS_READY", "xserver", "xserver_constructor_locks_ready",
+                ForensicLogger.fields("screen_width", screenInfo.width, "screen_height", screenInfo.height));
 
         pixmapManager = new PixmapManager();
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_PIXMAP_MANAGER_READY", "xserver", "xserver_pixmap_manager_ready",
+                ForensicLogger.fields("visual_depth", pixmapManager.visual.depth));
         drawableManager = new DrawableManager(this);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_DRAWABLE_MANAGER_READY", "xserver", "xserver_drawable_manager_ready", null);
         cursorManager = new CursorManager(drawableManager);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_CURSOR_MANAGER_READY", "xserver", "xserver_cursor_manager_ready", null);
         windowManager = new WindowManager(screenInfo, drawableManager);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_WINDOW_MANAGER_READY", "xserver", "xserver_window_manager_ready",
+                ForensicLogger.fields("root_window_id", windowManager.rootWindow.id));
         selectionManager = new SelectionManager(windowManager);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_SELECTION_MANAGER_READY", "xserver", "xserver_selection_manager_ready", null);
         inputDeviceManager = new InputDeviceManager(this);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_INPUT_DEVICE_MANAGER_READY", "xserver", "xserver_input_device_manager_ready", null);
         grabManager = new GrabManager(this);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_GRAB_MANAGER_READY", "xserver", "xserver_grab_manager_ready", null);
 
         DesktopHelper.attachTo(this);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_DESKTOP_HELPER_READY", "xserver", "xserver_desktop_helper_attached", null);
         setupExtensions();
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_EXTENSIONS_READY", "xserver", "xserver_extensions_ready",
+                ForensicLogger.fields("extension_count", extensions.size()));
+        cursorLocker = new CursorLocker(this);
+        ForensicLogger.appCheckpoint("info", "XSERVER_CONSTRUCTOR_CURSOR_LOCKER_READY", "xserver", "xserver_cursor_locker_ready", null);
     }
 
     public boolean isRelativeMouseMovement() {

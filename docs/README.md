@@ -57,6 +57,7 @@ This repo stores only application-layer documentation.
 - `docs/DONOR_REFLECTIVE_ROUND2_GAPS.md` - historical second-pass snapshot (legacy baseline).
 - `docs/TASK_MANAGER_WINMONITOR_CONTRACT.md` - task manager alignment contract against extracted `winmonitor` schema.
 - `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md` - focused donor audit for `GameNative` X11 / renderer / driver layers.
+- `docs/DEVICE_MIGRATION_BOOTSTRAP.md` - migration bootstrap path for bringing the full `Ae.solator` workspace onto a new `Termux/Android` device without reopening environment tails.
 - `docs/GAMENATIVE_FULL_TRANSFER_MATRIX.md` - full donor transfer matrix for `GameNative` runtime, payload, container, launcher, Wine/Proton, and renderer lanes.
 - `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md` - current donor runtime/code gap status before the first honest compile.
 - `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md` - source-backed reconstruction status for donor `libwinlator_11.so` behavior.

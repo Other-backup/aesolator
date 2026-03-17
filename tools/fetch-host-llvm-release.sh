@@ -3,7 +3,7 @@ set -eu
 
 LLVM_VERSION="${LLVM_VERSION:-22.1.1}"
 ROOT="/data/data/com.termux/files/home"
-REPO="${AEO_HOST_LLVM_REPO:-kosoymiki/aesolator}"
+REPO="${AEO_HOST_LLVM_REPO:-kosoymiki/wcp-runtime-lanes}"
 RELEASE_TAG="${AEO_HOST_LLVM_RELEASE_TAG:-host-llvm-${LLVM_VERSION}}"
 ASSET_NAME="${AEO_HOST_LLVM_ASSET_NAME:-llvm-${LLVM_VERSION}-termux-android-aarch64.tar.zst}"
 TMP_DIR="${ROOT}/.tmp_host_llvm_release"

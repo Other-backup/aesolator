@@ -1,6 +1,7 @@
 package com.winlator.cmod.renderer;
 
 import androidx.annotation.Keep;
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.xserver.Drawable;
 import java.nio.ByteBuffer;
 
@@ -12,7 +13,7 @@ public class GPUImage extends Texture {
     private static boolean supported = false;
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("GPUImage");
     }
 
     public GPUImage(short width, short height) {

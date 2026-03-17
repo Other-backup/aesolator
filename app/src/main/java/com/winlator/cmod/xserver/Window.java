@@ -185,6 +185,10 @@ public class Window extends XResource {
         return content != null;
     }
 
+    public boolean isRenderable() {
+        return content != null && attributes.isMapped() && width > 1 && height > 1;
+    }
+
     public void addChild(Window child) {
         if (child == null || child.parent == this) return;
         child.parent = this;

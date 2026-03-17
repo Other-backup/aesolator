@@ -614,6 +614,13 @@ public class WinHandler {
         }
     }
 
+    public void sendVirtualGamepadState(GamepadState state) {
+        // Local runtime path still uses the packet-based gamepad transport. Keep
+        // the donor API surface so transferred controller code can compile while
+        // routing state through the existing sender.
+        sendGamepadState();
+    }
+
     public void setXInputDisabled(boolean disabled) {
         this.xinputDisabled = disabled;
         this.xinputDisabledInitialized = true; // Mark as initialized

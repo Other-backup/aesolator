@@ -18,6 +18,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -58,6 +59,8 @@ import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
+import com.winlator.cmod.contents.Downloader;
+import com.winlator.cmod.contents.GamehubFeedNormalizer;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
@@ -75,6 +78,7 @@ import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
@@ -135,6 +139,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -663,16 +668,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         firstTimeBoot = container.getExtra("appVersion").isEmpty();
 
-        String wineVersion = resolveLaunchWineVersion();
-        effectiveRuntimeModel = resolveLaunchRuntimeModel(wineVersion);
+        String requestedWineVersion = resolveLaunchWineVersion();
+        effectiveRuntimeModel = resolveLaunchRuntimeModel(requestedWineVersion);
+        String wineVersion = resolveEffectiveLaunchWineVersion(requestedWineVersion, effectiveRuntimeModel);
         if (ensureLaunchRootfsReady(wineVersion, effectiveRuntimeModel)) {
             return;
         }
-        String canonicalWineVersion = contentsManager.resolveBestRuntimeEntry(wineVersion, effectiveRuntimeModel);
-        selectedRuntimeProfile = contentsManager.resolveBestRuntimeProfile(canonicalWineVersion, effectiveRuntimeModel);
+        if (ensureSelectedRuntimeReady(wineVersion, effectiveRuntimeModel)) {
+            return;
+        }
+        selectedRuntimeProfile = resolveLaunchRuntimeCandidate(wineVersion, effectiveRuntimeModel);
+        String canonicalWineVersion = selectedRuntimeProfile != null
+                ? ContentsManager.getEntryName(selectedRuntimeProfile)
+                : contentsManager.resolveBestRuntimeEntry(wineVersion, effectiveRuntimeModel);
+        if (selectedRuntimeProfile == null && canonicalWineVersion != null && !canonicalWineVersion.trim().isEmpty()) {
+            selectedRuntimeProfile = contentsManager.resolveBestRuntimeProfile(canonicalWineVersion, effectiveRuntimeModel);
+        }
         if (selectedRuntimeProfile != null && !selectedRuntimeProfile.getRuntimeModel().isEmpty()) {
             effectiveRuntimeModel = selectedRuntimeProfile.getRuntimeModel();
+            canonicalWineVersion = ContentsManager.getEntryName(selectedRuntimeProfile);
         }
+        persistResolvedLaunchRuntime(requestedWineVersion, canonicalWineVersion, effectiveRuntimeModel);
         wineInfo = WineInfo.fromIdentifier(this, contentsManager, canonicalWineVersion, effectiveRuntimeModel);
 
         imageFs.setWinePath(wineInfo.path);
@@ -686,6 +702,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
             ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
         }
         installForensicRuntimeLogCallbacks(ForensicConfig.load(this));
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_BOOTSTRAP_POST_HOOKS",
+                null,
+                "xserver",
+                "runtime_debug_hooks_installed",
+                ForensicLogger.fields(
+                        "enable_logs", enableLogs,
+                        "runtime_profile_present", selectedRuntimeProfile != null,
+                        "wine_version", canonicalWineVersion,
+                        "runtime_model", effectiveRuntimeModel
+                )
+        );
 
         graphicsDriver = container.getGraphicsDriver();
         String graphicsDriverConfig = container.getGraphicsDriverConfig();
@@ -720,7 +750,33 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_BOOTSTRAP_CONFIG_PARSED",
+                null,
+                "xserver",
+                "runtime_launch_configuration_parsed",
+                ForensicLogger.fields(
+                        "graphics_driver", graphicsDriver,
+                        "audio_driver", audioDriver,
+                        "emulator", emulator,
+                        "dxwrapper", dxwrapper,
+                        "screen_size", screenSize,
+                        "lc_all", lc_all,
+                        "xinput_disabled", xinputDisabledFromShortcut
+                )
+        );
         setupRuntimeDrawer();
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_BOOTSTRAP_DRAWER_READY",
+                null,
+                "xserver",
+                "runtime_drawer_ready",
+                null
+        );
 
         if (!wineInfo.isWin64()) {
             onExtractFileListener = (file, size) -> {
@@ -730,11 +786,88 @@ public class XServerDisplayActivity extends AppCompatActivity {
             };
         }
 
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_BOOTSTRAP_PRELOADER_SHOW",
+                null,
+                "xserver",
+                "preloader_show_requested",
+                ForensicLogger.fields("screen_size", screenSize)
+        );
         preloaderDialog.show(R.string.starting_up);
 
-        inputControlsManager = new InputControlsManager(this);
-        xServer = new XServer(new ScreenInfo(screenSize));
-        xServer.setWinHandler(winHandler);
+        try {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_BOOTSTRAP_INPUT_MANAGER_BEGIN",
+                    null,
+                    "xserver",
+                    "input_controls_manager_init_begin",
+                    null
+            );
+            inputControlsManager = new InputControlsManager(this);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_BOOTSTRAP_INPUT_MANAGER_READY",
+                    null,
+                    "xserver",
+                    "input_controls_manager_ready",
+                    null
+            );
+
+            WinlatorNative.ensureLoaded(this, "xserver_bootstrap_preload");
+
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_BOOTSTRAP_XSERVER_BEGIN",
+                    null,
+                    "xserver",
+                    "xserver_construction_begin",
+                    ForensicLogger.fields("screen_size", screenSize)
+            );
+            xServer = new XServer(new ScreenInfo(screenSize));
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_BOOTSTRAP_XSERVER_READY",
+                    null,
+                    "xserver",
+                    "xserver_construction_ready",
+                    ForensicLogger.fields(
+                            "screen_width", xServer.screenInfo.width,
+                            "screen_height", xServer.screenInfo.height
+                    )
+            );
+            xServer.setWinHandler(winHandler);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_BOOTSTRAP_WINHANDLER_BOUND",
+                    null,
+                    "xserver",
+                    "xserver_winhandler_bound",
+                    null
+            );
+        } catch (Throwable error) {
+            ForensicLogger.error(
+                    this,
+                    "XSERVER_BOOTSTRAP_NATIVE_OR_JAVA_FAILURE",
+                    null,
+                    "xserver",
+                    "bootstrap_failed_before_orientation_gate",
+                    error,
+                    ForensicLogger.fields(
+                            "screen_size", screenSize,
+                            "wine_version", canonicalWineVersion,
+                            "runtime_model", effectiveRuntimeModel
+                    )
+            );
+            throw error;
+        }
 
         boolean[] winStarted = {false};
 
@@ -933,6 +1066,147 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return containerVariant.isEmpty() ? Container.DEFAULT_VARIANT : containerVariant;
     }
 
+    private String resolveEffectiveLaunchWineVersion(String wineVersion, String runtimeModel) {
+        String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim();
+        if (!WineInfo.isMainWineVersion(normalizedWineVersion)) {
+            return normalizedWineVersion;
+        }
+        if (!ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))) {
+            return normalizedWineVersion;
+        }
+
+        ContentProfile fallbackProfile = findPreferredMainWineRuntimeProfile(runtimeModel);
+        if (fallbackProfile == null) {
+            return normalizedWineVersion;
+        }
+
+        String promotedEntry = ContentsManager.getEntryName(fallbackProfile);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_MAIN_WINE_PROMOTED",
+                null,
+                "xserver",
+                "main_wine_promoted_to_contents_runtime",
+                ForensicLogger.fields(
+                        "requested_entry", normalizedWineVersion,
+                        "promoted_entry", promotedEntry,
+                        "runtime_model", runtimeModel,
+                        "locally_installed", fallbackProfile.locallyInstalled,
+                        "source_label", fallbackProfile.sourceLabel
+                )
+        );
+        return promotedEntry;
+    }
+
+    private void persistResolvedLaunchRuntime(String requestedWineVersion, String resolvedWineVersion, String runtimeModel) {
+        if (container == null) return;
+
+        String normalizedRequested = requestedWineVersion == null ? "" : requestedWineVersion.trim();
+        String normalizedResolved = resolvedWineVersion == null ? "" : resolvedWineVersion.trim();
+        String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
+        boolean changed = false;
+
+        if (!normalizedResolved.isEmpty() && !normalizedResolved.equalsIgnoreCase(container.getWineVersion())) {
+            container.setWineVersion(normalizedResolved);
+            changed = true;
+        }
+
+        if (!normalizedRuntimeModel.isEmpty() && !normalizedRuntimeModel.equalsIgnoreCase(container.getContainerVariant())) {
+            container.setContainerVariant(normalizedRuntimeModel);
+            changed = true;
+        }
+
+        if (!changed) return;
+
+        container.saveData();
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_RUNTIME_CANONICALIZED",
+                null,
+                "xserver",
+                "runtime_selection_persisted_for_launch",
+                ForensicLogger.fields(
+                        "requested_entry", normalizedRequested,
+                        "resolved_entry", normalizedResolved,
+                        "container_variant", container.getContainerVariant(),
+                        "runtime_model", normalizedRuntimeModel
+                )
+        );
+    }
+
+    @Nullable
+    private ContentProfile findPreferredMainWineRuntimeProfile(String runtimeModel) {
+        ContentProfile proton = findPreferredLaunchRuntimeProfile(ContentProfile.ContentType.CONTENT_TYPE_PROTON, runtimeModel);
+        if (proton != null) return proton;
+        return findPreferredLaunchRuntimeProfile(ContentProfile.ContentType.CONTENT_TYPE_WINE, runtimeModel);
+    }
+
+    @Nullable
+    private ContentProfile findPreferredLaunchRuntimeProfile(@Nullable ContentProfile.ContentType preferredType, String runtimeModel) {
+        ContentProfile best = null;
+        for (ContentProfile.ContentType type : new ContentProfile.ContentType[] {
+                ContentProfile.ContentType.CONTENT_TYPE_PROTON,
+                ContentProfile.ContentType.CONTENT_TYPE_WINE
+        }) {
+            if (preferredType != null && type != preferredType) continue;
+            List<ContentProfile> profiles = contentsManager.getProfiles(type);
+            if (profiles == null) continue;
+            for (ContentProfile profile : profiles) {
+                if (profile == null || !profile.isWineProtonFamily()) continue;
+                if (!profile.isRuntimeModelCompatible(runtimeModel)) continue;
+                if (!ContentProfile.normalizeRuntimeModel(runtimeModel).isEmpty()
+                        && !ContentProfile.normalizeRuntimeModel(runtimeModel).equals(profile.getRuntimeModel())) {
+                    continue;
+                }
+                best = pickPreferredLaunchRuntime(best, profile);
+            }
+        }
+        return best;
+    }
+
+    private ContentProfile pickPreferredLaunchRuntime(@Nullable ContentProfile currentBest, @NonNull ContentProfile candidate) {
+        if (currentBest == null) return candidate;
+
+        int currentScore = computePreferredLaunchRuntimeScore(currentBest);
+        int candidateScore = computePreferredLaunchRuntimeScore(candidate);
+        if (candidateScore != currentScore) {
+            return candidateScore > currentScore ? candidate : currentBest;
+        }
+
+        int publishedCompare = comparePublishedAt(candidate.publishedAt, currentBest.publishedAt);
+        if (publishedCompare != 0) {
+            return publishedCompare > 0 ? candidate : currentBest;
+        }
+        if (candidate.verCode != currentBest.verCode) {
+            return candidate.verCode > currentBest.verCode ? candidate : currentBest;
+        }
+        return currentBest;
+    }
+
+    private int computePreferredLaunchRuntimeScore(@NonNull ContentProfile profile) {
+        int score = 0;
+        if (profile.locallyInstalled) score += 40;
+        if (profile.isProtonLike()) score += 20;
+        String archTag = profile.getArchitectureTag();
+        if ("arm64ec".equalsIgnoreCase(archTag)) score += 12;
+        else if ("bundle".equalsIgnoreCase(archTag)) score += 10;
+        else if ("x86_64".equalsIgnoreCase(archTag)) score += 6;
+        else if ("generic".equalsIgnoreCase(archTag)) score += 2;
+        if (ContentProfile.CHANNEL_NIGHTLY.equals(profile.getChannel())) score += 1;
+        return score;
+    }
+
+    private int comparePublishedAt(String left, String right) {
+        String normalizedLeft = left == null ? "" : left.trim();
+        String normalizedRight = right == null ? "" : right.trim();
+        if (normalizedLeft.isEmpty() && normalizedRight.isEmpty()) return 0;
+        if (normalizedLeft.isEmpty()) return -1;
+        if (normalizedRight.isEmpty()) return 1;
+        return normalizedLeft.compareToIgnoreCase(normalizedRight);
+    }
+
     private boolean ensureLaunchRootfsReady(String wineVersion, String runtimeModel) {
         if (!ImageFsInstaller.isInstallRequired(this, container, runtimeModel)) {
             return false;
@@ -988,6 +1262,297 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         });
         return true;
+    }
+
+    private boolean ensureSelectedRuntimeReady(String wineVersion, String runtimeModel) {
+        ContentProfile launchProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
+        if (launchProfile == null) {
+            if (!shouldAttemptRemoteRuntimeBootstrap(wineVersion, runtimeModel)) {
+                return false;
+            }
+            preloaderDialog.show(R.string.installing_content);
+            Executors.newSingleThreadExecutor().execute(() -> {
+                hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel);
+                ContentProfile hydratedProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
+                boolean ready = hydratedProfile != null && (isRuntimeProfileReady(hydratedProfile)
+                        || (hydratedProfile.isRemoteDownloadable() && installRemoteRuntimeProfile(hydratedProfile)));
+                runOnUiThread(() -> {
+                    preloaderDialog.closeOnUiThread();
+                    if (!ready) {
+                        AppUtils.showToast(this, R.string.unable_to_install_content);
+                        finish();
+                        return;
+                    }
+
+                    Intent restartIntent = new Intent(getIntent());
+                    restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    startActivity(restartIntent);
+                    overridePendingTransition(0, 0);
+                    finish();
+                    overridePendingTransition(0, 0);
+                });
+            });
+            return true;
+        }
+        if (isRuntimeProfileReady(launchProfile)) {
+            return false;
+        }
+        if (!launchProfile.isRemoteDownloadable()) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_RUNTIME_PROFILE_MISSING",
+                    null,
+                    "xserver",
+                    "runtime_profile_missing_before_launch",
+                    ForensicLogger.fields(
+                            "requested_entry", wineVersion,
+                            "runtime_model", runtimeModel,
+                            "profile_entry", ContentsManager.getEntryName(launchProfile),
+                            "profile_remote_url", launchProfile.remoteUrl
+                    )
+            );
+            AppUtils.showToast(this, R.string.unable_to_install_content);
+            finish();
+            return true;
+        }
+
+        preloaderDialog.show(R.string.installing_content);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            boolean installed = installRemoteRuntimeProfile(launchProfile);
+            runOnUiThread(() -> {
+                preloaderDialog.closeOnUiThread();
+                if (!installed) {
+                    AppUtils.showToast(this, R.string.unable_to_install_content);
+                    finish();
+                    return;
+                }
+
+                Intent restartIntent = new Intent(getIntent());
+                restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                startActivity(restartIntent);
+                overridePendingTransition(0, 0);
+                finish();
+                overridePendingTransition(0, 0);
+            });
+        });
+        return true;
+    }
+
+    private boolean shouldAttemptRemoteRuntimeBootstrap(String wineVersion, String runtimeModel) {
+        String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim().toLowerCase(Locale.US);
+        String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
+        return normalizedWineVersion.startsWith("proton-")
+                || WineInfo.isMainWineVersion(wineVersion)
+                || ContentProfile.RUNTIME_MODEL_GLIBC.equals(normalizedRuntimeModel);
+    }
+
+    private boolean isRuntimeProfileReady(@Nullable ContentProfile profile) {
+        if (profile == null || !profile.locallyInstalled || !profile.isWineProtonFamily()) {
+            return false;
+        }
+        File runtimeRoot = contentsManager.getRuntimeRootDir(profile);
+        if (runtimeRoot == null || !runtimeRoot.isDirectory()) {
+            return false;
+        }
+        File binDir = new File(contentsManager.getInstallDir(this, profile), profile.wineBinPath);
+        File libDir = new File(contentsManager.getInstallDir(this, profile), profile.wineLibPath);
+        File prefixPack = new File(contentsManager.getInstallDir(this, profile), profile.winePrefixPack);
+        return binDir.isDirectory() && libDir.isDirectory() && prefixPack.isFile();
+    }
+
+    @Nullable
+    private ContentProfile resolveLaunchRuntimeCandidate(String wineVersion, String runtimeModel) {
+        if (WineInfo.isMainWineVersion(wineVersion)) {
+            return findPreferredMainWineRuntimeProfile(runtimeModel);
+        }
+
+        String canonicalEntry = contentsManager.resolveBestRuntimeEntry(wineVersion, runtimeModel);
+        ContentProfile installed = contentsManager.resolveBestRuntimeProfile(canonicalEntry, runtimeModel);
+        if (installed != null) {
+            return installed;
+        }
+
+        ContentProfile candidate = contentsManager.getProfileByEntryName(canonicalEntry);
+        if (candidate != null && candidate.isWineProtonFamily() && candidate.isRuntimeModelCompatible(runtimeModel)) {
+            return candidate;
+        }
+
+        candidate = contentsManager.getProfileByEntryName(wineVersion);
+        if (candidate != null && candidate.isWineProtonFamily() && candidate.isRuntimeModelCompatible(runtimeModel)) {
+            return candidate;
+        }
+
+        ContentProfile.ContentType preferredType = wineVersion != null && wineVersion.toLowerCase(Locale.US).startsWith("proton-")
+                ? ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                : ContentProfile.ContentType.CONTENT_TYPE_WINE;
+        ContentProfile fallback = findPreferredLaunchRuntimeProfile(preferredType, runtimeModel);
+        if (fallback != null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_RUNTIME_FALLBACK_SELECTED",
+                    null,
+                    "xserver",
+                    "runtime_fallback_selected_for_missing_entry",
+                    ForensicLogger.fields(
+                            "requested_entry", wineVersion,
+                            "fallback_entry", ContentsManager.getEntryName(fallback),
+                            "runtime_model", runtimeModel,
+                            "preferred_type", preferredType.toString()
+                    )
+            );
+        }
+        return fallback;
+    }
+
+    private void hydrateLaunchRuntimeProfiles(String wineVersion, String runtimeModel) {
+        try {
+            ArrayList<String> payloads = new ArrayList<>();
+
+            String bundledArchive = readAssetText("contents.json");
+            if (bundledArchive != null && !bundledArchive.trim().isEmpty()) {
+                payloads.add(bundledArchive);
+            }
+
+            String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim().toLowerCase(Locale.US);
+            boolean wantsNightlies = ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))
+                    || normalizedWineVersion.startsWith("proton-");
+            if (wantsNightlies) {
+                String nightliesReleases = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES);
+                String normalizedNightlies = GamehubFeedNormalizer.normalizeNightliesReleaseFeed(nightliesReleases);
+                if (normalizedNightlies == null || normalizedNightlies.trim().isEmpty() || "[]".equals(normalizedNightlies.trim())) {
+                    String atom = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM);
+                    List<GamehubFeedNormalizer.ReleaseFeedEntry> entries =
+                            GamehubFeedNormalizer.parseGitHubReleaseAtom(atom, "The412Banner/Nightlies");
+                    ArrayList<String> atomPayloads = new ArrayList<>();
+                    for (GamehubFeedNormalizer.ReleaseFeedEntry entry : entries) {
+                        if (entry == null || !entry.isValid()) continue;
+                        String expandedAssetsUrl = "https://github.com/The412Banner/Nightlies/releases/expanded_assets/" + entry.tag.trim();
+                        String html = Downloader.downloadString(expandedAssetsUrl);
+                        String normalizedHtml = GamehubFeedNormalizer.normalizeExpandedAssetsHtml(
+                                html,
+                                entry,
+                                GamehubFeedNormalizer.NIGHTLIES_FEED_ID,
+                                GamehubFeedNormalizer.NIGHTLIES_LABEL,
+                                GamehubFeedNormalizer.NIGHTLIES_REPO_RELEASES,
+                                "The412Banner nightly package"
+                        );
+                        if (normalizedHtml != null && !normalizedHtml.trim().isEmpty() && !"[]".equals(normalizedHtml.trim())) {
+                            atomPayloads.add(normalizedHtml);
+                        }
+                        if (atomPayloads.size() >= 4) break;
+                    }
+                    normalizedNightlies = mergeRemoteProfilePayloads(atomPayloads);
+                }
+                if (normalizedNightlies != null && !normalizedNightlies.trim().isEmpty() && !"[]".equals(normalizedNightlies.trim())) {
+                    payloads.add(normalizedNightlies);
+                }
+            }
+
+            String merged = mergeRemoteProfilePayloads(payloads);
+            if (!merged.trim().isEmpty() && !"[]".equals(merged.trim())) {
+                contentsManager.setNightliesRemoteProfiles(merged);
+            }
+        } catch (Exception e) {
+            Log.w("XServerDisplayActivity", "Unable to hydrate runtime profiles for launch", e);
+        }
+    }
+
+    @Nullable
+    private String readAssetText(String assetName) {
+        if (assetName == null || assetName.trim().isEmpty()) return null;
+        try (InputStream inputStream = getAssets().open(assetName);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String mergeRemoteProfilePayloads(List<String> payloads) {
+        JSONArray merged = new JSONArray();
+        if (payloads == null) return merged.toString();
+        for (String payload : payloads) {
+            if (payload == null || payload.trim().isEmpty()) continue;
+            try {
+                JSONArray array = new JSONArray(payload);
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject object = array.optJSONObject(i);
+                    if (object != null) merged.put(object);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return merged.toString();
+    }
+
+    private boolean installRemoteRuntimeProfile(ContentProfile remoteProfile) {
+        File downloadDir = new File(getCacheDir(), "contents-runtime-downloads");
+        if (!downloadDir.exists() && !downloadDir.mkdirs()) {
+            return false;
+        }
+
+        String suffix = remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".tzst")
+                ? ".tzst"
+                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".txz")
+                ? ".txz"
+                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp.zst")
+                ? ".wcp.zst"
+                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp.xz")
+                ? ".wcp.xz"
+                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp")
+                ? ".wcp"
+                : ".pkg";
+        File payloadFile = new File(downloadDir, ContentsManager.getEntryName(remoteProfile) + suffix);
+        boolean downloaded = Downloader.downloadFile(remoteProfile.remoteUrl, payloadFile);
+        if (!downloaded || !payloadFile.isFile()) {
+            return false;
+        }
+
+        final ContentProfile[] extractedProfile = new ContentProfile[1];
+        final boolean[] installSucceeded = new boolean[1];
+
+        contentsManager.extraContentFile(Uri.fromFile(payloadFile), remoteProfile, new ContentsManager.OnInstallFinishedCallback() {
+            @Override
+            public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
+                installSucceeded[0] = false;
+            }
+
+            @Override
+            public void onSucceed(ContentProfile profile) {
+                extractedProfile[0] = profile;
+                installSucceeded[0] = true;
+            }
+        });
+        if (!installSucceeded[0] || extractedProfile[0] == null) {
+            return false;
+        }
+
+        installSucceeded[0] = false;
+        contentsManager.finishInstallContent(extractedProfile[0], new ContentsManager.OnInstallFinishedCallback() {
+            @Override
+            public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
+                installSucceeded[0] = false;
+            }
+
+            @Override
+            public void onSucceed(ContentProfile profile) {
+                installSucceeded[0] = true;
+            }
+        });
+        if (!installSucceeded[0]) {
+            return false;
+        }
+
+        contentsManager.syncContents();
+        ContentProfile installed = contentsManager.resolveBestRuntimeProfile(ContentsManager.getEntryName(remoteProfile), remoteProfile.getRuntimeModel());
+        return isRuntimeProfileReady(installed != null ? installed : remoteProfile);
     }
 
     private boolean parseBoolean(String value) {
@@ -1927,7 +2492,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String desktopTheme = container.getDesktopTheme();
         if (!(desktopTheme+","+xServer.screenInfo).equals(container.getExtra("desktopTheme"))) {
-            WineThemeManager.apply(this, new WineThemeManager.ThemeInfo(desktopTheme), xServer.screenInfo);
+            File themeRootDir = container != null ? container.getRootDir() : ImageFs.find(this).getRootDir();
+            WineThemeManager.apply(this, new WineThemeManager.ThemeInfo(desktopTheme), xServer.screenInfo, themeRootDir);
             container.putExtra("desktopTheme", desktopTheme+","+xServer.screenInfo);
             containerDataChanged = true;
         }
@@ -4511,10 +5077,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String getWineStartCommand() {
         // Initialize overrideEnvVars if not already done
         EnvVars envVars = getOverrideEnvVars();
-        boolean directDesktopShellBootstrap = shortcut == null
-                && wineInfo != null
-                && wineInfo.isArm64EC()
-                && !envVars.has("EXTRA_EXEC_ARGS");
 
         // Define default arguments
         String args = "";
@@ -4544,18 +5106,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (envVars.has("EXTRA_EXEC_ARGS")) {
                 args += " " + envVars.get("EXTRA_EXEC_ARGS");
                 envVars.remove("EXTRA_EXEC_ARGS"); // Remove the key after use
-            } else if (directDesktopShellBootstrap) {
-                // Let Wine own the virtual desktop shell directly for clean container boot.
-                args = "";
             } else {
-                args += "\"wfm.exe\"";
+                args += "\"" + resolveDesktopShellExecutable() + "\"";
             }
         }
-        // ARM64EC desktop bootstrap is more stable when the shell starts directly,
-        // bypassing the intermediate winhandler wrapper that trips libarm64ecfex.
-        String command = directDesktopShellBootstrap ? args.trim() : "winhandler.exe " + args;
-
-        return command;
+        return "winhandler.exe " + args;
     }
 
     private void configureDesktopShellRegistry() {
@@ -4608,9 +5163,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean directDesktopShellBootstrap = wineInfo != null
                     && wineInfo.isArm64EC()
                     && !getOverrideEnvVars().has("EXTRA_EXEC_ARGS");
-            filename = directDesktopShellBootstrap ? "explorer.exe" : "wfm.exe";
+            filename = directDesktopShellBootstrap ? "explorer.exe" : resolveDesktopShellExecutable();
         }
         return filename;
+    }
+
+    private String resolveDesktopShellExecutable() {
+        if (hasContainerShellExecutable("wfm.exe")) return "wfm.exe";
+        return "explorer.exe";
+    }
+
+    private boolean hasContainerShellExecutable(String executableName) {
+        if (container == null || executableName == null || executableName.isEmpty()) return false;
+        File rootDir = container.getRootDir();
+        if (rootDir == null) return false;
+
+        File[] candidates = new File[] {
+                new File(rootDir, ".wine/drive_c/windows/" + executableName),
+                new File(rootDir, ".wine/drive_c/windows/system32/" + executableName),
+                new File(rootDir, ".wine/drive_c/windows/syswow64/" + executableName)
+        };
+        for (File candidate : candidates) {
+            if (candidate.isFile()) return true;
+        }
+        return false;
     }
 
 

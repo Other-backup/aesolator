@@ -228,6 +228,10 @@ public class ImageFs {
         return new File(rootDir, "/usr/lib");
     }
 
+    public File getAndroidHostLibDir() {
+        return new File(rootDir, "/usr/lib/android-host");
+    }
+
     public File getLib32Dir() {
         return new File(rootDir, "/usr/lib/arm-linux-gnueabihf");
     }

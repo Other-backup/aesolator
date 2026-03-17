@@ -16,6 +16,8 @@ import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 
 public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent {
     public GlibcProgramLauncherComponent(ContentsManager contentsManager, ContentProfile wineProfile, Shortcut shortcut) {
@@ -38,8 +40,14 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         super.applyLauncherSpecificEnvVars(context, imageFs, rootDir, launchEnv);
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean enableBox64Logs = preferences.getBoolean("enable_box64_logs", false);
-        launchEnv.put("AERO_RUNTIME_EXECUTION_MODEL", "glibc_box64_guest");
-        launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "0");
+        boolean directArm64EcGuest = shouldUseDirectArm64EcGuestLaunch(imageFs, resolveEffectiveArm64EcEmulator(), isDesktopShellBootstrapLaunch());
+        launchEnv.put(
+                "AERO_RUNTIME_EXECUTION_MODEL",
+                directArm64EcGuest
+                        ? "glibc_fex_guest"
+                        : "glibc_box64_guest"
+        );
+        launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", directArm64EcGuest ? "1" : "0");
         launchEnv.put("WINEESYNC_WINLATOR", "1");
         launchEnv.put("BOX64_LD_LIBRARY_PATH", imageFs.getRootDir().getPath() + "/usr/lib/x86_64-linux-gnu");
         launchEnv.putAll(Box64PresetManager.getEnvVars("box64", context, getBox64Preset()));
@@ -63,14 +71,101 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
     }
 
     @Override
+    protected boolean usesAndroidBionicHostEnv(String effectiveEmulator, boolean desktopShellBootstrap) {
+        return shouldUseDirectArm64EcGuestLaunch(environment.getImageFs(), effectiveEmulator, desktopShellBootstrap);
+    }
+
+    @Override
+    protected void applyAndroidBionicHostEnv(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
+        launchEnv.put("AERO_RUNTIME_EXECUTION_MODEL", "android_bionic_wowbox64_guest");
+        launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
+        launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "host_closure_preload");
+        File androidHostLibDir = imageFs.getAndroidHostLibDir();
+        String androidHostLibPath = androidHostLibDir.isDirectory() ? androidHostLibDir.getPath() + ":" : "";
+        launchEnv.put(
+                "LD_LIBRARY_PATH",
+                androidHostLibPath
+                        + "/system/lib64:/apex/com.android.runtime/lib64"
+        );
+
+        StringBuilder ldPreload = new StringBuilder();
+        appendAndroidHostClosureLdPreload(ldPreload, imageFs, false);
+        if (ldPreload.length() > 0) {
+            launchEnv.put("LD_PRELOAD", ldPreload.toString());
+        } else {
+            launchEnv.remove("LD_PRELOAD");
+        }
+    }
+
+    @Override
     protected String buildGuestCommand(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv,
                                        String winePath, String effectiveEmulator, boolean desktopShellBootstrap) {
         if (getWineInfo() != null && getWineInfo().isArm64EC()) {
+            if (shouldUseDirectArm64EcGuestLaunch(imageFs, effectiveEmulator, desktopShellBootstrap)) {
+                Log.i("GlibcProgramLauncher", "Using direct arm64ec guest launcher via " + effectiveEmulator);
+                return super.buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
+            }
+            File wineBinary = new File(winePath, "wine");
+            if (shouldWrapArm64EcWineWithBox64(wineBinary)) {
+                File usrLocalBox64 = new File(imageFs.getLocalBinDir(), "box64");
+                String box64Path = usrLocalBox64.isFile() ? usrLocalBox64.getPath() : imageFs.getBinDir() + "/box64";
+                Log.w("GlibcProgramLauncher", "Wrapping arm64ec wine ELF with box64: " + wineBinary.getPath());
+                return box64Path + " " + getGuestExecutable();
+            }
             return super.buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
         }
         File usrLocalBox64 = new File(imageFs.getLocalBinDir(), "box64");
         String box64Path = usrLocalBox64.isFile() ? usrLocalBox64.getPath() : imageFs.getBinDir() + "/box64";
         return box64Path + " " + getGuestExecutable();
+    }
+
+    @Override
+    protected boolean requiresBox64ForArm64EcLaunch() {
+        if (getWineInfo() == null || !getWineInfo().isArm64EC()) return false;
+        if (shouldUseDirectArm64EcGuestLaunch(environment.getImageFs(), resolveEffectiveArm64EcEmulator(), isDesktopShellBootstrapLaunch())) {
+            return false;
+        }
+        File wineBinary = new File(getWineInfo().path, "bin/wine");
+        return shouldWrapArm64EcWineWithBox64(wineBinary);
+    }
+
+    private String resolveEffectiveArm64EcEmulator() {
+        String requestedEmulator = getContainer() != null ? getContainer().getEmulator() : "";
+        if (getShortcut() != null) {
+            requestedEmulator = getShortcut().getExtra("emulator", requestedEmulator);
+        }
+        boolean desktopShellBootstrap = isDesktopShellBootstrapLaunch();
+        boolean fexRequested = "fexcore".equalsIgnoreCase(requestedEmulator);
+        return desktopShellBootstrap && fexRequested ? "wowbox64" : requestedEmulator;
+    }
+
+    private boolean isDesktopShellBootstrapLaunch() {
+        String guestExecutable = getGuestExecutable();
+        if (getShortcut() != null || guestExecutable == null) return false;
+        String lowered = guestExecutable.toLowerCase(java.util.Locale.ROOT);
+        return lowered.contains("explorer /desktop=shell");
+    }
+
+    private boolean shouldUseDirectArm64EcGuestLaunch(ImageFs imageFs, String effectiveEmulator, boolean desktopShellBootstrap) {
+        if (getWineInfo() == null || !getWineInfo().isArm64EC() || imageFs == null) {
+            return false;
+        }
+
+        File system32Dir = new File(imageFs.wineprefix, "drive_c/windows/system32");
+        File wowbox64Dll = new File(system32Dir, "wowbox64.dll");
+        File wow64FexDll = new File(system32Dir, "libwow64fex.dll");
+        File arm64EcFexDll = new File(system32Dir, "libarm64ecfex.dll");
+
+        if ("wowbox64".equalsIgnoreCase(effectiveEmulator)) {
+            return wowbox64Dll.isFile();
+        }
+        if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
+            if (desktopShellBootstrap) {
+                return wowbox64Dll.isFile();
+            }
+            return wow64FexDll.isFile() && arm64EcFexDll.isFile();
+        }
+        return false;
     }
 
     private void copyDefaultBox64RCFile() {
@@ -85,6 +180,22 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             FileUtils.chmod(rcFile, 0644);
         } else {
             Log.d("GlibcProgramLauncher", "No donor rc file found, keeping current runtime defaults");
+        }
+    }
+
+    protected boolean shouldWrapArm64EcWineWithBox64(File wineBinary) {
+        if (wineBinary == null || !wineBinary.isFile()) return false;
+        byte[] header = new byte[4];
+        try (InputStream inputStream = new FileInputStream(wineBinary)) {
+            int count = inputStream.read(header);
+            return count == 4
+                    && header[0] == 0x7f
+                    && header[1] == 'E'
+                    && header[2] == 'L'
+                    && header[3] == 'F';
+        } catch (Exception e) {
+            Log.w("GlibcProgramLauncher", "Unable to inspect wine binary header: " + wineBinary.getPath(), e);
+            return false;
         }
     }
 }

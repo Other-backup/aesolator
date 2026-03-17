@@ -310,7 +310,10 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         Window ownerWindow = resolveCursorOwnerWindow(pointWindow);
         if (ownerWindow == null || ownerWindow == xServer.windowManager.rootWindow) return true;
         if (!ownerWindow.isApplicationWindow()) return true;
-        if (isDesktopShellWindow(ownerWindow)) return false;
+        // Keep the compositor cursor on the desktop shell. The shell path is
+        // driven by xServer pointer state and remains the most stable cursor
+        // owner for trackpad/desktop sessions.
+        if (isDesktopShellWindow(ownerWindow)) return true;
         return !isFullscreenLike(ownerWindow);
     }
 

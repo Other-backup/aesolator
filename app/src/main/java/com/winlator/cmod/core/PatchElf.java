@@ -6,7 +6,7 @@ import java.io.File;
 
 public class PatchElf {
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("PatchElf");
     }
 
     private long elfInstancePtr = 0;

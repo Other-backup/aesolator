@@ -4,6 +4,8 @@ import android.util.Log;
 
 import androidx.annotation.Keep;
 
+import com.winlator.cmod.core.WinlatorNative;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -13,7 +15,7 @@ public class ClientSocket {
     private final ArrayDeque<Integer> ancillaryFds = new ArrayDeque<>();
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("ClientSocket");
     }
 
     public ClientSocket(int fd) {

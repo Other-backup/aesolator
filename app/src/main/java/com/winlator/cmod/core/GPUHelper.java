@@ -16,7 +16,7 @@ public abstract class GPUHelper {
             CompletableFuture.supplyAsync(GPUHelper::vkGetApiVersion, IO);
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("GPUHelper");
     }
 
     public static native int vkGetApiVersion();

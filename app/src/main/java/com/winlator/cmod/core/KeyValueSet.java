@@ -47,6 +47,14 @@ public class KeyValueSet implements Iterable<String[]> {
         return fallback;
     }
 
+    public boolean isEmpty() {
+        return data == null || data.isEmpty();
+    }
+
+    public boolean getBoolean(String key) {
+        return getBoolean(key, false);
+    }
+
     // Method to get a boolean value associated with a key, or a fallback value if the key is not present
     public boolean getBoolean(String key, boolean fallback) {
         String value = get(key);
@@ -59,6 +67,20 @@ public class KeyValueSet implements Iterable<String[]> {
         String value = get(key);
         try {
             if (!value.isEmpty()) return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            // Ignore exception and return fallback
+        }
+        return fallback;
+    }
+
+    public int getInt(String key) {
+        return getInt(key, 0);
+    }
+
+    public int getInt(String key, int fallback) {
+        String value = get(key);
+        try {
+            if (!value.isEmpty()) return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             // Ignore exception and return fallback
         }

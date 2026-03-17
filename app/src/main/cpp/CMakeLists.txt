@@ -16,6 +16,18 @@ endif()
 
 # Add Winlator shared libraries
 set(WINLATOR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlator.exports.map.txt")
+set(AERO_REDIRECT_GLIBC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_glibc.exports.map.txt")
+set(AERO_REDIRECT_BIONIC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_bionic.exports.map.txt")
+set(AERO_EVSHIM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_evshim.exports.map.txt")
+
+function(aero_disable_host_rpath target_name)
+    set_target_properties(${target_name} PROPERTIES
+            SKIP_BUILD_RPATH TRUE
+            BUILD_RPATH ""
+            INSTALL_RPATH ""
+            BUILD_WITH_INSTALL_RPATH FALSE
+    )
+endfunction()
 
 add_library(winlator SHARED
         winlator/getauxval_shim.c
@@ -33,6 +45,7 @@ target_compile_definitions(winlator PRIVATE AERO_HAS_ADRENOTOOLS=$<BOOL:${HAS_AD
 target_link_options(winlator PRIVATE
         "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
 )
+aero_disable_host_rpath(winlator)
 
 target_link_libraries(winlator
         log
@@ -62,6 +75,7 @@ target_compile_options(winlatorxr PRIVATE -Wall -Wextra)
 target_link_options(winlatorxr PRIVATE
         "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
 )
+aero_disable_host_rpath(winlatorxr)
 
 target_link_libraries(winlatorxr
         log
@@ -70,4 +84,50 @@ target_link_libraries(winlatorxr
         EGL
         GLESv2
         GLESv3
+)
+
+add_library(aero_redirect_glibc SHARED
+        extras/redirect_common.c
+        extras/preload_replace.c
+)
+
+target_compile_options(aero_redirect_glibc PRIVATE -Wall -Wextra)
+target_link_options(aero_redirect_glibc PRIVATE
+        "LINKER:--allow-multiple-definition"
+        "LINKER:--version-script=${AERO_REDIRECT_GLIBC_EXPORT_MAP}"
+)
+aero_disable_host_rpath(aero_redirect_glibc)
+target_link_libraries(aero_redirect_glibc
+        log
+        dl
+)
+
+add_library(aero_redirect_bionic SHARED
+        extras/redirect_common.c
+        extras/preload_replace_bionic.c
+)
+
+target_compile_options(aero_redirect_bionic PRIVATE -Wall -Wextra)
+target_link_options(aero_redirect_bionic PRIVATE
+        "LINKER:--allow-multiple-definition"
+        "LINKER:--version-script=${AERO_REDIRECT_BIONIC_EXPORT_MAP}"
+)
+aero_disable_host_rpath(aero_redirect_bionic)
+target_link_libraries(aero_redirect_bionic
+        log
+        dl
+)
+
+add_library(aero_evshim SHARED
+        extras/evshim.c
+)
+
+target_compile_options(aero_evshim PRIVATE -Wall -Wextra)
+target_link_options(aero_evshim PRIVATE
+        "LINKER:--version-script=${AERO_EVSHIM_EXPORT_MAP}"
+)
+aero_disable_host_rpath(aero_evshim)
+target_link_libraries(aero_evshim
+        log
+        dl
 )

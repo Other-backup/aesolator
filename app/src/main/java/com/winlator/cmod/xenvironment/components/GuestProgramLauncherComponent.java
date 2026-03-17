@@ -32,12 +32,11 @@ import com.winlator.cmod.launchdeps.LaunchDependencyRegistry;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
 import com.winlator.cmod.xenvironment.EnvironmentComponent;
 import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.URL;
 import java.nio.file.Files;
@@ -100,6 +99,30 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return contentsManager.findProfileByVersion(type, versionName, false);
     }
 
+    private String resolveEmbeddedBox64Archive(Context context, ImageFs imageFs, String box64Version) {
+        String runtimeModel = imageFs != null ? imageFs.getRuntimeLibcModel() : "";
+        ArrayList<String> candidates = new ArrayList<>();
+        if ("bionic".equalsIgnoreCase(runtimeModel)) {
+            candidates.add("box86_64/box64-" + box64Version + "-bionic.tzst");
+        }
+        candidates.add("box86_64/box64-" + box64Version + ".tzst");
+        candidates.add("box64/box64-" + box64Version + ".tzst");
+
+        for (String candidate : candidates) {
+            if (assetExists(context, candidate)) return candidate;
+        }
+        return candidates.get(candidates.size() - 1);
+    }
+
+    private boolean assetExists(Context context, String assetPath) {
+        if (context == null || assetPath == null || assetPath.trim().isEmpty()) return false;
+        try (InputStream ignored = context.getAssets().open(assetPath)) {
+            return true;
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
     protected void extractBox64Files() {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
@@ -114,10 +137,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         File rootDir = imageFs.getRootDir();
         File box64Binary = new File(rootDir, "/usr/bin/box64");
-        boolean payloadMissing = needsFileRefresh(box64Binary);
+        File localBox64Binary = new File(rootDir, "/usr/local/bin/box64");
+        boolean payloadMissing = needsFileRefresh(box64Binary, localBox64Binary);
 
         if (payloadMissing || !box64Version.equals(container.getExtra("box64Version"))) {
             ContentProfile profile = resolveInstalledContentProfile(ContentProfile.ContentType.CONTENT_TYPE_BOX64, box64Version);
+            String embeddedArchive = resolveEmbeddedBox64Archive(context, imageFs, box64Version);
             ForensicLogger.logEvent(
                     context,
                     "info",
@@ -129,13 +154,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "version", box64Version,
                             "payload_missing", payloadMissing,
                             "profile_found", profile != null,
-                            "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
+                            "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : "",
+                            "embedded_archive", embeddedArchive
                     )
             );
             if (profile != null)
                 contentsManager.applyContent(profile);
             else
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, "box64/box64-" + box64Version + ".tzst", rootDir);
+                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, embeddedArchive, rootDir);
             container.putExtra("box64Version", box64Version);
             container.saveData();
         }
@@ -143,6 +169,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         // Set execute permissions for box64 just in case
         if (box64Binary.exists()) {
             FileUtils.chmod(box64Binary, 0755);
+        }
+        if (localBox64Binary.exists()) {
+            FileUtils.chmod(localBox64Binary, 0755);
         }
     }
 
@@ -250,12 +279,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 if (terminationCallback != null) terminationCallback.call(-1);
                 return;
             }
-            if (wineInfo.isArm64EC())
+            if (wineInfo.isArm64EC()) {
                 extractEmulatorsDlls();
+                if (requiresBox64ForArm64EcLaunch()) {
+                    extractBox64Files();
+                }
+            }
             else
                 extractBox64Files();
             LaunchDependencyRegistry.runPreLaunchSteps(environment.getContext(), container, shortcut, appId, this);
-            checkDependencies();
             pid = execGuestProgram();
             if (pid == -1) {
                 Log.e("GuestProgramLauncherComponent", "Guest runtime process failed to start for " + appId);
@@ -263,35 +295,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 if (terminationCallback != null) terminationCallback.call(-1);
             }
         }
-    }
-
-
-    private String checkDependencies() {
-        String curlPath = environment.getImageFs().getRootDir().getPath() + "/usr/lib/libXau.so";
-        String lddCommand = "ldd " + curlPath;
-
-        StringBuilder output = new StringBuilder("Checking Curl dependencies...\n");
-
-        try {
-            java.lang.Process process = Runtime.getRuntime().exec(lddCommand);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-            while ((line = errorReader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-
-            process.waitFor();
-        } catch (Exception e) {
-            output.append("Error running ldd: ").append(e.getMessage());
-        }
-
-        Log.d("CurlDeps", output.toString()); // Log the full dependency output
-        return output.toString();
     }
 
 
@@ -370,6 +373,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return String.join(":", segments);
     }
 
+    protected boolean requiresBox64ForArm64EcLaunch() {
+        return false;
+    }
+
     protected void applyMoboxRuntimeContracts(ImageFs imageFs, EnvVars launchEnv, File rootDir, String winePath) {
         launchEnv.put("PATH", buildRuntimePath(imageFs, rootDir, winePath));
 
@@ -386,6 +393,21 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_BOOTSTRAP_MODEL", "contents_contract");
         launchEnv.put("AERO_RUNTIME_COMPONENT_MODEL", "wcp_contents");
         launchEnv.put("AERO_RUNTIME_MOBOX_PATH_COMPAT", hasGlibcBin ? "1" : "0");
+    }
+
+    protected void applyRuntimePathContracts(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv, String winePath) {
+        if (context == null || imageFs == null || rootDir == null) return;
+
+        String filesDirPath = context.getFilesDir().getAbsolutePath();
+        launchEnv.put("AERO_RUNTIME_PACKAGE_NAME", context.getPackageName());
+        launchEnv.put("AERO_RUNTIME_FILES_PATH", filesDirPath);
+        launchEnv.put("AERO_RUNTIME_ROOTFS_PATH", rootDir.getAbsolutePath());
+        launchEnv.put("AERO_RUNTIME_TMP_PATH", imageFs.getTmpDir().getAbsolutePath());
+        launchEnv.put("AERO_RUNTIME_WINE_PATH", winePath);
+        launchEnv.put("AERO_RUNTIME_ANDROID_HOST_LIB_PATH", imageFs.getAndroidHostLibDir().getAbsolutePath());
+        if (!launchEnv.has("AERO_REDIRECT_DEBUG")) {
+            launchEnv.put("AERO_REDIRECT_DEBUG", "0");
+        }
     }
 
     private boolean shouldDisableFullscreenHack() {
@@ -450,6 +472,13 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_LAUNCHER_MODEL", getLauncherModel(imageFs));
     }
 
+    protected boolean usesAndroidBionicHostEnv(String effectiveEmulator, boolean desktopShellBootstrap) {
+        return false;
+    }
+
+    protected void applyAndroidBionicHostEnv(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
+    }
+
     protected String buildGuestCommand(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv,
                                        String winePath, String effectiveEmulator, boolean desktopShellBootstrap) {
         String command = "";
@@ -492,6 +521,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
         File rootDir = imageFs.getRootDir();
+        ImageFsInstaller.ensureBionicHostSupport(context, imageFs);
+        ImageFsInstaller.ensureAppNativeGuestLibs(context, imageFs);
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean enableBox64Logs = preferences.getBoolean("enable_box64_logs", false);
@@ -595,6 +626,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
 
         applyMoboxRuntimeContracts(imageFs, launchEnv, rootDir, winePath);
+        applyRuntimePathContracts(context, imageFs, rootDir, launchEnv, wineRootPath);
 
 
         launchEnv.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
@@ -636,6 +668,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_BROWSER_BRIDGE", openWithAndroidBrowser ? "1" : "0");
         launchEnv.put("AERO_RUNTIME_CLIPBOARD_SYNC", shareAndroidClipboard ? "1" : "0");
         applyLauncherSpecificEnvVars(context, imageFs, rootDir, launchEnv);
+        if (usesAndroidBionicHostEnv(effectiveEmulator, desktopShellBootstrap)) {
+            applyAndroidBionicHostEnv(context, imageFs, rootDir, launchEnv);
+        }
 
         if (launchEnv.has("MANGOHUD")) {
             launchEnv.remove("MANGOHUD");
@@ -691,6 +726,49 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     public void resumeProcess() {
         synchronized (lock) {
             if (pid != -1) ProcessHelper.resumeProcess(pid);
+        }
+    }
+
+    protected void appendLdPreload(StringBuilder builder, String value) {
+        if (builder == null || value == null) return;
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) return;
+        if (builder.length() > 0) builder.append(':');
+        builder.append(trimmed);
+    }
+
+    protected void appendExistingLdPreload(StringBuilder builder, EnvVars launchEnv) {
+        if (builder == null || launchEnv == null) return;
+        appendLdPreload(builder, launchEnv.get("LD_PRELOAD"));
+    }
+
+    protected void appendFileIfExists(StringBuilder builder, File file) {
+        if (builder == null || file == null || !file.isFile()) return;
+        appendLdPreload(builder, file.getPath());
+    }
+
+    protected void appendAndroidHostClosureLdPreload(StringBuilder builder, ImageFs imageFs, boolean includeRedirect) {
+        if (builder == null || imageFs == null) return;
+
+        File hostLibDir = imageFs.getAndroidHostLibDir();
+        if (!hostLibDir.isDirectory()) {
+            hostLibDir = imageFs.getLibDir();
+        }
+
+        // Keep the Android-host preload as small as possible. The direct host launcher
+        // only needs bootstrap shims here; the rest should resolve through
+        // LD_LIBRARY_PATH and the runtime's own unix-side loader.
+        String[] preloadOrder = new String[] {
+                "libandroid-support.so",
+                "libandroid-sysvshm.so"
+        };
+
+        for (String libraryName : preloadOrder) {
+            appendFileIfExists(builder, new File(hostLibDir, libraryName));
+        }
+
+        if (includeRedirect) {
+            appendFileIfExists(builder, new File(hostLibDir, "libredirect-bionic.so"));
         }
     }
 }

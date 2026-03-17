@@ -77,6 +77,6 @@ public abstract class GPUInformation {
     public native static String[] enumerateExtensions(String driverName, Context context);
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("GPUInformation");
     }
 }

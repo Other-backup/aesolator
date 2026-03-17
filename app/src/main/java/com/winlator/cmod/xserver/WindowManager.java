@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import android.util.SparseArray;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xserver.errors.BadIdChoice;
 import com.winlator.cmod.xserver.errors.BadMatch;
@@ -47,10 +48,38 @@ public class WindowManager extends XResourceManager {
     public WindowManager(ScreenInfo screenInfo, DrawableManager drawableManager) {
         this.drawableManager = drawableManager;
         int id = IDGenerator.generate();
+        ForensicLogger.appCheckpoint(
+                "info",
+                "WINDOW_MANAGER_ROOT_DRAWABLE_BEGIN",
+                "xserver",
+                "window_manager_root_drawable_begin",
+                ForensicLogger.fields(
+                        "root_drawable_id", id,
+                        "screen_width", screenInfo.width,
+                        "screen_height", screenInfo.height
+                )
+        );
         Drawable drawable = drawableManager.createDrawable(id, screenInfo.width, screenInfo.height, drawableManager.getVisual());
+        ForensicLogger.appCheckpoint(
+                "info",
+                "WINDOW_MANAGER_ROOT_DRAWABLE_READY",
+                "xserver",
+                "window_manager_root_drawable_ready",
+                ForensicLogger.fields(
+                        "root_drawable_id", id,
+                        "visual_depth", drawableManager.getVisual().depth
+                )
+        );
         rootWindow = new Window(id, drawable, 0, 0, screenInfo.width, screenInfo.height, null);
         rootWindow.attributes.setMapped(true);
         windows.put(id, rootWindow);
+        ForensicLogger.appCheckpoint(
+                "info",
+                "WINDOW_MANAGER_ROOT_WINDOW_READY",
+                "xserver",
+                "window_manager_root_window_ready",
+                ForensicLogger.fields("root_window_id", rootWindow.id)
+        );
     }
 
     public Window getWindow(int id) {

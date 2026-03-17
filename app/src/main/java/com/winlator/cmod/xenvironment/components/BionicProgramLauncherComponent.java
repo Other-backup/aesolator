@@ -29,35 +29,37 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         launchEnv.put("AERO_RUNTIME_EXECUTION_MODEL", "android_bionic_guest");
         launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
+        launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "host_closure_preload");
         launchEnv.put("WINE_OPEN_WITH_ANDROID_BROwSER", "1");
         launchEnv.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
+        File androidHostLibDir = imageFs.getAndroidHostLibDir();
+        if (androidHostLibDir.isDirectory()) {
+            String currentLdLibraryPath = launchEnv.get("LD_LIBRARY_PATH");
+            StringBuilder ldLibraryPath = new StringBuilder(androidHostLibDir.getPath());
+            if (currentLdLibraryPath != null && !currentLdLibraryPath.trim().isEmpty()) {
+                ldLibraryPath.append(':').append(currentLdLibraryPath.trim());
+            }
+            launchEnv.put("LD_LIBRARY_PATH", ldLibraryPath.toString());
+        }
         if (preferences.getBoolean("enable_peb_logs", false)) {
             launchEnv.put("WINE_LOG_PEB_DATA", "1");
         }
 
-        File sysvPath = new File(imageFs.getLibDir(), "libandroid-sysvshm.so");
-        File evshimPath = new File(imageFs.getLibDir(), "libevshim.so");
-        File redirectPath = new File(imageFs.getLibDir(), "libredirect-bionic.so");
-
         StringBuilder ldPreload = new StringBuilder();
-        appendLdPreload(ldPreload, launchEnv.get("LD_PRELOAD"));
-        appendLdPreload(ldPreload, sysvPath.isFile() ? sysvPath.getPath() : "");
-        appendLdPreload(ldPreload, evshimPath.isFile() ? evshimPath.getPath() : "");
-        appendLdPreload(ldPreload, redirectPath.isFile() ? redirectPath.getPath() : "");
+        appendExistingLdPreload(ldPreload, launchEnv);
+        appendAndroidHostClosureLdPreload(ldPreload, imageFs, false);
         if (ldPreload.length() > 0) {
             launchEnv.put("LD_PRELOAD", ldPreload.toString());
         }
 
+        File evshimPath = new File(imageFs.getAndroidHostLibDir(), "libevshim.so");
+        if (!evshimPath.isFile()) {
+            evshimPath = new File(imageFs.getLibDir(), "libevshim.so");
+        }
         if (evshimPath.isFile()) {
             launchEnv.put("EVSHIM_MAX_PLAYERS", "1");
             launchEnv.put("EVSHIM_SHM_ID", "1");
             launchEnv.put("EVSHIM_SHM_NAME", "controller-shm0");
         }
-    }
-
-    private void appendLdPreload(StringBuilder builder, String value) {
-        if (value == null || value.trim().isEmpty()) return;
-        if (builder.length() > 0) builder.append(':');
-        builder.append(value.trim());
     }
 }

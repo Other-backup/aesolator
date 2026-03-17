@@ -2,9 +2,15 @@ package com.winlator.cmod.xserver;
 
 import android.graphics.Bitmap;
 
+import com.winlator.cmod.core.WinlatorNative;
+
 import java.nio.ByteBuffer;
 
 public class Pixmap extends XResource {
+    static {
+        WinlatorNative.ensureLoaded("Pixmap");
+    }
+
     public final Drawable drawable;
 
     public Pixmap(Drawable drawable) {

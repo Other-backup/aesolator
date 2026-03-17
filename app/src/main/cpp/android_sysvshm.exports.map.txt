@@ -1,0 +1,9 @@
+{
+    global:
+        shmctl;
+        shmdt;
+        shmget;
+        shmat;
+    local:
+        *;
+};

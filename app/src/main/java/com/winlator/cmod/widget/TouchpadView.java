@@ -81,7 +81,6 @@ public class TouchpadView extends View {
     private int pendingMoveY = 0;
     private int logicalCursorX = 0;
     private int logicalCursorY = 0;
-    private boolean suppressTrackpadUntilAllFingersUp = false;
 
     private enum GestureMode {
         NONE,
@@ -330,24 +329,7 @@ public class TouchpadView extends View {
         int actionIndex = event.getActionIndex();
         int pointerId = event.getPointerId(actionIndex);
         int actionMasked = event.getActionMasked();
-        boolean desktopTrackpadMode = !simTouchScreen && !xServer.isRelativeMouseMovement();
         if (pointerId >= MAX_FINGERS) return true;
-
-        if (desktopTrackpadMode) {
-            if (actionMasked == MotionEvent.ACTION_DOWN) {
-                suppressTrackpadUntilAllFingersUp = false;
-            } else if (suppressTrackpadUntilAllFingersUp) {
-                if (actionMasked == MotionEvent.ACTION_UP || actionMasked == MotionEvent.ACTION_CANCEL) {
-                    resetTouchpadGestureState(true);
-                    suppressTrackpadUntilAllFingersUp = false;
-                }
-                return true;
-            } else if (actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
-                resetTouchpadGestureState(true);
-                suppressTrackpadUntilAllFingersUp = true;
-                return true;
-            }
-        }
 
         switch (actionMasked) {
             case MotionEvent.ACTION_DOWN:
@@ -412,6 +394,10 @@ public class TouchpadView extends View {
                                     scrolling = false;
                                     scrollAccumY = 0;
                                     gestureMode = GestureMode.NONE;
+                                } else if (numFingers < 2) {
+                                    scrolling = false;
+                                    scrollAccumY = 0;
+                                    gestureMode = GestureMode.NONE;
                                 }
                             }
                         }
@@ -430,14 +416,15 @@ public class TouchpadView extends View {
                         scrolling = false;
                         scrollAccumY = 0;
                         gestureMode = GestureMode.NONE;
-                    } else if (numFingers == 1) {
+                    } else if (numFingers < 2) {
+                        scrolling = false;
+                        scrollAccumY = 0;
                         gestureMode = GestureMode.NONE;
                     }
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
                 resetTouchpadGestureState(true);
-                suppressTrackpadUntilAllFingersUp = false;
                 break;
         }
 

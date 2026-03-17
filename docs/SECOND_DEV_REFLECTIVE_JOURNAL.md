@@ -2,6 +2,109 @@
 
 ## 2026-03-14
 
+## 2026-03-16
+
+## 2026-03-17
+
+### Entry 0: Migration bootstrap and main-only cleanup
+
+- Goal: make the move to a new device reproducible instead of relying on shell
+  memory and ad-hoc handoff notes.
+- Context: the user is moving to another device, while `aesolator` still held a
+  large dirty batch and `wcp-runtime-lanes` had already become the owner of the
+  host `LLVM 22.1.1` CI lane.
+- Decision: keep the host-LLVM owner lane removed from `Ae.solator`, add a
+  repo-tracked migration bootstrap doc and host setup script, and treat the
+  temporary side branch as debt that must be landed back onto `main`.
+- Tradeoff: a little more repo documentation and bootstrap plumbing, but far
+  less migration guesswork on the next device.
+- Verification: bootstrap doc/script staged locally; next step is to land the
+  full dirty batch onto `main` and verify clean worktrees afterward.
+- Next step: commit the app batch, fast-forward or merge it into `main`, push,
+  and record the exact new resume point for the next device.
+
+### Entry 0: Host LLVM ownership moved out of `Ae.solator`
+
+- Goal: stop treating `Ae.solator` as the owner of the `LLVM 22.1.1` CI lane.
+- Context: the user explicitly moved shared compiler builds into
+  `wcp-runtime-lanes` and requested a strict `main`-first ownership model.
+- Decision: remove the owner-side LLVM workflow/build script from `Ae.solator`,
+  keep only consumer-side fetch/use docs, and move the real CI/release lane to
+  `wcp-runtime-lanes`.
+- Tradeoff: local app docs still reference the toolchain, but the actual CI
+  build and release ownership no longer live in this repo.
+- Verification: `wcp-runtime-lanes/main` now carries
+  `ci-host-llvm-toolchain.yml`; `Ae.solator` no longer carries that workflow.
+- Next step: keep app-side local fetch pinned to the release asset and do not
+  restore a second host-LLVM owner lane here.
+
+### Entry 4: Main-only host-compiler CI rule
+
+- Goal: stop drifting between temporary integration branches and the real owner
+  lane for shared compiler work.
+- Context: the user explicitly tightened the rule: host `LLVM` build/release
+  work belongs in `wcp-runtime-lanes`, not `aesolator`, and ordinary sync work
+  should land straight on `main`.
+- Decision: strengthen `AGENTS.md` and the roadmap so host-compiler CI is
+  treated as `wcp-runtime-lanes/main` work, while `aesolator` stays consumer
+  only for that lane.
+- Tradeoff: less room for branch-first experimentation in the app repo, but a
+  much cleaner owner boundary and less merge debt.
+- Verification: rules/docs updated locally.
+- Next step: keep the next live fix loop focused on container/X11 startup in
+  `aesolator`, and treat compiler CI only as an upstream consumer dependency.
+
+### Entry 3: Restore redirect preload for arm64ec Android-bionic host launch
+
+- Goal: close the fresh `winex11.drv` init regression on container startup.
+- Context: the latest forensic bundle showed `winex11.drv` returning
+  `PROCESS_ATTACH=0` under direct `android_bionic_wowbox64_guest`, while the
+  host X11 lib closure itself was already present.
+- Decision: restore `libredirect-bionic.so` into
+  `GlibcProgramLauncherComponent.applyAndroidBionicHostEnv()`, alongside
+  `libandroid-sysvshm.so` and `libevshim.so`, so the direct arm64ec host lane
+  gets the same redirect contract as the dedicated bionic launcher.
+- Tradeoff: preload chain is a little heavier again, but the launch contract is
+  back in line with the donor/runtime expectation.
+- Verification: code patched; next step is rebuild, reinstall, and re-run the
+  same forensic container bootstrap on `container_id=1`.
+- Next step: verify whether `winex11.drv` now initializes and whether the
+  remaining tail moves past `nodrv_CreateWindow`.
+
+### Entry 1: Local host LLVM lane pin
+
+- Goal: pin local host compilation to `LLVM 22.1.1` instead of drifting
+  between Termux `21.1.8` and incompatible NDK host binaries.
+- Context: APK builds already exposed `llvm-strip` host mismatch tails, and the
+  next requested lane includes future local `wine` compilation.
+- Decision: add a repo-tracked build script for a source-built
+  `LLVM 22.1.1` host toolchain, keep it outside rootfs/APK payloads, and teach
+  the local env helper to prefer it automatically when present.
+- Tradeoff: first-time setup is heavier, but later local builds get a stable
+  compiler baseline.
+- Verification: script/env/doc lane staged; actual 22.1.1 build follows next.
+- Next step: build the toolchain into
+  `/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux` and verify
+  `clang` / `llvm-strip` report `22.1.1`.
+
+### Entry 2: Aggressive non-root build profile
+
+- Goal: push the device harder for the `LLVM 22.1.1` source build without
+  crossing into unstable OOM/thermal chaos.
+- Context: the first `JOBS=2` and `JOBS=4` passes were safe but too slow for a
+  full local LLVM lane on this phone.
+- Decision: inspect live CPU/memory/swap, enable the strongest available
+  non-root power profile through `adb`, disable animation overhead, and move
+  the active LLVM build profile to `JOBS=6` with one linker job.
+- Tradeoff: higher thermal and battery pressure, but far better compile
+  throughput while staying inside non-root controls.
+- Verification: device reports `8` CPUs, about `5.8 GiB` RAM, about `4.2 GiB`
+  swap; low power mode is off; active LLVM build relaunched under the new
+  profile.
+- Next step: let the `22.1.1` compile lane run long enough to prove this
+  profile survives real LLVM compilation and then verify installed tool
+  versions from the local prefix.
+
 ### Entry 1: Repo intake and contract alignment
 
 - Goal: establish operating context inside `aesolator`.
@@ -2373,3 +2476,110 @@
   normalization as closed.
 - Next step: stop the static lane here and treat the remaining work as
   compile/runtime proof rather than another paper cleanup pass.
+
+### Entry 104: passive device forensics exposed a dead shell path and a sticky multitouch kill-state
+
+- Goal: continue desktop debugging on the shared phone without foreground
+  launching `Ae.solator` from the same Termux session, which contaminates the
+  signal by stealing focus from Codex.
+- Context: passive ADB forensics showed two concrete defects. First, the live
+  rootfs contains `explorer.exe` but no `wfm.exe`, while local shell bootstrap
+  and the `Computer` start-menu entry still pointed at `wfm.exe`. Second, the
+  trackpad path in `TouchpadView` left `scrolling`/gesture state sticky after
+  two-finger interaction and also kept an aggressive
+  `suppressTrackpadUntilAllFingersUp` path that could freeze desktop input
+  until every finger was lifted.
+- Decision: remove the kill-state from `TouchpadView`, explicitly clear
+  `scrolling` and `scrollAccumY` whenever multitouch collapses back below two
+  fingers, keep compositor/X11 cursor ownership for the desktop shell, and
+  replace hard `wfm.exe` assumptions with a runtime fallback that prefers
+  `wfm.exe` only if it actually exists in the container and otherwise uses
+  `explorer.exe`. The start-menu `Computer` entry was also switched to
+  `C:/windows/explorer.exe`.
+- Tradeoff: this favors a stable desktop-shell contract over blind donor
+  fidelity. `GameNative` still references `wfm.exe`, but the live device rootfs
+  does not ship it, so preserving that donor string would only preserve a dead
+  path.
+- Verification: passive forensic bundle and `run-as` inspection confirmed
+  `explorer.exe` exists under the live prefix while `wfm.exe` does not; local
+  app code no longer routes default shell bootstrap or the `Computer` menu
+  entry through a guaranteed-missing binary; and the touchpad state machine no
+  longer keeps desktop input muted after a two-finger gesture collapses.
+- Next step: rebuild without foreground launch, install safely, and verify the
+  shell/file-manager path plus cursor clicks on device with passive forensics.
+
+### Entry 105: fresh post-install forensic caught a theme-registry crash before shell bootstrap
+
+- Goal: validate container open on the rebuilt donor-rootfs batch with passive
+  ADB forensics instead of foreground-launching the app from the shared Termux
+  session.
+- Context: the first fresh device pass after install still failed before the
+  desktop shell came up. Crash buffer and the full forensic bundle
+  `20260315_222602_container-open-failure-theme-npe` showed a
+  `NullPointerException` in `WineThemeManager.apply()` while writing
+  `Control Panel\\Desktop -> Wallpaper` through `WineRegistryEditor`.
+- Decision: harden `WineRegistryEditor` so a missing/failed key creation no
+  longer dereferences a null `Location`, and make `WineThemeManager` treat
+  registry-write failures as non-fatal. Theme application should never be a
+  crash gate for container launch.
+- Tradeoff: if registry creation still fails in an odd container state, theme
+  writes may be skipped for that pass. That is a better outcome than killing
+  `XServerDisplayActivity` before the container even opens.
+- Verification: full forensic capture completed, the exact Java stack was
+  pinned to `WineThemeManager.java:56`, a new APK with the guardrails was built
+  successfully, and that APK was reinstalled on the device without launching
+  the app from this Termux session.
+- Next step: clear logs, reproduce container open once more on the new build,
+  and verify that the previous `WineThemeManager` crash is gone before moving
+  back to cursor/file-manager tails.
+
+### Entry 106: local no-ADB forensic moved from shell logcat to app-owned external traces
+
+- Goal: keep autonomous device debugging viable after Wi-Fi `adb` disappeared
+  and local Termux `logcat` stopped showing meaningful `Ae.solator` app-UID
+  lines.
+- Context: the first local shell bundle after a manual repro mostly captured
+  `TermuxActivity` churn, not `com.winlator.cmod`. The real signal was still
+  being written by the app into `/storage/emulated/0/Ae.solator/logs/`.
+- Decision: treat external app-owned logs as primary truth on this ROM, add a
+  process-wide uncaught-exception handler that writes `fatal_crash_*.txt`
+  plus a synchronous `APP_FATAL_CRASH` forensic event, and bracket the narrow
+  bootstrap gap after `FORENSIC_STREAM_HOOKS_READY` with new explicit markers.
+- Tradeoff: this adds a little more disk I/O during fatal failures, but it is
+  the only honest way to keep debugging without pretending shell `logcat`
+  still sees the whole app.
+- Verification: external forensic files were found under
+  `/storage/emulated/0/Ae.solator/logs/forensics/`, and the latest repro was
+  proven to stop right after `FORENSIC_STREAM_HOOKS_READY`, before the usual
+  `orientation_gate` / runtime-prepared markers.
+- Next step: rebuild, install the fresh APK, reproduce once more, then inspect
+  `fatal_crash_*.txt` and the new post-hooks bootstrap markers before touching
+  runtime routing again.
+
+### Entry 107: the active native blocker is now narrowed to `libwinlator` preload or early `XServer` construction
+
+- Goal: stop guessing about "container does not open" and pin the current
+  failure to the smallest possible native/bootstrap surface before the next
+  rebuild.
+- Context: the latest external trace advanced beyond the earlier post-hooks
+  gap. The app now reaches `XSERVER_BOOTSTRAP_PRELOADER_SHOW`,
+  `XSERVER_BOOTSTRAP_INPUT_MANAGER_READY`, and
+  `XSERVER_BOOTSTRAP_XSERVER_BEGIN`, then dies before
+  `XSERVER_BOOTSTRAP_XSERVER_READY`. No guest runtime stream grows, and the
+  process is gone afterward.
+- Decision: centralize `libwinlator` loading through a new `WinlatorNative`
+  loader with synchronous forensic checkpoints, preload it deliberately before
+  `new XServer(...)`, add constructor-level checkpoints inside `XServer`
+  itself, and strip host `RUNPATH` from native targets in CMake so the Android
+  library perimeter stops carrying host linker baggage.
+- Tradeoff: this adds more low-level instrumentation and slightly more disk I/O
+  on the hottest bootstrap path. That is justified here because the current
+  blocker sits before guest runtime startup, where ordinary runtime logs are
+  still empty and asynchronous breadcrumbs can be lost.
+- Verification: static pass is clean, legacy scattered `System.loadLibrary`
+  calls have been replaced with the central loader, and the next rebuild will
+  be able to distinguish `libwinlator` preload failure from later `XServer`
+  constructor failure.
+- Next step: rebuild, install, reproduce once, and inspect the new synchronous
+  checkpoints to see whether the process dies inside `WINLATOR_NATIVE_LOAD_*`
+  or after a specific `XSERVER_CONSTRUCTOR_*` milestone.

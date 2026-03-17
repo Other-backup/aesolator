@@ -1,6 +1,6 @@
 # Second Developer Roadmap
 
-Updated: `2026-03-15`
+Updated: `2026-03-16`
 
 ## Mission
 
@@ -31,6 +31,16 @@ Second autonomous developer lane for `aesolator`:
   blocker, reason, scope impact, and explicit return point.
 
 ## Current Priorities
+
+0. Desktop bootstrap and host-launch closure
+   - keep `Ae.solator` consumer-only for host `LLVM 22.1.1`; the owner-side CI
+     lane now lives in `wcp-runtime-lanes/main`
+   - keep all future host-compiler CI/release work on `wcp-runtime-lanes/main`
+     directly; do not re-open branch-first LLVM orchestration in `aesolator`
+   - close the fresh `winex11.drv` init regression under direct
+     `android_bionic_wowbox64_guest`
+   - verify that redirect/sysvshm preload and host X11 closure agree with the
+     donor `GameNative` launch contract before widening into cursor UX again
 
 1. `New Container` device-led UX closure
    - keep container creation free of XR/native startup regressions
@@ -198,8 +208,15 @@ Second autonomous developer lane for `aesolator`:
     `imagefs_patches_gamenative.tzst` owns the extra `opt/system32` /
     `opt/apps` / `Steamless` / `7-Zip` utility overlay and donor `glibc`
     archives carry macOS packaging noise that must stay out of any rebuilt lane
+12. Local host LLVM lane
+  - build a dedicated `LLVM 22.1.1` toolchain for `Termux/Android`
+  - keep it outside rootfs and outside APK payloads
+  - use it as the pinned host compiler baseline for future `wine` and runtime
+    compilation instead of mixing Termux `21.1.8` with NDK-host binaries
+  - keep a documented high-performance non-root device profile for long local
+    toolchain builds; current target profile is `JOBS=6` with fixed
+    performance mode and one linker job
   - latest ownership-table closure:
-    rootfs layers are now explicitly classified in
     `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md`, including the fact that
     `imagefs.txz.02` is orphan/invalid baggage rather than a live archive shard
   - latest donor-rootfs-first closure:
@@ -217,7 +234,13 @@ Second autonomous developer lane for `aesolator`:
     extra `graphics_driver`, `dxwrapper`, `fexcore`, `wowbox64`,
     `steampipe`, `wincomponents`, `box86_64`, `steaminput`,
     `steam_regions.json`, and `box86_env_vars.json`
-12. `libwinlator_11.so` source-backed reconstruction lane
+13. Device migration readiness
+  - keep `main` as the only real landing lane before device moves
+  - keep a repo-tracked bootstrap path for a new `Termux/Android` host:
+    packages, SDK/NDK, host LLVM fetch, and `local.properties`
+  - keep the external handoff file and the repo bootstrap doc aligned so the
+    next device can resume from the same blocker without archaeological work
+14. `libwinlator_11.so` source-backed reconstruction lane
   - treat donor `libwinlator_11.so` as an audit surface, not a binary drop-in
   - record every reconstructible donor-native behavior in
     `docs/GAMENATIVE_LIBWINLATOR11_SOURCE_AUDIT.md`
@@ -511,3 +534,23 @@ Second autonomous developer lane for `aesolator`:
   not in missing static contracts: donor archive staging, runtime application
   of the selected `Vulkan SDK` group, and end-to-end `dgVoodoo` stage/runtime
   verification.
+- Shared-device desktop debugging now has one additional operating constraint:
+  when Termux and `Ae.solator` share the same phone, prefer passive ADB
+  forensics and `run-as` inspection over foreground launches from the same
+  session. The current live desktop tails are narrowed to shell executable
+  routing (`wfm.exe` vs `explorer.exe`) and trackpad-state recovery after
+  multitouch, not to unknown rootfs structure.
+- New device-proof from `2026-03-16` narrowed container-open failure further:
+  the next live blocker was not shell/bootstrap/input, but a theme registry
+  write crash in `WineThemeManager.apply()` against the container `user.reg`.
+  That guardrail is now patched locally and reinstalled; the next pass should
+  verify container open before revisiting desktop cursor tails.
+- Local no-`adb` forensic practice is now explicit: use external `Ae.solator`
+  logs first, not shell `logcat`. The reliable sources on this phone are
+  `logs/forensics/*.jsonl`, runtime stream files, and `fatal_crash_*.txt`
+  written by the app itself.
+- Fresh local external forensic now narrows the active blocker to the
+  `XServer` constructor corridor. The next proof target is no longer generic
+  "container does not open", but specifically `libwinlator` preload / root
+  drawable / early `XServer` construction with synchronous breadcrumbs and
+  a cleaned native link perimeter.

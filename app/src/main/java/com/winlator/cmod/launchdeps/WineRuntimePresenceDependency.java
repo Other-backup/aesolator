@@ -1,6 +1,7 @@
 package com.winlator.cmod.launchdeps;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -15,6 +16,8 @@ import com.winlator.cmod.xenvironment.ImageFs;
 import java.io.File;
 
 final class WineRuntimePresenceDependency implements LaunchDependency {
+    private static final String TAG = "WineRuntimePresence";
+
     @Override
     public String getId() {
         return "wine_runtime_presence";
@@ -51,10 +54,13 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
             return wineBinary.isFile();
         }
 
-        if (WineInfo.isMainWineVersion(canonicalEntry)) {
-            File mainOptPath = ImageFs.find(context).getMainWineDir();
-            File mainWineBinary = new File(mainOptPath, "bin/wine");
-            return mainWineBinary.isFile();
+        File mainOptPath = ImageFs.find(context).getMainWineDir();
+        File mainWineBinary = new File(mainOptPath, "bin/wine");
+        if (mainWineBinary.isFile()) {
+            if (!WineInfo.isMainWineVersion(canonicalEntry)) {
+                Log.w(TAG, "Custom runtime missing, falling back to canonical main wine: " + canonicalEntry);
+            }
+            return true;
         }
 
         return false;

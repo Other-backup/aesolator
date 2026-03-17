@@ -117,12 +117,13 @@ public final class ForensicConfig {
         if (loaderTraceEnabled) {
             tokens.add("+loaddll");
             tokens.add("+module");
+            tokens.add("+x11drv");
         }
         return String.join(",", tokens);
     }
 
     public static String buildLoaderTraceMode(Snapshot snapshot) {
-        return "wine:loaddll,module"
+        return "wine:loaddll,module,x11drv"
                 + ";box64:" + (snapshot.enableBox64Logs ? "stdout,file,dynarec_missing" : "off")
                 + ";fex:" + (snapshot.enableFexLogs ? "debug,file" : "off")
                 + ";dxvk:" + (snapshot.enableDxvkLogs ? "native,file" : "off")

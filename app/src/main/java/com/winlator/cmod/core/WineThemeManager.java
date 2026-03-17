@@ -9,6 +9,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.DisplayMetrics;
+import android.util.Log;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.xenvironment.ImageFs;
@@ -17,6 +18,7 @@ import com.winlator.cmod.xserver.ScreenInfo;
 import java.io.File;
 
 public abstract class WineThemeManager {
+    private static final String TAG = "WineThemeManager";
     public enum Theme {LIGHT, DARK}
     public enum BackgroundType {IMAGE, COLOR}
     public static final String DEFAULT_DESKTOP_THEME = Theme.LIGHT+","+BackgroundType.IMAGE+",#0277bd";
@@ -41,11 +43,15 @@ public abstract class WineThemeManager {
     }
 
     public static void apply(Context context, ThemeInfo themeInfo, ScreenInfo screenInfo) {
-        File rootDir = ImageFs.find(context).getRootDir();
+        apply(context, themeInfo, screenInfo, ImageFs.find(context).getRootDir());
+    }
+
+    public static void apply(Context context, ThemeInfo themeInfo, ScreenInfo screenInfo, File rootDir) {
+        ImageFs targetImageFs = ImageFs.find(rootDir);
         File userRegFile = new File(rootDir, ImageFs.WINEPREFIX+"/user.reg");
         String background = Color.red(themeInfo.backgroundColor)+" "+Color.green(themeInfo.backgroundColor)+" "+Color.blue(themeInfo.backgroundColor);
 
-        if (themeInfo.backgroundType == BackgroundType.IMAGE) createWallpaperBMPFile(context, screenInfo);
+        if (themeInfo.backgroundType == BackgroundType.IMAGE) createWallpaperBMPFile(context, screenInfo, targetImageFs);
 
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             if (themeInfo.backgroundType == BackgroundType.IMAGE) {
@@ -117,10 +123,12 @@ public abstract class WineThemeManager {
                 registryEditor.setStringValue("Control Panel\\Colors", "WindowFrame", "0 0 0");
                 registryEditor.setStringValue("Control Panel\\Colors", "WindowText", "255 255 255");
             }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to apply theme registry changes", e);
         }
     }
 
-    private static void createWallpaperBMPFile(Context context, ScreenInfo screenInfo) {
+    private static void createWallpaperBMPFile(Context context, ScreenInfo screenInfo, ImageFs targetImageFs) {
         final int outputHeight = screenInfo.height;
         int outputWidth = screenInfo.width;
 
@@ -153,8 +161,7 @@ public abstract class WineThemeManager {
             canvas.drawBitmap(wallpaperBitmap, srcRect, dstRect, paint);
         }
 
-        ImageFs imageFs = ImageFs.find(context);
-        MSBitmap.create(outputBitmap, new File(imageFs.getRootDir(), ImageFs.CACHE_PATH+"/wallpaper.bmp"));
+        MSBitmap.create(outputBitmap, new File(targetImageFs.getRootDir(), ImageFs.CACHE_PATH+"/wallpaper.bmp"));
     }
 
     public static File getUserWallpaperFile(Context context) {
