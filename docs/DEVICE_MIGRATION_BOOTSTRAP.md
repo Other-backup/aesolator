@@ -24,6 +24,8 @@ tails.
 - work in `main`, not side branches
 - push both repos before moving devices
 - keep `AGENTS.md`, roadmap, and reflective journal current
+- if the user explicitly activates approval-gated review mode, follow
+  `docs/CODEX_OPERATING_CONTRACT.md`
 - without `adb`, trust app-owned forensic files before shell `logcat`
 - host `LLVM 22.1.1` is owned by `wcp-runtime-lanes`, consumed by
   `aesolator`
@@ -34,7 +36,8 @@ tails.
 2. Run `tools/bootstrap-termux-host.sh` from `aesolator`.
 3. Source `tools/env-android-local.sh`.
 4. Verify that `local.properties`, SDK paths, and host LLVM paths are live.
-5. Continue from the latest roadmap/journal state and external forensic logs.
+5. Continue from the latest roadmap/journal state, external forensic logs, and
+   `docs/CODEX_OPERATING_CONTRACT.md`.
 
 ## Minimal Commands
 
@@ -108,10 +111,33 @@ from:
 
 ## Current Resume Point
 
-The active app blocker is still early native bootstrap, not guest runtime:
+The old wrapper/sysvshm blocker and the donor-`RUNPATH` payload blocker are
+both closed locally; the active failure is now narrower and later in the
+X11-driver attach path:
 
-- last good checkpoints reach `XSERVER_BOOTSTRAP_XSERVER_BEGIN`
-- failure is still before `XSERVER_BOOTSTRAP_XSERVER_READY`
+- fresh clean-session proof reaches runtime streams and no longer shows
+  `libandroid_shmget` / `Found no drivers`
+- donor absolute `RUNPATH` / `RPATH` is now sanitized both in installed
+  runtime roots and in `imagefs/usr/lib`, and the imagefs sanitizer now writes
+  `.winlator/.elf_runpath_sanitizer_version=2` so the app stops rescanning the
+  full tree every launch
+- current surviving chain is:
+  `winex11.drv` `PROCESS_ATTACH` `RETURN 0`
+  -> `Initialization of L"winex11.drv" failed`
+  -> `winewayland.drv` `status=c0000135`
+  -> `nodrv_CreateWindow`
+  -> `XSERVER_EXIT_REQUESTED` / self-exit
+- current local fix lane now does three things:
+  1. stage a source-built `libandroid-sysvshm.so` compatibility bridge with
+     both `shm*` and `libandroid_shm*` exports
+  2. sanitize donor absolute `RUNPATH` / `RPATH` in-place during runtime
+     install and repair
+  3. sanitize the rootfs `imagefs/usr/lib` closure and skip short ASCII
+     linker-script placeholders like `librt.so` instead of misclassifying them
+     as failed ELF rewrites
+- next proof target is no longer generic payload hygiene; it is targeted
+  instrumentation or static dependency closure around the `winex11.drv`
+  attach-time failure on `Container-1`
 
 Primary forensic sources on-device:
 
@@ -133,6 +159,7 @@ Primary forensic sources on-device:
 
 ## Related Docs
 
+- `docs/CODEX_OPERATING_CONTRACT.md`
 - `docs/ADB_WIFI_DEBUG.md`
 - `docs/HOST_LLVM_22_1_1_TOOLCHAIN.md`
 - `docs/TERMUX_LOCAL_BUILD.md`

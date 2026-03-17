@@ -554,3 +554,35 @@ Second autonomous developer lane for `aesolator`:
   "container does not open", but specifically `libwinlator` preload / root
   drawable / early `XServer` construction with synchronous breadcrumbs and
   a cleaned native link perimeter.
+- Fresh new-device ADB forensics supersede that older bootstrap hypothesis:
+  the active blocker is now the guest Vulkan wrapper lane, not early
+  `XServer` construction. The current causal chain is
+  `graphics_driver=wrapper` -> `libvulkan_wrapper.so` ->
+  missing `libandroid_shmget` -> `vkCreateInstance: Found no drivers` ->
+  `nodrv_CreateWindow` -> self-exit.
+- Local source-backed remediation now builds `aero_android_sysvshm` with both
+  legacy `shm*` and wrapper-expected `libandroid_shm*` exports, and stages it
+  as `libandroid-sysvshm.so` through `ImageFsInstaller`. The remaining proof
+  burden is one clean-session container launch on the freshly installed APK.
+- Fresh clean-session proof then closed that wrapper ABI hypothesis and exposed
+  the next real tail: unix-side Wine ELF payloads still carried donor absolute
+  `RUNPATH` entries pointing at
+  `/data/data/app.gamenative/files/imagefs/usr/lib`, which lines up with the
+  surviving `winex11.drv` / `winewayland.drv` / `nodrv_CreateWindow` chain.
+- Runtime remediation is now widened accordingly: `ContentsManager`
+  post-install/repair passes sanitize absolute donor `RUNPATH` / `RPATH`
+  entries in-place to a local `$ORIGIN` + relative `usr/lib` closure, so both
+  fresh installs and already-staged runtime roots are repaired from the app
+  side instead of by manual device surgery.
+- The next live pass closed the deeper rootfs half of that same contract too:
+  `ImageFsInstaller` now sanitizes donor absolute `RUNPATH` / `RPATH` across
+  `imagefs/usr/lib`, writes a versioned marker
+  `.winlator/.elf_runpath_sanitizer_version=2`, and skips short ASCII
+  linker-script placeholders like `librt.so` instead of treating them as ELF
+  rewrite failures. Remaining runtime risk is no longer path contamination or
+  repeated full-tree rescans; it is the surviving `winex11.drv`
+  `PROCESS_ATTACH -> RETURN 0` failure itself.
+- Repo process/docs now need one explicit Codex operating contract too:
+  approval-gated review mode, build/runbook sync, and forensic process
+  alignment are now centralized in `docs/CODEX_OPERATING_CONTRACT.md` and
+  mirrored from `AGENTS.md`, not left scattered across prompts.

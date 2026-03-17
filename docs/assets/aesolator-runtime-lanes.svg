@@ -33,7 +33,7 @@
 
   <rect x="80" y="150" width="340" height="160" rx="22" fill="url(#apk)" filter="url(#soft)"/>
   <text x="250" y="208" text-anchor="middle" fill="#fff" font-size="30" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-weight="700">Winlator APK</text>
-  <text x="250" y="240" text-anchor="middle" fill="#fff7ed" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">by.aero.so.benchmark</text>
+  <text x="250" y="240" text-anchor="middle" fill="#fff7ed" font-size="18" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">com.winlator.cmod</text>
   <text x="250" y="270" text-anchor="middle" fill="#fff7ed" font-size="17" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif">tags: winlator-latest / v0.9c</text>
 
   <rect x="470" y="150" width="330" height="160" rx="22" fill="url(#wine)" filter="url(#soft)"/>

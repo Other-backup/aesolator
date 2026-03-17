@@ -9,6 +9,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.contents.ContentProfile;
+import com.winlator.cmod.contents.WineRuntimeRunpathSanitizer;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
@@ -44,13 +45,13 @@ public abstract class ImageFsInstaller {
     private static final String[][] APP_NATIVE_GUEST_LIBS = {
             {"libaero_redirect_glibc.so", "libredirect.so"},
             {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
-            {"libandroid-sysvshm.so", "libandroid-sysvshm.so"},
+            {"libaero_android_sysvshm.so", "libandroid-sysvshm.so"},
             {"libaero_evshim.so", "libevshim.so"},
             {"libdummyvk.so", "libdummyvk.so"}
     };
     private static final String[][] APP_NATIVE_ANDROID_HOST_LIBS = {
             {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
-            {"libandroid-sysvshm.so", "libandroid-sysvshm.so"},
+            {"libaero_android_sysvshm.so", "libandroid-sysvshm.so"},
             {"libaero_evshim.so", "libevshim.so"},
             {"libdummyvk.so", "libdummyvk.so"}
     };
@@ -59,6 +60,8 @@ public abstract class ImageFsInstaller {
     private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 15000;
     private static final int DOWNLOAD_READ_TIMEOUT_MS = 30000;
     private static final int DOWNLOAD_BUFFER_SIZE = 64 * 1024;
+    private static final String IMAGEFS_LIB_RUNPATH_MARKER = ".elf_runpath_sanitizer_version";
+    private static final String IMAGEFS_LIB_RUNPATH_MARKER_VERSION = "2";
     private static final String DOWNLOAD_USER_AGENT =
             "Mozilla/5.0 (Android 14; Mobile; rv:124.0) Gecko/124.0 Ae.solator/ImageFsInstaller";
 
@@ -447,7 +450,7 @@ public abstract class ImageFsInstaller {
             if (!source.isFile()) continue;
 
             File destination = new File(guestLibDir, destinationName);
-            boolean needsCopy = !destination.isFile() || destination.length() != source.length();
+            boolean needsCopy = !destination.isFile() || !FileUtils.contentEquals(source, destination);
             if (needsCopy) {
                 FileUtils.copy(source, destination);
             }
@@ -463,7 +466,7 @@ public abstract class ImageFsInstaller {
             if (!source.isFile()) continue;
 
             File destination = new File(androidHostLibDir, destinationName);
-            boolean needsCopy = !destination.isFile() || destination.length() != source.length();
+            boolean needsCopy = !destination.isFile() || !FileUtils.contentEquals(source, destination);
             if (needsCopy) {
                 FileUtils.copy(source, destination);
             }
@@ -513,6 +516,7 @@ public abstract class ImageFsInstaller {
 
         File hostLibDir = imageFs.getAndroidHostLibDir();
         if (hasBionicHostSupportClosure(hostLibDir)) {
+            ensureImageFsLibraryRunpathSanitized(imageFs);
             return;
         }
 
@@ -523,6 +527,7 @@ public abstract class ImageFsInstaller {
             return;
         }
         chmodTree(hostLibDir, 0755);
+        ensureImageFsLibraryRunpathSanitized(imageFs);
     }
 
     private static boolean hasBionicHostSupportClosure(File hostLibDir) {
@@ -568,6 +573,7 @@ public abstract class ImageFsInstaller {
         chmodIfExists(new File(hostLibDir, "libandroid-sysvshm.so"));
         chmodIfExists(new File(hostLibDir, "libevshim.so"));
         chmodIfExists(new File(hostLibDir, "libdummyvk.so"));
+        ensureImageFsLibraryRunpathSanitized(imageFs);
     }
 
     public static boolean extractSupportArchive(Context context, String archiveName, TarCompressorUtils.Type type, File outputDir) {
@@ -674,6 +680,7 @@ public abstract class ImageFsInstaller {
                 }
                 installGuestLibs(context, rootDir);
                 ensureHybridRootfsLayout(imageFs, rootDir);
+                ensureImageFsLibraryRunpathSanitized(imageFs);
                 imageFs.createImgVersionFile(LATEST_VERSION);
                 imageFs.createVariantFile(containerVariant);
                 imageFs.createRootfsProviderFile(resolveInstalledRootfsProvider(imagefsArchive));
@@ -881,5 +888,32 @@ public abstract class ImageFsInstaller {
                 FileUtils.delete(containerPatternDir);
             }
         });
+    }
+
+    private static void ensureImageFsLibraryRunpathSanitized(ImageFs imageFs) {
+        if (imageFs == null) return;
+
+        File imageFsLibDir = imageFs.getLibDir();
+        if (imageFsLibDir == null || !imageFsLibDir.isDirectory()) return;
+
+        File configDir = imageFs.getConfigDir();
+        ensureDirectory(configDir, 0771);
+        File markerFile = new File(configDir, IMAGEFS_LIB_RUNPATH_MARKER);
+        if (markerFile.isFile()) {
+            String markerValue = FileUtils.readString(markerFile);
+            if (IMAGEFS_LIB_RUNPATH_MARKER_VERSION.equals(markerValue != null ? markerValue.trim() : "")) {
+                return;
+            }
+        }
+
+        WineRuntimeRunpathSanitizer.Result result =
+                WineRuntimeRunpathSanitizer.sanitizeTree(imageFsLibDir, imageFsLibDir);
+        if (result.hasSignal()) {
+            Log.i("ImageFsInstaller", "ImageFs lib RUNPATH sanitize: " + result.toSummary());
+        }
+
+        if (result.failedFiles == 0 && FileUtils.writeString(markerFile, IMAGEFS_LIB_RUNPATH_MARKER_VERSION)) {
+            FileUtils.chmod(markerFile, 0660);
+        }
     }
 }

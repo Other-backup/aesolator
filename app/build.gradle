@@ -229,6 +229,7 @@ dependencies {
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 

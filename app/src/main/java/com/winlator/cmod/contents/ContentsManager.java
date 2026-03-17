@@ -821,6 +821,7 @@ public class ContentsManager {
         if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
         ensureRuntimePrefixPackAtRoot(installPath, profile);
         normalizeWineLibraryStructure(installPath, profile);
+        sanitizeWineRuntimeRunpath(installPath, profile);
 
         File binDir = new File(installPath, normalizeRelativePath(profile.wineBinPath));
         if (binDir.isDirectory()) {
@@ -1351,6 +1352,7 @@ public class ContentsManager {
             ContentProfile profile = normalizeImportedProfile(readProfile(profileFile), null);
             if (profile == null || !profile.isWineProtonFamily()) continue;
             File normalizedRoot = migrateRuntimeInstallRoot(installRoot, getInstallDir(context, profile));
+            postProcessWineRuntimeInstall(normalizedRoot, profile);
             persistProfileMetadata(new File(normalizedRoot, PROFILE_NAME), profile);
         }
     }
@@ -1368,7 +1370,19 @@ public class ContentsManager {
             if (profile == null || !profile.isWineProtonFamily()) continue;
 
             File targetRoot = migrateRuntimeInstallRoot(installRoot, getInstallDir(context, profile));
+            postProcessWineRuntimeInstall(targetRoot, profile);
             persistProfileMetadata(new File(targetRoot, PROFILE_NAME), profile);
+        }
+    }
+
+    private void sanitizeWineRuntimeRunpath(File installPath, ContentProfile profile) {
+        if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
+        WineRuntimeRunpathSanitizer.Result result = WineRuntimeRunpathSanitizer.sanitizeTree(
+                resolveWineRuntimeRoot(installPath, profile),
+                ImageFs.find(context).getLibDir()
+        );
+        if (result.hasSignal()) {
+            Log.i("ContentsManager", "Wine runtime RUNPATH sanitize: " + result.toSummary());
         }
     }
 

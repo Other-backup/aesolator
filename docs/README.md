@@ -12,6 +12,9 @@ This repo stores only application-layer documentation.
 
 ## Source Of Truth
 
+- `AGENTS.md` - repository-local Codex execution rules.
+- `docs/CODEX_OPERATING_CONTRACT.md` - approval-gated review mode, execution
+  gates, and documentation sync map.
 - `docs/REPO_SPLIT_TOPOLOGY.md` - split repository contract and ownership.
 - `docs/CONTENTS_QA_CHECKLIST.md` - active Contents/UI closure checklist.
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md` - device forensic runbook.

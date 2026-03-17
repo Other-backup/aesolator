@@ -19,6 +19,7 @@ set(WINLATOR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlator.exports.map.txt")
 set(AERO_REDIRECT_GLIBC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_glibc.exports.map.txt")
 set(AERO_REDIRECT_BIONIC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_bionic.exports.map.txt")
 set(AERO_EVSHIM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_evshim.exports.map.txt")
+set(ANDROID_SYSVSHM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/android_sysvshm.exports.map.txt")
 
 function(aero_disable_host_rpath target_name)
     set_target_properties(${target_name} PROPERTIES
@@ -131,3 +132,17 @@ target_link_libraries(aero_evshim
         log
         dl
 )
+
+add_library(aero_android_sysvshm SHARED
+        ../../../../android_sysvshm/android_sysvshm.c
+)
+
+target_include_directories(aero_android_sysvshm PRIVATE
+        ../../../../android_sysvshm
+)
+target_compile_options(aero_android_sysvshm PRIVATE -Wall -Wextra -std=gnu99)
+target_link_options(aero_android_sysvshm PRIVATE
+        "LINKER:--version-script=${ANDROID_SYSVSHM_EXPORT_MAP}"
+)
+set_target_properties(aero_android_sysvshm PROPERTIES OUTPUT_NAME "aero_android_sysvshm")
+aero_disable_host_rpath(aero_android_sysvshm)

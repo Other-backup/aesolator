@@ -6,6 +6,52 @@ This repository is the source-of-truth for the Ae.solator Android application.
 This agent operates here as the second autonomous developer focused on app/UI,
 runtime-binding, documentation alignment, and repository contract integrity.
 
+## Operating Modes
+
+- Default mode is autonomous delivery:
+  inspect, edit, build, test, use `adb`, and close documentation tails in the
+  same pass.
+- If the user explicitly requests review-only / consultative work, or uses the
+  approval gates `APPROVED: IMPLEMENT` / `APPROVED: EXECUTE PLAN`, switch to
+  Approval-Gated Staff Review Mode.
+- The canonical cross-repo description of these modes lives in
+  `docs/CODEX_OPERATING_CONTRACT.md`.
+
+## Approval-Gated Staff Review Mode
+
+When this mode is active:
+
+- Before `APPROVED: IMPLEMENT`, do read-only work only:
+  inspect/search local files and summarize findings.
+- Before approval, do not:
+  edit files, run `gradlew`, use `adb`, install dependencies, access the
+  network, push, or perform any other stateful action.
+- If action beyond reading is needed, first explain:
+  1. why it is needed,
+  2. concrete tradeoffs,
+  3. the recommended option,
+  4. the approval request.
+- Start by asking whether the task is `BIG` or `SMALL` unless the user already
+  answered.
+- If no implementation plan was provided, first produce a short `Proposed Plan`
+  with steps, touched components, and test strategy.
+- Review sections must run in this exact order:
+  1. Architecture Review
+  2. Code Quality Review
+  3. Test Review
+  4. Performance Review
+- After each review section, stop and ask for feedback before moving to the
+  next one.
+- For each issue, provide:
+  1. problem,
+  2. why it matters,
+  3. 2-3 options,
+  4. effort/risk/impact/maintenance cost for each option,
+  5. recommended option and why.
+- Do not implement until `APPROVED: IMPLEMENT`.
+- After that, present a short execution plan with files, steps, tests, and
+  rollout/rollback, then wait for `APPROVED: EXECUTE PLAN` before acting.
+
 ## Rules
 
 - `Ae.solator` is the full app-owner repository. UI, Contents, runtime-binding,
@@ -86,6 +132,12 @@ runtime-binding, documentation alignment, and repository contract integrity.
   Termux/SDK/host-LLVM/bootstrap assumptions change.
 - Keep documentation aligned with actual code, runtime contracts, and split repo
   ownership before calling a task complete.
+- When process/build/forensic rules change, update the entry-point docs in the
+  same pass:
+  `README.md`, `docs/README.md`, `docs/CODEX_OPERATING_CONTRACT.md`,
+  `docs/TERMUX_LOCAL_BUILD.md`, `docs/DEVICE_MIGRATION_BOOTSTRAP.md`,
+  `docs/ADB_HARVARD_DEVICE_FORENSICS.md`, `docs/SECOND_DEV_ROADMAP.md`, and
+  `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`.
 - Report changes to the first developer as concise implementation notes with:
   scope, files touched, contract impact, verification status, and open risks.
 - Do not leave accidental build-side tails in the tree; restore or explain

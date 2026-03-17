@@ -2,14 +2,19 @@
 
 This runbook defines the device-side automation loop for the Winlator matrix:
 
-1. seed/clone container matrix,
-2. refresh latest artifact payloads,
-3. run full forensic matrix,
-4. classify runtime mismatch vs baseline,
-5. export per-scenario forensic bundles.
+1. capture a single-issue bundle by default,
+2. seed/clone container matrix when comparison is needed,
+3. refresh latest artifact payloads when payload drift is suspected,
+4. run the full forensic matrix,
+5. classify runtime mismatch vs baseline,
+6. export per-scenario forensic bundles.
 
 ## Scripts
 
+- `ci/winlator/forensic-adb-issue-capture.sh`
+  - default one-shot capture for a single broken container/session; collects a
+    full ADB bundle, app-private `run-as` evidence, fresh runtime logs, and the
+    parser outputs needed for first-pass root-cause work.
 - `ci/winlator/adb-container-seed-matrix.sh`
   - clones `xuser-N` trees from a seed container and rewrites `.container` metadata (`id`, `name`, profile keys).
 - `ci/winlator/adb-ensure-artifacts-latest.sh`
@@ -26,9 +31,14 @@ This runbook defines the device-side automation loop for the Winlator matrix:
 ## Quick Start
 
 ```bash
+# 0) Single-issue capture (default for one broken session)
+bash ci/winlator/forensic-adb-issue-capture.sh \
+  --serial <device> \
+  --package com.winlator.cmod
+
 # 1) Seed matrix (optional)
 ADB_SERIAL=<device> \
-WLT_PACKAGE=by.aero.so.benchmark \
+WLT_PACKAGE=com.winlator.cmod \
 WLT_SEED_CONTAINER_ID=1 \
 WLT_TARGET_CONTAINERS="1" \
 WLT_CONTAINER_PROFILE_MAP="1:wineVersion=freewine11-arm64ec-1;runtimeProfile=S8G1_SUPER" \
@@ -36,13 +46,13 @@ bash ci/winlator/adb-container-seed-matrix.sh
 
 # 2) Refresh artifacts (optional)
 ADB_SERIAL=<device> \
-WLT_PACKAGE=by.aero.so.benchmark \
+WLT_PACKAGE=com.winlator.cmod \
 WLT_TARGET_KEYS="freewine11 vulkansdkarm64 vulkansdkx86_64 aedxvkgplasync aedxvkgplasyncarm64ec aevkd3dproton aevkd3dprotonarm64ec" \
 bash ci/winlator/adb-ensure-artifacts-latest.sh
 
 # 3) Full suite
 ADB_SERIAL=<device> \
-WLT_PACKAGE=by.aero.so.benchmark \
+WLT_PACKAGE=com.winlator.cmod \
 WLT_SCENARIO_MATRIX="freewine11:1" \
 WLT_BASELINE_LABEL=freewine11 \
 WLT_RUN_SEED=0 \
@@ -53,7 +63,7 @@ bash ci/winlator/forensic-adb-harvard-suite.sh
 
 # 4) Arm64 autotune matrix validation (SoC/profile/env)
 ADB_SERIAL=<device> \
-WLT_PACKAGE=by.aero.so.benchmark \
+WLT_PACKAGE=com.winlator.cmod \
 WLT_CONTENT_NAME=freewine11-arm64ec-1 \
 WLT_REQUESTED_PROFILE=auto \
 WLT_CONTAINER_ID=1 \
@@ -61,7 +71,7 @@ bash ci/winlator/forensic-adb-arm64-autotune-matrix.sh
 
 # 5) Core upscale / Warcraft III loop
 ADB_SERIAL=<device> \
-WLT_PACKAGE=by.aero.so.benchmark \
+WLT_PACKAGE=com.winlator.cmod \
 WLT_SCENARIO_MATRIX="freewine11:1" \
 WLT_BASELINE_LABEL=freewine11 \
 WLT_ARTIFACT_KEYS="freewine11" \
@@ -69,6 +79,16 @@ bash ci/winlator/forensic-adb-core-upscale-loop.sh
 ```
 
 ## Outputs
+
+`forensic-adb-issue-capture.sh` writes a timestamped bundle under the default
+issue output root and includes:
+
+- clean-session `logcat -b all`,
+- `run-as` app-private evidence,
+- pulled runtime stream files,
+- `dumpsys` surfaces,
+- `runtime-log-assembler` outputs,
+- bundle markdown/index artifacts.
 
 `forensic-adb-harvard-suite.sh` writes to `WLT_OUT_DIR`:
 
@@ -83,11 +103,23 @@ bash ci/winlator/forensic-adb-core-upscale-loop.sh
 
 ## Notes
 
+- For a single runtime/container failure, do the issue capture first and only
+  widen into the full Harvard suite after the first parser pass.
 - `WLT_FAIL_ON_SEVERITY_AT_OR_ABOVE` propagates mismatch classifier exit thresholds (`off|info|low|medium|high`).
 - `WLT_FAIL_ON_CONFLICT_SEVERITY_AT_OR_ABOVE` applies the same threshold contract to strict runtime logging contour (`RUNTIME_SUBSYSTEM_SNAPSHOT`, `RUNTIME_LOGGING_CONTRACT_SNAPSHOT`, `RUNTIME_LIBRARY_COMPONENT_*`).
 - `WLT_CAPTURE_CONFLICT_LOGS=1` (default in `forensic-adb-complete-matrix.sh`) writes per-scenario `logcat-runtime-conflict-contour.txt` + `runtime-conflict-contour.summary.txt`.
-- `forensic-runtime-log-assembler.py` merges `logcat`, `forensics-jsonl-tail`, and `/sdcard/Winlator/logs/*` into a single per-scenario low-level report for loader/assert/ABI failures.
+- `forensic-runtime-log-assembler.py` merges `logcat`,
+  `forensics-jsonl-tail`, and `/storage/emulated/0/Ae.solator/logs/*` into a
+  single per-scenario low-level report for loader/assert/ABI failures.
 - `WLT_CAPTURE_NETWORK_DIAG=1` runs source endpoint diagnostics before scenario launches.
 - network summary includes `problemEndpoints` (non-zero curl status / HTTP 4xx-5xx / code 000) for quick outage triage.
 - For unstable VPN/DNS conditions, run artifact refresh first and then launch suite with `WLT_RUN_ARTIFACT_REFRESH=0`.
+- The maximum non-root contract also includes privilege/appops/whitelist state
+  and a `run-as` tree walk through the staged runtime files when loader / ABI /
+  path mismatches are suspected.
+- When unix-side Wine modules fail after bootstrap, inspect pulled ELF
+  `RUNPATH` / `RPATH` early; donor absolute app-private paths such as
+  `/data/data/app.gamenative/files/imagefs/usr/lib` can survive inside the
+  runtime payload and masquerade as later `winex11.drv` / `nodrv_CreateWindow`
+  failures.
 - Keep the wide suite baseline on `freewine11` (single active runtime lane).

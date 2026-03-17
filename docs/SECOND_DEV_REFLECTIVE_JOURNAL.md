@@ -2616,3 +2616,101 @@
 - Next step: build a fresh debug APK on this migrated device, pair or reconnect
   the phone over Wi-Fi ADB through the helper script, then resume the live
   XServer bootstrap blocker with fresh on-device forensics.
+
+### Entry 109: Codex operating rules and repo runbooks were realigned to the live build and forensic contract
+
+- Goal: stop repo/process drift by encoding the user's approval-gated
+  staff-review workflow in tracked docs while also updating the build and
+  forensic runbooks to the current `com.winlator.cmod` / Termux / device state.
+- Context: the repo had already grown strong local rules in `AGENTS.md`, but
+  the user supplied a stricter review-mode prompt with explicit
+  `APPROVED: IMPLEMENT` and `APPROVED: EXECUTE PLAN` gates. At the same time,
+  several docs still described the old package id
+  `by.aero.so.benchmark`, an outdated early-`XServer` failure point, and older
+  local-build assumptions.
+- Decision: add a canonical `docs/CODEX_OPERATING_CONTRACT.md`, mirror the
+  approval-gated mode into workspace/repo `AGENTS.md`, and update the repo
+  entry-point docs (`README`, docs index, Termux local build, migration
+  bootstrap, Harvard ADB forensics, roadmap, SVG identity) so future Codex
+  passes read one coherent contract instead of stale fragments.
+- Tradeoff: the repo now carries a stricter documentation-sync burden, and
+  future consultative/review requests will intentionally slow execution until
+  the user opens the gates. That is acceptable because the alternative was
+  process ambiguity and repeated repo drift.
+- Verification: the canonical process doc is now tracked in-repo, the old
+  package id was removed from the main entry points, the migration resume point
+  now reflects the live Vulkan/wrapper failure chain, and the local build /
+  forensic runbooks now point at the current Termux + Wi-Fi ADB workflow.
+- Next step: finish the live runtime lane by proving that the freshly staged
+  `libandroid-sysvshm.so` resolves the wrapper-side `libandroid_shm*` ABI
+  expectation during a clean-session launch of `Container-1`.
+
+### Entry 110: the wrapper ABI blocker was real, but the next tail was a donor absolute RUNPATH contract inside the installed runtime
+
+- Goal: close the surviving container self-exit after the `libandroid_shm*`
+  compatibility bridge landed and stop treating the old wrapper failure as the
+  current blocker.
+- Context: the rebuilt APK and fresh issue bundle proved that the old Vulkan
+  wrapper chain was gone: the staged `libandroid-sysvshm.so` now exports both
+  `shm*` and `libandroid_shm*`, the runtime no longer prints
+  `libandroid_shmget` / `Found no drivers`, and bootstrap reaches the guest
+  runtime streams. The next surviving failure is deeper:
+  `winex11.drv` `PROCESS_ATTACH` returns `0`, `winewayland.drv` reports
+  `status=c0000135`, and `nodrv_CreateWindow` still forces self-exit.
+- Decision: inspect the pulled unix-side Wine ELFs directly and treat payload
+  path hygiene as a first-class runtime contract. That static pass found stale
+  absolute donor `RUNPATH` entries pointing at
+  `/data/data/app.gamenative/files/imagefs/usr/lib` in `ntdll.so`,
+  `win32u.so`, `winex11.so`, and `wineserver`. A new local Java-side
+  sanitizer now rewrites absolute donor `RUNPATH` / `RPATH` entries in-place to
+  a local `$ORIGIN` + relative imagefs `usr/lib` closure during runtime
+  install and repair.
+- Tradeoff: this adds a small ELF dynamic-section parser to the app and does
+  one more filesystem hygiene pass over installed runtime roots. That is still
+  the pragmatic choice here because the alternative was manual device-side
+  `patchelf` surgery or repeated reinstallation without fixing the payload
+  contract at its source.
+- Verification: the runtime sanitizer is now wired into
+  `ContentsManager.postProcessWineRuntimeInstall()` and the installed-runtime
+  repair pass, so fresh installs and already-staged runtime roots go through
+  the same repair logic.
+- Next step: rebuild, reinstall, relaunch `Container-1`, and capture one fresh
+  clean-session forensic bundle to confirm whether `winex11.drv` now survives
+  past `PROCESS_ATTACH`.
+
+### Entry 111: imagefs library closure and sanitizer marker tails are now closed; the blocker is a true winex11 attach-time failure
+
+- Goal: stop treating rootfs payload hygiene as the active blocker once the
+  installed runtime fix landed, and close the repeated full-tree sanitize tail
+  that would have made every launch pay the same cost again.
+- Context: fresh device proof after the first runtime-side sanitizer showed two
+  concrete things. First, the remaining donor absolute paths were not only in
+  `/opt/runtime-*`, but also throughout `imagefs/usr/lib`, including the X11
+  closure (`libX11.so.6.4.0`, `libxcb.so.1.1.0`, `libXrandr.so.2.2.0`,
+  `libxkbcommon.so.0.9.2`). Second, the initial imagefs sanitizer pass still
+  reported `failed=1` because `imagefs/usr/lib/librt.so` is an 11-byte ASCII
+  linker-script placeholder, not an ELF, so the marker file was never written
+  and the app would rescan the tree on every launch.
+- Decision: widen the Java-side sanitizer into `ImageFsInstaller` so the app
+  repairs `imagefs/usr/lib` in-place during install and repair flows, add a
+  versioned marker file under `.winlator`, and classify short/truncated
+  non-ELF placeholders as `NOT_ELF` instead of `FAILED`. Keep the runtime-side
+  sanitizer public so both `ContentsManager` and `ImageFsInstaller` share the
+  same ELF rewrite logic.
+- Tradeoff: startup still pays one broad first-pass scan when upgrading an old
+  install, but subsequent launches stop rescanning the entire rootfs closure
+  once the marker is written. That is the right trade here because path-hygiene
+  repair is necessary exactly once per payload version, not once per launch.
+- Verification: on-device proof now shows
+  `files/imagefs/.winlator/.elf_runpath_sanitizer_version = 2`, the previous
+  `failed=1` / `librt.so` tail is gone, and the imagefs X11/rootfs closure no
+  longer depends on donor absolute paths. Fresh runtime logs on
+  `wine_loader_2026-03-18_02-13-13.txt` still show
+  `winex11.drv` loading successfully but failing during
+  `MODULE_InitDLL(... PROCESS_ATTACH ...)`, followed by
+  `winewayland.drv status=c0000135`, `nodrv_CreateWindow`, and
+  `XSERVER_EXIT_REQUESTED`.
+- Next step: instrument or statically audit the actual `winex11.drv`
+  attach-time path. The active question is no longer payload closure or
+  wrapper ABI, but what inside X11 driver initialization returns `0` after the
+  unix-side driver is already loaded with a sane local library closure.

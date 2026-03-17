@@ -7,7 +7,7 @@
 
 # Ae.solator
 
-Android application repository for Ae.solator (`by.aero.so.benchmark`).
+Android application repository for Ae.solator (`com.winlator.cmod`).
 
 ## Scope
 
@@ -43,7 +43,23 @@ Legacy donor runtime lanes are not active in Ae.solator.
 
 Legacy CI patch-overlay stack has been removed; this repository stays native source-of-truth for app code, while archive publishing is centralized in WCP Archive.
 
+## Operating Contract
+
+- Repo-local agent rules live in `AGENTS.md`.
+- Approval-gated review mode, documentation sync rules, and process gates live
+  in `docs/CODEX_OPERATING_CONTRACT.md`.
+
 ## Local Build
+
+Primary on-device Termux flow:
+
+```sh
+sh tools/bootstrap-termux-host.sh
+. tools/env-android-local.sh
+./gradlew --no-daemon assembleDebug
+```
+
+Legacy CI/helper wrapper:
 
 ```bash
 bash ci/winlator/ci-build-winlator-ludashi.sh
@@ -61,6 +77,7 @@ see `docs/TERMUX_LOCAL_BUILD.md`.
 ## Docs
 
 - `docs/REPO_SPLIT_TOPOLOGY.md`
+- `docs/CODEX_OPERATING_CONTRACT.md`
 - `docs/CONTENTS_QA_CHECKLIST.md`
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md`
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`

@@ -254,3 +254,19 @@ int shmctl(int shmid, int cmd, struct shmid_ds* buf) {
     }
     return -1;
 }
+
+int libandroid_shmget(key_t key, size_t size, int flags) {
+    return shmget(key, size, flags);
+}
+
+void* libandroid_shmat(int shmid, const void* shmaddr, int shmflg) {
+    return shmat(shmid, shmaddr, shmflg);
+}
+
+int libandroid_shmdt(const void* shmaddr) {
+    return shmdt(shmaddr);
+}
+
+int libandroid_shmctl(int shmid, int cmd, struct shmid_ds* buf) {
+    return shmctl(shmid, cmd, buf);
+}
