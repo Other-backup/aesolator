@@ -2,22 +2,18 @@ package com.winlator.cmod.runtimeprofile;
 
 import android.content.Context;
 import android.os.Build;
-import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.SocClassifier;
 import com.winlator.cmod.core.SpinnerAdapters;
 
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class RuntimeProfileManager {
-    private static final Pattern ADRENO_PATTERN = Pattern.compile("adreno\\s*(\\d{3,4})", Pattern.CASE_INSENSITIVE);
-
     private RuntimeProfileManager() {}
 
     public static ArrayList<RuntimeProfile> getProfiles(Context context) {
@@ -221,30 +217,28 @@ public final class RuntimeProfileManager {
     }
 
     private static String detectSoCClass(Context context) {
-        String renderer = "";
+        String renderer;
         try {
             renderer = GPUInformation.getRenderer(null, context);
         } catch (Throwable ignored) {
             renderer = "";
         }
-        String normalized = renderer == null ? "" : renderer.toLowerCase(Locale.ENGLISH);
-        if (normalized.contains("adreno")) {
-            Matcher matcher = ADRENO_PATTERN.matcher(normalized);
-            if (matcher.find()) {
-                int generation = parseIntSafe(matcher.group(1));
-                if (generation >= 700) return "adreno-7xx";
-                if (generation >= 600) return "adreno-6xx";
-            }
-            return "adreno-legacy";
-        }
-        if (normalized.contains("xclipse")) return "xclipse";
-        if (normalized.contains("mali")) {
-            if (normalized.contains("g7") || normalized.contains("g8") || normalized.contains("g9")) {
-                return "mali-g7xx-or-newer";
-            }
-            return "mali-legacy";
-        }
-        return "unknown";
+        SocClassifier.Tier tier = SocClassifier.detect(
+                renderer,
+                readBuildField("SOC_MODEL"),
+                readBuildField("HARDWARE"),
+                readSystemProperty("ro.board.platform"),
+                readSystemProperty("ro.product.board")
+        );
+        return switch (tier) {
+            case ADRENO_7XX -> "adreno-7xx";
+            case ADRENO_6XX -> "adreno-6xx";
+            case ADRENO_LEGACY -> "adreno-legacy";
+            case XCLIPSE_RDNA_MOBILE -> "xclipse";
+            case MALI_G7XX_OR_NEWER -> "mali-g7xx-or-newer";
+            case MALI_LEGACY -> "mali-legacy";
+            default -> "unknown";
+        };
     }
 
     private static String readBuildField(String fieldName) {
@@ -256,11 +250,15 @@ public final class RuntimeProfileManager {
         }
     }
 
-    private static int parseIntSafe(String value) {
+    private static String readSystemProperty(String key) {
         try {
-            return Integer.parseInt(value);
-        } catch (Exception ignored) {
-            return -1;
+            Class<?> systemPropertiesClass = Class.forName("android.os.SystemProperties");
+            Object value = systemPropertiesClass
+                    .getMethod("get", String.class, String.class)
+                    .invoke(null, key, "");
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "";
         }
     }
 }

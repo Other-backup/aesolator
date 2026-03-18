@@ -75,6 +75,7 @@ import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.SocClassifier;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.ThemeAssetPainter;
@@ -224,6 +225,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean upscalerDebugTearLines = false;
     private boolean upscalerInterpolatedOnly = false;
     private boolean upscalerVulkanValidationLayer = false;
+    private String upscalerBackendSource = "global_profile";
+    private String upscalerPresetSource = "global_profile";
+    private String upscalerFramegenSource = "global_profile";
+    private String upscalerValidationSource = "global_profile";
     PreloaderDialog preloaderDialog = null;
     private Runnable configChangedCallback = null;
     private boolean isPaused = false;
@@ -744,9 +749,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (!inputType.isEmpty()) winHandler.setInputType(Byte.parseByte(inputType));
             xinputDisabledFromShortcut = shortcut.getExtraBoolean("disableXinput", false);
             winHandler.setXInputDisabled(xinputDisabledFromShortcut);
-            parseUpscalerFromShortcut(shortcut);
             Log.d("XServerDisplayActivity", "XInput Disabled from Shortcut: " + xinputDisabledFromShortcut);
         }
+        parseUpscalerLaunchSettings(shortcut);
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
@@ -2969,34 +2974,64 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return Math.max(min, Math.min(max, parsed));
     }
 
-    private String resolveUpscalerValue(@NonNull Shortcut activeShortcut, @NonNull String key, @NonNull String fallback) {
-        String shortcutValue = activeShortcut.getExtra(key, "");
-        if (shortcutValue != null && !shortcutValue.trim().isEmpty()) return shortcutValue;
-        if (container != null) {
-            String containerValue = container.getExtra(key, "");
-            if (containerValue != null && !containerValue.trim().isEmpty()) return containerValue;
+    private static final class ResolvedUpscalerValue {
+        private final String value;
+        private final String source;
+
+        private ResolvedUpscalerValue(String value, String source) {
+            this.value = value;
+            this.source = source;
         }
-        return fallback;
     }
 
-    private void parseUpscalerFromShortcut(@NonNull Shortcut activeShortcut) {
+    private ResolvedUpscalerValue resolveUpscalerValue(
+            @Nullable Shortcut activeShortcut,
+            @NonNull String key,
+            @NonNull String fallback
+    ) {
+        if (activeShortcut != null) {
+            String shortcutValue = activeShortcut.getExtra(key, "");
+            if (shortcutValue != null && !shortcutValue.trim().isEmpty()) {
+                return new ResolvedUpscalerValue(shortcutValue, "shortcut");
+            }
+        }
+        if (container != null) {
+            String containerValue = container.getExtra(key, "");
+            if (containerValue != null && !containerValue.trim().isEmpty()) {
+                return new ResolvedUpscalerValue(containerValue, "container");
+            }
+        }
+        return new ResolvedUpscalerValue(fallback, "global_profile");
+    }
+
+    private void parseUpscalerLaunchSettings(@Nullable Shortcut activeShortcut) {
         UpscalerProfileStore.Profile globalProfile = UpscalerProfileStore.getSelectedProfile(preferences);
-        String backend = resolveUpscalerValue(activeShortcut, "upscalerBackend", globalProfile.backend);
-        backend = StringUtils.parseIdentifier(backend);
+        ResolvedUpscalerValue backendSetting =
+                resolveUpscalerValue(activeShortcut, "upscalerBackend", globalProfile.backend);
+        String backend = StringUtils.parseIdentifier(backendSetting.value);
         if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
             backend = UpscalerProfileStore.normalizeBackend(globalProfile.backend);
         }
+        upscalerBackendSource = backendSetting.source;
 
-        String effect = resolveUpscalerValue(activeShortcut, "upscalerEffect", globalProfile.effect);
-        effect = normalizeUpscalerEffect(effect);
+        String effect = normalizeUpscalerEffect(
+                resolveUpscalerValue(activeShortcut, "upscalerEffect", globalProfile.effect).value
+        );
 
-        String presetRaw = resolveUpscalerValue(activeShortcut, "upscalerPreset", globalProfile.preset);
+        ResolvedUpscalerValue presetSetting =
+                resolveUpscalerValue(activeShortcut, "upscalerPreset", globalProfile.preset);
+        String presetRaw = presetSetting.value;
         if (presetRaw == null || presetRaw.trim().isEmpty()) presetRaw = UPSCALER_PRESET_AUTO;
         upscalerPreset = normalizeUpscalerPreset(presetRaw);
+        upscalerPresetSource = presetSetting.source;
         upscalerBackend = backend;
         upscalerEffect = effect;
 
-        String scaleRaw = resolveUpscalerValue(activeShortcut, "upscalerScale", String.valueOf(globalProfile.scalePercent));
+        String scaleRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerScale",
+                String.valueOf(globalProfile.scalePercent)
+        ).value;
         upscalerScalePercent = parseBoundedInt(
                 scaleRaw,
                 100,
@@ -3004,7 +3039,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 200
         );
 
-        String sharpnessRaw = resolveUpscalerValue(activeShortcut, "upscalerSharpness", String.valueOf(globalProfile.sharpness));
+        String sharpnessRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerSharpness",
+                String.valueOf(globalProfile.sharpness)
+        ).value;
         upscalerSharpnessPercent = parseBoundedIntAllowZero(
                 sharpnessRaw,
                 100,
@@ -3012,7 +3051,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 100
         );
 
-        String denoiseRaw = resolveUpscalerValue(activeShortcut, "upscalerDenoise", String.valueOf(globalProfile.denoise));
+        String denoiseRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerDenoise",
+                String.valueOf(globalProfile.denoise)
+        ).value;
         upscalerDenoisePercent = parseBoundedIntAllowZero(
                 denoiseRaw,
                 100,
@@ -3020,18 +3063,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 100
         );
 
-        String framegenRaw = resolveUpscalerValue(
+        ResolvedUpscalerValue framegenSetting = resolveUpscalerValue(
                 activeShortcut,
                 "upscalerFrameGeneration",
                 globalProfile.frameGeneration ? "1" : "0"
         );
-        upscalerFrameGeneration = parseBoolean(framegenRaw);
+        upscalerFrameGeneration = parseBoolean(framegenSetting.value);
+        upscalerFramegenSource = framegenSetting.source;
 
         String generatedFramesRaw = resolveUpscalerValue(
                 activeShortcut,
                 "upscalerGeneratedFrames",
                 String.valueOf(globalProfile.generatedFrames)
-        );
+        ).value;
         upscalerGeneratedFrames = parseBoundedInt(
                 generatedFramesRaw,
                 1,
@@ -3039,23 +3083,31 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 3
         );
 
-        String fgSourceRaw = resolveUpscalerValue(activeShortcut, "upscalerFgSource", globalProfile.fgSource);
+        String fgSourceRaw = resolveUpscalerValue(activeShortcut, "upscalerFgSource", globalProfile.fgSource).value;
         upscalerFgSource = normalizeFgSource(fgSourceRaw);
 
-        String fgOutputRaw = resolveUpscalerValue(activeShortcut, "upscalerFgOutput", globalProfile.fgOutput);
+        String fgOutputRaw = resolveUpscalerValue(activeShortcut, "upscalerFgOutput", globalProfile.fgOutput).value;
         upscalerFgOutput = normalizeFgOutput(fgOutputRaw);
 
-        String framegenModeRaw = resolveUpscalerValue(activeShortcut, "upscalerFramegenMode", globalProfile.framegenMode);
+        String framegenModeRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerFramegenMode",
+                globalProfile.framegenMode
+        ).value;
         upscalerFramegenMode = normalizeFramegenMode(framegenModeRaw);
 
         String thermalGuardRaw = resolveUpscalerValue(
                 activeShortcut,
                 "upscalerThermalGuard",
                 globalProfile.thermalGuard ? "1" : "0"
-        );
+        ).value;
         upscalerThermalGuard = parseBoolean(thermalGuardRaw);
 
-        String targetFpsRaw = resolveUpscalerValue(activeShortcut, "upscalerTargetFps", String.valueOf(globalProfile.targetFps));
+        String targetFpsRaw = resolveUpscalerValue(
+                activeShortcut,
+                "upscalerTargetFps",
+                String.valueOf(globalProfile.targetFps)
+        ).value;
         upscalerTargetFps = parseBoundedIntAllowZero(
                 targetFpsRaw,
                 60,
@@ -3067,7 +3119,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 activeShortcut,
                 "upscalerInterpolationFactor",
                 String.valueOf(globalProfile.interpolationFactor)
-        );
+        ).value;
         upscalerInterpolationFactor = parseBoundedIntAllowZero(
                 interpolationRaw,
                 50,
@@ -3079,29 +3131,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 activeShortcut,
                 "upscalerDebugOverlay",
                 globalProfile.debugOverlay ? "1" : "0"
-        );
+        ).value;
         upscalerDebugOverlay = parseBoolean(debugOverlayRaw);
 
         String debugTearRaw = resolveUpscalerValue(
                 activeShortcut,
                 "upscalerDebugTearLines",
                 globalProfile.debugTearLines ? "1" : "0"
-        );
+        ).value;
         upscalerDebugTearLines = parseBoolean(debugTearRaw);
 
         String interpolatedOnlyRaw = resolveUpscalerValue(
                 activeShortcut,
                 "upscalerInterpolatedOnly",
                 globalProfile.interpolatedOnly ? "1" : "0"
-        );
+        ).value;
         upscalerInterpolatedOnly = parseBoolean(interpolatedOnlyRaw);
 
-        String vkValidationRaw = resolveUpscalerValue(
+        ResolvedUpscalerValue vkValidationSetting = resolveUpscalerValue(
                 activeShortcut,
                 "vulkanValidationLayer",
                 globalProfile.vulkanValidationLayer ? "1" : "0"
         );
-        upscalerVulkanValidationLayer = parseBoolean(vkValidationRaw);
+        upscalerVulkanValidationLayer = parseBoolean(vkValidationSetting.value);
+        upscalerValidationSource = vkValidationSetting.source;
         vkbasaltConfig = buildVkBasaltConfig(upscalerEffect, upscalerSharpnessPercent, upscalerDenoisePercent);
     }
 
@@ -3418,7 +3471,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "Applied upscaler/frame-generation contract",
                 ForensicLogger.fields(
                         "backend", upscalerBackend,
+                        "backend_source", upscalerBackendSource,
                         "preset_requested", requestedPreset,
+                        "preset_source", upscalerPresetSource,
                         "preset_effective", effectivePreset,
                         "soc_class", normalizedSocClass,
                         "effect", upscalerEffect,
@@ -3428,8 +3483,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "vk_validation_layer_requested", requestedValidationLayer ? "1" : "0",
                         "vk_validation_layer", upscalerValidationLayerActive ? "1" : "0",
                         "vk_validation_guard", requestedValidationLayer && !vulkanSdkAvailable ? "vulkan_sdk_missing" : "none",
+                        "vk_validation_source", upscalerValidationSource,
                         "vulkan_sdk_profile_count", vulkanSdkProfileCount,
                         "framegen_enabled", frameGenerationActive ? "1" : "0",
+                        "framegen_source", upscalerFramegenSource,
                         "generated_frames", upscalerGeneratedFrames,
                         "generated_frames_effective", effectiveGeneratedFrames,
                         "fg_source", upscalerFgSource,
@@ -3667,30 +3724,44 @@ public class XServerDisplayActivity extends AppCompatActivity {
         inputControlsView.invalidate();
     }
 
-    private static final Pattern SOC_ADRENO_PATTERN =
-            Pattern.compile("adreno\\s*(\\d{3,4})", Pattern.CASE_INSENSITIVE);
     private static final Pattern VULKAN_API_MINOR_PATTERN = Pattern.compile("1\\.(\\d+)");
 
     private String detectSoCClass() {
-        String renderer = GPUInformation.getRenderer(null, this);
-        if (renderer == null) return "unknown";
-        String normalized = renderer.toLowerCase(Locale.US);
+        SocClassifier.Tier tier = SocClassifier.detect(
+                GPUInformation.getRenderer(null, this),
+                readBuildField("SOC_MODEL"),
+                readBuildField("HARDWARE"),
+                readSystemProperty("ro.board.platform"),
+                readSystemProperty("ro.product.board")
+        );
+        return switch (tier) {
+            case ADRENO_7XX -> "adreno-7xx";
+            case ADRENO_6XX, ADRENO_LEGACY -> "adreno-6xx-and-older";
+            case XCLIPSE_RDNA_MOBILE -> "xclipse-rdna-mobile";
+            case MALI_G7XX_OR_NEWER -> "mali-g7xx-or-newer";
+            default -> "unknown";
+        };
+    }
 
-        if (normalized.contains("adreno")) {
-            Matcher matcher = SOC_ADRENO_PATTERN.matcher(normalized);
-            if (matcher.find()) {
-                int generation = safeParseInt(matcher.group(1));
-                if (generation >= 700) return "adreno-7xx";
-            }
-            return "adreno-6xx-and-older";
+    private String readBuildField(String fieldName) {
+        try {
+            Object value = Build.class.getField(fieldName).get(null);
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "";
         }
-        if (normalized.contains("xclipse")) return "xclipse-rdna-mobile";
-        if (normalized.contains("mali")) {
-            if (normalized.contains("g7") || normalized.contains("g8") || normalized.contains("g9")) {
-                return "mali-g7xx-or-newer";
-            }
+    }
+
+    private String readSystemProperty(String key) {
+        try {
+            Class<?> systemPropertiesClass = Class.forName("android.os.SystemProperties");
+            Object value = systemPropertiesClass
+                    .getMethod("get", String.class, String.class)
+                    .invoke(null, key, "");
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "";
         }
-        return "unknown";
     }
 
     private String resolveRuntimeProfileId() {

@@ -598,3 +598,18 @@ Second autonomous developer lane for `aesolator`:
   `wineserver`, `wfm.exe`, `war3.exe`, and `winecfg.exe` alive in the same
   session. Remaining risk has moved to payload-specific warnings and tuning,
   not to X11/container bring-up.
+- Fresh `2026-03-18` direct-container proof closes the next control-plane tail
+  too: `XServerDisplayActivity` now parses upscaler/framegen settings even
+  without a shortcut, and clean-session `UPSCALER_ROUTE_APPLIED` resolves
+  `backend=mobfgsr`, `backend_source=container`, `framegen_enabled=1`, and
+  `soc_class=adreno-7xx` on `SM8475 / taro` instead of falling back to
+  `backend=off` and `adreno-6xx-and-older`.
+- `Vulkan SDK` proof is now explicit on the same device pass: `rootfs`
+  contains `usr/share/vulkan-sdk/1.4.341.1/arm64/*` plus
+  `usr/share/vulkan/icd.d/wrapper_icd.aarch64.json`, and the same launch emits
+  `vulkan_sdk_profiles=VulkanSDK-1.4.341.1-arm64-1` in
+  `GRAPHICS_ROUTE_APPLIED`.
+- The remaining framegen tail is now narrowed, not speculative: the staged
+  rootfs currently contains no `mobfgsr` / `dlssg` / `fsr3` payload files, so
+  the open gate is provider-side runtime consumption, not app-side env export
+  or launch-policy selection.

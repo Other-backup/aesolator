@@ -2747,3 +2747,41 @@
 - Next step: treat the remaining warnings as payload-specific tuning or
   optional-module follow-up, not as container bootstrap failure. The launch
   infrastructure blocker is closed.
+
+### Entry 113: direct container launches now honor container framegen defaults, SoC classification is stable on SM8475, and Vulkan SDK proof is clean
+
+- Goal: close the last misleading runtime-control tail after container bootstrap
+  was already healthy: direct container launches were still silently falling
+  back to global upscaler defaults instead of honoring `.container`
+  `extraData`.
+- Context: live forensic on `2026-03-18` showed an internal contradiction.
+  `files/imagefs/home/xuser-1/.container` already carried
+  `upscalerBackend=mobfgsr`, `upscalerFrameGeneration=1`, and
+  `upscalerFramegenMode=low_latency`, but clean-session
+  `UPSCALER_ROUTE_APPLIED` still reported `backend=off`. In the same traces the
+  device also fell back to `soc_class=adreno-6xx-and-older` despite running on
+  `SM8475 / taro`.
+- Decision: parse upscaler/framegen launch settings for every container launch,
+  not only when a shortcut is present; add source markers
+  (`backend_source`, `preset_source`, `framegen_source`,
+  `vk_validation_source`) to `UPSCALER_ROUTE_APPLIED`; and centralize SoC
+  detection in `SocClassifier` with a Qualcomm platform fallback for renderer
+  strings that omit the Adreno generation.
+- Tradeoff: the app now trusts `.container extraData` during direct launches in
+  the same way it already trusted shortcut overrides. That is the correct
+  contract because container defaults are the only persisted runtime policy
+  source when a user launches the container shell directly.
+- Verification: fresh unit tests now cover `Adreno 730`, `SM8475/taro`,
+  `Adreno 650`, `Mali-G715`, and `Xclipse 920`. Fresh device bundle
+  `20260318_101550_direct_container_upscaler_retest` proves:
+  `GRAPHICS_ROUTE_APPLIED` still resolves
+  `VulkanSDK-1.4.341.1-arm64-1`, `UPSCALER_ROUTE_APPLIED` now reports
+  `backend=mobfgsr`, `backend_source=container`, `framegen_enabled=1`,
+  `framegen_source=container`, `preset_source=container`,
+  `soc_class=adreno-7xx`, and the prior regression chain
+  (`libandroid_shmget`, `Found no drivers`, `nodrv_CreateWindow`,
+  `XSERVER_EXIT_REQUESTED`) remains absent.
+- Remaining tail: the rootfs still contains no file matching `mobfgsr`,
+  `dlssg`, or `fsr3`, so the runtime-payload consumption gate for rounds
+  `R10-R14` is still genuinely open. The app-side contract is now correct and
+  provable; the provider-side payload is still missing from the staged rootfs.

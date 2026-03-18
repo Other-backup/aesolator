@@ -36,6 +36,10 @@ Closed in tree:
 
 Still open:
 - runtime/archive package-side consumption of MobFGSR env;
+- staged rootfs currently has no `mobfgsr` / `dlssg` / `fsr3` payload files on
+  the new-device proof bundle from `2026-03-18`, so provider-side runtime
+  consumption is still unproven even though app-side route selection is now
+  verified;
 - final per-game preset mapping policy;
 - launch/runtime/graphics-center/forensic closure gates.
 
@@ -101,6 +105,11 @@ Still open:
 - `2026-03-05`: first-pass app-side transfers for each round landed in `aeolator`.
 - `2026-03-06`: second-pass preset-aware / effective-policy integration landed for all five rounds.
 - `2026-03-06`: all five rounds were frozen as `gate_hold` by owner override so execution could move forward without forcing final gate closure in that phase.
+- `2026-03-18`: fresh device proof on `SM8475 / taro` verified that direct
+  container launches now honor container `mobfgsr` defaults and that
+  `VulkanSDK-1.4.341.1-arm64-1` is staged into rootfs and selected at runtime,
+  but the staged rootfs still contains no `mobfgsr` / `dlssg` / `fsr3`
+  provider payload, so the runtime-consumer gate remains open.
 
 ## Current Interpretation
 
