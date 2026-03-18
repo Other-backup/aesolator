@@ -586,3 +586,15 @@ Second autonomous developer lane for `aesolator`:
   approval-gated review mode, build/runbook sync, and forensic process
   alignment are now centralized in `docs/CODEX_OPERATING_CONTRACT.md` and
   mirrored from `AGENTS.md`, not left scattered across prompts.
+- Fresh bionic device proof closes the `winex11.drv PROCESS_ATTACH -> RETURN 0`
+  blocker too: `BionicProgramLauncherComponent` now keeps the guest/runtime
+  `LD_LIBRARY_PATH` head first and appends `imagefs/usr/lib/android-host` as a
+  fallback tail, so android-host X11 overlay copies no longer shadow the
+  runtime's own `usr/lib` closure.
+- The new proof burden is no longer container bootstrap. Fresh build/install on
+  `10.0.0.1:40741` emits forensic marker
+  `BIONIC_HOST_LIBPATH_ORDER_APPLIED`, shows
+  `MODULE_InitDLL(... winex11.drv ...) - RETURN 1`, and keeps
+  `wineserver`, `wfm.exe`, `war3.exe`, and `winecfg.exe` alive in the same
+  session. Remaining risk has moved to payload-specific warnings and tuning,
+  not to X11/container bring-up.

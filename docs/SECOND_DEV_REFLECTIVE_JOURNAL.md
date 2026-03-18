@@ -2714,3 +2714,36 @@
   attach-time path. The active question is no longer payload closure or
   wrapper ABI, but what inside X11 driver initialization returns `0` after the
   unix-side driver is already loaded with a sane local library closure.
+
+### Entry 112: the surviving bionic launch blocker was host-library shadowing, and the container now reaches live payload execution
+
+- Goal: close the last real infrastructure blocker after the payload-side
+  `RUNPATH` sanitizer landed and `winex11.drv` still failed during
+  `PROCESS_ATTACH`.
+- Context: static inspection of the live launcher path found a narrower bionic
+  bug than the earlier donor-rootfs problem. `BionicProgramLauncherComponent`
+  was prepending `files/imagefs/usr/lib/android-host` to `LD_LIBRARY_PATH`,
+  which meant the android-host overlay copies of `libX11.so`, `libXext.so`,
+  `libxcb.so`, and related X11 closure pieces could shadow the guest/runtime
+  `usr/lib` closure that `winex11.so` was supposed to consume.
+- Decision: keep the existing guest/runtime `LD_LIBRARY_PATH` head intact and
+  append `android-host` as a fallback tail instead. Add a forensic marker
+  `BIONIC_HOST_LIBPATH_ORDER_APPLIED` with the effective path head so future
+  device traces can prove which ordering contract was used at launch time.
+- Tradeoff: host overlay libraries remain available for bionic redirect mode,
+  but only after the guest/runtime closure gets first resolution priority. That
+  is the correct bias here because the host overlay exists to fill Android-side
+  gaps, not to replace the Wine/X11 closure that ships with the selected
+  runtime.
+- Verification: fresh `assembleDebug`, reinstall on `10.0.0.1:40741`, and a
+  clean `XServerDisplayActivity --ei container_id 1` launch on `2026-03-18`
+  now emit `BIONIC_HOST_LIBPATH_ORDER_APPLIED` in `logcat`, show
+  `MODULE_InitDLL(... winex11.drv ...) - RETURN 1` in the pulled
+  `explorer_2026-03-18_09-38-38.txt` / `wine_loader_2026-03-18_09-38-38.txt`
+  traces, and no longer reproduce the old
+  `winewayland.drv status=c0000135` / `nodrv_CreateWindow` /
+  `XSERVER_EXIT_REQUESTED` / `Found no drivers` chain. The same session keeps
+  `wineserver`, `wfm.exe`, `war3.exe`, and `winecfg.exe` alive on-device.
+- Next step: treat the remaining warnings as payload-specific tuning or
+  optional-module follow-up, not as container bootstrap failure. The launch
+  infrastructure blocker is closed.
