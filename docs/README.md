@@ -15,12 +15,16 @@ This repo stores only application-layer documentation.
 - `AGENTS.md` - repository-local Codex execution rules.
 - `docs/CODEX_OPERATING_CONTRACT.md` - approval-gated review mode, execution
   gates, and documentation sync map.
+- `docs/CHAPTER2_FREEWINE_AESOLATOR_CONTRACT.md` - current integrated product
+  contract for `Ae.solator + FreeWine11 + WCP`.
 - `docs/REPO_SPLIT_TOPOLOGY.md` - split repository contract and ownership.
 - `docs/CONTENTS_QA_CHECKLIST.md` - active Contents/UI closure checklist.
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md` - device forensic runbook.
 - `docs/ADB_WIFI_DEBUG.md` - local Termux Wi-Fi ADB pairing, reconnect, install, and launch helper runbook.
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md` - forensic sync contract for app/runtime diagnostics.
 - `docs/TERMUX_LOCAL_BUILD.md` - verified Termux ARM64 local build and Wi-Fi ADB install runbook.
+- `docs/PREFIX_PACK_TOOLKIT.md` - audited prefix-pack toolkit for VC++ AIO, Wine Mono, Wine Gecko, official DirectX June 2010, aligned repo/rootfs/Windows loaders, offline overlay packing, and direct device-side cache staging.
+- `docs/AJAY_PREFIX_COMPONENT_AUDIT.md` - Ajay Prefix Pro component audit that classifies what stays in `Contents/payload`, what can expand `prefix-pack`, and what remains on hold.
 - `docs/DONOR_REFLECTIVE_ROADMAP.md` - donor extraction roadmap with pre/during/post reflective gates.
 - `docs/DONOR_ROUND_QUEUE.md` - strict donor execution queue (`1 round = 1 donor`) and closure checklist.
 - `docs/R10_R14_STATUS_SNAPSHOT.md` - normalized closure state for frame-generation donor rounds `R10-R14` (`integrated in tree` vs `still gate_hold`).

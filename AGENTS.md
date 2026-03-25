@@ -54,6 +54,12 @@ When this mode is active:
 
 ## Rules
 
+- `Chapter 2` is now active:
+  `Ae.solator` is no longer just a launcher that can consume any arbitrary
+  Wine/Proton line. It now targets its own dedicated `FreeWine11` runtime
+  line.
+- The shared cross-repo contract for this phase lives in
+  `docs/CHAPTER2_FREEWINE_AESOLATOR_CONTRACT.md`.
 - `Ae.solator` is the full app-owner repository. UI, Contents, runtime-binding,
   preset UX, and device/debug surfaces live here.
 - The app owner is expected to work autonomously in this repo:
@@ -79,6 +85,48 @@ When this mode is active:
 - GitHub authentication must come from local runtime state only
   (`GITHUB_TOKEN`/credential helper/local shell session), never from repository
   files such as `AGENTS.md`.
+- For runtime redistributables, prefix packs, and helper payloads, prefer the
+  most transparent source in this order:
+  official vendor source, audited upstream repository with visible build/source
+  metadata, mirror page only as a distribution fallback.
+- For prefix-pack runtime entries, do not stop at a bare URL swap. Each entry
+  must keep all of these aligned in one pass:
+  `download_url`, `source_page_url`, `source_label`, `install_cmd`,
+  repo-side cache helper output, rootfs shell loader output, Windows loader
+  output, and start-menu wiring.
+- Prefix-pack user-facing wording must stay precise:
+  `Prepare` means verify/download into `Z:\opt\ae\prefix-pack\cache` and mirror
+  into `C:\AePrefixPack\cache`;
+  `Install` means execute a Windows-side installer into the current prefix;
+  `State` means the resulting marker/logs under the dedicated save-data root.
+- Keep the boundary explicit:
+  anything that is already delivered as a dedicated `Contents` / payload lane
+  (`DXVK`, `VKD3D`, `DgVoodoo`, `VulkanSDK`, graphics drivers, runtime wrapper
+  payloads) must stay out of `prefix-pack`. `prefix-pack` is for
+  prefix-local redistributables and helper installers, not for duplicating the
+  app's payload/package manager.
+- When prefix-pack assets change, bump
+  `app/src/main/assets/prefixpack/VERSION` in the same pass. Otherwise the live
+  app-private `imagefs` copy can silently keep stale toolkit files after APK
+  reinstall.
+- Prefix-pack Windows helpers follow an Ajay-style state discipline:
+  keep dedicated `save_data` and `logs` roots under the Windows user profile
+  instead of scattering runtime installer residue across temp paths.
+- Do not mark prefix-pack payloads `present` or `ready` when they are zero-byte
+  or partially staged. Repo cache, rootfs cache, and Windows-visible cache all
+  need size-valid proof before closure.
+- For large prefix-pack staging onto a device, do not stream directly into
+  `run-as cat > file` as the primary path. Use an explicit temp bridge such as
+  `/data/local/tmp -> run-as cp` and verify the byte count after copy.
+- For `FreeWine11` Chapter 2 work, treat `FEX` / `wowbox64` as required guest
+  translator payloads, but not as the default explanation for native
+  `wineboot` / prefix bootstrap failures. Prove the failing layer first.
+- Any runtime command routed through `WinHandler.exec()` must be checked with
+  the full real command length. Long `cmd.exe /c Z:\...` toolkit launches are
+  part of the regression surface and must not be assumed safe without proof.
+- Do not treat mirror pages such as `TechPowerUp` as the source-of-truth for
+  pinned runtime payload decisions if an upstream such as
+  `abbodi1406/vcredist` or an official vendor release exists.
 - Local host compiler lane is pinned to `LLVM 22.1.1` when a dedicated
   source-built toolchain is present under
   `/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux`.
@@ -124,6 +172,10 @@ When this mode is active:
 ## Working Contract
 
 - Maintain the execution roadmap in `docs/SECOND_DEV_ROADMAP.md`.
+- Keep that roadmap live during the same session:
+  when the user sends a new screenshot batch, marked UI defect, fresh crash,
+  or runtime anomaly, append it to the active roadmap/tail list immediately
+  instead of waiting for a later recap pass.
 - Maintain a reflective work journal in `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`.
 - Maintain donor binary/source boundary notes in:
   `docs/GAMENATIVE_RUNTIME_GAP_INVENTORY.md` and
@@ -146,6 +198,52 @@ When this mode is active:
   goal, context, decision, tradeoff, verification status, and next step.
 - Prefer reflective, contract-first integration over blind donor copying or
   cosmetic-only edits without documentation sync.
+- When the user asks for `deep search`, `omega level`, `full reflection`, or a
+  source choice, respond with a source-backed comparison:
+  why the chosen upstream won, which alternatives were held, exact pinned
+  versions/URLs when possible, and what remains intentionally manual.
+- Default to that same deep-search mode for any non-trivial runtime,
+  installer, prefix-pack, forensic, device-debug, or UI/UX tail even when the
+  user does not repeat the phrase explicitly.
+- When donor hunting is part of the pass, do not stop at one familiar repo.
+  Pull a broad GitHub candidate pool first, then keep both the shortlist and
+  the rejected-but-reviewed donors in docs so the next pass inherits the full
+  search space instead of restarting it.
+- In this repo, `deep search` means one combined closure loop:
+  latest screenshot batch + freshest forensic bundle + local code-path audit +
+  donor/upstream comparison + fresh device proof.
+- Do not close a live tail from one source alone.
+  For runtime/UI/install defects, require all three:
+  1. screenshot proof,
+  2. forensic/log proof,
+  3. code-path confirmation.
+- For recurring product tails, keep digging until the failing layer,
+  contradictory evidence, and next corrective action are explicit.
+  Do not stop at the first plausible explanation.
+- For supply-chain choices, the reflective result must also state how the
+  payload is fetched, where provenance remains visible to the user, and which
+  loader/status surfaces were updated to keep that provenance inspectable.
+- When donor hunting is active, do not stop at one or two obvious forks.
+  Always search a broad GitHub candidate pool first, then rank the best donor
+  set against the active layer:
+  prefix/install flow, start menu UX, contents feeds, diagnostics, runtime UI,
+  or device integration.
+- For donor passes, keep a reflective shortlist and a rejected-candidate list.
+  The result must state why each winner beat the others:
+  branch relevance, release freshness, active maintenance, install-flow
+  visibility, component inventory, and fit with the current `Ae.solator`
+  contract.
+- If the user narrows a donor transfer to one layer such as management UI,
+  treat that as a hard scope wall:
+  do not sprawl back into start-menu, payload import, or unrelated runtime
+  plumbing during the same pass unless the user explicitly widens the scope.
+- If the user later widens that scope again, expansion is allowed only along
+  adjacent management/runtime surfaces and only if install/state/proof logic
+  stays at least as strict as before. Wider scope is not permission to weaken
+  contracts or revive dead-end UX.
+- Treat `Ajay Prefix Pro` as audited input only:
+  mine it for component inventory, save-data discipline, and UX ideas, but do
+  not import or redistribute its proprietary AutoIt/batch shell verbatim.
 - Treat donor repositories such as `Gamehub-Components` and
   `BannersComponentInjector` as audited input, not as automatic source-of-truth:
   borrow feed logic, UX patterns, and package-link discovery only after
@@ -273,6 +371,9 @@ When this mode is active:
 - When the user sends many goals in one burst, normalize them into an ordered
   backlog in `docs/SECOND_DEV_ROADMAP.md` instead of switching reactively
   between unrelated tasks.
+- If the same user message also sharpens product requirements or process
+  expectations, mirror that refinement into `AGENTS.md` and the relevant
+  runbook instead of leaving it trapped in chat history.
 - Default execution order:
   1. close requested product/UI/content tasks,
   2. close documentation and handoff tails,
@@ -291,6 +392,19 @@ When this mode is active:
 
 - Treat real device screenshots as UI ground truth whenever polishing mobile
   surfaces or validating a suspected visual regression.
+- Treat the freshest user screenshot batch as a first-class forensic artifact:
+  when screenshots and automated captures disagree, prefer the user screenshots
+  for UI-tail inventory and pull them into the active forensic bundle.
+- In every active device/UI session where the user says they made a screenshot
+  batch, inspect the latest 5-10 screenshots under
+  `/storage/emulated/0/Pictures/Screenshots/` before declaring closure.
+- Screenshot review must stay reflective and geometric:
+  audit every visible edge, clipped row, spacer, card width, header alignment,
+  contrast failure, duplicated button, and action drift; turn each confirmed
+  defect into an explicit tail item for the same pass.
+- When the user says they opened things manually, scrolled, or reproduced the
+  bug by hand before taking screenshots, treat that batch as the primary UI
+  truth for the current pass and mine it for all remaining tails.
 - Use an iterative ADB loop for UI work:
   capture screen, interpret layout, identify interaction target, execute the
   next action, capture the new state, then update the working hypothesis.
@@ -301,6 +415,9 @@ When this mode is active:
 - Prioritize concrete UX issues over vague styling notes:
   hierarchy, spacing rhythm, readability, tap target clarity, wording, action
   discoverability, and flow friction.
+- Runtime progress surfaces, prefix/install loaders, and nested runtime dialogs
+  must stay on the runtime blue / amber palette. Do not leave legacy green
+  progress spinners, confirm buttons, or green-on-green cards in these flows.
 - When a UI fix also touches runtime stability, close the crash tail first,
   then return to the visual pass on the stabilized screen.
 - For meaningful device-led passes, record:
@@ -318,6 +435,24 @@ When this mode is active:
   before changing code:
   `logcat`, in-app forensic jsonl, current screenshot/UI dump, and a
   `run-as` snapshot of `files/contents` / relevant app-private state.
+- For `Prefix Pack` launch failures, do not stop at Android-side dispatch logs.
+  Verify the staged launcher itself:
+  `C:\\AePrefixPack\\staging`, the lane state marker, and the lane launcher log.
+  If `WinHandler` dispatch is unproven, escalate to a guest-side fallback path
+  instead of concluding that the lane merely "cached".
+- If a legacy installer reports `MFC42.DLL`, `MFC42LOC.DLL`, `isskin.dll`, or
+  similar classic dependency errors, first verify that the `vcrun6` /
+  `vcrun_full` lane actually executed. Do not treat those warnings as proof
+  that the VC payload pack itself is missing when the lane state is still only
+  `scheduled`.
+- `Task Manager` process rows must land on full-row boundaries after scrolling.
+  A clipped first or last row, animated half-row snap, or viewport height that
+  cannot fit an integer count of rows is a functional regression, not a
+  cosmetic nit.
+- If the user explicitly says the current live crash is fresh, prioritize a
+  freshest-log-first capture before further taps, scripted UI navigation, or
+  extra launches. Preserve the first clean post-crash evidence bundle as the
+  reference point.
 - Configuration dialogs must not depend on crash-prone native probes during
   open/render. If runtime/native discovery is unstable, move the heavy probe
   out of the dialog path, use a safe cached or catalog-backed fallback, and
@@ -471,6 +606,144 @@ When this mode is active:
   `libwinlator` loading through one central loader with synchronous forensic
   checkpoints, and prefer source fixes that remove host-side binary leakage
   such as stray `RUNPATH` entries before chasing guest runtime symptoms.
+
+## Prefix Pack / Legacy DX Contract
+
+- `Prefix Pack` owns prefix-local redistributables, install state, and graphics
+  diagnostics discovery. It does not own `DXVK`, `VKD3D`, `dgVoodoo`,
+  `Vulkan SDK`, or graphics-driver payload lanes.
+- In donor-driven UI passes, prioritize Android-side management surfaces over
+  Windows start-menu cloning unless the user explicitly asks for start-menu
+  work in the same pass.
+- The Android `Prefix Pack` UI must expose three separate facts clearly:
+  1. cache location and cache readiness,
+  2. install action into the current prefix,
+  3. install-state/log roots and the last known result.
+- Do not label a button `Fetch` without clarifying that it only caches payloads
+  into `Z:\opt\ae\prefix-pack\cache` / app-private rootfs cache and does not
+  install anything into the prefix.
+- Every Windows-side install helper must write reproducible state under the
+  dedicated save root so the Android UI and forensic passes can tell whether a
+  lane never ran, is running, failed, or completed.
+- Windows-side helpers must use a visible installer-cache contract:
+  backend cache in `Z:\opt\ae\prefix-pack\cache`,
+  mirrored runnable installers in `C:\AePrefixPack\cache`,
+  staging in `C:\AePrefixPack\staging`,
+  and state/logs in `C:\users\xuser\Documents\AePrefixPack\save_data`.
+- `Install` must stage a visible launcher under
+  `C:\AePrefixPack\staging\<lane>\install-<lane>.cmd` and prewrite a scheduled
+  state marker before handing off to runtime. If the runtime-side launch dies,
+  the user still needs a resumable launcher plus a state/log breadcrumb.
+- If the user requests a no-intermediate-build clean pass, finish the full
+  requested code/assets/docs slice before reopening `assembleDebug`, install,
+  or device repro. One final closure build is preferred over churn.
+- If an installer requires GUI interaction, surface that expectation in the UI
+  and keep logs/state paths visible instead of pretending the flow is silent.
+- `Task Manager` is a runtime tool, not a `Prefix Pack` tool. Do not duplicate
+  it inside the `Prefix Pack` surface when the runtime drawer already owns that
+  function.
+- `Prefix Pack` should read like a `Contents`-style loader, not a vague tool
+  bucket: keep compact sectioned lanes, per-lane class badges, and direct
+  `Prepare -> Install -> Launch -> State/Logs` visibility on the primary
+  surface.
+- `Prefix Pack` install actions must be closure-safe:
+  if payloads are missing, `Install` should auto-run `Prepare`, then dismiss
+  the Android dialog before launching the Windows installer so any GUI path is
+  actually visible to the user instead of hiding behind the overlay.
+- Prefer detached guest launch as the primary `Prefix Pack` install bridge and
+  treat `WinHandler` shell dispatch as a fallback path, not the only way to
+  open the staged installer.
+- `Prefix Pack` deferred install targets are one-shot debug aids, not sticky
+  product state:
+  consume them once and clear them so reopening the toolkit never silently
+  relaunches a previous `.NET` or installer lane.
+- `Prefix Pack` launcher dispatch must be forensically explicit:
+  after dialog dismissal, record whether runtime execution was dispatched,
+  retried, or timed out waiting for `WinHandler`, and do not call the pass
+  closed while lane state is still stuck at `scheduled` with no launcher log.
+- Primary `Install` on a `Prefix Pack` lane must always restage:
+  do not silently reuse old `C:\AePrefixPack\staging` launchers from the main
+  lane card just because stale files exist. Stale launcher reuse belongs only
+  to an explicit secondary `Launch` action.
+- Treat fresh user screenshots as real runtime evidence, not cosmetic notes:
+  mine them for every visible paint, geometry, wording, and flow defect and
+  fold those tails into the same closure pass.
+- Do not close a runtime UI pass while any defect visible in the latest user
+  screenshot batch remains unexplained, even if the agent's own capture looks
+  cleaner.
+- For installer hand-off proof, stale state or old launcher logs do not count.
+  Compare state/log freshness against the current dispatch attempt and retry
+  alternate launch forms until the current attempt leaves fresh proof or the
+  runtime wait path times out.
+- `C:\AePrefixPack\staging` is a user-facing runtime surface:
+  keep a direct Android-side entry to the stage root, and make lane-level
+  `Launch` rerun the staged launcher itself instead of just opening Explorer on
+  that path.
+- `Wine Mono` and `Mono Runtime` are not synonyms. `Wine Mono` stays the single
+  official WineHQ MSI, while extra Mono Project x86/x64 installers belong to a
+  dedicated managed-runtime lane with their own source labels and install state.
+- If the user explicitly says the Mono Project Windows installer lane is not
+  relevant, remove it from the active `Prefix Pack` surface instead of keeping
+  it as speculative coverage.
+- Keep managed-runtime architecture coverage explicit everywhere:
+  `Wine Gecko` is `x86 + x86_64`, `Wine Mono` remains the single upstream `x86`
+  MSI, and Windows Mono is the separate `win32 + x64` lane. If UI or docs blur
+  those boundaries, treat it as a contract bug.
+- If user feedback points at missing classic managed dependencies such as
+  `.NET Framework 4.x`, solve that with an explicit source-backed `.NET
+  Framework` lane instead of relabeling Wine Mono or Mono Project payloads.
+- `Task Manager` must keep the process list functionally visible:
+  if tab/content weights or theme colors can make rows disappear, treat that as
+  a blocker. Dense scrollable rows with inline telemetry beat oversized cards.
+- On the current runtime branch, prefer a Linux-first `Task Manager`:
+  one large left process pane, fixed headers, near-full-height scrolling, dense
+  inline telemetry, and enough bottom padding that the final row is never cut
+  by dialog chrome or bottom actions.
+- Keep the Linux list table-like and stable:
+  one outer process card, flat rows instead of stacked mini-cards, metrics
+  aligned under fixed headers, and ordering stable enough that live refreshes
+  do not visually "eat" a row while the user is scrolling.
+- After manual scroll, the Linux list should settle on a full-row boundary at
+  the top edge too. A half-cut first row is a functional bug, not acceptable
+  polish debt.
+- Runtime dialogs must keep contrast honest:
+  no green-on-green footer/buttons/checks inside `Task Manager`, `Prefix Pack`,
+  or sibling runtime tools when the active accent family is blue/amber.
+- Do not let generic theme repaint passes recolor runtime preloaders or
+  runtime-specific progress dialogs back to legacy green once the runtime
+  palette has already been applied.
+- After runtime UI changes, closure requires device proof:
+  install the APK, open the touched surface on the device, save a fresh
+  screenshot, and pair it with the matching forensic/log bundle before calling
+  the pass complete.
+- If the user supplied a newer screenshot batch than the agent's own capture,
+  use the fresher user screenshots as the primary UI truth until a newer
+  device capture proves the issue gone.
+- Treat the latest user screenshot batch as an active defect queue, not as
+  optional commentary: every visible flaw stays on the tail list until fixed or
+  disproven by a newer live capture.
+- Keep the roadmap live during the active session:
+  every new marked screenshot batch, forensic bundle, crash, hang, or user
+  wording change must be folded into the current tail inventory and reflected in
+  `docs/SECOND_DEV_ROADMAP.md` before the pass is called closed.
+- Before adding new prefix-pack payloads, surface the diagnostics already
+  present in the staged rootfs/prefix if they exist:
+  `DXDiag`, `TestD3D.exe`, `GPUInfo.exe`, `GLview`, and similar donor utility
+  overlays.
+- If donor/rootfs diagnostics exist in app-private `imagefs` but are missing
+  from UI discovery, treat that as a broken linkage/discoverability bug rather
+  than as proof they need to be re-imported.
+- Do not delete donor/rootfs utility overlays such as `opt/apps`, `7-Zip`,
+  `GPUInfo.exe`, or `TestD3D.exe` during generic runtime patch passes unless a
+  replacement overlay is staged in the same pass and that replacement is
+  explicitly verified.
+- For legacy DirectX handling, prefer one explicit story over folklore:
+  document which `DirectX June 2010` components are staged, where they land,
+  and how old D3D/XACT/XAudio/XInput expectations are satisfied.
+- `dgVoodoo` remains a dedicated payload lane, but the runtime UI, docs, and
+  forensics must show:
+  requested mode, requested arch, active arch, stage target, force-D3D11 flag,
+  and whether staged DLL ownership actually succeeded for the launched target.
 
 ## Main Docs
 

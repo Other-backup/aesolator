@@ -1,6 +1,6 @@
 # Second Developer Roadmap
 
-Updated: `2026-03-16`
+Updated: `2026-03-21`
 
 ## Mission
 
@@ -31,6 +31,253 @@ Second autonomous developer lane for `aesolator`:
   blocker, reason, scope impact, and explicit return point.
 
 ## Current Priorities
+
+### Active Closure Slice: Runtime Drawer / Prefix Pack / Route-Aware Profiles
+
+Carry these tails as one closure batch until a fresh live build disproves them:
+
+1. `Debug` / runtime `Logs`
+   - stop rendering the runtime log as striped table rows
+   - keep `View Log` from the runtime drawer on the exact same visual contract
+     as the main forensic viewer:
+     same width profile, same compact action row, same live/paused ticker
+     rhythm, same console body emphasis
+   - latest marked screenshot batch (`2026-03-20 22:16-22:17`) sharpened the
+     remaining geometry tail:
+     the runtime `Logs` window still read as a different product surface
+     because metadata stacked above a detached action row and left a dead band
+     in the header, so both viewers now need the same inline
+     `metadata-left / actions-right` top contract plus matching outer padding
+   - live proof now exists on the rebuilt surface:
+     `out/live_verify_20260320_2238_runtime_logs_contract/`
+     shows `DESKTOP_DEBUG_LOGS_AUTOOPEN_ARMED`,
+     `DESKTOP_DEBUG_LOGS_AUTOOPEN_EXEC`, and a fresh screenshot where the
+     runtime drawer `Logs` view matches the main forensic viewer geometry more
+     closely while the `LogView` body renders semantic color accents instead of
+     the older flat striped table feel
+   - preserve smooth streaming under live append so the log window no longer
+     contributes to runtime `ANR` risk while the user drags it
+   - fresh live proof also exposed a new blocker around that surface:
+     `Runtime Profiles` can still occupy the top-most popup path on a fresh
+     launch and steal the drawer/log proof flow, so the debug launch contract
+     now needs a direct `Logs` auto-open lane next to `Task Manager` and
+     `Prefix Pack`
+2. `Runtime Profiles`
+   - stop exposing a fake generic `64-bit Emulator` selector on the live
+     desktop route
+   - for `arm64ec` containers, show an explicit `FEX` launch lane with real
+     `version + preset` controls
+   - for `x86_64` containers, show an explicit `Box64` launch lane with real
+     `version + preset` controls
+   - keep selector contrast readable and avoid blue-on-blue controls
+3. compact runtime geometry
+   - keep `Runtime Profiles`, `Screen Effects`, and `Input Controls` in the
+     compact runtime-dialog lane instead of forcing tall wide-scroll dialog
+     geometry just because they use a `ScrollView`
+   - latest marked screenshot batch (`2026-03-20 22:43`) added a drawer-open
+     logic tail:
+     reopening the runtime drawer could preserve a stale internal scroll offset
+     and expose the next session with a clipped half-card at the top edge, so
+     the drawer must snap back to scroll-top on every open instead of resuming
+     from the previous partial-row position
+   - live proof now exists for that drawer-open fix as well:
+     `out/live_verify_20260320_2310_drawer_autoopen/drawer.png`
+     shows the drawer reopening from the top with the header and first action
+     card fully visible instead of resuming from the previous clipped row
+   - center the preloader / install-start loading icon and keep the loading
+     card visually symmetric
+   - latest marked screenshot (`2026-03-20 22:33`) tightened that same tail:
+     the detached installer hand-off toast also showed the leading info icon
+     drifting inside the card, so the loading/hand-off family now shares a
+     single requirement: fixed-width card, symmetric paddings, and a dedicated
+     centered icon lane instead of free-floating icon placement
+   - live proof now exists for both surfaces:
+     `out/full_forensics_20260320_2248_startup_centering/screen_03s.png`
+     shows the refreshed `Starting up` card with the icon centered in the
+     loading ring, and
+     `out/live_verify_20260320_2252_prefix_toast_centering/screen_12s.png`
+     captures the detached installer hand-off toast after the new centered
+     leading icon lane landed
+4. `Task Manager`
+   - treat the final Linux process row as a hard functional bug until a fresh
+     device screenshot shows it is no longer clipped
+   - keep the Linux-first surface stable and avoid reintroducing oversized dead
+     tail space while adding bottom slack
+5. `Prefix Pack`
+   - remove open-jank from lane-card rendering and delayed status hydration
+   - keep `Install` honest for GUI-heavy lanes:
+     a detached guest installer start must advance lane state beyond `queued`
+     instead of triggering self-retry loops
+   - keep the user-visible contract explicit:
+     `Prepare -> Install -> Clean`, with state/log proof still recorded under
+     `AePrefixPack\save_data`
+   - latest marked screenshot batch (`2026-03-20 21:54-21:56`) adds three
+     fresh geometry tails:
+     `Overview` badge overlaps the first summary line,
+     the `Lanes` hint burns too much vertical space before the first section,
+     and the live lane list still feels heavier than necessary while opening
+   - latest manual screenshots (`2026-03-21 11:22-11:24`) keep one logic tail
+     explicitly alive:
+     `DXSDK_Jun10.exe` launches from the visible `C:\AePrefixPack\cache`,
+     shows `Setup is loading installation components`, and then fails on the
+     legacy `.NET Framework 2.0 redist` prerequisite with `error 51023`; do
+     not mark legacy DX install flow closed until a newer live bundle disproves
+     that exact chain
+   - the auxiliary `Prefix Pack` surfaces still belong to the same contract:
+     `Graphics Diagnostics` and lane `Info` must use the same split-pane,
+     inline-header runtime-management geometry as the main toolkit rather than
+     falling back to older stacked badge or button-wall layouts
+6. runtime log surfaces
+   - the console visual language is now correct, but the fresh screenshots
+     still show a control row that is too tall and steals useful height from
+     the log body in both the main forensic viewer and the runtime drawer log
+7. execution discipline
+   - keep the roadmap itself updated during the same session as new screenshot
+     batches, forensic bundles, marked defects, and crashes arrive
+   - do not call the batch closed until the freshest user screenshots no longer
+     show the same geometry / contrast / flow defects
+
+### Active Donor Base: Ajay / Prefix Install Flow
+
+- Fresh donor base is now staged locally from the official release:
+  `docs/PREFIX_DONOR_SHORTLIST.md`
+- Official winner:
+  `Ajay Prefix Pro v1.6 Offline`
+  with verified archive hash
+  `e4a23f89c8cc5944b87d7228d04a820e659b494a7e230498910f2c93a2305aa6`
+- Local donor root:
+  `/data/data/com.termux/files/home/donors/ajay-prefix/v1.6_offline`
+- Reflective donor conclusion:
+  Ajay is the strongest donor for offline prefix-local installers, Wine-side
+  helper scripts, and GPU/API test coverage, but it is not sufficient as the
+  source-of-truth for our stricter `Prefix Pack` state/proof contract
+- Active import targets from this donor lane:
+  richer graphics diagnostics coverage,
+  compact lane grouping,
+  explicit `Only Start Menu / Prefix / Both` install mental model,
+  and broadened helper-script inventory
+- Active non-import rule from this donor lane:
+  do not copy Ajay's looser `Start <exe>` installer dispatch or treat its
+  `.NET` handling as proof that our `DXSDK Jun10 -> legacy .NET 2.0` blocker
+  is solved
+- What is already imported from the donor lane into the Android-side
+  management contract:
+  visible `Prepare -> Install -> State/Logs` staging roots,
+  broader offline redistributable coverage,
+  `Wine Mono -> XNA` prerequisite logic,
+  donor diagnostics surfacing (`DXDiag`, `DXCaps`, `DXCpl`, `GLview`,
+  `TestD3D.exe`, `GPUInfo.exe`),
+  and stricter state/proof logging around staged launchers
+- What is still intentionally not imported:
+  Ajay start-menu cloning,
+  loose `Start <exe>` fire-and-forget launchers,
+  payload ownership that belongs to runtime lanes (`DXVK`, `VKD3D`,
+  `dgVoodoo`, `Vulkan SDK`, graphics-driver payloads),
+  and the out-of-scope Mono Project Windows installer lane the user rejected
+
+### Active Clean Pass: Prefix Pack / Legacy DX / Freshest-Log Closure
+
+Closed or materially narrowed in this pass:
+
+1. freshest-crash-first discipline is now explicit:
+   fatal crash files and the newest runtime bundle are captured before new UI
+   poking when the user reports a live crash
+2. runtime-drawer polish stays gesture-first and targeted:
+   no permanent floating open button, stronger contrast is applied to the
+   `Task Manager` and `Prefix Pack` rows instead of covering the renderer
+3. `Prefix Pack` now follows a precise
+   `Prepare -> Install -> State/Logs` contract instead of an opaque
+   `fetcher` mental model
+4. Windows-visible installer copies remain first-class:
+   `Z:\opt\ae\prefix-pack\cache -> C:\AePrefixPack\cache ->
+   C:\AePrefixPack\staging`
+5. donor/rootfs diagnostics remain surfaced:
+   `DXDiag`, `TestD3D.exe`, `GPUInfo.exe`, `DXCaps`, `DXCpl`, and `GLview`
+6. donor utility overlays such as `opt/apps` and `7-Zip` are preserved during
+   runtime patching instead of being treated as disposable residue
+7. the supply chain is tighter:
+   `XNA 3.1`, `XNA 4.0`, `OpenAL 1.1`, `.NET Framework 3.5/4.0/4.8`,
+   `PhysX`, `LAVFilters`, and the full `DXSDK_Jun10.exe` lane are staged from
+   source-backed upstreams, while
+   `dgVoodoo` and `Vulkan SDK` stay on dedicated payload lanes
+8. false-ready payload states are no longer acceptable:
+   repo cache, device cache, and Windows-visible cache now reject zero-byte
+   entries, and device staging uses a large-file-safe temp bridge instead of
+   direct `run-as cat` streaming
+9. the old `Prefix Pack` launch crash is narrowed to a concrete fixed root
+   cause:
+   long `WinHandler.exec()` commands are no longer limited to the previous
+   64-byte packet assumption
+10. `Task Manager` root cause is explicit and closed:
+    the process tabs no longer depend on a `wrap_content` parent with a
+    weighted zero-height list region, so a live process list is not silently
+    collapsed even when forensics already report `windows_visible > 0`
+11. `Prefix Pack` now behaves like a compact sectioned loader:
+    `Core`, `Managed`, `Legacy APIs`, `Middleware`, and `Diagnostics` lanes are
+    grouped with per-lane state instead of one oversized button wall
+12. managed-runtime ownership is explicit:
+    `Wine Mono` stays the single WineHQ MSI, while a new dual-arch Mono Project
+    lane was later removed from the active `Prefix Pack` surface after user
+    feedback rejected Mono Project as out-of-scope for this stack
+13. `AGENTS.md`, roadmap, and reflective notes are kept in the same closure
+    lane so the next pass inherits the install/forensic/runtime contract
+14. `Prefix Pack` install-flow is now honest:
+    `Install` auto-prepares missing payloads, then dismisses the Android
+    overlay before launching the Windows-side installer, while per-lane
+    `State` and `Logs` stay directly reachable from the same surface
+
+Remaining live-verify tails after the clean rebuild/install:
+
+- run one fresh managed-runtime prepare/install pass so device cache can move
+  from the previous `14/16` state to the new post-`.NET` target and leave the
+  managed-runtime plus `.NET Framework` state markers
+- capture one fresh post-fix `Prefix Pack` install launched from the current
+  dialog surface and confirm the new `r7` state/log markers under
+  `AePrefixPack\save_data`
+- keep `dgVoodoo` proof explicit for legacy DirectX paths without moving
+  `dgVoodoo` itself into `Prefix Pack`
+
+### Fresh Live Proof: Managed Runtime Closure (`2026-03-21 15:44-15:47`)
+
+Fresh bundle:
+`out/managed_runtime_closure_20260321_154439/`
+
+Reflective result from the latest clean-session batch:
+
+1. `.NET Framework` lane moved past the old dead launcher path
+   - detached guest dispatch is now proven by fresh
+     `DETACHED_GUEST_PROGRAM_STARTED/TERMINATED` events and a confirmed retry
+     path in `logcat`
+   - however the lane still leaves `dotnet_framework.properties` in `queued`
+     with no fresh lane log under `AePrefixPack\save_data\logs`
+   - active tail:
+     the `.NET` lane still needs an honest post-dispatch proof token and state
+     transition instead of stopping at "launcher accepted"
+2. `legacy_dx_sdk` materially improved
+   - the stale `failed exit_code=1023` state is replaced by a fresh
+     `interactive` state with dispatch proof:
+     `Guest runtime produced a fresh lane log...`
+   - the old blocker is therefore no longer Android hand-off failure
+   - active tail:
+     DXSDK still is not closed until the actual SDK tool proof
+     (`DXCapsViewer.exe` / `dxcpl.exe`) is visible in a newer clean pass
+3. `xna` closed its previous false-negative state
+   - the latest `xna.properties` is now `success`
+   - `xna-framework-3.1.log` and `xna-framework-4.0-refresh.log` both exist
+     in the fresh run
+   - the lane now continues when proof is already visible instead of
+     remaining stuck on a noisy MSI return code
+4. remaining managed-runtime contradiction
+   - despite the stronger lane results, fresh `user.reg` still shows disabled
+     managed overrides (`mscoree`, `mscoreei`, `mscorlib`, `mscorwks`)
+   - active tail:
+     prefix-wide managed runtime contract still needs a persistent repair,
+     not just lane-local workarounds
+5. screenshot hygiene note
+   - the latest automated screens in this proof run were polluted by live user
+     foreground activity (`Telegram`, `Termux`), so current closure claims
+     must rely on log/state/registry proof first and wait for the next clean
+     screenshot batch before calling the visual side closed
 
 0. Desktop bootstrap and host-launch closure
    - keep `Ae.solator` consumer-only for host `LLVM 22.1.1`; the owner-side CI
@@ -88,6 +335,19 @@ Second autonomous developer lane for `aesolator`:
   - keep implementation notes aligned with repo contracts
   - keep the Termux local-build path self-contained instead of relying on
     ad-hoc CLI flags for `aapt2`
+  - keep the prefix-pack supply chain pinned to audited upstreams, not mirrors,
+    and document every source/payload choice explicitly
+  - keep prefix-pack manifest fields, repo/rootfs/Windows loaders, start-menu
+    entries, and toolkit `VERSION` in lockstep so device-side `imagefs` never
+    drifts behind the current APK assets
+  - keep the ownership boundary explicit:
+    anything that already belongs to dedicated `Contents` / payload lanes
+    stays out of `prefix-pack`, even if donor bundles expose it via helper
+    scripts or app-store shortcuts
+  - keep the latest runtime UX tails explicit:
+    `Task Manager` must stay a stable Linux-first table with non-clipping rows,
+    while `Prefix Pack` must consume deferred install targets only once and
+    prove runtime launch dispatch beyond `scheduled`
 7. Handoff/reporting discipline
    - summarize each completed step for the first developer
    - call out verification gaps explicitly
@@ -218,6 +478,18 @@ Second autonomous developer lane for `aesolator`:
     performance mode and one linker job
   - latest ownership-table closure:
     `docs/IMAGEFS_LAYER_OWNERSHIP_TABLE.md`, including the fact that
+
+13. Prefix-pack runtime toolkit lane
+  - keep the extra runtime cache lane reproducible and source-backed
+  - stage a rootfs-visible toolkit under `/opt/ae/prefix-pack` instead of
+    scattering ad-hoc payloads in random directories
+  - treat `abbodi1406/vcredist` as the VC AIO upstream and `TechPowerUp` only
+    as a mirror, not a source-of-truth
+  - pin `Wine Mono` / `Wine Gecko` to official `dl.winehq.org` release
+    directories and keep the exact versions in the catalog
+  - keep `DirectX June 2010` cache-aware and explicitly documented as a manual
+    Microsoft-page lane until the official direct binary URL is stable enough
+    for unattended fetches
     `imagefs.txz.02` is orphan/invalid baggage rather than a live archive shard
   - latest donor-rootfs-first closure:
     canonical donor base is now staged in code too:
@@ -613,3 +885,270 @@ Second autonomous developer lane for `aesolator`:
   rootfs currently contains no `mobfgsr` / `dlssg` / `fsr3` payload files, so
   the open gate is provider-side runtime consumption, not app-side env export
   or launch-policy selection.
+- Active `2026-03-20` runtime clean-pass tails are now narrower and explicit:
+  `Runtime Profiles` still needs live-proof as a route-aware surface where
+  `arm64ec` shows only `FEXCore` controls and `x86_64` shows only `Box64`
+  controls; runtime `Debug/Logs` must match the main forensic console style
+  instead of the older striped table look; `Screen Effects` and sibling drawer
+  dialogs still need tighter geometry with smaller profile rows and less dead
+  height; `Task Manager` only has one remaining geometry tail, namely the final
+  Linux row padding without dead-space overshoot; and `Prefix Pack` must prove
+  a one-shot installer hand-off without slow re-open, stale `queued` state, or
+  proof retries after a direct GUI installer already appeared.
+- Fresh `2026-03-20 20:42-20:45` user screenshots plus today-forensics refine
+  that same `Prefix Pack` tail from "installer might not start" to a stricter
+  causal chain: GUI installers do appear (`visualcppredist_aio_x86_x64.exe`,
+  `vc6redistsetup_enu.exe`, `dxsetup.exe`), but the toolkit still keeps running
+  verify/retry candidates because launch proof only trusted files/state and not
+  the newly mapped installer window surface. The corrective path is now
+  explicit: treat fresh non-shell mapped windows as live proof, stop retrying
+  GUI lanes once a valid hand-off exists, and reduce card-build burst work so
+  opening the toolkit does not feel like a blocking batch.
+- The same fresh screenshot batch also adds a dependency tail, not just a paint
+  nit: `dxsetup.exe` currently throws a `.NET Framework Initialization Error`
+  (`v4.0.30319`) from the live prefix. `DirectX June 2010`, `XNA`, and related
+  managed legacy lanes therefore need a prerequisite-aware flow that redirects
+  into the `.NET Framework` lane first instead of launching a doomed installer
+  and leaving the user with a false failure.
+- The next clean-pass narrowed that dependency work even further: the new
+  redirect path itself is correct, but stale `.NET Framework` lane states from
+  much older sessions can still look "in flight" and suppress a needed rerun.
+  Active remediation therefore includes stale-state expiry for queued /
+  interactive prerequisite lanes so a dead old `.NET` attempt cannot block
+  `DirectX` forever.
+- Fresh live proof on `10.0.0.1:38781` now closes both halves of that same
+  installer contract:
+  `vcrun_full` no longer enters the old verify/retry ladder after the first
+  accepted hand-off, and `directx_jun2010` now reroutes into
+  `dotnet_framework` instead of launching a doomed `DXSETUP` path. The latest
+  clean bundle shows `PREFIX_PACK_INSTALL_LAUNCH install_target=dotnet_framework`,
+  `DETACHED_GUEST_PROGRAM_STARTED`, and then a real
+  `XSERVER_APP_WINDOW_MAPPED class_name=ndp48-x86-x64-allos-enu.exe`, with no
+  follow-on `PREFIX_PACK_RUNTIME_DISPATCH_RETRY`.
+- `Task Manager` is now effectively feature-closed and only retains a tiny live
+  geometry guardrail: preserve the final Linux row with enough bottom inset to
+  avoid clipping, but do not reintroduce the old dead tail after the last row.
+- The roadmap itself is now a live operating surface during active runtime/UI
+  work: every fresh marked screenshot batch, forensic bundle, crash, hang, or
+  wording correction from the user must be folded into this file before the
+  pass is called closed.
+- Fresh `2026-03-20 22:33-22:43` marked screenshots add one narrow active tail
+  to `Starting up` and one structural tail to `Prefix Pack`: the loading ring
+  is still optically right-shifted relative to the `Starting up...` label, and
+  grouped lane hand-off still reads like a generic lane replay instead of a
+  concrete installer launch. Active remediation is now explicit: shift the
+  loader icon lane by the shared title axis, keep the log viewers on one
+  console renderer family, and route `Prefix Pack` through staged lane
+  ownership so lane scripts, not raw payload bypass, own extraction, GUI spawn,
+  logging and proof.
+- Fresh `2026-03-21 09:42-09:45` live proof plus the newest marked screenshots
+  close the old `Debug/Logs` console-family tail and keep `Task Manager`
+  within its final geometry guardrail, but they also expose the last real
+  installer blocker more sharply: `.NET Framework` now stages the correct lane
+  and logs `PREFIX_PACK_RUNTIME_WINHANDLER_DISPATCHED`, yet the first accepted
+  command still reaches no lane bootstrap proof. The causal chain is now
+  explicit: GUI lanes were being marked `interactive` too early, synthetic
+  dispatch metadata was masquerading as fresh launcher proof, and desktop-shell
+  dispatch still preferred the nested `cmd /c call install-<lane>.cmd` form
+  before the simpler staged `launch-<lane>.vbs` route. Active remediation is
+  therefore to keep GUI lanes in `queued` until a real window / lane-log /
+  state proof appears, stop writing synthetic proof into launcher logs, and
+  prefer the staged dispatch script ahead of the raw batch launcher when
+  building runtime and detached-guest candidate lists.
+- Fresh `2026-03-21 09:55-09:57` live proof confirms that this cleanup is now
+  honest: `.NET Framework` stays `queued` instead of self-promoting to
+  `interactive`, candidate `0` is the shorter staged
+  `wscript launch-<lane>.vbs` route, and the toolkit no longer treats
+  synthetic dispatch metadata as proof that the installer actually appeared.
+  The next remaining runtime gate is responsiveness, not false state: GUI
+  lanes should go detached-first with faster verification cadence so a visible
+  installer window can appear quickly, and the fallback ladder should no
+  longer spend most of its time parked on a dead desktop-shell route.
+- The same pass also resolves the fresh Mono confusion from the user report:
+  `Mono Project 6.12.0.206` is a separate Windows Mono product and is no longer
+  part of the active `Prefix Pack` surface. Keep `Wine Mono` as the Wine-managed
+  web/runtime payload and do not surface the separate Mono Project MSI lane
+  unless the user explicitly asks for it.
+- Fresh `2026-03-21 10:04-10:05` screenshots and the matching `r15` forensic
+  bundle turn the `.NET Framework` contradiction into an explicit runtime
+  diagnosis instead of a vague installer complaint: the live prefix already
+  contains `Microsoft.NET\Framework*\v4.0.30319` CLR files, but the expected
+  `.NET v4` registry proof is still missing, so dependent SDK bootstrap apps
+  throw `v4.0.30319` initialization errors while the `4.8` GUI can still claim
+  the newest runtime is present. Active remediation is therefore not "add more
+  Mono", but to treat this as a broken partial CLR state, prefer `.NET 4.0
+  Full` as the repair-first lane for `v4.0.30319`-era tools, and keep legacy
+  DirectX / XNA lanes redirected until that repair path leaves fresh proof.
+- The same forensic pass also exposed a concrete lane-contract bug: when a
+  prerequisite redirect jumped from `legacy_dx_sdk` or `xna` into
+  `dotnet_framework`, the child lane inherited the parent launcher metadata and
+  wrote stale `launcher_file` breadcrumbs. The corrective path is now explicit:
+  reset lane context per target before every state transition, route
+  prerequisite redirects through `prefix-pack-loader.cmd install <target>`, and
+  reject oversized or corrupted state markers instead of trusting them as live
+  proof.
+- Because those launcher/script fixes landed after the earlier `r15` toolkit
+  sync, the active runtime tail also includes a required toolkit version bump.
+  Device proof is not complete until the refreshed rootfs toolkit reaches
+  `2026.03.21-r16` and the new staged scripts are visible under
+  `files/imagefs/opt/ae/prefix-pack/windows`.
+- Fresh `r16` live proof then narrowed the remaining blocker one level deeper.
+  The redirect and lane-state contract is now honest: `legacy_dx_sdk` reroutes
+  into `.NET`, `.NET` keeps its own launcher path, and stale oversized state
+  files are rejected. But the actual `.NET 4.0 Full` GUI still leaves no fresh
+  installer window proof in this hybrid prefix. The current correction is
+  therefore to treat the prefix as a partial donor CLR install: if
+  `Framework*\v4.0.30319` files already exist while registry proof does not,
+  repair the official `.NET 4` detection keys in place first, then rerun the
+  dependent lane before falling back to another GUI installer pass.
+- Fresh `2026-03-21 10:54` live registry audit refines that diagnosis further:
+  the registry is not globally empty for all prefix-pack components. The live
+  prefix already carries concrete `system.reg` footprints for `Visual C++`,
+  `XNA 3.1/4.0`, `PhysX`, and `Wine Mono`, while `.NET 4` proof remains the
+  outlier. The active registry-repair work therefore targets the real missing
+  layer instead of bluntly treating the whole registry as broken:
+  `dotnet_framework` now emits a dedicated registry-audit log, checks both
+  64-bit and `Wow6432Node` proof keys, repairs `.NET 4` keys in place when CLR
+  files already exist, and only then allows dependent lanes such as
+  `legacy_dx_sdk` to continue.
+- Fresh `2026-03-21 11:18-11:24` screenshots plus the matching forensic/log
+  bundle invalidate the earlier assumption that `legacy_dx_sdk` is mainly a
+  `.NET 4` problem. The live `explorer` trace shows `DXSDK_Jun10.exe` loading
+  `v2.0.50727` CLR pieces, then spawning `dotnetfx2.0.x64.exe`, while the
+  screenshot batch surfaces both the old `v4.0.30319` initialization dialog
+  and the later `dotnet 2.0` / `51023` prerequisite failures. Active
+  remediation is therefore requester-aware and two-layered: fix the broken
+  registry-audit quoting so the lane stops logging false `reg query` syntax
+  errors, then pivot `legacy_dx_sdk` to the legacy `.NET 2.0/3.5` family
+  instead of the generic `.NET 4` redirect. The `dotnet_framework` umbrella
+  lane now has to preserve `requested_by` across staged state transitions,
+  prefer the legacy repair/install path when launched on behalf of
+  `legacy_dx_sdk`, and treat a fresh mapped installer window as real dispatch
+  proof instead of leaving the lane stranded in a false `queued` state.
+- Fresh donor reflection from the fully unpacked `Ajay Prefix Pro v1.6 Offline`
+  base sharpens that remediation again:
+  `legacy_dx_sdk` should keep the donor-backed Mono/DLL-override guard, but
+  `xna` should no longer be modeled as a generic `.NET 4` lane. Ajay's own XNA
+  launchers point at `Wine Mono` first, so the active no-build batch now moves
+  `xna` onto a lane-owned `Wine Mono prerequisite -> XNA MSI` path and treats
+  the old `legacy_dx_sdk -> dotnet_framework` forensic bundle as historical
+  proof of the pre-fix behavior that the next closure cycle must beat.
+- Fresh donor-driven UI work on `2026-03-21` narrows the active scope
+  explicitly to Android-side management surfaces and freezes start-menu work
+  out of the pass. The current no-build batch ports donor geometry into
+  `Prefix Pack`, `Runtime Profiles`, `Screen Effects`, and the last-row guard
+  of `Task Manager` only.
+- `Prefix Pack` is moving away from stacked overview chrome toward a split
+  management surface:
+  left operational rail for session/flow/path state, right lane workspace with
+  slimmer section headers and denser lane cards. Active acceptance criteria are
+  fewer overlay badges, less dead top space, and only the primary
+  `Prepare / Install / Clean` actions on lane rows.
+- `Runtime Profiles` is now explicitly a route-owned surface instead of a
+  generic emulator chooser: one overview rail, one active family card, and no
+  visual suggestion that `FEX` and `Box64` are simultaneously editable on the
+  same live route.
+- `Screen Effects` now follows the same split management geometry:
+  color adjustments on one side, profile/toggle control on the other. This is
+  a usability pass only; no renderer semantics should drift during the same
+  slice.
+- Empty helper `cmd` windows are now part of the same tail inventory:
+  the staged dispatch layer must hide helper consoles and let only the real GUI
+  installer own the foreground window. `PhysX` and `GLview` are included in
+  that contract rather than being left in a vague `queued/accepted` state.
+- The widened management batch now also absorbs adjacent runtime dialogs that
+  sit directly behind those surfaces:
+  `Input Controls`, preset editors behind `Runtime Profiles`, and
+  `Container Storage Info` now move toward the same inline-header /
+  split-surface language instead of keeping older overlay-badge cards.
+- `Task Manager` remains feature-closed for this pass. Only the safe bottom
+  reserve is allowed to move, and only to ensure the final Linux row is never
+  clipped while avoiding a new dead tail after the list ends.
+- Because the user explicitly requested no intermediate compiles for this donor
+  UI pass, proof is deferred until the whole management-surface slice is ready
+  for one closure cycle. Do not mix halfway APK/device claims into this batch.
+- The user then widened the donor UI pass again, but with a strict guardrail:
+  let adjacent management surfaces join the batch if that improves coherence,
+  but do not degrade install/state/proof logic while scope expands. That keeps
+  start-menu and payload sprawl subordinate to the stronger runtime-management
+  contract rather than letting them dilute it.
+## 2026-03-21 Managed Runtime Closure Slice
+
+- Fresh screenshot batch `2026-03-21 11:19-11:24` stays in the active tail list as historical control proof for the old DXSDK path:
+  - `.NET Framework 4 Setup` claims a newer version is already present.
+  - `DXSDK_Jun10.exe` later shows `.NET Framework Initialization Error` for `v4.0.30319`.
+- Fresh post-restore live bundles narrowed the real active tails:
+  - `live_verify_20260321_152227_legacy_dxsdk_postrestore`
+    - launcher/hand-off is now real
+    - blank helper `cmd` window is gone
+    - DXSDK wizard opens for real
+    - remaining blocker is guest-side managed runtime execution, not Android dispatch
+  - `live_verify_20260321_152439_xna_postrestore`
+    - staged launcher and detached guest path are now real
+    - active tail moved to guest-side XNA proof/state handling
+- Fresh app-private proof from the live prefix:
+  - `dotnet_framework.properties` says `success`, but the live prefix still carried `HKCU\\Software\\Wine\\DllOverrides` entries with `mscoree/mscoreei/mscorlib/mscorwks=disabled`
+  - `legacy_dx_sdk.properties` remained `failed` with `exit_code=1023`
+  - `xna.properties` remained `failed` even though `xna-framework-3.1.log` and `system.reg` already showed `XNA 3.1` / `XNA 4.0` proof
+- Root-cause conclusions for the current closure pass:
+  - `Prefix Pack` had a false-positive managed-runtime contract:
+    registry/file proof existed, but disabled managed overrides still broke real CLR-backed helpers
+  - `DXSDK` no longer needs launcher surgery first; it needs managed-runtime repair in the live prefix
+  - `XNA` needs proof-based lane success instead of trusting raw MSI exit codes alone
+- Required patch batch for this slice:
+  - normalize `.NET InstallRoot`
+  - repair disabled managed overrides back to builtin when Wine Mono is already present
+  - stop calling `.NET` satisfied when the live prefix still has disabled managed overrides
+  - make `legacy_dx_sdk` use an adaptive managed-runtime guard instead of blindly disabling Mono-related overrides
+  - make `xna` continue when proof is already visible despite a noisy MSI return code
+
+## 2026-03-21 Frozen Resume Point
+
+- This roadmap is intentionally frozen at the current omega checkpoint.
+- Do not reopen the pass from a broad UI or donor scope.
+- The next continuation must start from:
+  `Prefix Pack -> legacy_dx_sdk -> DXSDK_Jun10.exe`
+- Fresh user screenshots already narrowed the blocker:
+  - the lane can reach the real DirectX SDK installer window
+  - it can reach `Copying Files`
+  - it then hangs or re-enters the legacy managed prerequisite path
+  - the visible failure family remains `.NET Framework 2.0 redist` / `51023`
+- One and only one final omega compile already happened successfully.
+  Do not launch another Gradle build as the first resume step.
+- The repo already carries a newer unrebuilt lane script in
+  `app/src/main/assets/prefixpack/windows/install-directx-sdk-tools.cmd`.
+  Because that patch landed after the single final build, the first resume
+  action should be a live rootfs sync of that script, not a second compile.
+- Exact resume order:
+  1. restore working wireless `adb`
+  2. sync the patched `install-directx-sdk-tools.cmd` into
+     `files/imagefs/opt/ae/prefix-pack/windows/`
+  3. rerun only `legacy_dx_sdk`
+  4. capture a fresh lane-only forensic bundle
+  5. decide from that proof whether the remaining defect is inside the lane
+     script, the guest dispatch bridge, or another legacy CLR edge
+- Reference hold note:
+  [HOLD_2026_03_21_DXSDK_CHECKPOINT.md](/data/data/com.termux/files/home/aesolator/docs/HOLD_2026_03_21_DXSDK_CHECKPOINT.md)
+
+## 2026-03-25 Chapter 2 integrated runtime shift
+
+- The active product frame has changed:
+  `Ae.solator` now advances one dedicated runtime line, `FreeWine11`, instead
+  of treating generic `Wine/Proton` intake as the main story.
+- This shifts the main debug loop from app-only tails toward one integrated
+  runtime closure loop:
+  `Ae.solator symptom -> WCP layout/provenance -> FreeWine11 native runtime ->
+  translator payload proof -> app confirmation`.
+- `FreeWine11` compile-side omega closure is already available; the next
+  product work is packaging and integrating that runtime as the app's own
+  `bionic-only` line with a `FreeWine11` `prefixPack.txz`.
+- `FEX` and `wowbox64` remain required launch/runtime dependencies for the
+  arm64ec story, but they are no longer allowed to blur root-cause order:
+  native bootstrap and prefix faults must be proven at the FreeWine layer
+  before blaming translators.
+- The shared contract for this phase is now explicit in:
+  `docs/CHAPTER2_FREEWINE_AESOLATOR_CONTRACT.md`.
+- Active execution lane:
+  integrate the packaged `FreeWine11` WCP into `Ae.solator`, then continue the
+  next dense runtime debug passes from the app surface rather than from
+  disconnected repo-local assumptions.
