@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="${ROOT:-/data/data/com.termux/files/home}"
@@ -6,17 +6,19 @@ AESOLATOR_ROOT="${AESOLATOR_ROOT:-$ROOT/aesolator}"
 LLVM_ROOT="${LLVM_ROOT:-$ROOT/.toolchains/llvm-22.1.1-termux}"
 ANDROID_API="${ANDROID_API:-34}"
 NDK_ROOT="${NDK_ROOT:-$ROOT/android-sdk/ndk/29.0.14206865}"
-NDK_HOST_TAG="${NDK_HOST_TAG:-linux-x86_64}"
-NDK_SYSROOT="${NDK_SYSROOT:-$NDK_ROOT/toolchains/llvm/prebuilt/$NDK_HOST_TAG/sysroot}"
-CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-$NDK_ROOT/toolchains/llvm/prebuilt/$NDK_HOST_TAG/lib/clang/21}"
+NDK_PREBUILT_ROOT="${NDK_PREBUILT_ROOT:-}"
+NDK_HOST_TAG="${NDK_HOST_TAG:-}"
+NDK_SYSROOT="${NDK_SYSROOT:-}"
+CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-}"
+HOST_PKG_CONFIG="${HOST_PKG_CONFIG:-$(command -v pkg-config || true)}"
 OUT_ROOT="${OUT_ROOT:-$AESOLATOR_ROOT/out/graphics-source-builds}"
 JOBS="${JOBS:-8}"
 
 VIRGL_URL="${VIRGL_URL:-https://gitlab.freedesktop.org/virgl/virglrenderer}"
 VIRGL_REPO="${VIRGL_REPO:-$ROOT/.cache/virglrenderer-1.3.0-audit}"
 VIRGL_BASE_REF="${VIRGL_BASE_REF:-virglrenderer-1.3.0}"
-VIRGL_OVERLAY_FETCH_REF="${VIRGL_OVERLAY_FETCH_REF:-refs/merge-requests/1613/head}"
-VIRGL_OVERLAY_REF="${VIRGL_OVERLAY_REF:-refs/remotes/origin/merge-requests/1613/head}"
+VIRGL_OVERLAY_FETCH_REF="${VIRGL_OVERLAY_FETCH_REF:-refs/merge-requests/1615/head}"
+VIRGL_OVERLAY_REF="${VIRGL_OVERLAY_REF:-refs/remotes/origin/merge-requests/1615/head}"
 APPLY_VIRGL_OVERLAY="${APPLY_VIRGL_OVERLAY:-1}"
 VIRGL_PATCH="${VIRGL_PATCH:-$AESOLATOR_ROOT/patches/virglrenderer/android-external-egl-no-gbm.patch}"
 
@@ -55,9 +57,76 @@ require_path() {
   fi
 }
 
+resolve_ndk_prebuilt_root() {
+  local prebuilt_root host_uname preferred
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ] && [ -d "$NDK_PREBUILT_ROOT/sysroot" ]; then
+    printf '%s\n' "$NDK_PREBUILT_ROOT"
+    return 0
+  fi
+
+  prebuilt_root="$NDK_ROOT/toolchains/llvm/prebuilt"
+  [ -d "$prebuilt_root" ] || return 1
+
+  if [ -n "${NDK_HOST_TAG:-}" ] && [ -d "$prebuilt_root/$NDK_HOST_TAG/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$NDK_HOST_TAG"
+    return 0
+  fi
+
+  host_uname="$(uname -m 2>/dev/null || true)"
+  case "$host_uname" in
+    aarch64|arm64)
+      preferred="linux-aarch64"
+      ;;
+    x86_64|amd64)
+      preferred="linux-x86_64"
+      ;;
+    *)
+      preferred=""
+      ;;
+  esac
+
+  if [ -n "$preferred" ] && [ -d "$prebuilt_root/$preferred/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$preferred"
+    return 0
+  fi
+
+  find "$prebuilt_root" -mindepth 1 -maxdepth 1 -type d | while IFS= read -r candidate; do
+    [ -d "$candidate/sysroot" ] || continue
+    printf '%s\n' "$candidate"
+    break
+  done
+}
+
+resolve_clang_resource_dir() {
+  local resolved=""
+
+  if [ -n "${CLANG_RESOURCE_DIR:-}" ] && [ -d "$CLANG_RESOURCE_DIR/include" ]; then
+    printf '%s\n' "$CLANG_RESOURCE_DIR"
+    return 0
+  fi
+
+  if [ -x "$LLVM_ROOT/bin/clang" ]; then
+    resolved="$("$LLVM_ROOT/bin/clang" --print-resource-dir 2>/dev/null || true)"
+    if [ -n "$resolved" ] && [ -d "$resolved/include" ]; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  fi
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ]; then
+    find "$NDK_PREBUILT_ROOT/lib/clang" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1
+    return 0
+  fi
+
+  return 1
+}
+
 for tool in git ninja patchelf pkg-config tar zstd python3; do
   require_tool "$tool"
 done
+
+require_path "$HOST_PKG_CONFIG"
 
 require_path "$LLVM_ROOT/bin/clang"
 require_path "$LLVM_ROOT/bin/clang++"
@@ -65,6 +134,10 @@ require_path "$LLVM_ROOT/bin/llvm-ar"
 require_path "$LLVM_ROOT/bin/llvm-ranlib"
 require_path "$LLVM_ROOT/bin/llvm-strip"
 require_path "$LLVM_ROOT/bin/ld.lld"
+NDK_PREBUILT_ROOT="$(resolve_ndk_prebuilt_root)"
+[ -n "$NDK_HOST_TAG" ] || NDK_HOST_TAG="$(basename "$NDK_PREBUILT_ROOT")"
+[ -n "$NDK_SYSROOT" ] || NDK_SYSROOT="$NDK_PREBUILT_ROOT/sysroot"
+CLANG_RESOURCE_DIR="$(resolve_clang_resource_dir)"
 require_path "$NDK_SYSROOT/usr/include/EGL/egl.h"
 require_path "$CLANG_RESOURCE_DIR/include/stddef.h"
 require_path "$VIRGL_PATCH"
@@ -193,7 +266,7 @@ cpp = '$LLVM_ROOT/bin/clang++'
 ar = '$LLVM_ROOT/bin/llvm-ar'
 ranlib = '$LLVM_ROOT/bin/llvm-ranlib'
 strip = '$LLVM_ROOT/bin/llvm-strip'
-pkg-config = '/data/data/com.termux/files/usr/bin/pkg-config'
+pkg-config = '$HOST_PKG_CONFIG'
 
 [properties]
 needs_exe_wrapper = true

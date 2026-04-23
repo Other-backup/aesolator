@@ -1,0 +1,13 @@
+{
+    global:
+        libandroid_shmctl;
+        libandroid_shmdt;
+        libandroid_shmget;
+        libandroid_shmat;
+        shmctl;
+        shmdt;
+        shmget;
+        shmat;
+    local:
+        *;
+};

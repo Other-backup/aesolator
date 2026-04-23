@@ -112,6 +112,10 @@ def aeRequiredRuntimeAssets = [
 ]
 File aeLocalPropertiesFile = rootProject.file("local.properties")
 def aeBuildEnv = new LinkedHashMap<>(System.getenv())
+def aeRequireVirglWrapperJni = (
+        (project.findProperty("ae.requireVirglWrapperJni")?.toString() ?: "") == "true" ||
+                (aeBuildEnv["AEO_REQUIRE_VIRGL_WRAPPER_JNI"] ?: "") == "1"
+)
 def aeEnforceEmbeddedRuntimeAssets = (
         (project.findProperty("ae.enforceEmbeddedRuntimeAssets")?.toString() ?: "") == "true" ||
                 (aeBuildEnv["AEO_ENFORCE_EMBEDDED_RUNTIME_ASSETS"] ?: "") == "1"
@@ -222,6 +226,9 @@ tasks.register("prepareVirglWrapperJni") {
                 aeBundledArm64JniLibsDir
         )
         if (jniSourceDir == null) {
+            if (aeRequireVirglWrapperJni) {
+                throw new GradleException("Fresh VirGL wrapper JNI payload is required but missing from source build outputs.")
+            }
             println("VirGL wrapper JNI payload is absent in clean source lane; skipping APK-native VirGL payload staging.")
             return
         }

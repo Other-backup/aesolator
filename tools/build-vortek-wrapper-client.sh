@@ -4,14 +4,19 @@ set -eu
 JOBS="${JOBS:-8}"
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 ROOT_HOME="$(CDPATH= cd -- "$ROOT_DIR/.." && pwd)"
+AESOLATOR_ROOT="${AESOLATOR_ROOT:-$ROOT_DIR}"
 LLVM_ROOT="${LLVM_ROOT:-$ROOT_HOME/.toolchains/llvm-22.1.1-termux}"
 ANDROID_API="${ANDROID_API:-34}"
 NDK_ROOT="${NDK_ROOT:-$ROOT_HOME/android-sdk/ndk/29.0.14206865}"
-NDK_HOST_TAG="${NDK_HOST_TAG:-linux-x86_64}"
-NDK_SYSROOT="${NDK_SYSROOT:-$NDK_ROOT/toolchains/llvm/prebuilt/$NDK_HOST_TAG/sysroot}"
-NDK_TARGET_LIB_DIR="${NDK_TARGET_LIB_DIR:-$NDK_SYSROOT/usr/lib/aarch64-linux-android/$ANDROID_API}"
-CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-$NDK_ROOT/toolchains/llvm/prebuilt/$NDK_HOST_TAG/lib/clang/21}"
+NDK_PREBUILT_ROOT="${NDK_PREBUILT_ROOT:-}"
+NDK_HOST_TAG="${NDK_HOST_TAG:-}"
+NDK_SYSROOT="${NDK_SYSROOT:-}"
+NDK_TARGET_LIB_DIR="${NDK_TARGET_LIB_DIR:-}"
+CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-}"
 TERMUX_PREFIX="${TERMUX_PREFIX:-/data/data/com.termux/files/usr}"
+GRAPHICS_META_TOOL="${GRAPHICS_META_TOOL:-$AESOLATOR_ROOT/tools/generate_graphics_driver_meta.py}"
+APP_GRAPHICS_ASSET_DIR="${APP_GRAPHICS_ASSET_DIR:-$AESOLATOR_ROOT/app/src/main/assets/graphics_driver}"
+INSTALL_APP_ASSET="${INSTALL_APP_ASSET:-0}"
 WORK_ROOT="${WORK_ROOT:-$ROOT_DIR/out/vortek-wrapper-client}"
 SRC_DIR="${VORTEK_SRC:-$HOME/.cache/research/vortek}"
 SOURCE_REPO="${VORTEK_REPO:-https://github.com/brunodev85/vortek}"
@@ -31,9 +36,79 @@ require_path() {
   fi
 }
 
+resolve_ndk_prebuilt_root() {
+  local prebuilt_root host_uname preferred
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ] && [ -d "$NDK_PREBUILT_ROOT/sysroot" ]; then
+    printf '%s\n' "$NDK_PREBUILT_ROOT"
+    return 0
+  fi
+
+  prebuilt_root="$NDK_ROOT/toolchains/llvm/prebuilt"
+  [ -d "$prebuilt_root" ] || return 1
+
+  if [ -n "${NDK_HOST_TAG:-}" ] && [ -d "$prebuilt_root/$NDK_HOST_TAG/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$NDK_HOST_TAG"
+    return 0
+  fi
+
+  host_uname="$(uname -m 2>/dev/null || true)"
+  case "$host_uname" in
+    aarch64|arm64)
+      preferred="linux-aarch64"
+      ;;
+    x86_64|amd64)
+      preferred="linux-x86_64"
+      ;;
+    *)
+      preferred=""
+      ;;
+  esac
+
+  if [ -n "$preferred" ] && [ -d "$prebuilt_root/$preferred/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$preferred"
+    return 0
+  fi
+
+  find "$prebuilt_root" -mindepth 1 -maxdepth 1 -type d | while IFS= read -r candidate; do
+    [ -d "$candidate/sysroot" ] || continue
+    printf '%s\n' "$candidate"
+    break
+  done
+}
+
+resolve_clang_resource_dir() {
+  local resolved=""
+
+  if [ -n "${CLANG_RESOURCE_DIR:-}" ] && [ -d "$CLANG_RESOURCE_DIR/include" ]; then
+    printf '%s\n' "$CLANG_RESOURCE_DIR"
+    return 0
+  fi
+
+  if [ -x "$LLVM_ROOT/bin/clang" ]; then
+    resolved="$("$LLVM_ROOT/bin/clang" --print-resource-dir 2>/dev/null || true)"
+    if [ -n "$resolved" ] && [ -d "$resolved/include" ]; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  fi
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ]; then
+    find "$NDK_PREBUILT_ROOT/lib/clang" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1
+    return 0
+  fi
+
+  return 1
+}
+
 find_vulkan_headers() {
   if [ -n "${VULKAN_HEADERS_DIR:-}" ] && [ -f "$VULKAN_HEADERS_DIR/vulkan/vulkan.h" ]; then
     printf '%s\n' "$VULKAN_HEADERS_DIR"
+    return 0
+  fi
+
+  if [ -f "$NDK_SYSROOT/usr/include/vulkan/vulkan.h" ]; then
+    printf '%s\n' "$NDK_SYSROOT/usr/include"
     return 0
   fi
 
@@ -41,8 +116,8 @@ find_vulkan_headers() {
     "$HOME/.cache/research/vulkan-headers-v1.4.349/include" \
     "$ROOT_DIR/out/graphics-source-builds"/*/src/mesa/include \
     "$HOME/.cache/donors/mesa-main/include" \
-    "${ANDROID_HOME:-$HOME/android-sdk}/ndk"/*/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include \
-    "$HOME/android-sdk/ndk"/*/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+    "${ANDROID_HOME:-$HOME/android-sdk}/ndk"/*/toolchains/llvm/prebuilt/*/sysroot/usr/include \
+    "$HOME/android-sdk/ndk"/*/toolchains/llvm/prebuilt/*/sysroot/usr/include
   do
     if [ -f "$dir/vulkan/vulkan.h" ]; then
       printf '%s\n' "$dir"
@@ -61,9 +136,15 @@ require_path "$LLVM_ROOT/bin/llvm-nm"
 require_path "$LLVM_ROOT/bin/llvm-ranlib"
 require_path "$LLVM_ROOT/bin/llvm-readelf"
 require_path "$LLVM_ROOT/bin/ld.lld"
+NDK_PREBUILT_ROOT="$(resolve_ndk_prebuilt_root)"
+[ -n "$NDK_HOST_TAG" ] || NDK_HOST_TAG="$(basename "$NDK_PREBUILT_ROOT")"
+[ -n "$NDK_SYSROOT" ] || NDK_SYSROOT="$NDK_PREBUILT_ROOT/sysroot"
+[ -n "$NDK_TARGET_LIB_DIR" ] || NDK_TARGET_LIB_DIR="$NDK_SYSROOT/usr/lib/aarch64-linux-android/$ANDROID_API"
+CLANG_RESOURCE_DIR="$(resolve_clang_resource_dir)"
 require_path "$NDK_SYSROOT/usr/include/stdio.h"
 require_path "$NDK_TARGET_LIB_DIR/liblog.so"
 require_path "$CLANG_RESOURCE_DIR/include/stddef.h"
+require_path "$GRAPHICS_META_TOOL"
 
 ANDROID_C_FLAGS="--target=aarch64-unknown-linux-android$ANDROID_API --sysroot=$NDK_SYSROOT -resource-dir $CLANG_RESOURCE_DIR -B$TERMUX_PREFIX/bin"
 ANDROID_LINK_FLAGS="$ANDROID_C_FLAGS --ld-path=$LLVM_ROOT/bin/ld.lld -Wl,-dynamic-linker,/system/bin/linker64"
@@ -143,5 +224,51 @@ else
   echo "Vortek wrapper is missing Loader/Driver interface v4 physical-device proc hook" >&2
   exit 67
 fi
+
+publish_app_asset() {
+  local asset_path="$1"
+  local asset_name family
+
+  [ "$INSTALL_APP_ASSET" = "1" ] || return 0
+  asset_name="$(basename "$asset_path")"
+  mkdir -p "$APP_GRAPHICS_ASSET_DIR"
+  family="${asset_name%%-*}"
+  if [ "$family" = "vortek" ]; then
+    find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+      \( -name 'vortek-*.tzst' -o -name 'vortek-*.tzst.sha256' \) \
+      ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+  fi
+  install -m 0644 "$asset_path" "$APP_GRAPHICS_ASSET_DIR/$asset_name"
+  sha256sum "$APP_GRAPHICS_ASSET_DIR/$asset_name" > "$APP_GRAPHICS_ASSET_DIR/$asset_name.sha256"
+}
+
+SOURCE_COMMIT="$(git -C "$WORK_SRC" rev-parse HEAD)"
+SOURCE_SHORT_COMMIT="$(printf '%s' "$SOURCE_COMMIT" | cut -c1-8)"
+SOURCE_COMMIT_DATE="$(git -C "$WORK_SRC" show -s --format=%cI HEAD)"
+SOURCE_COMMIT_DAY="$(git -C "$WORK_SRC" show -s --format=%cs HEAD | tr -d '-')"
+VORTEK_VERSION="${VORTEK_VERSION:-${SOURCE_COMMIT_DAY}-${SOURCE_SHORT_COMMIT}}"
+PACKAGE_DIR="${PACKAGE_DIR:-$WORK_ROOT/package}"
+ASSET_NAME="vortek-${VORTEK_VERSION}.tzst"
+ASSET_ROOT="$PACKAGE_DIR/$ASSET_NAME.root"
+ASSET_PATH="$PACKAGE_DIR/$ASSET_NAME"
+
+rm -rf "$ASSET_ROOT"
+mkdir -p "$ASSET_ROOT/usr/lib" "$ASSET_ROOT/usr/share/vulkan/icd.d" "$ASSET_ROOT/usr/share/aesolator/graphics_driver" "$PACKAGE_DIR"
+install -m 0755 "$OUT_LIB" "$ASSET_ROOT/usr/lib/libvulkan_vortek.so"
+install -m 0644 "$WORK_SRC/vortek_icd.aarch64.json" "$ASSET_ROOT/usr/share/vulkan/icd.d/vortek_icd.aarch64.json"
+: > "$ASSET_ROOT/usr/share/aesolator/graphics_driver/$ASSET_NAME.installed"
+python3 "$GRAPHICS_META_TOOL" vortek-wrapper \
+  --version "$VORTEK_VERSION" \
+  --source-repo "$SOURCE_REPO" \
+  --source-ref "$SOURCE_REF" \
+  --source-commit "$SOURCE_COMMIT" \
+  --source-commit-date "$SOURCE_COMMIT_DATE" \
+  --artifact-name "$ASSET_NAME" \
+  --library-name "usr/lib/libvulkan_vortek.so" \
+  --root-library-path "usr/lib/libvulkan_vortek.so" \
+  --output "$ASSET_ROOT/meta.json"
+tar -C "$ASSET_ROOT" --zstd -cf "$ASSET_PATH" .
+sha256sum "$ASSET_PATH" > "$ASSET_PATH.sha256"
+publish_app_asset "$ASSET_PATH"
 
 printf '%s\n' "$OUT_LIB"

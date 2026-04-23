@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="${ROOT:-/data/data/com.termux/files/home}"
@@ -18,12 +18,18 @@ JOBS="${JOBS:-8}"
 ANDROID_API="${ANDROID_API:-34}"
 LLVM_VERSION="${LLVM_VERSION:-22.1.1}"
 LLVM_ROOT="${LLVM_ROOT:-$ROOT/.toolchains/llvm-22.1.1-termux}"
+NDK_ROOT="${NDK_ROOT:-$ROOT/android-sdk/ndk/29.0.14206865}"
+NDK_PREBUILT_ROOT="${NDK_PREBUILT_ROOT:-}"
+NDK_HOST_TAG="${NDK_HOST_TAG:-}"
+NDK_SYSROOT="${NDK_SYSROOT:-}"
 TERMUX_PREFIX="${TERMUX_PREFIX:-/data/data/com.termux/files/usr}"
-ANDROID_SYSROOT="${ANDROID_SYSROOT:-/data/data/com.termux/files}"
-CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-$TERMUX_PREFIX/lib/clang/21}"
+ANDROID_SYSROOT="${ANDROID_SYSROOT:-}"
+CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR:-}"
 HOST_TARGET="${HOST_TARGET:-aarch64-unknown-linux-android$ANDROID_API}"
-HOST_CLANG_RESOURCE_DIR="${HOST_CLANG_RESOURCE_DIR:-$CLANG_RESOURCE_DIR}"
-ANDROID_SYSVSHM_SRC_DIR="${ANDROID_SYSVSHM_SRC_DIR:-$ROOT/freewine11/android/android_sysvshm}"
+HOST_CLANG_RESOURCE_DIR="${HOST_CLANG_RESOURCE_DIR:-}"
+HOST_PKG_CONFIG="${HOST_PKG_CONFIG:-$(command -v pkg-config || true)}"
+HOST_LIBCXX_SHARED="${HOST_LIBCXX_SHARED:-}"
+ANDROID_SYSVSHM_SRC_DIR="${ANDROID_SYSVSHM_SRC_DIR:-}"
 ANDROID_SYSVSHM_LIB="${ANDROID_SYSVSHM_LIB:-}"
 ALLOW_SYSTEM_LLVM_FOR_CLC="${ALLOW_SYSTEM_LLVM_FOR_CLC:-0}"
 LLVM_PROJECT_SRC="${LLVM_PROJECT_SRC:-$ROOT/.toolchains-src/llvm-project-$LLVM_VERSION}"
@@ -64,7 +70,8 @@ Environment:
   JOBS         Ninja jobs. Default: 8.
   ANDROID_API  Android platform-sdk-version. Default: 34.
   ANDROID_SYSVSHM_SRC_DIR
-               Default: $ROOT/freewine11/android/android_sysvshm.
+               Default: prefers $AESOLATOR_ROOT/android_sysvshm, then
+               $ROOT/freewine11/android/android_sysvshm.
   ANDROID_SYSVSHM_LIB
                Optional prebuilt override. Default is a source-built support lib under RUN_ROOT.
   ENABLE_AEMALI_MESA_PATCHSET
@@ -122,11 +129,153 @@ require_path() {
   fi
 }
 
+resolve_ndk_prebuilt_root() {
+  local prebuilt_root host_uname preferred
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ] && [ -d "$NDK_PREBUILT_ROOT/sysroot" ]; then
+    printf '%s\n' "$NDK_PREBUILT_ROOT"
+    return 0
+  fi
+
+  prebuilt_root="$NDK_ROOT/toolchains/llvm/prebuilt"
+  [ -d "$prebuilt_root" ] || return 1
+
+  if [ -n "${NDK_HOST_TAG:-}" ] && [ -d "$prebuilt_root/$NDK_HOST_TAG/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$NDK_HOST_TAG"
+    return 0
+  fi
+
+  host_uname="$(uname -m 2>/dev/null || true)"
+  case "$host_uname" in
+    aarch64|arm64)
+      preferred="linux-aarch64"
+      ;;
+    x86_64|amd64)
+      preferred="linux-x86_64"
+      ;;
+    *)
+      preferred=""
+      ;;
+  esac
+
+  if [ -n "$preferred" ] && [ -d "$prebuilt_root/$preferred/sysroot" ]; then
+    printf '%s\n' "$prebuilt_root/$preferred"
+    return 0
+  fi
+
+  find "$prebuilt_root" -mindepth 1 -maxdepth 1 -type d | while IFS= read -r candidate; do
+    [ -d "$candidate/sysroot" ] || continue
+    printf '%s\n' "$candidate"
+    break
+  done
+}
+
+resolve_android_sysroot() {
+  if [ -n "${ANDROID_SYSROOT:-}" ] && [ -d "$ANDROID_SYSROOT/usr/include" ]; then
+    printf '%s\n' "$ANDROID_SYSROOT"
+    return 0
+  fi
+
+  if [ -d "/data/data/com.termux/files/usr/include" ]; then
+    printf '%s\n' "/data/data/com.termux/files"
+    return 0
+  fi
+
+  if [ -n "${NDK_SYSROOT:-}" ] && [ -d "$NDK_SYSROOT/usr/include" ]; then
+    printf '%s\n' "$NDK_SYSROOT"
+    return 0
+  fi
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ] && [ -d "$NDK_PREBUILT_ROOT/sysroot/usr/include" ]; then
+    printf '%s\n' "$NDK_PREBUILT_ROOT/sysroot"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_clang_resource_dir() {
+  local requested="$1"
+  local resolved=""
+
+  if [ -n "$requested" ] && [ -d "$requested/include" ]; then
+    printf '%s\n' "$requested"
+    return 0
+  fi
+
+  if [ -x "$LLVM_ROOT/bin/clang" ]; then
+    resolved="$("$LLVM_ROOT/bin/clang" --print-resource-dir 2>/dev/null || true)"
+    if [ -n "$resolved" ] && [ -d "$resolved/include" ]; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  fi
+
+  if [ -n "${NDK_PREBUILT_ROOT:-}" ] && [ -d "$NDK_PREBUILT_ROOT/lib/clang" ]; then
+    find "$NDK_PREBUILT_ROOT/lib/clang" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1
+    return 0
+  fi
+
+  if [ -d "$TERMUX_PREFIX/lib/clang" ]; then
+    find "$TERMUX_PREFIX/lib/clang" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_host_libcxx_shared() {
+  if [ -n "${HOST_LIBCXX_SHARED:-}" ] && [ -f "$HOST_LIBCXX_SHARED" ]; then
+    printf '%s\n' "$HOST_LIBCXX_SHARED"
+    return 0
+  fi
+
+  if [ -f "$TERMUX_PREFIX/lib/libc++_shared.so" ]; then
+    printf '%s\n' "$TERMUX_PREFIX/lib/libc++_shared.so"
+    return 0
+  fi
+
+  if [ -n "${ANDROID_SYSROOT:-}" ] && [ -f "$ANDROID_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so" ]; then
+    printf '%s\n' "$ANDROID_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so"
+    return 0
+  fi
+
+  if [ -n "${NDK_SYSROOT:-}" ] && [ -f "$NDK_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so" ]; then
+    printf '%s\n' "$NDK_SYSROOT/usr/lib/aarch64-linux-android/libc++_shared.so"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_android_sysvshm_src_dir() {
+  local candidate
+
+  if [ -n "${ANDROID_SYSVSHM_SRC_DIR:-}" ] && [ -f "$ANDROID_SYSVSHM_SRC_DIR/android_sysvshm.c" ]; then
+    printf '%s\n' "$ANDROID_SYSVSHM_SRC_DIR"
+    return 0
+  fi
+
+  for candidate in \
+    "$AESOLATOR_ROOT/android_sysvshm" \
+    "$ROOT/aesolator/android_sysvshm" \
+    "$ROOT/freewine11/android/android_sysvshm"
+  do
+    if [ -f "$candidate/android_sysvshm.c" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 for tool in cmake curl git ninja patchelf pkg-config tar zstd; do
   require_tool "$tool"
 done
 require_tool "$PYTHON_BIN"
 require_path "$GRAPHICS_META_TOOL"
+require_path "$HOST_PKG_CONFIG"
 require_path "$LLVM_ROOT/bin/clang"
 require_path "$LLVM_ROOT/bin/clang++"
 require_path "$LLVM_ROOT/bin/llvm-ar"
@@ -134,9 +283,17 @@ require_path "$LLVM_ROOT/bin/llvm-ranlib"
 require_path "$LLVM_ROOT/bin/llvm-strip"
 require_path "$LLVM_ROOT/bin/ld.lld"
 require_path "$LLVM_ROOT/bin/llvm-config"
+NDK_PREBUILT_ROOT="$(resolve_ndk_prebuilt_root || true)"
+[ -n "${NDK_SYSROOT:-}" ] || [ -z "${NDK_PREBUILT_ROOT:-}" ] || NDK_SYSROOT="$NDK_PREBUILT_ROOT/sysroot"
+ANDROID_SYSROOT="$(resolve_android_sysroot)"
+CLANG_RESOURCE_DIR="$(resolve_clang_resource_dir "$CLANG_RESOURCE_DIR")"
+HOST_CLANG_RESOURCE_DIR="$(resolve_clang_resource_dir "$HOST_CLANG_RESOURCE_DIR")"
+HOST_LIBCXX_SHARED="$(resolve_host_libcxx_shared)"
+ANDROID_SYSVSHM_SRC_DIR="$(resolve_android_sysvshm_src_dir)"
+require_path "$ANDROID_SYSROOT/usr/include"
 require_path "$CLANG_RESOURCE_DIR/include/stddef.h"
 require_path "$HOST_CLANG_RESOURCE_DIR/include/stddef.h"
-require_path "$TERMUX_PREFIX/lib/libc++_shared.so"
+require_path "$HOST_LIBCXX_SHARED"
 if [ -n "$ANDROID_SYSVSHM_LIB" ]; then
   require_path "$ANDROID_SYSVSHM_LIB"
 fi
@@ -493,7 +650,7 @@ int native_handle_delete(native_handle_t *h);
 EOF
 
 cat > "$TOOLCHAIN_DIR/clang-android22" <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 link_mode=1
 for arg in "\$@"; do
   case "\$arg" in
@@ -528,7 +685,7 @@ exec "\${base[@]}" "\$@"
 EOF
 
 cat > "$TOOLCHAIN_DIR/clangxx-android22" <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 link_mode=1
 for arg in "\$@"; do
   case "\$arg" in
@@ -564,7 +721,7 @@ exec "\${base[@]}" "\$@"
 EOF
 
 cat > "$TOOLCHAIN_DIR/clang-native22" <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 link_mode=1
 for arg in "\$@"; do
   case "\$arg" in
@@ -599,7 +756,7 @@ exec "\${base[@]}" "\$@"
 EOF
 
 cat > "$TOOLCHAIN_DIR/clangxx-native22" <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 link_mode=1
 for arg in "\$@"; do
   case "\$arg" in
@@ -647,7 +804,7 @@ ar = '$LLVM_ROOT/bin/llvm-ar'
 ranlib = '$LLVM_ROOT/bin/llvm-ranlib'
 strip = '$LLVM_ROOT/bin/llvm-strip'
 llvm-config = '$LLVM_ROOT/bin/llvm-config'
-pkg-config = '$TERMUX_PREFIX/bin/pkg-config'
+pkg-config = '$HOST_PKG_CONFIG'
 
 [properties]
 pkg_config_libdir = '$TOOLCHAIN_DIR/support/usr/lib/pkgconfig:$TOOLCHAIN_DIR/support/usr/share/pkgconfig:$LLVM_ROOT/lib/pkgconfig:$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
@@ -668,7 +825,7 @@ ar = '$LLVM_ROOT/bin/llvm-ar'
 ranlib = '$LLVM_ROOT/bin/llvm-ranlib'
 strip = '$LLVM_ROOT/bin/llvm-strip'
 llvm-config = '$LLVM_ROOT/bin/llvm-config'
-pkg-config = '$TERMUX_PREFIX/bin/pkg-config'
+pkg-config = '$HOST_PKG_CONFIG'
 
 [built-in options]
 c_args = ['-Qunused-arguments']
@@ -1364,6 +1521,11 @@ copy_runtime_lib() {
         source="$ANDROID_SYSVSHM_LIB"
       fi
       ;;
+    libc++_shared.so)
+      if [ -z "$source" ]; then
+        source="$HOST_LIBCXX_SHARED"
+      fi
+      ;;
     *)
       if [ -z "$source" ]; then
         for candidate in \
@@ -1454,6 +1616,33 @@ publish_app_asset() {
   require_path "$asset_out"
   mkdir -p "$APP_GRAPHICS_ASSET_DIR"
   asset_name="$(basename "$asset_out")"
+  case "$asset_name" in
+    aemali-panvk-*.tzst)
+      find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+        \( -name 'aemali-panvk-*.tzst' -o -name 'aemali-panvk-*.tzst.sha256' \) \
+        ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+      ;;
+    aemali-gallium-*.tzst)
+      find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+        \( -name 'aemali-gallium-*.tzst' -o -name 'aemali-gallium-*.tzst.sha256' \) \
+        ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+      ;;
+    zink-*.tzst)
+      find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+        \( -name 'zink-*.tzst' -o -name 'zink-*.tzst.sha256' \) \
+        ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+      ;;
+    virgl-*.tzst)
+      find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+        \( -name 'virgl-*.tzst' -o -name 'virgl-*.tzst.sha256' \) \
+        ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+      ;;
+    turnip-*.tzst)
+      find "$APP_GRAPHICS_ASSET_DIR" -maxdepth 1 -type f \
+        \( -name 'turnip-*.tzst' -o -name 'turnip-*.tzst.sha256' \) \
+        ! -name "$asset_name" ! -name "$asset_name.sha256" -delete
+      ;;
+  esac
   install -m 0644 "$asset_out" "$APP_GRAPHICS_ASSET_DIR/$asset_name"
   sha256sum "$APP_GRAPHICS_ASSET_DIR/$asset_name" > "$APP_GRAPHICS_ASSET_DIR/$asset_name.sha256"
   echo "installed_app_graphics_asset=$APP_GRAPHICS_ASSET_DIR/$asset_name"
