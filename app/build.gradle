@@ -20,6 +20,18 @@ class AeBuildHostSupport {
         props
     }
 
+    static void registerOptionalFileInput(def taskInputs, String name, File file) {
+        taskInputs.property("${name}Path", file.absolutePath)
+        taskInputs.property("${name}Exists", file.exists())
+        if (file.exists()) {
+            taskInputs.file(file)
+        }
+    }
+
+    static boolean hasRequiredFiles(File dir, List<String> names) {
+        dir != null && dir.isDirectory() && names.every { new File(dir, it).isFile() }
+    }
+
     static String resolveNdkDir(File propsFile, String ndkVersion, Map<String, String> env) {
         def props = readLocalProperties(propsFile)
         def sdkDir = trimValue(props.getProperty("sdk.dir") ?: env["ANDROID_SDK_ROOT"])
@@ -60,6 +72,25 @@ class AeBuildHostSupport {
                 ? null
                 : new File(prebuiltRoot, "sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
     }
+
+    static File resolveVirglWrapperJniSourceDir(File pointerFile, File bundledDir) {
+        def requiredNames = ["libvirglrenderer.so", "libepoxy.so"]
+        if (pointerFile.exists() && pointerFile.isFile()) {
+            String runRootPath = pointerFile.getText("UTF-8").trim()
+            if (runRootPath.isEmpty()) {
+                throw new GradleException("VirGL wrapper pointer is empty: ${pointerFile}")
+            }
+
+            File runRoot = new File(runRootPath)
+            File jniSourceDir = new File(runRoot, "jni/arm64-v8a")
+            if (!hasRequiredFiles(jniSourceDir, requiredNames)) {
+                throw new GradleException("VirGL wrapper JNI directory is missing required payload: ${jniSourceDir}")
+            }
+            return jniSourceDir
+        }
+
+        hasRequiredFiles(bundledDir, requiredNames) ? bundledDir : null
+    }
 }
 
 plugins {
@@ -68,6 +99,7 @@ plugins {
 }
 def aeAssetDir = new File(rootProject.projectDir, "app/src/main/assets")
 def aeGeneratedJniLibsDir = new File(buildDir, "generated/ae-jniLibs")
+def aeBundledArm64JniLibsDir = new File(rootProject.projectDir, "app/src/main/jniLibs/arm64-v8a")
 def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
 def aeResolvedNdkVersion = "29.0.14206865"
 def aeRequiredRootfsAssets = [
@@ -143,7 +175,7 @@ tasks.register("prepareKotlinBuildScriptModel") {}
 
 tasks.register("prepareRuntimeSharedJni") {
     File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
-    inputs.file(aeLocalPropertiesFile)
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeLocalPropertiesFile", aeLocalPropertiesFile)
     inputs.property("aeResolvedNdkVersion", aeResolvedNdkVersion)
     if (aeBuildEnv["AEO_ANDROID_NDK_HOST_TAG"] != null) {
         inputs.property("AEO_ANDROID_NDK_HOST_TAG", aeBuildEnv["AEO_ANDROID_NDK_HOST_TAG"])
@@ -177,25 +209,21 @@ tasks.register("prepareRuntimeSharedJni") {
 
 tasks.register("prepareVirglWrapperJni") {
     File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
-    inputs.file(aeVirglWrapperPointerFile)
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeVirglWrapperPointerFile", aeVirglWrapperPointerFile)
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeBundledVirglRendererFile", new File(aeBundledArm64JniLibsDir, "libvirglrenderer.so"))
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeBundledEpoxyFile", new File(aeBundledArm64JniLibsDir, "libepoxy.so"))
     outputs.files(
             new File(outputDir, "libvirglrenderer.so"),
             new File(outputDir, "libepoxy.so")
     )
     doLast {
-        if (!aeVirglWrapperPointerFile.exists() || !aeVirglWrapperPointerFile.isFile()) {
-            throw new GradleException("VirGL wrapper pointer is missing: ${aeVirglWrapperPointerFile}")
-        }
-
-        String runRootPath = aeVirglWrapperPointerFile.getText("UTF-8").trim()
-        if (runRootPath.isEmpty()) {
-            throw new GradleException("VirGL wrapper pointer is empty: ${aeVirglWrapperPointerFile}")
-        }
-
-        File runRoot = new File(runRootPath)
-        File jniSourceDir = new File(runRoot, "jni/arm64-v8a")
-        if (!jniSourceDir.isDirectory()) {
-            throw new GradleException("VirGL wrapper JNI directory is missing: ${jniSourceDir}")
+        File jniSourceDir = AeBuildHostSupport.resolveVirglWrapperJniSourceDir(
+                aeVirglWrapperPointerFile,
+                aeBundledArm64JniLibsDir
+        )
+        if (jniSourceDir == null) {
+            println("VirGL wrapper JNI payload is absent in clean source lane; skipping APK-native VirGL payload staging.")
+            return
         }
 
         outputDir.mkdirs()
