@@ -11,7 +11,6 @@ public abstract class ManifestContentTypes {
     public static final String FEXCORE = "fexcore";
     public static final String WINE = "wine";
     public static final String PROTON = "proton";
-    public static final String VULKAN_SDK = "vulkansdk";
 
     @Nullable
     public static ContentProfile.ContentType toContentType(String manifestType) {
@@ -24,7 +23,6 @@ public abstract class ManifestContentTypes {
             case FEXCORE -> ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
             case WINE -> ContentProfile.ContentType.CONTENT_TYPE_WINE;
             case PROTON -> ContentProfile.ContentType.CONTENT_TYPE_PROTON;
-            case VULKAN_SDK -> ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK;
             default -> null;
         };
     }

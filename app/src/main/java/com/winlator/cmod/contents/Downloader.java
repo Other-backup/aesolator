@@ -17,12 +17,50 @@ import java.util.Locale;
 import java.util.Properties;
 
 public class Downloader {
-    private static final int CONNECT_TIMEOUT_MS = 15000;
-    private static final int READ_TIMEOUT_MS = 30000;
-    private static final int MAX_RETRIES = 3;
+    private static final int CONNECT_TIMEOUT_MS = 20000;
+    private static final int READ_TIMEOUT_MS = 120000;
+    private static final int MAX_RETRIES = 4;
     private static final int BUFFER_SIZE = 64 * 1024;
     private static final String USER_AGENT =
             "Mozilla/5.0 (Android 14; Mobile; rv:124.0) Gecko/124.0 Ae.solator/ContentsDownloader";
+
+    public static final class StringResponse {
+        public final String url;
+        public final int statusCode;
+        public final String body;
+        public final String errorBody;
+        public final Exception exception;
+
+        StringResponse(String url, int statusCode, String body, String errorBody, Exception exception) {
+            this.url = url == null ? "" : url;
+            this.statusCode = statusCode;
+            this.body = body == null ? "" : body;
+            this.errorBody = errorBody == null ? "" : errorBody;
+            this.exception = exception;
+        }
+
+        public boolean isSuccessful() {
+            return statusCode >= 200 && statusCode < 300 && !body.trim().isEmpty();
+        }
+
+        public boolean isGitHubRateLimited() {
+            String normalizedUrl = url.trim().toLowerCase(Locale.US);
+            String normalizedError = errorBody.trim().toLowerCase(Locale.US);
+            return statusCode == HttpURLConnection.HTTP_FORBIDDEN
+                    && normalizedUrl.contains("api.github.com")
+                    && (normalizedError.isEmpty()
+                    || normalizedError.contains("rate limit")
+                    || normalizedError.contains("secondary rate limit"));
+        }
+
+        public String classifyFailure() {
+            if (isGitHubRateLimited()) return "github_rate_limited";
+            if (statusCode > 0) return "http_" + statusCode;
+            if (exception != null) return "io_exception";
+            if (body.trim().isEmpty()) return "empty_body";
+            return "";
+        }
+    }
 
     public static boolean downloadFile(String address, File file) {
         if (address == null || address.trim().isEmpty() || file == null) return false;
@@ -101,6 +139,11 @@ public class Downloader {
     }
 
     public static String downloadString(String address) {
+        StringResponse response = downloadStringResponse(address);
+        return response.isSuccessful() ? response.body : null;
+    }
+
+    public static StringResponse downloadStringResponse(String address) {
         HttpURLConnection connection = null;
         InputStream input = null;
         InputStream error = null;
@@ -114,14 +157,14 @@ public class Downloader {
                 String errorBody = readFully(error);
                 System.err.println("HTTP " + responseCode + " for " + address
                         + (errorBody.isEmpty() ? "" : " :: " + errorBody));
-                return null;
+                return new StringResponse(address, responseCode, "", errorBody, null);
             }
 
             input = connection.getInputStream();
-            return readFully(input);
+            return new StringResponse(address, responseCode, readFully(input), "", null);
         } catch (Exception e) {
             e.printStackTrace();
-            return null;
+            return new StringResponse(address, 0, "", "", e);
         } finally {
             closeQuietly(reader);
             closeQuietly(error);

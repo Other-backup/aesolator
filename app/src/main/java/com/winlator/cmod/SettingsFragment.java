@@ -90,6 +90,8 @@ public class SettingsFragment extends Fragment {
     private CheckBox cbXinputToggle;
 
     private CheckBox cbEnableBigPictureMode;
+    private CheckBox cbShowShortcutsFirst;
+    private CheckBox cbWarnBeforeExit;
     private CheckBox cbEnableCustomApiKey;
     private EditText etCustomApiKey;
 
@@ -149,6 +151,10 @@ public class SettingsFragment extends Fragment {
         // Initialize Big Picture Mode Checkbox
         cbEnableBigPictureMode = view.findViewById(R.id.CBEnableBigPictureMode);
         cbEnableBigPictureMode.setChecked(preferences.getBoolean("enable_big_picture_mode", false));
+        cbShowShortcutsFirst = view.findViewById(R.id.CBShowShortcutsFirst);
+        cbShowShortcutsFirst.setChecked(preferences.getBoolean("show_shortcuts_first", false));
+        cbWarnBeforeExit = view.findViewById(R.id.CBWarnBeforeExit);
+        cbWarnBeforeExit.setChecked(preferences.getBoolean("warn_before_exit", false));
 
         initCustomApiKeySettings(view);
 
@@ -357,6 +363,8 @@ public class SettingsFragment extends Fragment {
 
             // Save Big Picture Mode setting
             editor.putBoolean("enable_big_picture_mode", ((CheckBox) view.findViewById(R.id.CBEnableBigPictureMode)).isChecked());
+            editor.putBoolean("show_shortcuts_first", ((CheckBox) view.findViewById(R.id.CBShowShortcutsFirst)).isChecked());
+            editor.putBoolean("warn_before_exit", ((CheckBox) view.findViewById(R.id.CBWarnBeforeExit)).isChecked());
             saveCustomApiKeySettings(editor);
 
             if (editor.commit()) {
@@ -713,7 +721,9 @@ public class SettingsFragment extends Fragment {
             try {
                 jsonArray = new JSONArray(FileUtils.readString(context, "wine_debug_channels.json"));
             }
-            catch (JSONException e) {}
+            catch (JSONException e) {
+                Log.w("SettingsFragment", "Unable to parse wine debug channels catalog", e);
+            }
 
             final String[] items = ArrayUtils.toStringArray(jsonArray);
             ContentDialog.showMultipleChoiceList(context, R.string.wine_debug_channel, items, (selectedPositions) -> {

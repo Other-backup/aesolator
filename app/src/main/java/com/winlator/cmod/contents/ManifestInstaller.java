@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import com.winlator.cmod.R;
 
 import java.io.File;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +28,7 @@ public abstract class ManifestInstaller {
             @Nullable ProgressListener progressListener
     ) {
         if (isDriver) {
-            return downloadAndInstallDriver(context, entry, progressListener);
+            return downloadAndInstallDriver(context, entry, contentType, progressListener);
         }
         if (contentType == null) {
             throw new IllegalArgumentException("contentType must be provided when installing manifest content");
@@ -38,10 +39,21 @@ public abstract class ManifestInstaller {
     public static ManifestInstallResult downloadAndInstallDriver(
             Context context,
             ManifestEntry entry,
+            @Nullable ContentProfile.ContentType contentType,
             @Nullable ProgressListener progressListener
     ) {
         File destFile = null;
         try {
+            AdrenotoolsManager driverManager = new AdrenotoolsManager(context);
+            List<String> installedDrivers = driverManager.enumarateInstalledDrivers();
+            if (ManifestComponentHelper.versionExists(entry.id, installedDrivers)
+                    || ManifestComponentHelper.versionExists(entry.getDisplayName(), installedDrivers)) {
+                if (progressListener != null) progressListener.onProgress(1f);
+                return new ManifestInstallResult(
+                        true,
+                        context.getString(R.string.manifest_install_success, entry.getDisplayName())
+                );
+            }
             if (progressListener != null) progressListener.onProgress(0f);
             destFile = new File(context.getCacheDir(), buildCacheName(entry));
             if (!Downloader.downloadFile(entry.url, destFile)) {
@@ -52,8 +64,17 @@ public abstract class ManifestInstaller {
             }
             if (progressListener != null) progressListener.onProgress(1f);
 
-            String name = new AdrenotoolsManager(context).installDriver(Uri.fromFile(destFile));
+            ContentProfile remoteHint = contentType == null ? null : buildRemoteHint(entry, contentType);
+            String name = driverManager.installDriver(Uri.fromFile(destFile), remoteHint);
             if (name == null || name.trim().isEmpty()) {
+                return new ManifestInstallResult(
+                        false,
+                        context.getString(R.string.manifest_install_failed, entry.getDisplayName())
+                );
+            }
+            List<String> refreshedDrivers = driverManager.enumarateInstalledDrivers();
+            if (!ManifestComponentHelper.versionExists(entry.id, refreshedDrivers)
+                    && !ManifestComponentHelper.versionExists(entry.getDisplayName(), refreshedDrivers)) {
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
@@ -84,6 +105,7 @@ public abstract class ManifestInstaller {
     ) {
         File destFile = null;
         try {
+            ContentsManager manager = new ContentsManager(context);
             if (progressListener != null) progressListener.onProgress(0f);
             destFile = new File(context.getCacheDir(), buildCacheName(entry));
             if (!Downloader.downloadFile(entry.url, destFile)) {
@@ -93,8 +115,6 @@ public abstract class ManifestInstaller {
                 );
             }
 
-            ContentsManager manager = new ContentsManager(context);
-            manager.syncContents();
             ContentProfile remoteHint = buildRemoteHint(entry, expectedType);
             ContentProfile profile = extractContent(manager, Uri.fromFile(destFile), remoteHint);
             if (profile == null) {
@@ -104,6 +124,13 @@ public abstract class ManifestInstaller {
                 );
             }
             if (!finishInstall(manager, profile)) {
+                return new ManifestInstallResult(
+                        false,
+                        context.getString(R.string.manifest_install_failed, entry.getDisplayName())
+                );
+            }
+            manager.syncContents();
+            if (!manager.hasInstalledVersion(expectedType, entry.id, true)) {
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
@@ -185,18 +212,15 @@ public abstract class ManifestInstaller {
         profile.displayCategory = switch (contentType) {
             case CONTENT_TYPE_PROTON -> "Proton";
             case CONTENT_TYPE_WINE -> "Wine";
-            case CONTENT_TYPE_VULKAN_SDK -> "Vulkan SDK";
             case CONTENT_TYPE_DGVOODOO -> "dgVoodoo";
             default -> contentType.toString();
         };
+        profile.runtimeModel = ContentProfile.normalizeRuntimeModel(entry.variant);
         profile.sourceRepo = "utkarshdalal/GameNative";
         profile.sourceFeed = ManifestRepository.GAMENATIVE_MANIFEST_URL;
         profile.sourceLabel = "GameNative Manifest";
         profile.artifactName = buildCacheName(entry);
         profile.releaseTag = extractReleaseTag(entry.url);
-        if (contentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            profile.vulkanSdkVersion = entry.id;
-        }
         return profile;
     }
 

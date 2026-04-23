@@ -37,9 +37,9 @@ configure_app_version_env() {
 
   if [[ -z "${AEROSO_APP_VERSION_NAME:-}" ]]; then
     if [[ "${GITHUB_RUN_NUMBER:-}" =~ ^[0-9]+$ ]]; then
-      name="0.9c+.${GITHUB_RUN_NUMBER}"
+      name="0.9q+.${GITHUB_RUN_NUMBER}"
     else
-      name="0.9c+.$(date -u +%Y%m%d%H%M)"
+      name="0.9q+.$(date -u +%Y%m%d%H%M)"
     fi
     export AEROSO_APP_VERSION_NAME="${name}"
   fi

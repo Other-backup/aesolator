@@ -81,6 +81,8 @@ public abstract class ProcessHelper {
         EnvironmentManager.setEnvVars(envp);
 
         int pid = -1;
+        boolean forensicMode = isForensicModeEnv(envp);
+        int callbackCount = getDebugCallbackCount();
         try {
             Log.d("ProcessHelper", "Splitting command: " + command);
             String[] splitCommand = splitCommand(command);
@@ -89,11 +91,27 @@ public abstract class ProcessHelper {
             ProcessBuilder pb = new ProcessBuilder(splitCommand);
             pb.directory(workingDir);
             pb.environment().putAll(EnvironmentManager.getEnvVars());
-            if (debugCallbacks.isEmpty()) {
+            if (callbackCount == 0 && !forensicMode) {
                 File null_file = new File("/dev/null");
                 pb.redirectError(null_file);
                 pb.redirectOutput(null_file);
             }
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "info",
+                    "PROCESS_EXEC_START",
+                    null,
+                    "process_helper",
+                    "process_exec_start",
+                    ForensicLogger.fields(
+                            "command", command,
+                            "working_dir", workingDir != null ? workingDir.getAbsolutePath() : "",
+                            "forensic_mode", forensicMode ? "1" : "0",
+                            "debug_callback_count", callbackCount,
+                            "stream_capture", (callbackCount > 0 || forensicMode) ? "1" : "0",
+                            "env_hash", hashEnvp(envp)
+                    )
+            );
             java.lang.Process process = pb.start();
 
             // Accessing hidden field
@@ -103,8 +121,23 @@ public abstract class ProcessHelper {
             pid = pidField.getInt(process);
             pidField.setAccessible(false);
             Log.d("ProcessHelper", "Process started with pid: " + pid);
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "info",
+                    "PROCESS_EXEC_READY",
+                    null,
+                    "process_helper",
+                    "process_exec_ready",
+                    ForensicLogger.fields(
+                            "pid", pid,
+                            "command", command,
+                            "forensic_mode", forensicMode ? "1" : "0",
+                            "debug_callback_count", callbackCount,
+                            "stream_capture", (callbackCount > 0 || forensicMode) ? "1" : "0"
+                    )
+            );
 
-            if (!debugCallbacks.isEmpty()) {
+            if (callbackCount > 0 || forensicMode) {
                 createDebugThread(process.getInputStream());
                 createDebugThread(process.getErrorStream());
             }
@@ -116,6 +149,31 @@ public abstract class ProcessHelper {
             Log.e("ProcessHelper", "Error executing command: " + command, e);
         }
         return pid;
+    }
+
+    private static boolean isForensicModeEnv(String[] envp) {
+        if (envp == null) return false;
+        for (String entry : envp) {
+            if (entry == null) continue;
+            if (entry.startsWith("AERO_FORENSIC_MODE=")) {
+                String value = entry.substring("AERO_FORENSIC_MODE=".length()).trim();
+                return "1".equals(value) || "true".equalsIgnoreCase(value);
+            }
+        }
+        return false;
+    }
+
+    private static int getDebugCallbackCount() {
+        synchronized (debugCallbacks) {
+            return debugCallbacks.size();
+        }
+    }
+
+    private static String hashEnvp(String[] envp) {
+        if (envp == null || envp.length == 0) return "";
+        String[] copy = Arrays.copyOf(envp, envp.length);
+        Arrays.sort(copy);
+        return ForensicLogger.sha256Hex(String.join("\n", copy));
     }
 
     private static void createDebugThread(final InputStream inputStream) {
@@ -184,17 +242,12 @@ public abstract class ProcessHelper {
             if (startedQuotes) {
                 if (currChar == '"') {
                     startedQuotes = false;
-                    if (!value.isEmpty()) {
-                        value += '"';
-                        result.add(value);
-                        value = "";
-                    }
+                    continue;
                 }
                 else value += currChar;
             }
             else if (currChar == '"') {
                 startedQuotes = true;
-                value += '"';
             }
             else {
                 nextChar = i < count-1 ? command.charAt(i+1) : '\0';
@@ -218,6 +271,9 @@ public abstract class ProcessHelper {
             }
         }
 
+        if (!value.isEmpty()) {
+            result.add(value);
+        }
         return result.toArray(new String[0]);
     }
 
@@ -275,7 +331,11 @@ public abstract class ProcessHelper {
                 BufferedReader br = new BufferedReader(new InputStreamReader(fr));
                 data = br.readLine();
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                if (PRINT_DEBUG) {
+                    Log.d("ProcessHelper", "Failed to read /proc stat for pid " + allPids[index], e);
+                }
+            }
             for (String filter : filterList) {
                 if (data.contains(filter))
                     filteredPids.add(allPids[index]);

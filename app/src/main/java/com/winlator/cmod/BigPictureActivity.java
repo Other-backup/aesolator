@@ -15,6 +15,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -54,8 +55,11 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LaunchSecurity;
+import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -85,6 +89,8 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Toast;
 
 public class BigPictureActivity extends AppCompatActivity {
+    private long lastExitBackPressAtMs = 0L;
+
     private ImageView coverArtView;
     private TextView gameTitleView, graphicsDriverView, graphicsDriverVersionView, dxWrapperView, dxWrapperConfigView, audioDriverView, box64PresetView, playCountView, playtimeView;
     private RecyclerView recyclerView;
@@ -139,6 +145,7 @@ public class BigPictureActivity extends AppCompatActivity {
         boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
         setTheme(isDarkMode ? R.style.AppTheme_Dark : R.style.AppTheme);
         super.onCreate(savedInstanceState);
+        ImageFsInstaller.ensurePrefixPackToolkit(this, ImageFs.find(this));
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
@@ -653,6 +660,15 @@ public class BigPictureActivity extends AppCompatActivity {
         if (findViewById(R.id.settingsLayout).getVisibility() == View.VISIBLE) {
             hideSettingsView();
         } else {
+            SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+            if (preferences.getBoolean("warn_before_exit", false)) {
+                long now = SystemClock.elapsedRealtime();
+                if (now - lastExitBackPressAtMs > 2000L) {
+                    lastExitBackPressAtMs = now;
+                    AppUtils.showToast(this, R.string.back_press_exit_warning);
+                    return;
+                }
+            }
             super.onBackPressed();
         }
     }
@@ -949,7 +965,7 @@ public class BigPictureActivity extends AppCompatActivity {
 
         // Get the associated container for this shortcut (unchanged)
         Container container = manager.getContainerForShortcut(shortcut);
-        String graphicsDriver = shortcut.getExtra("graphicsDriver");
+        String graphicsDriver = Container.normalizeGraphicsDriver(shortcut.getExtra("graphicsDriver"));
 
         setTextOrPlaceholder(graphicsDriverView, graphicsDriver, container.getGraphicsDriver());
         setTextOrPlaceholder(graphicsDriverVersionView, shortcut.getExtra("graphicsDroverConfig"), container.getGraphicsDriverConfig());
@@ -995,6 +1011,10 @@ public class BigPictureActivity extends AppCompatActivity {
         intent.putExtra("container_id", shortcut.container.id);
         intent.putExtra("shortcut_path", shortcut.file.getPath());
         intent.putExtra("shortcut_name", shortcut.name); // Pass the shortcut name for display
+        String appId = shortcut.container.getSessionMetadata("appId", "");
+        if (!appId.isEmpty()) {
+            intent.putExtra(LaunchSecurity.EXTRA_APP_ID, appId);
+        }
         // Check if the shortcut has the disableXinput value; if not, default to false.
         String disableXinputValue = shortcut.getExtra("disableXinput", "0"); // Get value from shortcut or use "0" (false) by default
         intent.putExtra("disableXinput", disableXinputValue); // Use the actual value from the shortcut
@@ -1007,9 +1027,9 @@ public class BigPictureActivity extends AppCompatActivity {
         if (!shortcutValue.isEmpty()) {
             textView.setText(shortcutValue); // Use the value from the shortcut if available
         } else if (!containerValue.isEmpty()) {
-            textView.setText(containerValue); // Fallback to the container's value
+            textView.setText(containerValue); // degrade to the container's value
         } else {
-            textView.setText(R.string.not_set); // Fallback if neither are available
+            textView.setText(R.string.not_set); // degrade if neither are available
         }
     }
 
@@ -1018,9 +1038,9 @@ public class BigPictureActivity extends AppCompatActivity {
         if (!shortcutValue.isEmpty()) {
             textView.setText(label + shortcutValue); // Use the value from the shortcut if available
         } else if (!containerValue.isEmpty()) {
-            textView.setText(label + containerValue); // Fallback to the container's value
+            textView.setText(label + containerValue); // degrade to the container's value
         } else {
-            textView.setText(label + getString(R.string.not_set)); // Fallback if neither are available
+            textView.setText(label + getString(R.string.not_set)); // degrade if neither are available
         }
     }
 

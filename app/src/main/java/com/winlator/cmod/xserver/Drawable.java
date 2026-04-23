@@ -3,7 +3,6 @@ package com.winlator.cmod.xserver;
 import android.graphics.Bitmap;
 
 import com.winlator.cmod.core.Callback;
-import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.Texture;
@@ -16,13 +15,15 @@ public class Drawable extends XResource {
     public final short height;
     public final Visual visual;
     private Texture texture = new Texture();
+    // May be null when storage is texture-only or owned by an external/shared GPU path.
     private ByteBuffer data;
     private Runnable onDrawListener;
     private Callback<Drawable> onDestroyListener;
+    private boolean offscreenStorage;
     public final Object renderLock = new Object();
 
     static {
-        WinlatorNative.ensureLoaded("Drawable");
+        System.loadLibrary("winlator");
     }
 
     public Drawable(int id, int width, int height, Visual visual) {
@@ -56,9 +57,6 @@ public class Drawable extends XResource {
     }
 
     public void setData(ByteBuffer data) {
-        if (data == null) {
-            throw new IllegalArgumentException("Attempting to set Drawable.data to null!");
-        }
         this.data = data;
     }
 
@@ -82,6 +80,20 @@ public class Drawable extends XResource {
         this.onDestroyListener = onDestroyListener;
     }
 
+    public boolean isOffscreenStorage() {
+        return offscreenStorage;
+    }
+
+    public void setOffscreenStorage(boolean offscreenStorage) {
+        this.offscreenStorage = offscreenStorage;
+        forceUpdate();
+    }
+
+    public void forceUpdate() {
+        texture.setNeedsUpdate(true);
+        if (onDrawListener != null) onDrawListener.run();
+    }
+
     public void drawImage(short srcX, short srcY, short dstX, short dstY, short width, short height, byte depth, ByteBuffer data, short totalWidth, short totalHeight) {
         if (depth == 1) {
             drawBitmap(width, height, data, this.data);
@@ -98,8 +110,7 @@ public class Drawable extends XResource {
         this.data.rewind();
         data.rewind();
 
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
+        forceUpdate();
     }
 
     public ByteBuffer getImage(short x, short y, short width, short height) {
@@ -135,8 +146,7 @@ public class Drawable extends XResource {
         this.data.rewind();
         drawable.data.rewind();
 
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
+        forceUpdate();
     }
 
     public void fillColor(int color) {
@@ -152,8 +162,7 @@ public class Drawable extends XResource {
         fillRect((short)x, (short)y, (short)width, (short)height, color, this.getStride(), this.data);
         this.data.rewind();
 
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
+        forceUpdate();
     }
 
     public void drawLines(int color, int lineWidth, short... points) {
@@ -172,21 +181,14 @@ public class Drawable extends XResource {
 
         this.data.rewind();
 
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
+        forceUpdate();
     }
 
     public void drawAlphaMaskedBitmap(byte foreRed, byte foreGreen, byte foreBlue, byte backRed, byte backGreen, byte backBlue, Drawable srcDrawable, Drawable maskDrawable) {
         drawAlphaMaskedBitmap(foreRed, foreGreen, foreBlue, backRed, backGreen, backBlue, srcDrawable.data, maskDrawable.data, this.data);
         this.data.rewind();
 
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
-    }
-
-    public void forceUpdate() {
-        texture.setNeedsUpdate(true);
-        if (onDrawListener != null) onDrawListener.run();
+        forceUpdate();
     }
 
     private static native void drawBitmap(short width, short height, ByteBuffer srcData, ByteBuffer dstData);

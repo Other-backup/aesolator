@@ -7,6 +7,7 @@ import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkInfo;
+import android.util.Log;
 import android.net.wifi.WifiManager;
 import android.system.OsConstants;
 
@@ -113,7 +114,9 @@ public class NetworkHelper {
                     }
                 }
             }
-            catch (SocketException | UnknownHostException ignored) {}
+            catch (SocketException | UnknownHostException e) {
+                Log.w("NetworkHelper", "Failed to resolve netmask for current IPv4 address", e);
+            }
         }
 
         return netmask;

@@ -5,9 +5,10 @@ import android.content.Context;
 import androidx.annotation.Keep;
 
 import com.winlator.cmod.contentdialog.VortekConfigDialog;
+import com.winlator.cmod.contents.VortekVulkanDriverPackageManager;
 import com.winlator.cmod.core.GPUHelper;
-import com.winlator.cmod.core.GeneralComponents;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.VortekExtensionPolicy;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.Texture;
 import com.winlator.cmod.widget.XServerView;
@@ -26,7 +27,10 @@ import java.io.IOException;
 import java.util.Objects;
 
 public class VortekRendererComponent extends EnvironmentComponent implements ConnectionHandler, RequestHandler {
-    public static final int VK_MAX_VERSION = GPUHelper.vkMakeVersion(1, 3, 128);
+    private static final byte REQUEST_CODE_CREATE_CONTEXT = 1;
+    private static final byte REQUEST_CODE_SEND_EXTRA_DATA = 2;
+    public static final short IMAGE_CACHE_SIZE = 256;
+    public static final int VK_MAX_VERSION = GPUHelper.vkMakeVersion(1, 4, 4095);
 
     private XConnectorEpoll connector;
     private final Options options;
@@ -49,39 +53,52 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
     public static class Options {
         public int vkMaxVersion = VK_MAX_VERSION;
         public short maxDeviceMemory = 0;
-        public short imageCacheSize = 256;
+        public short imageCacheSize = IMAGE_CACHE_SIZE;
         public byte resourceMemoryType = 0;
         public String[] exposedDeviceExtensions = null;
+        public String[] disabledDeviceExtensions = null;
         public String libvulkanPath = null;
 
         public static Options fromKeyValueSet(Context context, KeyValueSet config) {
-            if (config == null || config.isEmpty()) return new Options();
-
             Options options = new Options();
-            String exposedDeviceExtensions = config.get("exposedDeviceExtensions", "all");
-            if (!exposedDeviceExtensions.isEmpty() && !"all".equals(exposedDeviceExtensions)) {
+            KeyValueSet safeConfig = config == null ? new KeyValueSet() : config;
+            String defaultProfile = VortekExtensionPolicy.PROFILE_MALI_SYSTEM;
+            String exposedDeviceExtensions = safeConfig.get("exposedDeviceExtensions");
+            if (exposedDeviceExtensions.isEmpty()) {
+                options.exposedDeviceExtensions = VortekExtensionPolicy.getSelectedExtensionsForProfile(
+                        safeConfig.get("extensionProfile", defaultProfile),
+                        VortekExtensionPolicy.buildCandidateExtensions(GPUHelper.vkGetDeviceExtensions())
+                );
+            } else if (!"all".equals(exposedDeviceExtensions)) {
                 options.exposedDeviceExtensions = exposedDeviceExtensions.split("\\|");
+            }
+            String disabledDeviceExtensions = safeConfig.get("disabledDeviceExtensions");
+            if (disabledDeviceExtensions.isEmpty()) {
+                disabledDeviceExtensions = VortekExtensionPolicy.joinExtensions(
+                        VortekExtensionPolicy.getDisabledExtensionsForProfile(safeConfig.get("extensionProfile", defaultProfile))
+                );
+            }
+            if (!disabledDeviceExtensions.isEmpty()) {
+                options.disabledDeviceExtensions = disabledDeviceExtensions.split("\\|");
             }
 
             String defaultVkMaxVersion = VortekConfigDialog.DEFAULT_VK_MAX_VERSION;
-            String vkMaxVersion = config.get("vkMaxVersion", defaultVkMaxVersion);
+            String vkMaxVersion = safeConfig.get("vkMaxVersion", defaultVkMaxVersion);
             if (!vkMaxVersion.equals(defaultVkMaxVersion)) {
                 String[] parts = vkMaxVersion.split("\\.");
                 options.vkMaxVersion = GPUHelper.vkMakeVersion(
                         Integer.parseInt(parts[0]),
                         Integer.parseInt(parts[1]),
-                        128
+                        4095
                 );
             }
 
-            options.maxDeviceMemory = (short) config.getInt("maxDeviceMemory");
-            options.imageCacheSize = (short) config.getInt("imageCacheSize", 256);
-            options.resourceMemoryType = (byte) config.getInt("resourceMemoryType");
-            String adrenotoolsDriver = config.get("adrenotoolsDriver");
-            options.libvulkanPath = GeneralComponents.getDefinitivePath(
-                    GeneralComponents.Type.ADRENOTOOLS_DRIVER,
-                    context,
-                    adrenotoolsDriver
+            options.maxDeviceMemory = (short) safeConfig.getInt("maxDeviceMemory");
+            options.imageCacheSize = (short) safeConfig.getInt("imageCacheSize", IMAGE_CACHE_SIZE);
+            options.resourceMemoryType = (byte) safeConfig.getInt("resourceMemoryType");
+            VortekVulkanDriverPackageManager packageManager = new VortekVulkanDriverPackageManager(context);
+            options.libvulkanPath = packageManager.resolveLibraryPath(
+                    safeConfig.get("vulkanDriverEntry", VortekVulkanDriverPackageManager.SYSTEM_ENTRY)
             );
             return options;
         }
@@ -125,7 +142,7 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
     }
 
     @Keep
-    private long getWindowHardwareBuffer(int windowId) {
+    private long getWindowHardwareBuffer(int windowId, boolean useHALPixelFormatBGRA8888) {
         Window window = xServer.windowManager.getWindow(windowId);
         if (window == null) return 0L;
 
@@ -135,7 +152,7 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
             XServerView xServerView = xServer.getRenderer().xServerView;
             Objects.requireNonNull(texture);
             xServerView.queueEvent(() -> destroyTexture(texture));
-            drawable.setTexture(new GPUImage(drawable.width, drawable.height));
+            drawable.setTexture(new GPUImage(drawable.width, drawable.height, false, useHALPixelFormatBGRA8888));
         }
         return ((GPUImage) drawable.getTexture()).getHardwareBufferPtr();
     }
@@ -170,14 +187,14 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
 
         int requestCode = inputStream.readInt();
         int requestLength = inputStream.readInt();
-        if (requestCode == 1) {
+        if (requestCode == REQUEST_CODE_CREATE_CONTEXT) {
             long contextPtr = createVkContext(client.clientSocket.fd, options);
             if (contextPtr > 0) {
                 client.setTag(contextPtr);
             } else if (connector != null) {
                 connector.killConnection(client);
             }
-        } else if (requestCode > 32767 && (requestCode >> 16) == 2) {
+        } else if (requestCode > 32767 && (requestCode >> 16) == REQUEST_CODE_SEND_EXTRA_DATA) {
             int requestId = requestCode & 65535;
             boolean success = handleExtraDataRequest((Long) client.getTag(), requestId, requestLength);
             if (!success) {

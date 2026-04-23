@@ -248,7 +248,7 @@ def render_markdown(
     lines.append("")
     lines.append("- Keep runtime launch flow changes in smallest possible follow-up patches.")
     lines.append("- For files in `critical` bucket, run `ci/winlator/check-patch-stack.sh` before push.")
-    lines.append("- Any new patch touching `XServerDisplayActivity` or `GuestProgramLauncherComponent` must include forensic markers and fallback reason codes.")
+    lines.append("- Any new patch touching `XServerDisplayActivity` or `GuestProgramLauncherComponent` must include forensic markers and secondary path reason codes.")
     lines.append("")
     return "\n".join(lines)
 

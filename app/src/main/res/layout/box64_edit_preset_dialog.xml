@@ -2,37 +2,58 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:paddingBottom="4dp">
 
     <EditText
         style="@style/EditText"
         android:layout_width="match_parent"
         android:id="@+id/ETName"
+        android:layout_marginBottom="4dp"
         android:hint="@string/untitled" />
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <LinearLayout
-            style="@style/FieldSet"
-            android:tag="theme_card">
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
-                <LinearLayout
-                    android:id="@+id/LLContent"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
-        </LinearLayout>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/surface_runtime_taskmgr_background"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp"
+        android:tag="theme_card preserve_background">
 
         <TextView
             android:id="@+id/TVEnvironmentVariables"
-            style="@style/FieldSetLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/surface_runtime_taskmgr_header_background"
+            android:paddingStart="8dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="5dp"
             android:tag="theme_badge"
-            android:text="@string/environment_variables" />
-    </FrameLayout>
+            android:text="@string/environment_variables"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8.8sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="6dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/LLContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="2dp"
+                android:paddingBottom="10dp" />
+        </ScrollView>
+    </LinearLayout>
 </LinearLayout>

@@ -3,7 +3,7 @@
 Consumer-side notes for the shared host LLVM lane used by `Ae.solator` local
 builds on `Termux/Android`, separate from rootfs.
 
-Updated: `2026-03-18`
+Updated: `2026-04-20`
 
 ## Ownership
 
@@ -20,12 +20,22 @@ not carry a second owner-side host-LLVM GitHub Actions lane.
 - pin local host compiler tools to `LLVM 22.1.1`
 - stop depending on mixed `termux 21.1.8` + NDK host binaries
 - prepare a stable host toolchain for future `wine` / runtime builds
+- provide the LLVM/Clang development link surface required by Mesa CLC lanes:
+  `libLLVM.so`, `libclang-cpp.so`, `opt`, `llvm-config`, and LLVM/Clang CMake
+  package files
 
 ## Local Build
 
 ```sh
 sh /data/data/com.termux/files/home/aesolator/tools/build-host-llvm-toolchain.sh
 ```
+
+This is a compatibility wrapper. It delegates to the canonical
+`wcp-runtime-lanes/ci/toolchains/build-host-llvm-android.sh` builder instead of
+carrying a second implementation in `Ae.solator`.
+On the Android/Termux device the delegated builder uses
+`LLVM_HOST_BUILD_MODE=termux-native` automatically when no desktop-host
+`ANDROID_NDK_ROOT` is exported.
 
 Installs into:
 
@@ -92,6 +102,9 @@ If the local LLVM lane exists, the env helper prepends it to `PATH` and exports:
 - not part of `imagefs`
 - not packaged into the APK
 - intended for local Android/Termux builds and later `wine` compilation
+- Mesa PanVK/Panfrost/AeMali may build `SPIRV-LLVM-Translator` and `libclc`
+  locally as product-specific support with this LLVM 22.1.1 toolchain. Those
+  are CLC support packages, not alternate LLVM owners.
 
 ## Device Prep
 

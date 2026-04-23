@@ -122,6 +122,10 @@ public final class ThemeAssetPainter {
     }
 
     private static void applyTaggedSurface(View view, boolean isDarkMode) {
+        if (hasTagFlag(view, "preserve_background")) {
+            return;
+        }
+
         if (hasTagFlag(view, "theme_card")) {
             view.setBackgroundResource(isDarkMode
                     ? R.drawable.surface_card_background_dark

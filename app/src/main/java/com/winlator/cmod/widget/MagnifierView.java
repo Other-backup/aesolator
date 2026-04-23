@@ -3,6 +3,7 @@ package com.winlator.cmod.widget;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.PointF;
+import android.util.Log;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -110,7 +111,9 @@ public class MagnifierView extends FrameLayout {
                     x = Short.parseShort(parts[0]);
                     y = Short.parseShort(parts[1]);
                 }
-                catch (NumberFormatException e) {}
+                catch (NumberFormatException e) {
+                    Log.w("MagnifierView", "Ignoring malformed saved magnifier position: " + config, e);
+                }
             }
 
             movePanel(x, y);

@@ -48,7 +48,7 @@ public abstract class WineThemeManager {
 
     public static void apply(Context context, ThemeInfo themeInfo, ScreenInfo screenInfo, File rootDir) {
         ImageFs targetImageFs = ImageFs.find(rootDir);
-        File userRegFile = new File(rootDir, ImageFs.WINEPREFIX+"/user.reg");
+        File userRegFile = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "user.reg");
         String background = Color.red(themeInfo.backgroundColor)+" "+Color.green(themeInfo.backgroundColor)+" "+Color.blue(themeInfo.backgroundColor);
 
         if (themeInfo.backgroundType == BackgroundType.IMAGE) createWallpaperBMPFile(context, screenInfo, targetImageFs);
@@ -136,7 +136,7 @@ public abstract class WineThemeManager {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         Canvas canvas = new Canvas(outputBitmap);
 
-        File userWallpaperFile = getUserWallpaperFile(context);
+        File userWallpaperFile = getUserWallpaperFile(targetImageFs.getRootDir());
         if (userWallpaperFile.isFile()) {
             Bitmap image = BitmapFactory.decodeFile(userWallpaperFile.getPath());
             Rect srcRect = new Rect(0, 0, image.getWidth(), image.getHeight());
@@ -166,5 +166,9 @@ public abstract class WineThemeManager {
 
     public static File getUserWallpaperFile(Context context) {
         return new File(ImageFs.find(context).getRootDir(), ImageFs.CONFIG_PATH+"/user-wallpaper.png");
+    }
+
+    public static File getUserWallpaperFile(File rootDir) {
+        return new File(ImageFs.find(rootDir).getRootDir(), ImageFs.CONFIG_PATH+"/user-wallpaper.png");
     }
 }

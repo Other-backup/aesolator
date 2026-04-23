@@ -111,6 +111,16 @@
         <item name="android:textColor">?attr/aePrimaryTextColor</item>
     </style>
 
+    <style name="RuntimeComboBoxCompact" parent="ComboBox">
+        <item name="android:layout_height">40dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">34dp</item>
+        <item name="android:background">@drawable/surface_runtime_combo_box</item>
+        <item name="android:popupBackground">@drawable/surface_runtime_taskmgr_background</item>
+    </style>
+
     <style name="MultiSelectionComboBox" parent="ComboBox"/>
     <style name="MultiSelectionComboBox.Dark" parent="ComboBox.Dark"/>
 
@@ -245,6 +255,24 @@
 
     <style name="ButtonInlineNeutral.Dark" parent="ButtonInlineNeutral" />
 
+    <style name="ButtonInlineRuntimeNeutral" parent="ButtonInlineNeutral">
+        <item name="android:background">@drawable/surface_runtime_button_neutral</item>
+        <item name="android:textColor">@color/surface_runtime_button_text</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+    </style>
+
+    <style name="ButtonInlineRuntimePositive" parent="ButtonInlineNeutral">
+        <item name="android:background">@drawable/surface_runtime_button_positive</item>
+        <item name="android:textColor">@color/surface_runtime_button_positive_text</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+    </style>
+
     <style name="ToggleButtonCompact">
         <item name="android:layout_width">72dp</item>
         <item name="android:layout_height">34dp</item>
@@ -336,6 +364,16 @@
     <style name="ListMenuButton.Dark" parent="ListMenuButton">
         <item name="android:background">@drawable/list_menu_button_bg_dark</item>
         <item name="android:tint">@color/colorAccentDark</item>
+    </style>
+
+    <style name="RuntimeListMenuButton" parent="BaseImageButton">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:background">@drawable/surface_runtime_button_neutral</item>
+        <item name="android:tint">@color/surface_runtime_button_text</item>
+        <item name="android:padding">5dp</item>
+        <item name="android:layout_marginStart">2dp</item>
+        <item name="android:layout_marginEnd">0dp</item>
     </style>
 
     <!-- Line Styles -->

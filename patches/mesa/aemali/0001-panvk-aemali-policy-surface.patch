@@ -1,0 +1,314 @@
+diff --git a/src/panfrost/vulkan/meson.build b/src/panfrost/vulkan/meson.build
+--- a/src/panfrost/vulkan/meson.build
++++ b/src/panfrost/vulkan/meson.build
+@@ -34,6 +34,7 @@ libpanvk_files = files(
+   'panvk_buffer.c',
+   'panvk_cmd_pool.c',
+   'panvk_device_memory.c',
++  'panvk_aemali_policy.c',
+   'panvk_host_copy.c',
+   'panvk_image.c',
+   'panvk_instance.c',
+diff --git a/src/panfrost/vulkan/panvk_aemali_policy.c b/src/panfrost/vulkan/panvk_aemali_policy.c
+new file mode 100644
+--- /dev/null
++++ b/src/panfrost/vulkan/panvk_aemali_policy.c
+@@ -0,0 +1,199 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#include "panvk_aemali_policy.h"
++
++#include "util/log.h"
++#include "util/os_misc.h"
++#include "vk_physical_device.h"
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++static const char *
++aemali_first_option(const char *primary, const char *secondary)
++{
++   const char *value = os_get_option(primary);
++   if (value && value[0])
++      return value;
++
++   value = os_get_option(secondary);
++   return value && value[0] ? value : NULL;
++}
++
++static bool
++aemali_is_truthy(const char *value)
++{
++   if (!value || !value[0])
++      return false;
++
++   return !strcmp(value, "1") ||
++          !strcmp(value, "true") ||
++          !strcmp(value, "on") ||
++          !strcmp(value, "yes") ||
++          !strcmp(value, "enabled") ||
++          !strcmp(value, "aemali") ||
++          !strcmp(value, "mali") ||
++          !strcmp(value, "mali-system") ||
++          !strcmp(value, "mali-compat");
++}
++
++bool
++panvk_aemali_policy_enabled(void)
++{
++   const char *driver = aemali_first_option("AEMALI_DRIVER", "AERO_MESA_DRIVER");
++   const char *native = os_get_option("AERO_VORTEK_MALI_NATIVE_VULKAN");
++
++   return aemali_is_truthy(driver) || aemali_is_truthy(native);
++}
++
++const char *
++panvk_aemali_policy_profile(void)
++{
++   const char *profile =
++      aemali_first_option("AEMALI_PROFILE", "AERO_VORTEK_EXTENSION_PROFILE");
++
++   return profile && profile[0] ? profile : "mali-system";
++}
++
++static bool
++aemali_is_compat_profile(void)
++{
++   const char *profile = panvk_aemali_policy_profile();
++
++   return !strcmp(profile, "mali-compat") ||
++          !strcmp(profile, "mali-compatibility") ||
++          !strcmp(profile, "mediatek-compat");
++}
++
++static uint32_t
++aemali_parse_api_ceiling(void)
++{
++   const char *raw = aemali_first_option("AEMALI_VK_API_CEILING",
++                                         "AERO_VORTEK_VK_MAX_VERSION");
++   unsigned major = 0, minor = 0;
++
++   if (!raw || !raw[0])
++      return 0;
++
++   if (sscanf(raw, "%u.%u", &major, &minor) != 2)
++      return 0;
++
++   if (major == 0 || major > 1 || minor > 4)
++      return 0;
++
++   return VK_MAKE_API_VERSION(0, major, minor, VK_HEADER_VERSION);
++}
++
++uint32_t
++panvk_aemali_clamp_instance_version(uint32_t version)
++{
++   const uint32_t ceiling = aemali_parse_api_ceiling();
++
++   if (!panvk_aemali_policy_enabled() || !ceiling)
++      return version;
++
++   return version > ceiling ? ceiling : version;
++}
++
++void
++panvk_aemali_filter_device_extensions(struct vk_device_extension_table *ext,
++                                      unsigned pan_arch)
++{
++   if (!panvk_aemali_policy_enabled() || !ext)
++      return;
++
++   if (aemali_is_compat_profile()) {
++      ext->KHR_push_descriptor = false;
++      ext->KHR_shader_float_controls = false;
++      ext->KHR_shader_float_controls2 = false;
++      ext->EXT_color_write_enable = false;
++      ext->EXT_extended_dynamic_state = false;
++      ext->EXT_hdr_metadata = false;
++#ifdef PANVK_USE_WSI_PLATFORM
++      ext->KHR_swapchain_maintenance1 = false;
++      ext->EXT_swapchain_maintenance1 = false;
++#endif
++   }
++
++   if (pan_arch < 10) {
++      ext->KHR_maintenance4 = false;
++      ext->KHR_maintenance5 = false;
++      ext->KHR_maintenance6 = false;
++      ext->KHR_maintenance7 = false;
++      ext->KHR_maintenance8 = false;
++      ext->KHR_spirv_1_4 = false;
++      ext->KHR_shader_quad_control = false;
++      ext->KHR_shader_maximal_reconvergence = false;
++   }
++}
++
++void
++panvk_aemali_get_driver_name(char *dst, size_t dst_size,
++                            const char *fallback)
++{
++   if (!dst || !dst_size)
++      return;
++
++   if (panvk_aemali_policy_enabled()) {
++      snprintf(dst, dst_size, "aemali-panvk");
++      return;
++   }
++
++   snprintf(dst, dst_size, "%s", fallback ? fallback : "panvk");
++}
++
++void
++panvk_aemali_get_driver_info(char *dst, size_t dst_size,
++                            const char *fallback)
++{
++   const char *profile = panvk_aemali_policy_profile();
++   const char *route = aemali_first_option("AEMALI_ROUTE",
++                                           "AERO_VORTEK_VULKAN_SOURCE");
++   const char *transport = aemali_first_option("AEMALI_TRANSPORT",
++                                               "AERO_VORTEK_VULKAN_DRIVER_TRANSPORT");
++   const char *ceiling = aemali_first_option("AEMALI_VK_API_CEILING",
++                                             "AERO_VORTEK_VK_MAX_VERSION");
++
++   if (!dst || !dst_size)
++      return;
++
++   if (!panvk_aemali_policy_enabled()) {
++      snprintf(dst, dst_size, "%s", fallback ? fallback : "");
++      return;
++   }
++
++   snprintf(dst, dst_size,
++            "%s; AeMali profile=%s route=%s transport=%s vk_ceiling=%s",
++            fallback ? fallback : "",
++            profile ? profile : "mali-system",
++            route ? route : "panvk",
++            transport ? transport : "drm-render-node-experimental",
++            ceiling ? ceiling : "driver-default");
++}
++
++void
++panvk_aemali_log_startup(void)
++{
++   const char *route;
++   const char *transport;
++   const char *ceiling;
++
++   if (!panvk_aemali_policy_enabled())
++      return;
++
++   route = aemali_first_option("AEMALI_ROUTE", "AERO_VORTEK_VULKAN_SOURCE");
++   transport = aemali_first_option("AEMALI_TRANSPORT",
++                                   "AERO_VORTEK_VULKAN_DRIVER_TRANSPORT");
++   ceiling = aemali_first_option("AEMALI_VK_API_CEILING",
++                                 "AERO_VORTEK_VK_MAX_VERSION");
++
++   mesa_logi("AeMali PanVK policy: profile=%s route=%s transport=%s vk_ceiling=%s",
++             panvk_aemali_policy_profile(),
++             route ? route : "panvk",
++             transport ? transport : "drm-render-node-experimental",
++             ceiling ? ceiling : "driver-default");
++}
+diff --git a/src/panfrost/vulkan/panvk_aemali_policy.h b/src/panfrost/vulkan/panvk_aemali_policy.h
+new file mode 100644
+--- /dev/null
++++ b/src/panfrost/vulkan/panvk_aemali_policy.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#ifndef PANVK_AEMALI_POLICY_H
++#define PANVK_AEMALI_POLICY_H
++
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++
++#include "vulkan/vulkan_core.h"
++
++struct vk_device_extension_table;
++
++bool panvk_aemali_policy_enabled(void);
++const char *panvk_aemali_policy_profile(void);
++uint32_t panvk_aemali_clamp_instance_version(uint32_t version);
++void panvk_aemali_filter_device_extensions(struct vk_device_extension_table *ext,
++                                           unsigned pan_arch);
++void panvk_aemali_get_driver_name(char *dst, size_t dst_size,
++                                  const char *fallback);
++void panvk_aemali_get_driver_info(char *dst, size_t dst_size,
++                                  const char *fallback);
++void panvk_aemali_log_startup(void);
++
++#endif
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -10,6 +10,7 @@
+ 
+ #include "vk_alloc.h"
+ #include "vk_log.h"
++#include "panvk_aemali_policy.h"
+ 
+ #include "panvk_entrypoints.h"
+ #include "panvk_instance.h"
+@@ -82,7 +83,7 @@ panvk_EnumerateInstanceVersion(uint32_t *pApiVersion)
+ {
+    uint32_t version_override = vk_get_version_override();
+    *pApiVersion = version_override ? version_override :
+-      VK_MAKE_API_VERSION(0, 1, 4, VK_HEADER_VERSION);
++      panvk_aemali_clamp_instance_version(VK_MAKE_API_VERSION(0, 1, 4, VK_HEADER_VERSION));
+ 
+    return VK_SUCCESS;
+ }
+@@ -288,6 +289,7 @@ panvk_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
+ 
+    if (PANVK_DEBUG(STARTUP))
+       mesa_logi("Created an instance");
++   panvk_aemali_log_startup();
+ 
+    VG(VALGRIND_CREATE_MEMPOOL(instance, 0, false));
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -16,6 +16,7 @@
+ #include "vk_limits.h"
+ #include "vk_shader_module.h"
+ 
++#include "panvk_aemali_policy.h"
+ #include "panvk_instance.h"
+ #include "panvk_buffer.h"
+ #include "panvk_cmd_draw.h"
+@@ -222,9 +223,11 @@ panvk_per_arch(get_physical_device_extensions)(
+       .VALVE_mutable_descriptor_type = PAN_ARCH >= 9,
+ 
+       .ARM_shader_core_builtins = true,
+       .ARM_shader_core_properties = has_vk1_1,
+       .ARM_scheduling_controls = PAN_ARCH >= 10,
+    };
++
++   panvk_aemali_filter_device_extensions(ext, PAN_ARCH);
+ }
+ 
+ static bool
+@@ -1212,9 +1215,11 @@ panvk_per_arch(get_physical_device_properties)(
+    STATIC_ASSERT(sizeof(instance->driver_build_sha) >= VK_UUID_SIZE);
+    memcpy(properties->driverUUID, instance->driver_build_sha, VK_UUID_SIZE);
+ 
+-   snprintf(properties->driverName, VK_MAX_DRIVER_NAME_SIZE, "panvk");
+-   snprintf(properties->driverInfo, VK_MAX_DRIVER_INFO_SIZE,
+-            "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
++   panvk_aemali_get_driver_name(properties->driverName,
++                                VK_MAX_DRIVER_NAME_SIZE, "panvk");
++   char driver_info[VK_MAX_DRIVER_INFO_SIZE];
++   snprintf(driver_info, sizeof(driver_info), "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
++   panvk_aemali_get_driver_info(properties->driverInfo, VK_MAX_DRIVER_INFO_SIZE, driver_info);
+ 
+    /* VK_EXT_physical_device_drm */
+    if (device->drm.primary_rdev) {

@@ -36,7 +36,7 @@ GROUP_RULES: Tuple[GroupRule, ...] = (
         checks=(
             TokenRule("telemetry_calls", (r"ForensicLogger\.logEvent\(",)),
             TokenRule("reason_markers", (r'"reason"\s*,', r"_reason", r"GUARD_REASON")),
-            TokenRule("fallback_guardrails", (r"fallback", r"deferred", r"guard")),
+            TokenRule("fallback_guardrails", (r"secondary path", r"deferred", r"guard")),
             TokenRule(
                 "external_signal_inputs",
                 (

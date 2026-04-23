@@ -1,0 +1,9 @@
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index c55cc42f..e656fc28 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -728,3 +728,3 @@ panvk_per_arch(get_physical_device_properties)(
+    *properties = (struct vk_properties){
+-      .apiVersion = get_api_version(),
++      .apiVersion = panvk_aemali_clamp_instance_version(get_api_version()),
+       .driverVersion = vk_get_driver_version(),

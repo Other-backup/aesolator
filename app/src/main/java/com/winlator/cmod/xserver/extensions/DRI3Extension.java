@@ -31,7 +31,9 @@ public class DRI3Extension implements Extension {
     public static final byte MAJOR_OPCODE = -102;
     private final Callback<Drawable> onDestroyDrawableListener = (drawable) -> {
         ByteBuffer data = drawable.getData();
-        SysVSharedMemory.unmapSHMSegment(data, data.capacity());
+        if (data != null) {
+            SysVSharedMemory.unmapSHMSegment(data, data.capacity());
+        }
     };
 
     private static abstract class ClientOpcodes {

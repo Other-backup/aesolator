@@ -34,11 +34,13 @@ def load_assembler(path: Path) -> dict:
 
 def build_markdown(scenario_dir: Path, root_mode: str) -> str:
     scenario_meta = read_keyvals(scenario_dir / "scenario_meta.txt")
+    session_meta = read_keyvals(scenario_dir.parent / "session_meta.txt")
     wait_meta = read_keyvals(scenario_dir / "wait-status.txt")
     assembler = load_assembler(scenario_dir / "runtime-log-assembler.json")
     issues = assembler.get("issues", []) if isinstance(assembler, dict) else []
-    events = assembler.get("events", []) if isinstance(assembler, dict) else []
+    events = assembler.get("forensic_events_tail", []) if isinstance(assembler, dict) else []
     summary = read_text(scenario_dir / "runtime-log-assembler.summary.txt").strip()
+    ptrace_summary = read_text(scenario_dir / "runas-ptrace.summary.txt").strip()
     logcat_filtered = read_text(scenario_dir / "logcat-filtered.txt").splitlines()[-20:]
     files = sorted(p.name for p in scenario_dir.iterdir() if p.is_file())
     runtime_logs = sorted((scenario_dir / "runtime-logs").iterdir()) if (scenario_dir / "runtime-logs").is_dir() else []
@@ -49,8 +51,8 @@ def build_markdown(scenario_dir: Path, root_mode: str) -> str:
         "## Metadata",
         "",
         f"- label: `{scenario_meta.get('label', '')}`",
-        f"- package: `{scenario_meta.get('package', '')}`",
-        f"- serial: `{scenario_meta.get('serial', '')}`",
+        f"- package: `{scenario_meta.get('package', session_meta.get('package', ''))}`",
+        f"- serial: `{scenario_meta.get('serial', session_meta.get('serial', ''))}`",
         f"- root_mode: `{root_mode}`",
         f"- wait_status: `intent={wait_meta.get('saw_intent', '')} submit={wait_meta.get('saw_submit', '')} terminal={wait_meta.get('saw_terminal', '')}`",
         f"- assembler_summary: `{summary}`",
@@ -76,6 +78,8 @@ def build_markdown(scenario_dir: Path, root_mode: str) -> str:
             )
     lines.extend(["", "## Logcat tail", "", "```text"])
     lines.extend(logcat_filtered or ["<empty>"])
+    lines.extend(["```", "", "## run-as ptrace", "", "```text"])
+    lines.extend((ptrace_summary.splitlines() if ptrace_summary else ["<empty>"]))
     lines.extend(["```", "", "## Files", ""])
     for name in files:
         lines.append(f"- `{name}`")

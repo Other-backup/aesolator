@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_OUT_DIR:=/tmp/winlator-harvard-suite-$(date +%Y%m%d_%H%M%S)}"
 : "${WLT_SCENARIO_MATRIX:=freewine11:1}"
 : "${WLT_BASELINE_LABEL:=freewine11}"

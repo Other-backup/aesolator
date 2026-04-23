@@ -1,0 +1,161 @@
+{
+  "captured_at": "2026-04-13",
+  "purpose": "Chapter 2 donor freeze for relevant GitHub frontier",
+  "entries": [
+    {
+      "repo": "AndreRH/wine",
+      "class": "source",
+      "role": "arm64ec baseline",
+      "ref": "arm64ec",
+      "head": "04d384823c7594274bb0a99121cc733b8478d33b"
+    },
+    {
+      "repo": "ValveSoftware/Proton",
+      "class": "source",
+      "role": "fresh runtime/source wall",
+      "ref": "bleeding-edge",
+      "head": "9a6055401d42b62ff2a1fe6804736d975e6c4dca"
+    },
+    {
+      "repo": "ValveSoftware/Proton",
+      "class": "source",
+      "role": "default release line",
+      "ref": "proton_10.0",
+      "head": "e2becb87430ca3ff510d949d9e75fa9b401da489"
+    },
+    {
+      "repo": "utkarshdalal/GameNative",
+      "class": "app",
+      "role": "primary app/runtime donor",
+      "ref": "master",
+      "head": "9a8401c2194283d78870c1eefb7f36e1e9a998ba"
+    },
+    {
+      "repo": "brunodev85/winlator",
+      "class": "app",
+      "role": "upstream app baseline",
+      "ref": "refs/heads/main",
+      "head": "95b053b768669be14b8190bb9cd82ec2c6088116"
+    },
+    {
+      "repo": "winebox64/winlator",
+      "class": "app",
+      "role": "comparative app fork",
+      "ref": "refs/heads/main",
+      "head": "c7021b03d837a9ecfb6e85850b257dc2d7abf33d"
+    },
+    {
+      "repo": "afeimod/winlator-mod",
+      "class": "app-rootfs",
+      "role": "comparative mod and rootfs donor",
+      "ref": "refs/heads/main",
+      "head": "7020f5320f9c1bfb77ee2f62cba228198393f1de"
+    },
+    {
+      "repo": "The412Banner/Nightlies",
+      "class": "feed-package",
+      "role": "component freshness wall",
+      "release": "nightly-20260413-190849"
+    },
+    {
+      "repo": "Arihany/WinlatorWCPHub",
+      "class": "feed-package",
+      "role": "package index and catalog donor"
+    },
+    {
+      "repo": "Waim908/wine-winlator",
+      "class": "feed-package",
+      "role": "runtime packaging donor",
+      "release": "10.14-r1-arm64ec"
+    },
+    {
+      "repo": "Waim908/rootfs-winlator",
+      "class": "rootfs",
+      "role": "primary rootfs/imagefs donor",
+      "release": "rootfs-g7.1.6-1.1"
+    },
+    {
+      "repo": "Alexoqool/winlator-bionic-build",
+      "class": "rootfs-bionic",
+      "role": "bionic runtime/rootfs donor",
+      "release": "2026-04-12"
+    },
+    {
+      "repo": "Xnick417x/Winlator-Bionic-Nightly-wcp",
+      "class": "feed-package-bionic",
+      "role": "bionic nightly WCP donor"
+    },
+    {
+      "repo": "moze30/winlator-glibc",
+      "class": "rootfs-glibc",
+      "role": "glibc comparative donor"
+    },
+    {
+      "repo": "moze30/winlator-wcp",
+      "class": "feed-package-glibc",
+      "role": "glibc WCP comparative donor"
+    },
+    {
+      "repo": "xodiosx/wine-stuff",
+      "class": "source-build",
+      "role": "Termux runtime/build comparative donor"
+    },
+    {
+      "repo": "atgehrhardt/wine-wcp-builder",
+      "class": "tooling-builder",
+      "role": "builder and packaging automation donor"
+    },
+    {
+      "repo": "AndreRH/hangover",
+      "class": "source-translator",
+      "role": "ARM64EC hybrid execution donor",
+      "ref": "refs/heads/master",
+      "head": "689e2bea9090b80d7f7e8fdb5367046c5e67e4f8"
+    },
+    {
+      "repo": "FEX-Emu/FEX",
+      "class": "translator",
+      "role": "primary FEX donor",
+      "ref": "refs/heads/main",
+      "head": "9681559d56eee7eff5cd9232ca3b49ba419cb62b"
+    },
+    {
+      "repo": "ptitSeb/box64",
+      "class": "translator",
+      "role": "primary box64 donor",
+      "ref": "refs/heads/main",
+      "head": "f388a8f4937dcbc196e2046e291f823b57ef68c0"
+    },
+    {
+      "repo": "K11MCH1/AdrenoToolsDrivers",
+      "class": "graphics-provider",
+      "role": "primary Adreno driver donor",
+      "ref": "refs/heads/main",
+      "head": "278cdc7522e0873fed1e3aa963539a0c374c7862"
+    },
+    {
+      "repo": "WearyConcern1165/ExynosTools",
+      "class": "graphics-provider",
+      "role": "primary Exynos/Xclipse donor",
+      "ref": "refs/heads/main",
+      "head": "fa0d8428b51c1144243965bd67eda9e6d06e4496"
+    },
+    {
+      "repo": "Honkonx/winlator-honkon",
+      "class": "device-comparative",
+      "role": "VirGL-focused comparative donor"
+    },
+    {
+      "repo": "Fcharan/WinlatorMali",
+      "class": "device-comparative",
+      "role": "Mali-focused comparative donor"
+    },
+    {
+      "repo": "lastmile-ai/mcp-agent",
+      "class": "tooling",
+      "role": "durable MCP-native automation donor",
+      "ref": "main",
+      "head": "f62d849350816588b1c6294e7914bbe4d8b84072"
+    }
+  ]
+}

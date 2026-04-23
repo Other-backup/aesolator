@@ -433,15 +433,15 @@ if legacy_apply in text:
 elif legacy_apply_replacement not in text:
     raise SystemExit("targeted reject-heal failed: ContentsManager applyContent guard not found")
 
-vulkan_prefix_line = """    public static final String[] VULKAN_SDK_TRUST_PREFIXES = {"${sharedir}/vulkan", "${sharedir}/vulkan-sdk"};
-"""
 graphics_prefix_block = """    public static final String[] TURNIP_DRIVER_TRUST_PREFIXES = {"${sharedir}/vulkan", "${libdir}"};
     public static final String[] OPENGL_DRIVER_TRUST_PREFIXES = {"${libdir}", "${sharedir}/glvnd", "${sharedir}/drirc.d"};
 """
+trust_prefix_anchor = """    public static File getInstallDir(Context context, ContentProfile profile) {
+"""
 if "TURNIP_DRIVER_TRUST_PREFIXES" not in text and "OPENGL_DRIVER_TRUST_PREFIXES" not in text:
-    if vulkan_prefix_line not in text:
+    if trust_prefix_anchor not in text:
         raise SystemExit("targeted reject-heal failed: ContentsManager trust-prefix anchor not found")
-    text = text.replace(vulkan_prefix_line, vulkan_prefix_line + graphics_prefix_block, 1)
+    text = text.replace(trust_prefix_anchor, graphics_prefix_block + "\n" + trust_prefix_anchor, 1)
 
 preferred_profile_marker = """    public static File getInstallDir(Context context, ContentProfile profile) {
 """
@@ -483,7 +483,6 @@ repo_managed_pattern = re.compile(
 )
 repo_managed_replacement = """    private boolean isRepoManagedOverlayType(ContentProfile.ContentType type) {
         return isWineFamilyType(type)
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
                 || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
@@ -501,7 +500,6 @@ trusted_prefix_pattern = re.compile(
 )
 trusted_prefix_replacement = """    private boolean isTrustedByPrefix(ContentProfile.ContentType type, String normalizedTarget) {
         String[] prefixes = switch (type) {
-            case CONTENT_TYPE_VULKAN_SDK -> VULKAN_SDK_TRUST_PREFIXES;
             case CONTENT_TYPE_TURNIP_DRIVER -> TURNIP_DRIVER_TRUST_PREFIXES;
             case CONTENT_TYPE_OPENGL_DRIVER -> OPENGL_DRIVER_TRUST_PREFIXES;
             default -> null;
@@ -575,7 +573,7 @@ PY
       [[ -f "${xserver_rej}" ]] || return 1
       [[ -f "${xserver_vulkan_template}" ]] || return 1
       grep -Fq 'private static void appendUniqueEnvValue(EnvVars envVars, String key, String value)' "${xserver_file}" || return 1
-      grep -Fq 'envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");' "${xserver_file}" || return 1
+      grep -Fq 'envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);' "${xserver_file}" || return 1
 
       python3 - "${xserver_file}" "${xserver_vulkan_template}" <<'PY'
 import re
@@ -691,7 +689,7 @@ apply_one() {
     return 0
   fi
 
-  # Fallback: generate rejects (NO --3way with --reject)
+  # degrade: generate rejects (NO --3way with --reject)
   log "Conflicts, generating *.rej: $name"
   git -C "$WINLATOR_SRC_DIR" apply --recount --reject --whitespace=nowarn --ignore-whitespace "$patch" || reject_rc=$?
   mapfile -t rejs < <(find "${WINLATOR_SRC_DIR}" -name '*.rej' -type f | sort)
@@ -699,7 +697,7 @@ apply_one() {
   # Some patches fail --3way due index drift but still apply cleanly in --reject mode.
   if [[ "${#rejs[@]}" -eq 0 ]]; then
     if [[ "${reject_rc}" -eq 0 ]] || git -C "$WINLATOR_SRC_DIR" apply --reverse --check --recount --ignore-whitespace "$patch" >/dev/null 2>&1; then
-      log "Applied via reject fallback: $name"
+      log "Applied via reject secondary path: $name"
       return 0
     fi
   fi

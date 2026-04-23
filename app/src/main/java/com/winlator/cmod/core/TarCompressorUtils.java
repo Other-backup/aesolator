@@ -26,6 +26,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public abstract class TarCompressorUtils {
+    private static final String TAG = "TarCompressorUtils";
+
     public enum Type {XZ, ZSTD}
 
     // Interface to define the exclusion filter
@@ -33,6 +35,83 @@ public abstract class TarCompressorUtils {
         boolean shouldInclude(File file);
     }
 
+    static File resolveExtractionTarget(File rootDir, String entryName) throws IOException {
+        File target = FileUtils.resolveSafeArchiveEntry(rootDir, entryName);
+        if (target == null) {
+            logError("Blocked unsafe archive entry: " + entryName);
+        }
+        return target;
+    }
+
+    private static void logError(String message) {
+        try {
+            Log.e(TAG, message);
+        } catch (RuntimeException ignored) {
+            // Logger may be unavailable during bootstrap or test harness execution.
+        }
+    }
+
+    private static void logError(String message, Throwable throwable) {
+        try {
+            Log.e(TAG, message, throwable);
+        } catch (RuntimeException ignored) {
+            // Logger may be unavailable during bootstrap or test harness execution.
+        }
+    }
+
+    static String normalizeArchiveEntryName(String entryName) {
+        if (entryName == null) return "";
+        String normalized = entryName.replace('\\', '/');
+        while (normalized.startsWith("./")) normalized = normalized.substring(2);
+        while (normalized.endsWith("/") && normalized.length() > 1) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    static String stripTopLevelDirectory(String entryName, String topLevelDirectory) {
+        String normalizedEntry = normalizeArchiveEntryName(entryName);
+        String normalizedTop = normalizeArchiveEntryName(topLevelDirectory);
+        if (normalizedTop.isEmpty()) return normalizedEntry;
+        if (normalizedEntry.equals(normalizedTop)) return "";
+        String prefix = normalizedTop + "/";
+        return normalizedEntry.startsWith(prefix) ? normalizedEntry.substring(prefix.length()) : normalizedEntry;
+    }
+
+    private static boolean isTmpDirectoryEntry(String entryName) {
+        String normalized = normalizeArchiveEntryName(entryName);
+        return normalized.equals("tmp") || normalized.startsWith("tmp/") || normalized.contains("/tmp/");
+    }
+
+    private static File applyListener(File rootDir, File file, long size, OnExtractFileListener onExtractFileListener) throws IOException {
+        if (onExtractFileListener == null) return file;
+        File mapped = onExtractFileListener.onExtractFile(file, size);
+        if (mapped == null) return null;
+        File canonical = mapped.getCanonicalFile();
+        if (!FileUtils.isSameOrChild(rootDir, canonical)) {
+            logError("Blocked listener-remapped archive entry outside destination: " + mapped.getAbsolutePath());
+            return null;
+        }
+        return canonical;
+    }
+
+    private static boolean ensureParentDirectory(File file) {
+        File parent = file.getParentFile();
+        return parent == null || parent.isDirectory() || parent.mkdirs();
+    }
+
+    private static boolean extractEntryData(ArchiveInputStream tar, TarArchiveEntry entry, File file) throws IOException {
+        if (entry.isDirectory()) {
+            return file.isDirectory() || file.mkdirs();
+        }
+        if (!ensureParentDirectory(file)) return false;
+        if (entry.isSymbolicLink()) {
+            return FileUtils.symlink(entry.getLinkName(), file.getAbsolutePath());
+        }
+        try (BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file), StreamUtils.BUFFER_SIZE)) {
+            return StreamUtils.copy(tar, outStream);
+        }
+    }
 
     private static void addFile(ArchiveOutputStream tar, File file, String entryName) {
         try {
@@ -42,7 +121,9 @@ public abstract class TarCompressorUtils {
             }
             tar.closeArchiveEntry();
         }
-        catch (Exception e) {}
+        catch (Exception e) {
+            logError("Failed to add archive entry: " + entryName, e);
+        }
     }
 
     private static void addLinkFile(ArchiveOutputStream tar, File file, String entryName) {
@@ -52,7 +133,9 @@ public abstract class TarCompressorUtils {
             tar.putArchiveEntry(entry);
             tar.closeArchiveEntry();
         }
-        catch (Exception e) {}
+        catch (Exception e) {
+            logError("Failed to add archive symlink: " + entryName, e);
+        }
     }
 
     private static void addDirectory(ArchiveOutputStream tar, File folder, String basePath, ExclusionFilter filter) throws IOException {
@@ -155,33 +238,25 @@ public abstract class TarCompressorUtils {
 
     private static boolean extract(Type type, InputStream source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null) return false;
+        File rootDir;
+        try {
+            rootDir = FileUtils.ensureCanonicalDirectory(destination);
+        }
+        catch (IOException e) {
+            logError("Invalid extraction destination: " + destination, e);
+            return false;
+        }
         try (InputStream inStream = getCompressorInputStream(type, source);
              ArchiveInputStream tar = new TarArchiveInputStream(inStream)) {
             TarArchiveEntry entry;
             while ((entry = (TarArchiveEntry)tar.getNextEntry()) != null) {
                 if (!tar.canReadEntryData(entry)) continue;
-                File file = new File(destination, entry.getName());
-
-                if (onExtractFileListener != null) {
-                    file = onExtractFileListener.onExtractFile(file, entry.getSize());
-                    if (file == null) continue;
-                }
-
-                if (entry.isDirectory()) {
-                    if (!file.isDirectory()) file.mkdirs();
-                }
-                else {
-                    if (entry.isSymbolicLink()) {
-                        FileUtils.symlink(entry.getLinkName(), file.getAbsolutePath());
-                    }
-                    else {
-                        try (BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file), StreamUtils.BUFFER_SIZE)) {
-                            if (!StreamUtils.copy(tar, outStream)) return false;
-                        }
-                    }
-                }
-
-                FileUtils.chmod(file, 0771);
+                File file = resolveExtractionTarget(rootDir, entry.getName());
+                if (file == null) return false;
+                file = applyListener(rootDir, file, entry.getSize(), onExtractFileListener);
+                if (file == null) continue;
+                if (!extractEntryData(tar, entry, file)) return false;
+                if (!entry.isSymbolicLink()) FileUtils.chmod(file, 0771);
             }
             return true;
         }
@@ -238,6 +313,14 @@ public abstract class TarCompressorUtils {
 
     public static boolean extractTar(File source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null || !source.isFile()) return false;
+        File rootDir;
+        try {
+            rootDir = FileUtils.ensureCanonicalDirectory(destination);
+        }
+        catch (IOException e) {
+            logError("Invalid tar extraction destination: " + destination, e);
+            return false;
+        }
         try (InputStream inStream = new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE);
              TarArchiveInputStream tar = new TarArchiveInputStream(inStream)) {
             TarArchiveEntry entry;
@@ -245,8 +328,7 @@ public abstract class TarCompressorUtils {
             while ((entry = (TarArchiveEntry) tar.getNextEntry()) != null) {
                 if (!tar.canReadEntryData(entry)) continue;
 
-                // Get the top-level directory name
-                String entryName = entry.getName();
+                String entryName = normalizeArchiveEntryName(entry.getName());
                 if (topLevelDirectory == null) {
                     if (entry.isDirectory()) {
                         topLevelDirectory = entryName;
@@ -255,33 +337,20 @@ public abstract class TarCompressorUtils {
                 }
 
                 // Skip the entire tmp directory
-                if (entryName.contains("/tmp/")) {
+                if (isTmpDirectoryEntry(entryName)) {
                     Log.d("RestoreOp", "Skipping tmp directory: " + entryName);
                     continue;
                 }
 
                 // Adjust the extraction path to remove the top-level directory
-                String adjustedName = entryName.replaceFirst("^" + topLevelDirectory, "");
-                File file = new File(destination, adjustedName);
-
-                if (onExtractFileListener != null) {
-                    file = onExtractFileListener.onExtractFile(file, entry.getSize());
-                    if (file == null) continue;
-                }
-
-                if (entry.isDirectory()) {
-                    if (!file.isDirectory()) file.mkdirs();
-                } else {
-                    if (entry.isSymbolicLink()) {
-                        FileUtils.symlink(entry.getLinkName(), file.getAbsolutePath());
-                    } else {
-                        try (BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(file), StreamUtils.BUFFER_SIZE)) {
-                            if (!StreamUtils.copy(tar, outStream)) return false;
-                        }
-                    }
-                }
-
-                FileUtils.chmod(file, 0771);
+                String adjustedName = stripTopLevelDirectory(entryName, topLevelDirectory);
+                if (adjustedName.isEmpty()) continue;
+                File file = resolveExtractionTarget(rootDir, adjustedName);
+                if (file == null) return false;
+                file = applyListener(rootDir, file, entry.getSize(), onExtractFileListener);
+                if (file == null) continue;
+                if (!extractEntryData(tar, entry, file)) return false;
+                if (!entry.isSymbolicLink()) FileUtils.chmod(file, 0771);
             }
             return true;
         } catch (IOException e) {
@@ -292,9 +361,6 @@ public abstract class TarCompressorUtils {
 
 
 }
-
-
-
 
 
 

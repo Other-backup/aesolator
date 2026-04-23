@@ -2,7 +2,6 @@ package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
@@ -25,13 +24,9 @@ import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.VKD3DVersionItem;
 import com.winlator.cmod.xenvironment.ImageFs;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import androidx.preference.PreferenceManager;
 
@@ -46,40 +41,8 @@ public class DXVKConfigDialog extends ContentDialog {
     private final View llAsync;
     private final View llAsyncCache;
     private final Context context;
-    private static List<String> dxvkVersions;
-    private static final Pattern SEMVER = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
-
-    private static Integer tryGetMajor(String s) {
-        if (s == null) return null;
-        Matcher m = SEMVER.matcher(s);
-        if (!m.find()) return null;
-        try {
-            return Integer.parseInt(m.group(1));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
+    private List<String> dxvkVersions = new ArrayList<>();
     public static final String[] VKD3D_FEATURE_LEVEL = {"12_0", "12_1", "12_2", "11_1", "11_0", "10_1", "10_0", "9_3", "9_2", "9_1"};
-
-    private static int compareVersion(String varA, String varB) {
-        final String[] levelsA = varA.split("\\.");
-        final String[] levelsB = varB.split("\\.");
-        int minLen = Math.min(levelsA.length, levelsB.length);
-        int numA, numB;
-
-        for (int i = 0; i < minLen; i++) {
-            numA = Integer.parseInt(levelsA[i]);
-            numB = Integer.parseInt(levelsB[i]);
-            if (numA != numB)
-                return numA - numB;
-        }
-
-        if (levelsA.length != levelsB.length)
-            return levelsA.length - levelsB.length;
-
-        return 0;
-    }
 
     public DXVKConfigDialog(View anchor, boolean isARM64EC) {
         super(anchor.getContext(), R.layout.dxvk_config_dialog);
@@ -107,7 +70,7 @@ public class DXVKConfigDialog extends ContentDialog {
 
         sVKD3DFeatureLevel.setAdapter(SpinnerAdapters.create(context, isDarkMode(), Arrays.asList(VKD3D_FEATURE_LEVEL)));
 
-        setDXVKSpinner(sDXVKVersion, config, contentsManager, isARM64EC);
+        setDXVKSpinner(sDXVKVersion, config);
         AppUtils.setSpinnerSelectionFromIdentifier(sFramerate, config.get("framerate"));
         AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DVersion, config.get("vkd3dVersion"));
         AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DFeatureLevel, config.get("vkd3dLevel"));
@@ -136,34 +99,13 @@ public class DXVKConfigDialog extends ContentDialog {
                 String currentDXVKVersion = config.get("version");
 
                 if (!"None".equalsIgnoreCase(selectedVersion) && !AppUtils.isMissingComponentValue(selectedVersion)) {
-                    ArrayList<String> versions = new ArrayList<>();
-
-                    for (int i = 0; i < dxvkVersions.size(); i++) {
-                        if (AppUtils.isMissingComponentValue(dxvkVersions.get(i))) continue;
-                        Integer major = tryGetMajor(dxvkVersions.get(i));
-                        if (major != null && major < 2) {
-                            versions.add(dxvkVersions.get(i));
-                        }
-                    }
-
-                    dxvkVersions.removeAll(versions);
-                    if (dxvkVersions.isEmpty()) {
-                        dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
-                    }
-
-                    sDXVKVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(), dxvkVersions));
-                    sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
-
-                    Integer curMajor = tryGetMajor(currentDXVKVersion);
-                    AppUtils.setSpinnerSelectionFromIdentifier(
-                            sDXVKVersion,
-                            (curMajor != null && curMajor >= 2) ? currentDXVKVersion : DefaultVersion.DXVK
-                    );
+                    loadDxvkVersionSpinner(contentsManager, sDXVKVersion, isARM64EC);
+                    selectDxvkVersion(sDXVKVersion, currentDXVKVersion);
                     updateConfigVisibility(getDXVKType(sDXVKVersion.getSelectedItemPosition()));
                 }
                 else {
                     loadDxvkVersionSpinner(contentsManager, sDXVKVersion, isARM64EC);
-                    AppUtils.setSpinnerSelectionFromIdentifier(sDXVKVersion, config.get("version"));
+                    selectDxvkVersion(sDXVKVersion, config.get("version"));
                 }
             }
 
@@ -243,41 +185,23 @@ public class DXVKConfigDialog extends ContentDialog {
         return dxvkType;
     }
 
-    private void setDXVKSpinner(Spinner sDXVKVersion, KeyValueSet config, ContentsManager contentsManager, boolean isARM64EC) {
+    private void setDXVKSpinner(Spinner sDXVKVersion, KeyValueSet config) {
         if (dxvkVersions == null || dxvkVersions.isEmpty() || AppUtils.isMissingComponentValue(dxvkVersions.get(0))) {
             sDXVKVersion.setSelection(0, false);
             return;
         }
 
-        String selectedVersion = config.get("vkd3dVersion");
         String currentDXVKVersion = config.get("version");
-        if (!selectedVersion.equals("None")) {
-            ArrayList<String> versions = new ArrayList<>();
+        selectDxvkVersion(sDXVKVersion, currentDXVKVersion);
+    }
 
-            for (int i = 0; i < dxvkVersions.size(); i++) {
-                if (AppUtils.isMissingComponentValue(dxvkVersions.get(i))) continue;
-                Integer major = tryGetMajor(dxvkVersions.get(i));
-                if (major != null && major < 2) {
-                    versions.add(dxvkVersions.get(i));
-                }
-            }
-
-            dxvkVersions.removeAll(versions);
-            if (dxvkVersions.isEmpty()) {
-                dxvkVersions.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
-            }
-
-            sDXVKVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(), dxvkVersions));
-            sDXVKVersion.setEnabled(!AppUtils.isMissingComponentValue(dxvkVersions.get(0)));
-
-            Integer curMajor = tryGetMajor(currentDXVKVersion);
-            AppUtils.setSpinnerSelectionFromIdentifier(
-                    sDXVKVersion,
-                    (curMajor != null && curMajor >= 2) ? currentDXVKVersion : DefaultVersion.DXVK
-            );
+    private void selectDxvkVersion(Spinner spinner, String version) {
+        if (dxvkVersions == null || dxvkVersions.isEmpty() || AppUtils.isMissingComponentValue(dxvkVersions.get(0))) {
+            spinner.setSelection(0, false);
+            return;
         }
-        else
-            AppUtils.setSpinnerSelectionFromIdentifier(sDXVKVersion, currentDXVKVersion);
+        String selectedVersion = version == null || version.trim().isEmpty() ? DefaultVersion.DXVK : version.trim();
+        AppUtils.setSpinnerSelectionFromIdentifier(spinner, selectedVersion);
     }
 
     public static KeyValueSet parseConfig(Object config) {
@@ -322,25 +246,19 @@ public class DXVKConfigDialog extends ContentDialog {
             }
         }
 
-        List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
-        if (profiles != null) {
-            for (ContentProfile profile : profiles) {
-                if (profile == null || !profile.locallyInstalled) continue;
-                if (profile.verName == null || profile.verName.trim().isEmpty()) continue;
-                if (!itemList.contains(profile.verName)) {
-                    itemList.add(profile.verName);
-                }
+        for (String version : manager.getInstalledVersionNames(ContentProfile.ContentType.CONTENT_TYPE_DXVK, true)) {
+            if (!itemList.contains(version)) {
+                itemList.add(version);
             }
         }
 
-        Iterator<String> iterator = itemList.iterator();
-        while (iterator.hasNext()) {
-            String value = iterator.next();
-            if (value.contains("arm64ec") && !isARM64EC) {
-                iterator.remove();
-            }
+        ArrayList<String> filteredItems = new ArrayList<>();
+        for (String value : itemList) {
+            if (value.contains("arm64ec") && !isARM64EC) continue;
+            filteredItems.add(value);
         }
 
+        itemList = filteredItems;
         boolean hasVersions = !itemList.isEmpty();
         if (!hasVersions) {
             itemList.add(AppUtils.MISSING_COMPONENT_PLACEHOLDER);
@@ -369,7 +287,7 @@ public class DXVKConfigDialog extends ContentDialog {
         List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D);
         if (profiles != null) {
             for (ContentProfile profile : profiles) {
-                if (profile == null || !profile.locallyInstalled) continue;
+                if (profile == null || !manager.isInstalledProfileUsable(profile)) continue;
                 String displayName = profile.verName;
                 int versionCode = profile.verCode;
                 itemList.add(new VKD3DVersionItem(displayName, versionCode));

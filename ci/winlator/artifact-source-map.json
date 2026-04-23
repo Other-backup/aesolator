@@ -14,18 +14,6 @@
       "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/freewine11-arm64ec-latest/freewine11-arm64ec.wcp",
       "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/freewine11-arm64ec-latest/SHA256SUMS-freewine11-arm64ec.txt"
     },
-    "vulkansdkarm64": {
-      "kind": "wcp",
-      "description": "Vulkan SDK ARM64 installable contents package",
-      "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/vulkan-sdk-arm64.wcp",
-      "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-arm64-latest/SHA256SUMS-vulkan-sdk-arm64.txt"
-    },
-    "vulkansdkx86_64": {
-      "kind": "wcp",
-      "description": "Vulkan SDK x86_64 installable contents package",
-      "remoteUrl": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/vulkan-sdk-x86_64.wcp",
-      "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/vulkan-sdk-x86_64-latest/SHA256SUMS-vulkan-sdk-x86_64.txt"
-    },
     "aedxvkgplasync": {
       "kind": "wcp",
       "description": "AeDXVK GPLAsync source-built WCP package (generic)",

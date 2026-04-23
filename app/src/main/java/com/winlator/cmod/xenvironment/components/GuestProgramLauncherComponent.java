@@ -4,7 +4,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
 import android.os.Process;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.preference.PreferenceManager;
@@ -12,11 +14,13 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
@@ -25,6 +29,7 @@ import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.fexcore.FEXCoreManager;
 import com.winlator.cmod.fexcore.FEXCorePreset;
 import com.winlator.cmod.fexcore.FEXCorePresetManager;
@@ -45,6 +50,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -62,6 +68,28 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private final ContentProfile wineProfile;
     private Container container;
     private final Shortcut shortcut;
+
+    @FunctionalInterface
+    private interface LaunchStageAction {
+        void run() throws Exception;
+    }
+
+    private static final class PrimaryDnsResolution {
+        final String address;
+        final String source;
+        final boolean activeNetworkPresent;
+        final boolean linkPropertiesPresent;
+        final int dnsServerCount;
+
+        PrimaryDnsResolution(String address, String source, boolean activeNetworkPresent,
+                             boolean linkPropertiesPresent, int dnsServerCount) {
+            this.address = address;
+            this.source = source;
+            this.activeNetworkPresent = activeNetworkPresent;
+            this.linkPropertiesPresent = linkPropertiesPresent;
+            this.dnsServerCount = dnsServerCount;
+        }
+    }
 
     public void setWineInfo(WineInfo wineInfo) {
         this.wineInfo = wineInfo;
@@ -83,6 +111,162 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     protected Shortcut getShortcut() {
         return shortcut;
+    }
+
+    private String resolveLaunchAppId() {
+        if (container != null) {
+            String sessionAppId = container.getSessionMetadata("appId", "").trim();
+            if (!sessionAppId.isEmpty()) return sessionAppId;
+        }
+        if (shortcut != null) {
+            String shortcutAppId = shortcut.getExtra("appId", "").trim();
+            if (!shortcutAppId.isEmpty()) return shortcutAppId;
+            String shortcutName = shortcut.name != null ? shortcut.name.trim() : "";
+            if (!shortcutName.isEmpty()) return shortcutName;
+        }
+        return guestExecutable;
+    }
+
+    private String resolveForensicTraceIdHint() {
+        if (envVars == null) return null;
+        String traceId = envVars.get("AERO_FORENSIC_TRACE_ID");
+        if (traceId == null) return null;
+        traceId = traceId.trim();
+        return traceId.isEmpty() ? null : traceId;
+    }
+
+    private String normalizeVersion(String value, String fallback) {
+        if (value == null) return fallback;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? fallback : normalized;
+    }
+
+    private void logLaunchStageEvent(Context context, String severity, String eventId, String traceId,
+                                     String stageId, String appId, long elapsedMs, Throwable error,
+                                     Object... extraFields) {
+        ArrayList<Object> fields = new ArrayList<>();
+        fields.add("stage_id");
+        fields.add(stageId == null ? "" : stageId);
+        fields.add("app_id");
+        fields.add(appId == null || appId.trim().isEmpty() ? "-" : appId);
+        fields.add("container_id");
+        fields.add(container != null ? container.id : -1);
+        fields.add("guest_executable");
+        fields.add(guestExecutable != null ? guestExecutable : "");
+        if (elapsedMs >= 0L) {
+            fields.add("elapsed_ms");
+            fields.add(elapsedMs);
+        }
+        if (error != null) {
+            fields.add("error_class");
+            fields.add(error.getClass().getName());
+            fields.add("error_detail");
+            fields.add(String.valueOf(error.getMessage()));
+        }
+        if (extraFields != null) {
+            for (Object field : extraFields) {
+                fields.add(field);
+            }
+        }
+        ForensicLogger.logEvent(
+                context,
+                severity,
+                eventId,
+                traceId,
+                "guest_program_launcher",
+                stageId == null ? "" : stageId,
+                ForensicLogger.fields(fields.toArray())
+        );
+    }
+
+    private boolean runLaunchStage(Context context, String traceId, String appId, String stageId,
+                                   LaunchStageAction action, Object... extraFields) {
+        logLaunchStageEvent(context, "info", "LAUNCH_STAGE_START", traceId, stageId, appId, -1L, null, extraFields);
+        long startedAt = SystemClock.elapsedRealtime();
+        try {
+            action.run();
+            logLaunchStageEvent(
+                    context,
+                    "info",
+                    "LAUNCH_STAGE_DONE",
+                    traceId,
+                    stageId,
+                    appId,
+                    SystemClock.elapsedRealtime() - startedAt,
+                    null,
+                    extraFields
+            );
+            return true;
+        } catch (Exception e) {
+            Log.e("GuestProgramLauncherComponent", "Launch stage failed: " + stageId, e);
+            logLaunchStageEvent(
+                    context,
+                    "error",
+                    "LAUNCH_STAGE_FAILED",
+                    traceId,
+                    stageId,
+                    appId,
+                    SystemClock.elapsedRealtime() - startedAt,
+                    e,
+                    extraFields
+            );
+            return false;
+        }
+    }
+
+    private void failLaunchPreparation(Context context, String traceId, String appId, String detail) {
+        String message = detail == null || detail.trim().isEmpty()
+                ? "Failed to prepare Wine runtime launch"
+                : detail.trim();
+        logLaunchStageEvent(
+                context,
+                "warn",
+                "LAUNCH_PREPARE_ABORT",
+                traceId,
+                "launch_prepare_abort",
+                appId,
+                -1L,
+                null,
+                "detail", message
+        );
+        AppUtils.showToast(context, message);
+        if (terminationCallback != null) terminationCallback.call(-1);
+    }
+
+    private PrimaryDnsResolution resolvePrimaryDns(Context context) {
+        String fallback = "8.8.4.4";
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Service.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) {
+            return new PrimaryDnsResolution(fallback, "fallback_no_connectivity_manager", false, false, 0);
+        }
+
+        try {
+            android.net.Network activeNetwork = connectivityManager.getActiveNetwork();
+            if (activeNetwork == null) {
+                return new PrimaryDnsResolution(fallback, "fallback_no_active_network", false, false, 0);
+            }
+
+            LinkProperties linkProperties = connectivityManager.getLinkProperties(activeNetwork);
+            if (linkProperties == null) {
+                return new PrimaryDnsResolution(fallback, "fallback_no_link_properties", true, false, 0);
+            }
+
+            List<InetAddress> dnsServers = linkProperties.getDnsServers();
+            if (dnsServers == null || dnsServers.isEmpty()) {
+                return new PrimaryDnsResolution(fallback, "fallback_no_dns_servers", true, true, 0);
+            }
+
+            InetAddress primaryServer = dnsServers.get(0);
+            String hostAddress = primaryServer != null ? primaryServer.getHostAddress() : "";
+            hostAddress = hostAddress == null ? "" : hostAddress.trim();
+            if (hostAddress.isEmpty()) {
+                return new PrimaryDnsResolution(fallback, "fallback_empty_dns_address", true, true, dnsServers.size());
+            }
+            return new PrimaryDnsResolution(hostAddress, "active_network_dns", true, true, dnsServers.size());
+        } catch (Exception e) {
+            Log.w("GuestProgramLauncherComponent", "Unable to resolve active network DNS, falling back", e);
+            return new PrimaryDnsResolution(fallback, "fallback_dns_exception", true, false, 0);
+        }
     }
 
     private boolean needsFileRefresh(File... files) {
@@ -127,11 +311,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
 
-        // Fallback to default if the shared preference is not set or is empty
-        String box64Version = container.getBox64Version();
+        // degrade to default if the shared preference is not set or is empty
+        String box64Version = normalizeVersion(container.getBox64Version(), DefaultVersion.BOX64);
 
         if (shortcut != null)
-            box64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
+            box64Version = normalizeVersion(shortcut.getExtra("box64Version", shortcut.container.getBox64Version()), box64Version);
 
         Log.d("GuestProgramLauncherComponent", "box64Version: " + box64Version);
 
@@ -177,15 +361,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     protected void extractEmulatorsDlls() {;
         Context context = environment.getContext();
-        File rootDir = environment.getImageFs().getRootDir();
-        File system32dir = new File(rootDir + "/home/xuser/.wine/drive_c/windows/system32");
+        ImageFs imageFs = environment.getImageFs();
+        File system32dir = new File(imageFs.getWinePrefixDir(), "drive_c/windows/system32");
         boolean containerDataChanged = false;
 
-        String wowbox64Version = container.getBox64Version();
-        String fexcoreVersion = container.getFEXCoreVersion();
+        String wowbox64Version = normalizeVersion(container.getBox64Version(), DefaultVersion.WOWBOX64);
+        String fexcoreVersion = normalizeVersion(container.getFEXCoreVersion(), DefaultVersion.FEXCORE);
 
         if (shortcut != null) {
-            wowbox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
+            wowbox64Version = normalizeVersion(shortcut.getExtra("box64Version", shortcut.container.getBox64Version()), wowbox64Version);
         }
 
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
@@ -259,7 +443,20 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 Log.w("GuestProgramLauncherComponent", "Container is null, skipping guest program start");
                 return;
             }
-            String appId = shortcut != null ? shortcut.name : guestExecutable;
+            bindActiveContainerHome(environment.getImageFs());
+            String appId = resolveLaunchAppId();
+            String traceId = resolveForensicTraceIdHint();
+            logLaunchStageEvent(
+                    environment.getContext(),
+                    "info",
+                    "LAUNCH_STAGE_START",
+                    traceId,
+                    "launcher_start",
+                    appId,
+                    -1L,
+                    null,
+                    "wine_info_present", wineInfo != null
+            );
             if (wineInfo == null) {
                 wineInfo = WineInfo.fromIdentifier(
                         environment.getContext(),
@@ -269,7 +466,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 );
             }
             LaunchDependencyRegistry.DependencyRunResult dependencyResult =
-                    LaunchDependencyRegistry.runDependencies(environment.getContext(), container, shortcut, appId);
+                    LaunchDependencyRegistry.runDependencies(environment.getContext(), contentsManager, container, shortcut, appId, traceId);
             if (!dependencyResult.success) {
                 Log.e("GuestProgramLauncherComponent", "Launch dependencies failed: " + dependencyResult.dependencyId + " / " + dependencyResult.message);
                 String failMessage = dependencyResult.message == null || dependencyResult.message.trim().isEmpty()
@@ -280,15 +477,62 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 return;
             }
             if (wineInfo.isArm64EC()) {
-                extractEmulatorsDlls();
+                if (!runLaunchStage(environment.getContext(), traceId, appId, "extract_emulators_dlls",
+                        this::extractEmulatorsDlls,
+                        "arm64ec", true)) {
+                    failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to refresh emulator payloads");
+                    return;
+                }
                 if (requiresBox64ForArm64EcLaunch()) {
-                    extractBox64Files();
+                    if (!runLaunchStage(environment.getContext(), traceId, appId, "extract_box64_files",
+                            this::extractBox64Files,
+                            "arm64ec", true,
+                            "required_for_arm64ec", true)) {
+                        failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to refresh box64 payload");
+                        return;
+                    }
                 }
             }
-            else
-                extractBox64Files();
-            LaunchDependencyRegistry.runPreLaunchSteps(environment.getContext(), container, shortcut, appId, this);
-            pid = execGuestProgram();
+            else if (!runLaunchStage(environment.getContext(), traceId, appId, "extract_box64_files",
+                    this::extractBox64Files,
+                    "arm64ec", false)) {
+                failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to refresh box64 payload");
+                return;
+            }
+            if (!runLaunchStage(environment.getContext(), traceId, appId, "prelaunch_steps",
+                    () -> LaunchDependencyRegistry.runPreLaunchSteps(environment.getContext(), container, shortcut, appId, traceId, this))) {
+                failLaunchPreparation(environment.getContext(), traceId, appId, "Pre-launch step failed");
+                return;
+            }
+            long execStartedAt = SystemClock.elapsedRealtime();
+            try {
+                pid = execGuestProgram();
+            } catch (Exception e) {
+                Log.e("GuestProgramLauncherComponent", "Guest runtime process threw before exec submit for " + appId, e);
+                logLaunchStageEvent(
+                        environment.getContext(),
+                        "error",
+                        "LAUNCH_STAGE_FAILED",
+                        traceId,
+                        "exec_guest_program",
+                        appId,
+                        SystemClock.elapsedRealtime() - execStartedAt,
+                        e
+                );
+                failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to prepare Wine runtime launch");
+                return;
+            }
+            logLaunchStageEvent(
+                    environment.getContext(),
+                    "info",
+                    "LAUNCH_STAGE_DONE",
+                    traceId,
+                    "exec_guest_program",
+                    appId,
+                    SystemClock.elapsedRealtime() - execStartedAt,
+                    null,
+                    "pid", pid
+            );
             if (pid == -1) {
                 Log.e("GuestProgramLauncherComponent", "Guest runtime process failed to start for " + appId);
                 AppUtils.showToast(environment.getContext(), "Failed to start Wine runtime process");
@@ -386,7 +630,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
         String runtimeTmpPath = runtimeTmpDir.getPath();
         if (!launchEnv.has("TMPDIR")) launchEnv.put("TMPDIR", runtimeTmpPath);
-        if (!launchEnv.has("TEMP")) launchEnv.put("TEMP", runtimeTmpPath);
+        if (!launchEnv.has("transient")) launchEnv.put("transient", runtimeTmpPath);
         if (!launchEnv.has("TMP")) launchEnv.put("TMP", runtimeTmpPath);
 
         boolean hasGlibcBin = new File(rootDir, "/usr/glibc/bin").isDirectory();
@@ -438,7 +682,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private boolean isDesktopShellBootstrap() {
         if (shortcut != null || guestExecutable == null) return false;
         String lowered = guestExecutable.toLowerCase(Locale.ROOT);
-        return lowered.contains("explorer /desktop=shell");
+        return lowered.contains("explorer /desktop=shell")
+                || lowered.contains("explorer.exe /desktop=shell");
     }
 
     private String resolveRequestedEmulator() {
@@ -447,6 +692,32 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             emulator = shortcut.getExtra("emulator", container.getEmulator());
         }
         return emulator == null ? "" : emulator;
+    }
+
+    protected File getArm64EcSystem32Dir(ImageFs imageFs) {
+        if (imageFs == null) return null;
+        return new File(imageFs.wineprefix, "drive_c/windows/system32");
+    }
+
+    protected boolean hasWowbox64Payload(ImageFs imageFs) {
+        File system32Dir = getArm64EcSystem32Dir(imageFs);
+        return system32Dir != null && new File(system32Dir, "wowbox64.dll").isFile();
+    }
+
+    protected boolean hasFexArm64EcPayload(ImageFs imageFs) {
+        File system32Dir = getArm64EcSystem32Dir(imageFs);
+        if (system32Dir == null) return false;
+        return new File(system32Dir, "libwow64fex.dll").isFile()
+                && new File(system32Dir, "libarm64ecfex.dll").isFile();
+    }
+
+    protected String resolveEffectiveEmulator(ImageFs imageFs, String requestedEmulator, boolean desktopShellBootstrap) {
+        String normalizedRequested = requestedEmulator == null ? "" : requestedEmulator.trim();
+        if (wineInfo == null || !wineInfo.isArm64EC()) return normalizedRequested;
+        if (!"fexcore".equalsIgnoreCase(normalizedRequested)) return normalizedRequested;
+        if (hasFexArm64EcPayload(imageFs)) return "fexcore";
+        if (hasWowbox64Payload(imageFs)) return "wowbox64";
+        return normalizedRequested;
     }
 
     protected String getLauncherModel(ImageFs imageFs) {
@@ -490,12 +761,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
 
         if (wineInfo.isArm64EC()) {
-            String hodll;
-            if (effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore")) {
-                hodll = desktopShellBootstrap ? "wowbox64.dll" : "libwow64fex.dll";
-            } else {
-                hodll = "wowbox64.dll";
-            }
+            String hodll = effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore")
+                    ? "libwow64fex.dll"
+                    : "wowbox64.dll";
             launchEnv.put("HODLL", hodll);
             ForensicLogger.logEvent(
                     context,
@@ -512,17 +780,85 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "hodll", hodll
                     )
             );
+            if (shouldUseWineBinaryLauncher(guestExecutable, desktopShellBootstrap)) {
+                return winePath + "/wine " + guestExecutable;
+            }
             return winePath + "/" + guestExecutable;
         }
         return imageFs.getBinDir() + "/box64 " + guestExecutable;
     }
 
+    private boolean shouldUseWineBinaryLauncher(String guestExecutable, boolean desktopShellBootstrap) {
+        if (desktopShellBootstrap) return false;
+        String normalized = guestExecutable != null ? guestExecutable.trim() : "";
+        if (normalized.isEmpty()) return false;
+        String token = firstGuestToken(normalized).toLowerCase(Locale.ROOT);
+        if (token.isEmpty()) return false;
+        return token.endsWith(".exe")
+                || token.endsWith(".cmd")
+                || token.endsWith(".bat")
+                || token.endsWith(".vbs")
+                || token.endsWith(".js")
+                || token.endsWith(".msi")
+                || token.contains(":\\");
+    }
+
+    private String firstGuestToken(String command) {
+        if (command == null) return "";
+        String normalized = command.trim();
+        if (normalized.isEmpty()) return "";
+        boolean quoted = normalized.startsWith("\"");
+        StringBuilder builder = new StringBuilder();
+        for (int i = quoted ? 1 : 0; i < normalized.length(); i++) {
+            char ch = normalized.charAt(i);
+            if (quoted) {
+                if (ch == '"') break;
+                builder.append(ch);
+            } else {
+                if (Character.isWhitespace(ch)) break;
+                builder.append(ch);
+            }
+        }
+        return builder.toString();
+    }
+
     protected int execGuestProgram() {
+        return execGuestProgramInternal(true, terminationCallback);
+    }
+
+    public int launchDetachedGuestProgram(String guestExecutableOverride, Callback<Integer> detachedTerminationCallback) {
+        String normalizedGuestExecutable = guestExecutableOverride != null ? guestExecutableOverride.trim() : "";
+        if (normalizedGuestExecutable.isEmpty()) return -1;
+        synchronized (lock) {
+            String originalGuestExecutable = guestExecutable;
+            guestExecutable = normalizedGuestExecutable;
+            try {
+                return execGuestProgramInternal(false, detachedTerminationCallback);
+            } finally {
+                guestExecutable = originalGuestExecutable;
+            }
+        }
+    }
+
+    private int execGuestProgramInternal(boolean trackPrimaryPid, Callback<Integer> activeTerminationCallback) {
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
+        bindActiveContainerHome(imageFs);
         File rootDir = imageFs.getRootDir();
-        ImageFsInstaller.ensureBionicHostSupport(context, imageFs);
-        ImageFsInstaller.ensureAppNativeGuestLibs(context, imageFs);
+        String appId = resolveLaunchAppId();
+        String stageTraceId = resolveForensicTraceIdHint();
+        if (!runLaunchStage(context, stageTraceId, appId, "ensure_bionic_host_support",
+                () -> ImageFsInstaller.ensureBionicHostSupport(context, imageFs))) {
+            return -1;
+        }
+        if (!runLaunchStage(context, stageTraceId, appId, "ensure_app_native_guest_libs",
+                () -> ImageFsInstaller.ensureAppNativeGuestLibs(context, imageFs))) {
+            return -1;
+        }
+        if (!runLaunchStage(context, stageTraceId, appId, "ensure_prefix_pack_toolkit",
+                () -> ImageFsInstaller.ensurePrefixPackToolkit(context, imageFs))) {
+            return -1;
+        }
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean enableBox64Logs = preferences.getBoolean("enable_box64_logs", false);
@@ -532,8 +868,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         EnvVars launchEnv = new EnvVars();
         String requestedEmulator = resolveRequestedEmulator();
         boolean desktopShellBootstrap = wineInfo.isArm64EC() && isDesktopShellBootstrap();
-        boolean fexRequested = "fexcore".equalsIgnoreCase(requestedEmulator);
-        String effectiveEmulator = desktopShellBootstrap && fexRequested ? "wowbox64" : requestedEmulator;
+        String effectiveEmulator = resolveEffectiveEmulator(imageFs, requestedEmulator, desktopShellBootstrap);
 
         addBox64EnvVars(launchEnv, enableBox64Logs);
         if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
@@ -574,11 +909,28 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
 
         String wineRootPath = imageFs.getWinePath();
-        String wineBinPath = wineRootPath + "/bin";
-        String wineLibPath = wineRootPath + "/lib";
+        File runtimeRootDir = new File(wineRootPath);
+        WineUtils.RuntimeLayout runtimeLayout = WineUtils.resolveRuntimeLayout(runtimeRootDir);
+        File runtimeBinDir = runtimeLayout.binDir;
+        File runtimeLibDir = runtimeLayout.libDir;
+        File runtimeWineLibDir = runtimeLayout.wineLibDir;
+        File runtimeWineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRootDir);
+        if (runtimeBinDir == null || runtimeLibDir == null || runtimeWineLibDir == null || runtimeWineUnixDir == null) {
+            Log.e(
+                    "GuestProgramLauncherComponent",
+                    "Runtime layout incomplete for launch: root=" + wineRootPath
+                            + " bin=" + (runtimeBinDir != null)
+                            + " lib=" + (runtimeLibDir != null)
+                            + " wineLib=" + (runtimeWineLibDir != null)
+                            + " wineUnix=" + (runtimeWineUnixDir != null)
+            );
+            return -1;
+        }
+        String wineBinPath = runtimeBinDir.getPath();
+        String wineLibPath = runtimeLibDir.getPath();
         String wineLib64Path = wineRootPath + "/lib64";
-        String wineUnixPath = wineLibPath + "/wine/aarch64-unix";
-        String wineDllPath = wineLibPath + "/wine";
+        String wineUnixPath = runtimeWineUnixDir.getPath();
+        String wineDllPath = runtimeWineLibDir.getPath();
 
         // Setting up essential environment variables for Wine
         launchEnv.put("HOME", imageFs.home_path);
@@ -627,17 +979,30 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         applyMoboxRuntimeContracts(imageFs, launchEnv, rootDir, winePath);
         applyRuntimePathContracts(context, imageFs, rootDir, launchEnv, wineRootPath);
+        launchEnv.put("AERO_RUNTIME_WINE_BIN_PATH", wineBinPath);
+        launchEnv.put("AERO_RUNTIME_WINE_LIB_PATH", wineLibPath);
+        launchEnv.put("AERO_RUNTIME_WINE_DLL_PATH", wineDllPath);
 
 
         launchEnv.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
 
-        String primaryDNS = "8.8.4.4";
-        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Service.CONNECTIVITY_SERVICE);
-        if (connectivityManager.getActiveNetwork() != null) {
-            ArrayList<InetAddress> dnsServers = new ArrayList<>(connectivityManager.getLinkProperties(connectivityManager.getActiveNetwork()).getDnsServers());
-            primaryDNS = dnsServers.get(0).toString().substring(1);
-        }
-        launchEnv.put("ANDROID_RESOLV_DNS", primaryDNS);
+        PrimaryDnsResolution dnsResolution = resolvePrimaryDns(context);
+        launchEnv.put("ANDROID_RESOLV_DNS", dnsResolution.address);
+        logLaunchStageEvent(
+                context,
+                "info",
+                "LAUNCH_DNS_READY",
+                stageTraceId,
+                "resolve_primary_dns",
+                appId,
+                -1L,
+                null,
+                "primary_dns", dnsResolution.address,
+                "dns_source", dnsResolution.source,
+                "active_network_present", dnsResolution.activeNetworkPresent,
+                "link_properties_present", dnsResolution.linkPropertiesPresent,
+                "dns_server_count", dnsResolution.dnsServerCount
+        );
         launchEnv.put("WINE_NEW_NDIS", "1");
 
         String ld_preload = "";
@@ -684,7 +1049,49 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             launchEnv.put("AESO_BIND_PATH_COUNT", String.valueOf(bindingPaths.length));
         }
 
-        String command = buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
+        long buildCommandStartedAt = SystemClock.elapsedRealtime();
+        String command;
+        try {
+            command = buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
+        } catch (Exception e) {
+            Log.e("GuestProgramLauncherComponent", "Unable to build guest command", e);
+            logLaunchStageEvent(
+                    context,
+                    "error",
+                    "LAUNCH_STAGE_FAILED",
+                    stageTraceId,
+                    "build_guest_command",
+                    appId,
+                    SystemClock.elapsedRealtime() - buildCommandStartedAt,
+                    e,
+                    "requested_emulator", requestedEmulator,
+                    "effective_emulator", effectiveEmulator,
+                    "desktop_shell_bootstrap", desktopShellBootstrap
+            );
+            return -1;
+        }
+        logLaunchStageEvent(
+                context,
+                "info",
+                "LAUNCH_STAGE_DONE",
+                stageTraceId,
+                "build_guest_command",
+                appId,
+                SystemClock.elapsedRealtime() - buildCommandStartedAt,
+                null,
+                "requested_emulator", requestedEmulator,
+                "effective_emulator", effectiveEmulator,
+                "desktop_shell_bootstrap", desktopShellBootstrap,
+                "env_hash", ForensicLogger.hashEnvVars(launchEnv)
+        );
+        String resolvedForensicTraceId = launchEnv.get("AERO_FORENSIC_TRACE_ID");
+        if (resolvedForensicTraceId != null) {
+            resolvedForensicTraceId = resolvedForensicTraceId.trim();
+        }
+        if (resolvedForensicTraceId != null && resolvedForensicTraceId.isEmpty()) {
+            resolvedForensicTraceId = null;
+        }
+        final String forensicTraceId = resolvedForensicTraceId;
 
         // **Maybe remove this: Set execute permissions for box64 if necessary (Glibc/Proot artifact)
         File box64File = new File(rootDir, "/usr/bin/box64");
@@ -692,13 +1099,46 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             FileUtils.chmod(box64File, 0755);
         }
 
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "LAUNCH_EXEC_SUBMIT",
+                forensicTraceId,
+                "guest_program_launcher",
+                "launch_exec_submit",
+                ForensicLogger.fields(
+                        "track_primary_pid", trackPrimaryPid,
+                        "desktop_shell_bootstrap", desktopShellBootstrap,
+                        "requested_emulator", requestedEmulator,
+                        "effective_emulator", effectiveEmulator,
+                        "guest_executable", guestExecutable != null ? guestExecutable : "",
+                        "command", command
+                )
+        );
+
         return ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
-            synchronized (lock) {
-                pid = -1;
+            ForensicLogger.logEvent(
+                    context,
+                    status == 0 ? "info" : "warn",
+                    "LAUNCH_EXEC_EXIT",
+                    forensicTraceId,
+                    "guest_program_launcher",
+                    "launch_exec_exit",
+                    ForensicLogger.fields(
+                            "status", status,
+                            "track_primary_pid", trackPrimaryPid,
+                            "guest_executable", guestExecutable != null ? guestExecutable : ""
+                    )
+            );
+            if (trackPrimaryPid) {
+                synchronized (lock) {
+                    pid = -1;
+                }
             }
 
-            if (terminationCallback != null)
-                terminationCallback.call(status);
+            if (activeTerminationCallback != null) {
+                activeTerminationCallback.call(status);
+            }
         });
     }
 
@@ -770,5 +1210,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (includeRedirect) {
             appendFileIfExists(builder, new File(hostLibDir, "libredirect-bionic.so"));
         }
+    }
+
+    private void bindActiveContainerHome(ImageFs imageFs) {
+        if (imageFs == null || container == null) return;
+        ContainerManager.activateContainerHome(new File(imageFs.getRootDir(), "home"), container);
+        imageFs.setHomeDir(container.getRootDir());
     }
 }

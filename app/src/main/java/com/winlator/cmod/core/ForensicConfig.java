@@ -73,6 +73,14 @@ public final class ForensicConfig {
         return snapshot;
     }
 
+    public static Snapshot withRuntimeCaptureDefaults(Snapshot snapshot, boolean forensicMode) {
+        Snapshot effective = copyOf(snapshot);
+        if (!forensicMode) return effective;
+
+        effective.enableLoaderTrace = true;
+        return effective;
+    }
+
     public static void save(Context context, Snapshot snapshot) {
         SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
         apply(editor, snapshot);
@@ -101,8 +109,33 @@ public final class ForensicConfig {
         editor.putString(PREF_ADB_CAPTURE_MODE, normalizeAdbCaptureMode(snapshot.adbCaptureMode));
     }
 
+    private static Snapshot copyOf(Snapshot snapshot) {
+        Snapshot copy = new Snapshot();
+        if (snapshot == null) return copy;
+        copy.enableWineDebug = snapshot.enableWineDebug;
+        copy.wineDebugChannels = normalizeChannels(snapshot.wineDebugChannels);
+        copy.enableLoaderTrace = snapshot.enableLoaderTrace;
+        copy.enableBox64Logs = snapshot.enableBox64Logs;
+        copy.enableFexLogs = snapshot.enableFexLogs;
+        copy.enableTurnipLogs = snapshot.enableTurnipLogs;
+        copy.enableVulkanApiDump = snapshot.enableVulkanApiDump;
+        copy.enableVulkanLoaderDebug = snapshot.enableVulkanLoaderDebug;
+        copy.enableVulkanValidation = snapshot.enableVulkanValidation;
+        copy.enableDxvkLogs = snapshot.enableDxvkLogs;
+        copy.enableVkd3dLogs = snapshot.enableVkd3dLogs;
+        copy.enableDgVoodooLogs = snapshot.enableDgVoodooLogs;
+        copy.enablePulseLogs = snapshot.enablePulseLogs;
+        copy.enableAlsaLogs = snapshot.enableAlsaLogs;
+        copy.enableDeviceSnapshot = snapshot.enableDeviceSnapshot;
+        copy.enableNonRootCapture = snapshot.enableNonRootCapture;
+        copy.enableRootCapture = snapshot.enableRootCapture;
+        copy.enableShizukuCapture = snapshot.enableShizukuCapture;
+        copy.adbCaptureMode = normalizeAdbCaptureMode(snapshot.adbCaptureMode);
+        return copy;
+    }
+
     public static boolean shouldEnableLoaderTrace(Snapshot snapshot, boolean forensicMode) {
-        return forensicMode || snapshot.enableLoaderTrace || snapshot.enableWineDebug;
+        return forensicMode || snapshot.enableLoaderTrace;
     }
 
     public static String buildEffectiveWineDebug(boolean enableWineDebug, String wineDebugChannels, boolean loaderTraceEnabled) {
@@ -114,16 +147,12 @@ public final class ForensicConfig {
             }
         }
         if (tokens.isEmpty()) tokens.add("-all");
-        if (loaderTraceEnabled) {
-            tokens.add("+loaddll");
-            tokens.add("+module");
-            tokens.add("+x11drv");
-        }
         return String.join(",", tokens);
     }
 
     public static String buildLoaderTraceMode(Snapshot snapshot) {
-        return "wine:loaddll,module,x11drv"
+        return "wine_markers:" + (snapshot.enableLoaderTrace ? "freewine-low-noise" : "off")
+                + ";wine_debug:" + (snapshot.enableWineDebug ? normalizeChannels(snapshot.wineDebugChannels) : "off")
                 + ";box64:" + (snapshot.enableBox64Logs ? "stdout,file,dynarec_missing" : "off")
                 + ";fex:" + (snapshot.enableFexLogs ? "debug,file" : "off")
                 + ";dxvk:" + (snapshot.enableDxvkLogs ? "native,file" : "off")
@@ -190,7 +219,7 @@ public final class ForensicConfig {
             obj.put("adbShellRecommended", true);
             obj.put("loaderTraceMode", buildLoaderTraceMode(snapshot));
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return obj;
     }
 

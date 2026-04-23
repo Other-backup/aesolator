@@ -3,13 +3,17 @@ package com.winlator.cmod.contents;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import org.json.JSONArray;
@@ -26,11 +30,15 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -43,6 +51,16 @@ public class ContentsManager {
     public static final String REMOTE_THE412BANNER_NIGHTLIES_RELEASES = "https://api.github.com/repos/The412Banner/Nightlies/releases?per_page=100";
     public static final String REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM = "https://github.com/The412Banner/Nightlies/releases.atom";
     public static final String REMOTE_WINE_PROTON_OVERLAY = REMOTE_PROFILES_AE;
+    private static final String TAG = "ContentsManager";
+    private static final long MAIN_THREAD_RUNTIME_REPAIR_COOLDOWN_MS = 5 * 60 * 1000L;
+    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    private static final AtomicBoolean RUNTIME_REPAIR_RUNNING = new AtomicBoolean(false);
+    private static final ExecutorService RUNTIME_REPAIR_EXECUTOR = Executors.newSingleThreadExecutor((runnable) -> {
+        Thread thread = new Thread(runnable, "contents-runtime-overlay-repair");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static volatile long lastRuntimeRepairFinishedAtMs;
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -59,11 +77,13 @@ public class ContentsManager {
             "${system32}/Glide.dll", "${system32}/Glide2x.dll",
             "${system32}/Glide3x.dll", "${system32}/Glide3xNapalm.dll"
     };
-    public static final String[] VULKAN_SDK_TRUST_PREFIXES = {
-            "${sharedir}/vulkan",
-            "${sharedir}/vulkan-sdk",
-            "${libdir}/vulkan",
-            "${libdir}/vulkan-sdk"
+    private static final String[] DGVOODOO_PACKAGE_RUNTIME_ARCHES = {"x86", "x64", "arm64", "arm64ec"};
+    private static final String[] DGVOODOO_PACKAGE_RUNTIME_FILES = {
+            "D3D8.dll", "D3D9.dll", "D3DImm.dll", "DDraw.dll",
+            "Glide.dll", "Glide2x.dll", "Glide3x.dll", "Glide3xNapalm.dll"
+    };
+    private static final String[] DGVOODOO_PACKAGE_ROOT_FILES = {
+            "dgVoodoo.conf", "dgVoodooCpl.exe"
     };
     private static final String[] CONTENT_ARCHIVE_SUFFIXES = {
             ".wcp", ".wcp.xz", ".wcp.zst", ".zip", ".tar", ".txz", ".tzst", ".tar.xz", ".tar.zst"
@@ -105,6 +125,22 @@ public class ContentsManager {
         }
     }
 
+    public static final class InstalledProfileState {
+        public final boolean present;
+        public final boolean usable;
+        public final String brokenReason;
+
+        private InstalledProfileState(boolean present, boolean usable, @Nullable String brokenReason) {
+            this.present = present;
+            this.usable = usable;
+            this.brokenReason = brokenReason == null ? "" : brokenReason.trim();
+        }
+
+        public boolean isBroken() {
+            return present && !usable;
+        }
+    }
+
     private final Context context;
 
     private HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
@@ -112,7 +148,8 @@ public class ContentsManager {
     private ArrayList<ContentProfile> remoteProfiles;
 
     public ContentsManager(Context context) {
-        this.context = context;
+        Context applicationContext = context != null ? context.getApplicationContext() : null;
+        this.context = applicationContext != null ? applicationContext : context;
         this.preferences = context.getSharedPreferences("contents_manager_prefs", Context.MODE_PRIVATE);
     }
 
@@ -163,6 +200,12 @@ public class ContentsManager {
         syncContents();
     }
 
+    public void setHydratedRuntimeProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json, false, false, false, true);
+        syncContents();
+    }
+
     private void appendRemoteProfiles(String json, boolean includeBeta, boolean ignoreRepoManaged, boolean onlyRepoManaged, boolean keepAllChannels) {
         if (json == null || json.trim().isEmpty()) return;
         try {
@@ -198,15 +241,12 @@ public class ContentsManager {
                     remoteProfile.artifactName = object.optString(ContentProfile.MARK_ARTIFACT_NAME, "").trim();
                     remoteProfile.publishedAt = object.optString(ContentProfile.MARK_PUBLISHED_AT, "").trim();
                     remoteProfile.releaseNotes = object.optString(ContentProfile.MARK_RELEASE_NOTES, "").trim();
-                    remoteProfile.runtimeModel = ContentProfile.normalizeRuntimeModel(
-                            object.optString(ContentProfile.MARK_RUNTIME_MODEL, "")
-                    );
+                    remoteProfile.runtimeModel = readRuntimeModelHint(object);
                     remoteProfile.vulkanApiMin = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MIN), 0);
                     remoteProfile.vulkanApiMax = parseOptionalInt(object.opt(ContentProfile.MARK_VULKAN_API_MAX), 0);
-                    remoteProfile.vulkanSdkVersion = object.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "").trim();
                     remoteProfile.delivery = object.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE).trim();
                     remoteProfile.channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
-                    remoteProfile.locallyInstalled = false;
+                    remoteProfile.setInstalledLocally(false);
 
                     if (remoteProfile.verName.isEmpty()) {
                         remoteProfile.verName = deriveVersionNameFromUrl(remoteProfile.remoteUrl);
@@ -231,16 +271,43 @@ public class ContentsManager {
 
                     remoteProfiles.add(remoteProfile);
                 } catch (Exception e) {
-                    Log.w("ContentsManager", "Failed to parse remote profile row", e);
+                    Log.w(TAG, "Failed to parse remote profile row", e);
                 }
             }
         } catch (JSONException e) {
-            Log.w("ContentsManager", "Failed to parse remote profile feed", e);
+            Log.w(TAG, "Failed to parse remote profile feed", e);
         }
     }
 
+    private String readRuntimeModelHint(JSONObject object) {
+        if (object == null) return "";
+
+        String runtimeModel = ContentProfile.normalizeRuntimeModel(object.optString(ContentProfile.MARK_RUNTIME_MODEL, ""));
+        if (!runtimeModel.isEmpty()) return runtimeModel;
+
+        runtimeModel = ContentProfile.normalizeRuntimeModel(object.optString("runtimeClassTarget", ""));
+        if (!runtimeModel.isEmpty()) return runtimeModel;
+
+        runtimeModel = ContentProfile.normalizeRuntimeModel(object.optString("runtimeClassDetected", ""));
+        if (!runtimeModel.isEmpty()) return runtimeModel;
+
+        JSONObject runtimeObject = object.optJSONObject("runtime");
+        if (runtimeObject != null) {
+            runtimeModel = ContentProfile.normalizeRuntimeModel(runtimeObject.optString("runtimeClassTarget", ""));
+            if (!runtimeModel.isEmpty()) return runtimeModel;
+
+            runtimeModel = ContentProfile.normalizeRuntimeModel(runtimeObject.optString("runtimeClassDetected", ""));
+            if (!runtimeModel.isEmpty()) return runtimeModel;
+
+            runtimeModel = ContentProfile.normalizeRuntimeModel(runtimeObject.optString("target", ""));
+            if (!runtimeModel.isEmpty()) return runtimeModel;
+        }
+
+        return "";
+    }
+
     public void syncContents() {
-        repairInstalledRuntimeOverlays();
+        repairInstalledRuntimeOverlaysForCurrentThread();
         profilesMap = new HashMap<>();
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             profilesMap.put(type, new LinkedList<>());
@@ -258,7 +325,7 @@ public class ContentsManager {
                     if (proFile.exists() && proFile.isFile()) {
                         ContentProfile profile = normalizeImportedProfile(readProfile(proFile), null);
                         if (profile != null && profile.type == type) {
-                            profile.locallyInstalled = true;
+                            profile.setInstalledLocally(true);
                             profiles.add(profile);
                             profileByEntry.put(getEntryName(profile), profile);
                             profileFileByProfile.put(profile, proFile);
@@ -284,6 +351,59 @@ public class ContentsManager {
                 }
             }
         }
+    }
+
+    public void syncContentsAsync(@Nullable Runnable onFinished) {
+        if (!RUNTIME_REPAIR_RUNNING.compareAndSet(false, true)) {
+            MAIN_HANDLER.post(() -> {
+                syncContents();
+                if (onFinished != null) onFinished.run();
+            });
+            return;
+        }
+
+        Context repairContext = context;
+        RUNTIME_REPAIR_EXECUTOR.execute(() -> {
+            try {
+                new ContentsManager(repairContext).repairInstalledRuntimeOverlays();
+                lastRuntimeRepairFinishedAtMs = System.currentTimeMillis();
+            } catch (Exception e) {
+                Log.w(TAG, "Async runtime overlay repair failed", e);
+            } finally {
+                RUNTIME_REPAIR_RUNNING.set(false);
+            }
+            MAIN_HANDLER.post(() -> {
+                syncContents();
+                if (onFinished != null) onFinished.run();
+            });
+        });
+    }
+
+    private void repairInstalledRuntimeOverlaysForCurrentThread() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            scheduleInstalledRuntimeOverlayRepair();
+            return;
+        }
+        repairInstalledRuntimeOverlays();
+    }
+
+    private void scheduleInstalledRuntimeOverlayRepair() {
+        long lastFinishedAt = lastRuntimeRepairFinishedAtMs;
+        long now = System.currentTimeMillis();
+        if (lastFinishedAt > 0 && now - lastFinishedAt < MAIN_THREAD_RUNTIME_REPAIR_COOLDOWN_MS) return;
+        if (!RUNTIME_REPAIR_RUNNING.compareAndSet(false, true)) return;
+
+        Context repairContext = context;
+        RUNTIME_REPAIR_EXECUTOR.execute(() -> {
+            try {
+                new ContentsManager(repairContext).repairInstalledRuntimeOverlays();
+                lastRuntimeRepairFinishedAtMs = System.currentTimeMillis();
+            } catch (Exception e) {
+                Log.w(TAG, "Background runtime overlay repair failed", e);
+            } finally {
+                RUNTIME_REPAIR_RUNNING.set(false);
+            }
+        });
     }
 
     public void extraContentFile(Uri uri, OnInstallFinishedCallback callback) {
@@ -329,6 +449,10 @@ public class ContentsManager {
             return;
         }
         profile = normalizeImportedProfile(profile, remoteHint);
+        if (ContentProfileIdentity.isRemoteProfileIdentityMismatch(profile, remoteHint)) {
+            callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
+            return;
+        }
 
         String imagefsPath = context.getFilesDir().getAbsolutePath() + "/imagefs";
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
@@ -338,22 +462,15 @@ public class ContentsManager {
                 return;
             }
 
-            String realPath = getPathFromTemplate(contentFile.target);
-            if (!isSubPath(imagefsPath, realPath) || isSubPath(ContentsManager.getContentDir(context).getAbsolutePath(), realPath) || realPath.contains("dosdevices")) {
+            if (!isTrustedInstallTarget(profile, contentFile.target, imagefsPath)) {
                 callback.onFailed(InstallFailedReason.ERROR_UNTRUSTPROFILE, null);
                 return;
             }
         }
 
-        if (profile.isWineProtonFamily()) {
-            File bin = new File(file, profile.wineBinPath);
-            File lib = new File(file, profile.wineLibPath);
-            File cp = new File(file, profile.winePrefixPack);
-
-            if (!bin.exists() || !bin.isDirectory() || !lib.exists() || !lib.isDirectory() || !cp.exists() || !cp.isFile()) {
-                callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
-                return;
-            }
+        if (profile.isWineProtonFamily() && !hasResolvedRuntimePayload(file, profile)) {
+            callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
+            return;
         }
 
         callback.onSucceed(profile);
@@ -404,11 +521,7 @@ public class ContentsManager {
     }
 
     private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
-        File dstFile = new File(rootDir, entry.getName());
-        String rootPath = rootDir.getCanonicalPath() + File.separator;
-        String dstPath = dstFile.getCanonicalPath();
-        if (!dstPath.startsWith(rootPath)) return null;
-        return dstFile;
+        return FileUtils.resolveSafeArchiveEntry(rootDir, entry.getName());
     }
 
     public void finishInstallContent(ContentProfile profile, OnInstallFinishedCallback callback) {
@@ -449,7 +562,7 @@ public class ContentsManager {
 
         boolean moved = tmpPath.renameTo(installPath);
         if (!moved) {
-            // Fallback to recursive copy for filesystems where renameTo can fail.
+            // degrade to recursive copy for filesystems where renameTo can fail.
             moved = FileUtils.copy(tmpPath, installPath);
             if (moved) {
                 FileUtils.delete(tmpPath);
@@ -473,6 +586,9 @@ public class ContentsManager {
             postProcessWineRuntimeInstall(installPath, profile);
         }
         persistProfileMetadata(new File(installPath, PROFILE_NAME), profile);
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            pruneSupersededDgVoodooInstalls(typeDir, installPath, profile);
+        }
 
         callback.onSucceed(profile);
     }
@@ -510,11 +626,6 @@ public class ContentsManager {
             }
             if (profile.vulkanApiMax > 0 && object.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0) != profile.vulkanApiMax) {
                 object.put(ContentProfile.MARK_VULKAN_API_MAX, profile.vulkanApiMax);
-                changed = true;
-            }
-            if (profile.vulkanSdkVersion != null && !profile.vulkanSdkVersion.trim().isEmpty()
-                    && !profile.vulkanSdkVersion.equals(object.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, ""))) {
-                object.put(ContentProfile.MARK_VULKAN_SDK_VERSION, profile.vulkanSdkVersion.trim());
                 changed = true;
             }
             if (profile.isWineProtonFamily()) {
@@ -620,14 +731,11 @@ public class ContentsManager {
             profile.artifactName = profileJSONObject.optString(ContentProfile.MARK_ARTIFACT_NAME, "");
             profile.publishedAt = profileJSONObject.optString(ContentProfile.MARK_PUBLISHED_AT, "");
             profile.releaseNotes = profileJSONObject.optString(ContentProfile.MARK_RELEASE_NOTES, "");
-            profile.runtimeModel = ContentProfile.normalizeRuntimeModel(
-                    profileJSONObject.optString(ContentProfile.MARK_RUNTIME_MODEL, "")
-            );
+            profile.runtimeModel = readRuntimeModelHint(profileJSONObject);
             profile.vulkanApiMin = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0);
             profile.vulkanApiMax = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0);
-            profile.vulkanSdkVersion = profileJSONObject.optString(ContentProfile.MARK_VULKAN_SDK_VERSION, "");
             profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
-            profile.locallyInstalled = true;
+            profile.setInstalledLocally(true);
 
             List<ContentProfile.ContentFile> fileList = new ArrayList<>();
             JSONArray fileJSONArray = profileJSONObject.optJSONArray(ContentProfile.MARK_FILE_LIST);
@@ -753,28 +861,85 @@ public class ContentsManager {
         return resolveWineRuntimeRoot(getInstallDir(context, profile), profile);
     }
 
+    public InstalledProfileState resolveInstalledProfileState(@Nullable ContentProfile profile) {
+        if (profile == null) {
+            return new InstalledProfileState(false, false, "missing_profile");
+        }
+        if (!profile.isInstalledLocally()) {
+            return new InstalledProfileState(false, false, "not_installed");
+        }
+        if (!profile.isWineProtonFamily()) {
+            return new InstalledProfileState(true, true, "");
+        }
+
+        File installDir = getInstallDir(context, profile);
+        if (!installDir.isDirectory()) {
+            return new InstalledProfileState(true, false, "missing_install_dir");
+        }
+
+        File profileJson = new File(installDir, PROFILE_NAME);
+        if (!profileJson.isFile()) {
+            return new InstalledProfileState(true, false, "missing_profile_json");
+        }
+
+        File runtimeRoot = resolveWineRuntimeRoot(installDir, profile);
+        if (runtimeRoot == null || !runtimeRoot.isDirectory()) {
+            return new InstalledProfileState(true, false, "missing_runtime_root");
+        }
+        if (!WineUtils.hasRuntimePayload(runtimeRoot)) {
+            return new InstalledProfileState(true, false, "missing_runtime_payload");
+        }
+
+        return new InstalledProfileState(true, true, "");
+    }
+
+    public boolean isInstalledProfilePresent(@Nullable ContentProfile profile) {
+        return resolveInstalledProfileState(profile).present;
+    }
+
+    public boolean isInstalledProfileUsable(@Nullable ContentProfile profile) {
+        return resolveInstalledProfileState(profile).usable;
+    }
+
+    private boolean hasInstalledRuntimeProfilePayload(@Nullable ContentProfile profile) {
+        return profile != null
+                && profile.isWineProtonFamily()
+                && resolveInstalledProfileState(profile).usable;
+    }
+
+    private boolean matchesInstalledRequirement(@Nullable ContentProfile profile, boolean requireUsable) {
+        if (requireUsable) {
+            return isInstalledProfileUsable(profile);
+        }
+        return isInstalledProfilePresent(profile);
+    }
+
+    private boolean hasResolvedRuntimePayload(@Nullable File installPath, @Nullable ContentProfile profile) {
+        if (installPath == null || profile == null || !profile.isWineProtonFamily()) return false;
+        File runtimeRoot = resolveWineRuntimeRoot(installPath, profile);
+        return runtimeRoot != null && runtimeRoot.isDirectory() && WineUtils.hasRuntimePayload(runtimeRoot);
+    }
+
     private File resolveWineRuntimeRoot(File installPath, @Nullable ContentProfile profile) {
         if (installPath == null || profile == null || !profile.isWineProtonFamily()) {
             return installPath;
         }
 
+        File canonicalInstallRoot = WineUtils.resolveCanonicalRuntimeRoot(installPath);
+        if (canonicalInstallRoot != null && WineUtils.hasRuntimePayload(canonicalInstallRoot)) {
+            return canonicalInstallRoot;
+        }
+
         String commonRoot = resolveSharedRuntimeRoot(profile);
         if (commonRoot.isEmpty()) {
-            return installPath;
+            return canonicalInstallRoot != null ? canonicalInstallRoot : installPath;
         }
 
-        File candidate = new File(installPath, commonRoot);
-        if (!candidate.isDirectory()) {
-            return installPath;
+        File candidate = WineUtils.resolveCanonicalRuntimeRoot(new File(installPath, commonRoot));
+        if (candidate != null && candidate.isDirectory() && WineUtils.hasRuntimePayload(candidate)) {
+            return candidate;
         }
-
-        File binDir = new File(installPath, normalizeRelativePath(profile.wineBinPath));
-        File libDir = new File(installPath, normalizeRelativePath(profile.wineLibPath));
-        File prefixPack = new File(installPath, normalizeRelativePath(profile.winePrefixPack));
-        if (!binDir.isDirectory() || !libDir.isDirectory() || !prefixPack.isFile()) {
-            return installPath;
-        }
-        return candidate;
+        return canonicalInstallRoot != null ? canonicalInstallRoot : installPath;
     }
 
     private String resolveSharedRuntimeRoot(@Nullable ContentProfile profile) {
@@ -821,12 +986,27 @@ public class ContentsManager {
         if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
         ensureRuntimePrefixPackAtRoot(installPath, profile);
         normalizeWineLibraryStructure(installPath, profile);
+        rebindWineFamilyProfilePaths(installPath, profile);
         sanitizeWineRuntimeRunpath(installPath, profile);
 
-        File binDir = new File(installPath, normalizeRelativePath(profile.wineBinPath));
-        if (binDir.isDirectory()) {
+        File binDir = WineUtils.resolveRuntimeBinDir(installPath);
+        if (binDir != null && binDir.isDirectory()) {
             setExecutablePermissionsRecursive(binDir);
         }
+    }
+
+    private void rebindWineFamilyProfilePaths(File installPath, ContentProfile profile) {
+        if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
+
+        File binDir = WineUtils.resolveRuntimeBinDir(installPath);
+        File libDir = WineUtils.resolveRuntimeLibDir(installPath);
+        File prefixPack = WineUtils.resolveRuntimePrefixPack(installPath);
+        if (binDir == null || libDir == null || prefixPack == null) return;
+
+        profile.wineBinPath = relativizePath(installPath, binDir);
+        profile.wineLibPath = relativizePath(installPath, libDir);
+        profile.winePrefixPack = relativizePath(installPath, prefixPack);
+        profile.runtimeModel = profile.getRuntimeModel();
     }
 
     private void ensureRuntimePrefixPackAtRoot(File installPath, ContentProfile profile) {
@@ -927,9 +1107,11 @@ public class ContentsManager {
         createTrustedFilesMap();
         List<ContentProfile.ContentFile> files = new ArrayList<>();
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
+            if (isDgVoodooPackageLocalTarget(profile, contentFile.target)) {
+                continue;
+            }
             String normalizedTarget = Paths.get(getPathFromTemplate(contentFile.target)).toAbsolutePath().normalize().toString();
-            if (!trustedFilesMap.get(profile.type).contains(normalizedTarget)
-                    && !isTrustedByPrefix(profile.type, normalizedTarget)) {
+            if (!trustedFilesMap.get(profile.type).contains(normalizedTarget)) {
                 files.add(contentFile);
             }
         }
@@ -940,11 +1122,60 @@ public class ContentsManager {
         return Paths.get(child).toAbsolutePath().normalize().startsWith(Paths.get(parent).toAbsolutePath().normalize());
     }
 
+    private boolean isTrustedInstallTarget(ContentProfile profile, String target, String imagefsPath) {
+        if (isDgVoodooPackageLocalTarget(profile, target)) return true;
+        String realPath = getPathFromTemplate(target);
+        return isSubPath(imagefsPath, realPath)
+                && !isSubPath(ContentsManager.getContentDir(context).getAbsolutePath(), realPath)
+                && !realPath.contains("dosdevices");
+    }
+
+    private boolean isDgVoodooPackageLocalTarget(ContentProfile profile, String target) {
+        if (profile == null || profile.type != ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return false;
+        String normalized = normalizePackageLocalTarget(target);
+        if (normalized.isEmpty()) return false;
+
+        for (String rootFile : DGVOODOO_PACKAGE_ROOT_FILES) {
+            if (rootFile.equalsIgnoreCase(normalized)) return true;
+        }
+
+        String[] parts = normalized.split("/");
+        if (parts.length != 4) return false;
+        if (!"payload".equals(parts[0]) || !"runtime".equals(parts[1])) return false;
+        if (!containsToken(DGVOODOO_PACKAGE_RUNTIME_ARCHES, parts[2])) return false;
+        return containsToken(DGVOODOO_PACKAGE_RUNTIME_FILES, parts[3]);
+    }
+
+    private String normalizePackageLocalTarget(String target) {
+        if (target == null) return "";
+        String normalized = target.trim().replace('\\', '/');
+        while (normalized.startsWith("./")) {
+            normalized = normalized.substring(2);
+        }
+        if (normalized.isEmpty() || normalized.startsWith("/") || normalized.contains(":")) return "";
+        String[] parts = normalized.split("/");
+        ArrayList<String> safeParts = new ArrayList<>();
+        for (String part : parts) {
+            if (part == null || part.isEmpty() || ".".equals(part) || "..".equals(part)) return "";
+            safeParts.add(part);
+        }
+        return String.join("/", safeParts);
+    }
+
+    private boolean containsToken(String[] values, String candidate) {
+        if (values == null || candidate == null) return false;
+        for (String value : values) {
+            if (value.equalsIgnoreCase(candidate)) return true;
+        }
+        return false;
+    }
+
     private void createDirTemplateMap() {
         if (dirTemplateMap == null) {
             dirTemplateMap = new HashMap<>();
-            String imagefsPath = context.getFilesDir().getAbsolutePath() + "/imagefs";
-            String drivecPath = imagefsPath + "/home/xuser/.wine/drive_c";
+            ImageFs imageFs = ImageFs.find(context);
+            String imagefsPath = imageFs.getRootDir().getAbsolutePath();
+            String drivecPath = imageFs.getWinePrefixDir().getAbsolutePath() + "/drive_c";
             dirTemplateMap.put("${libdir}", imagefsPath + "/usr/lib");
             dirTemplateMap.put("${system32}", drivecPath + "/windows/system32");
             dirTemplateMap.put("${syswow64}", drivecPath + "/windows/syswow64");
@@ -1013,7 +1244,7 @@ public class ContentsManager {
         RuntimeEntryParts requested = RuntimeEntryParts.parse(entryName);
         if (requested == null) {
             ContentProfile direct = getProfileByEntryName(entryName);
-            if (direct != null && direct.locallyInstalled && direct.isRuntimeModelCompatible(requestedRuntimeModel)) {
+            if (direct != null && isInstalledProfileUsable(direct) && direct.isRuntimeModelCompatible(requestedRuntimeModel)) {
                 return direct;
             }
             return null;
@@ -1029,7 +1260,7 @@ public class ContentsManager {
             List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
             if (profiles == null) continue;
             for (ContentProfile profile : profiles) {
-                if (profile == null || !profile.locallyInstalled || !profile.isWineProtonFamily()) continue;
+                if (!hasInstalledRuntimeProfilePayload(profile)) continue;
                 if (profile.verName == null || !requested.versionName.equalsIgnoreCase(profile.verName)) continue;
                 if (!profile.isRuntimeModelCompatible(requested.runtimeModel)) continue;
                 if (profile.isProtonLike()) {
@@ -1047,7 +1278,7 @@ public class ContentsManager {
         }
 
         ContentProfile exact = getProfileByEntryName(entryName);
-        if (exact != null && exact.locallyInstalled && exact.isRuntimeModelCompatible(requested.runtimeModel)) {
+        if (exact != null && hasInstalledRuntimeProfilePayload(exact) && exact.isRuntimeModelCompatible(requested.runtimeModel)) {
             return exact;
         }
         return null;
@@ -1108,7 +1339,7 @@ public class ContentsManager {
         if (normalizedVersion.isEmpty()) return null;
 
         ContentProfile direct = getProfileByEntryName(normalizedVersion);
-        if (direct != null && direct.type == type && (!installedOnly || direct.locallyInstalled)) {
+        if (direct != null && direct.type == type && (!installedOnly || matchesInstalledRequirement(direct, true))) {
             return direct;
         }
 
@@ -1123,11 +1354,97 @@ public class ContentsManager {
         ContentProfile best = null;
         for (ContentProfile profile : profiles) {
             if (profile == null) continue;
-            if (installedOnly && !profile.locallyInstalled) continue;
+            if (installedOnly && !matchesInstalledRequirement(profile, true)) continue;
             if (profile.verName == null || !normalizedVersion.equalsIgnoreCase(profile.verName)) continue;
             best = pickPreferredVersionCandidate(best, profile);
         }
         return best;
+    }
+
+    @Nullable
+    public ContentProfile findInstalledProfileByVersion(ContentProfile.ContentType type, String versionName, boolean requireUsable) {
+        if (type == null || versionName == null) return null;
+        String normalizedVersion = versionName.trim();
+        if (normalizedVersion.isEmpty()) return null;
+
+        String typePrefix = type.toString() + "-";
+        if (normalizedVersion.regionMatches(true, 0, typePrefix, 0, typePrefix.length())) {
+            normalizedVersion = normalizedVersion.substring(typePrefix.length()).trim();
+        }
+
+        List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
+        if (profiles == null) return null;
+
+        ContentProfile best = null;
+        for (ContentProfile profile : profiles) {
+            if (profile == null) continue;
+            if (!matchesInstalledRequirement(profile, requireUsable)) continue;
+            if (!matchesInstalledVersion(profile, normalizedVersion)) continue;
+            best = pickPreferredVersionCandidate(best, profile);
+        }
+        return best;
+    }
+
+    public boolean hasInstalledVersion(ContentProfile.ContentType type, String versionName) {
+        return hasInstalledVersion(type, versionName, true);
+    }
+
+    public boolean hasInstalledVersion(ContentProfile.ContentType type, String versionName, boolean requireUsable) {
+        return findInstalledProfileByVersion(type, versionName, requireUsable) != null;
+    }
+
+    public int countInstalledProfiles(ContentProfile.ContentType type, boolean requireUsable) {
+        List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
+        if (profiles == null) return 0;
+
+        int count = 0;
+        for (ContentProfile profile : profiles) {
+            if (profile == null) continue;
+            if (!matchesInstalledRequirement(profile, requireUsable)) continue;
+            count++;
+        }
+        return count;
+    }
+
+    public List<String> getInstalledVersionNames(ContentProfile.ContentType type, boolean requireUsable) {
+        LinkedHashSet<String> versions = new LinkedHashSet<>();
+        List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
+        if (profiles == null) return new ArrayList<>();
+
+        for (ContentProfile profile : profiles) {
+            if (profile == null) continue;
+            if (!matchesInstalledRequirement(profile, requireUsable)) continue;
+            String version = profile.verName == null ? "" : profile.verName.trim();
+            if (!version.isEmpty()) versions.add(version);
+        }
+        return new ArrayList<>(versions);
+    }
+
+    public List<String> getInstalledRuntimeEntries(@Nullable String requestedRuntimeModel,
+                                                   boolean requireUsable,
+                                                   ContentProfile.ContentType... types) {
+        LinkedHashSet<String> entries = new LinkedHashSet<>();
+        if (types == null || types.length == 0) return new ArrayList<>();
+
+        String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedRuntimeModel);
+        for (ContentProfile.ContentType type : types) {
+            List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
+            if (profiles == null) continue;
+
+            for (ContentProfile profile : profiles) {
+                if (profile == null || !profile.isWineProtonFamily()) continue;
+                if (!matchesInstalledRequirement(profile, requireUsable)) continue;
+                if (!normalizedRuntimeModel.isEmpty() && !profile.isRuntimeModelCompatible(normalizedRuntimeModel)) {
+                    continue;
+                }
+
+                String runtimeEntry = resolveBestRuntimeEntry(getEntryName(profile), profile.getRuntimeModel());
+                if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
+                    entries.add(runtimeEntry);
+                }
+            }
+        }
+        return new ArrayList<>(entries);
     }
 
     private ContentProfile pickPreferredVersionCandidate(ContentProfile currentBest, ContentProfile candidate) {
@@ -1140,6 +1457,28 @@ public class ContentsManager {
 
         if (candidate.verCode > currentBest.verCode) return candidate;
         return currentBest;
+    }
+
+    private boolean matchesInstalledVersion(@Nullable ContentProfile profile, String versionName) {
+        if (profile == null || versionName == null || versionName.trim().isEmpty()) return false;
+
+        String normalizedVersion = versionName.trim().toLowerCase(Locale.US);
+        String normalizedVersionId = StringUtils.parseIdentifier(normalizedVersion);
+        String profileVersion = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
+        if (profileVersion.isEmpty()) return false;
+
+        if (profileVersion.equals(normalizedVersion)) return true;
+
+        String profileVersionId = StringUtils.parseIdentifier(profileVersion);
+        if (profileVersionId.equals(normalizedVersionId)) return true;
+
+        if (profileVersion.startsWith(normalizedVersion + "-")
+                || normalizedVersion.startsWith(profileVersion + "-")) {
+            return true;
+        }
+
+        return profileVersionId.startsWith(normalizedVersionId + "-")
+                || normalizedVersionId.startsWith(profileVersionId + "-");
     }
 
     private int comparePublishedAt(String left, String right) {
@@ -1290,7 +1629,6 @@ public class ContentsManager {
 
     private boolean isRepoManagedOverlayType(ContentProfile.ContentType type) {
         return isWineFamilyType(type)
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
                 || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
@@ -1299,21 +1637,11 @@ public class ContentsManager {
     }
 
     private boolean isUpdatableLane(ContentProfile.ContentType type) {
-        return type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
+        return type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
                 || type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
                 || type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER;
-    }
-
-    private boolean isTrustedByPrefix(ContentProfile.ContentType type, String normalizedTarget) {
-        if (type != ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return false;
-        for (String prefix : VULKAN_SDK_TRUST_PREFIXES) {
-            String resolvedPrefix = Paths.get(getPathFromTemplate(prefix)).toAbsolutePath().normalize().toString();
-            if (normalizedTarget.startsWith(resolvedPrefix)) return true;
-        }
-        return false;
     }
 
     private ContentProfile findEquivalentProfile(List<ContentProfile> profiles, ContentProfile remote) {
@@ -1355,6 +1683,8 @@ public class ContentsManager {
             postProcessWineRuntimeInstall(normalizedRoot, profile);
             persistProfileMetadata(new File(normalizedRoot, PROFILE_NAME), profile);
         }
+
+        pruneSupersededWineRuntimeInstalls(sharedRuntimeDir);
     }
 
     private void migrateLegacyRuntimeDir(File legacyDir, File sharedRuntimeDir) {
@@ -1384,6 +1714,115 @@ public class ContentsManager {
         if (result.hasSignal()) {
             Log.i("ContentsManager", "Wine runtime RUNPATH sanitize: " + result.toSummary());
         }
+    }
+
+    private void pruneSupersededWineRuntimeInstalls(File sharedRuntimeDir) {
+        if (sharedRuntimeDir == null || !sharedRuntimeDir.isDirectory()) return;
+
+        LinkedHashMap<String, InstalledRuntimeRoot> bestByFamily = new LinkedHashMap<>();
+        ArrayList<InstalledRuntimeRoot> staleRoots = new ArrayList<>();
+        File[] installedRoots = sharedRuntimeDir.listFiles();
+        if (installedRoots == null) return;
+
+        for (File installRoot : installedRoots) {
+            if (installRoot == null || !installRoot.isDirectory()) continue;
+            File profileFile = new File(installRoot, PROFILE_NAME);
+            if (!profileFile.isFile()) continue;
+
+            ContentProfile profile = normalizeImportedProfile(readProfile(profileFile), null);
+            if (profile == null || !profile.isWineProtonFamily()) continue;
+
+            InstalledRuntimeRoot candidate = new InstalledRuntimeRoot(installRoot, profile);
+            String familyKey = buildInstalledRuntimeFamilyKey(profile);
+            InstalledRuntimeRoot currentBest = bestByFamily.get(familyKey);
+            if (shouldPreferInstalledRuntimeRoot(candidate, currentBest)) {
+                if (currentBest != null) staleRoots.add(currentBest);
+                bestByFamily.put(familyKey, candidate);
+            } else if (currentBest != null) {
+                staleRoots.add(candidate);
+            }
+        }
+
+        for (InstalledRuntimeRoot stale : staleRoots) {
+            if (stale == null || stale.installRoot == null || !stale.installRoot.exists()) continue;
+            String installName = stale.installRoot.getName();
+            if (FileUtils.delete(stale.installRoot)) {
+                Log.i("ContentsManager", "Pruned superseded Wine runtime install: " + installName);
+            } else {
+                Log.w("ContentsManager", "Failed to prune superseded Wine runtime install: " + installName);
+            }
+        }
+    }
+
+    private void pruneSupersededDgVoodooInstalls(File typeDir, File currentInstallPath, ContentProfile installedProfile) {
+        if (typeDir == null || currentInstallPath == null || installedProfile == null) return;
+        File[] installedRoots = typeDir.listFiles();
+        if (installedRoots == null) return;
+
+        for (File installedRoot : installedRoots) {
+            if (installedRoot == null || !installedRoot.isDirectory()) continue;
+            if (installedRoot.equals(currentInstallPath)) continue;
+
+            ContentProfile candidate = readProfile(new File(installedRoot, PROFILE_NAME));
+            if (candidate == null || candidate.type != ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) continue;
+            if (DgVoodooManager.compareVersionNames(installedProfile.verName, candidate.verName) > 0) {
+                FileUtils.delete(installedRoot);
+            }
+        }
+    }
+
+    private String buildInstalledRuntimeFamilyKey(ContentProfile profile) {
+        if (profile == null) return "";
+        String archHint = resolveRuntimeArchHint(profile);
+        if (archHint.isEmpty()) archHint = resolveArchHint(profile);
+        return (profile.type == null ? "" : profile.type.toString().toLowerCase(Locale.US))
+                + "|" + normalizeFamilyKeyToken(profile.getRuntimeModel())
+                + "|" + normalizeFamilyKeyToken(profile.getChannel())
+                + "|" + normalizeFamilyKeyToken(archHint)
+                + "|" + normalizeFamilyKeyToken(profile.verName);
+    }
+
+    private boolean shouldPreferInstalledRuntimeRoot(@Nullable InstalledRuntimeRoot candidate,
+                                                     @Nullable InstalledRuntimeRoot currentBest) {
+        if (candidate == null) return false;
+        if (currentBest == null) return true;
+
+        ContentProfile candidateProfile = candidate.profile;
+        ContentProfile currentProfile = currentBest.profile;
+        if (candidateProfile.verCode != currentProfile.verCode) {
+            return candidateProfile.verCode > currentProfile.verCode;
+        }
+
+        int candidateMetadataScore = computeInstalledRuntimeMetadataScore(candidateProfile);
+        int currentMetadataScore = computeInstalledRuntimeMetadataScore(currentProfile);
+        if (candidateMetadataScore != currentMetadataScore) {
+            return candidateMetadataScore > currentMetadataScore;
+        }
+
+        boolean candidateCanonical = candidate.installRoot.equals(getInstallDir(context, candidateProfile));
+        boolean currentCanonical = currentBest.installRoot.equals(getInstallDir(context, currentProfile));
+        if (candidateCanonical != currentCanonical) {
+            return candidateCanonical;
+        }
+
+        return candidate.installRoot.getName().compareToIgnoreCase(currentBest.installRoot.getName()) > 0;
+    }
+
+    private int computeInstalledRuntimeMetadataScore(ContentProfile profile) {
+        if (profile == null) return 0;
+        int score = 0;
+        if (profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty()) score += 4;
+        if (profile.releaseTag != null && !profile.releaseTag.trim().isEmpty()) score += 3;
+        if (profile.artifactName != null && !profile.artifactName.trim().isEmpty()) score += 3;
+        if (profile.sourceRepo != null && !profile.sourceRepo.trim().isEmpty()) score += 2;
+        if (profile.sourceFeed != null && !profile.sourceFeed.trim().isEmpty()) score += 1;
+        if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) score += 1;
+        if (profile.publishedAt != null && !profile.publishedAt.trim().isEmpty()) score += 1;
+        return score;
+    }
+
+    private String normalizeFamilyKeyToken(@Nullable String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.US);
     }
 
     private File migrateRuntimeInstallRoot(File installRoot, File canonicalRoot) {
@@ -1557,6 +1996,16 @@ public class ContentsManager {
         }
     }
 
+    private static final class InstalledRuntimeRoot {
+        private final File installRoot;
+        private final ContentProfile profile;
+
+        private InstalledRuntimeRoot(File installRoot, ContentProfile profile) {
+            this.installRoot = installRoot;
+            this.profile = profile;
+        }
+    }
+
     @Nullable
     private ContentProfile synthesizeProfileFromExtractedPayload(File rootDir, ContentProfile remoteHint) {
         if (rootDir == null || remoteHint == null || remoteHint.type == null) return null;
@@ -1581,12 +2030,9 @@ public class ContentsManager {
         profile.runtimeModel = remoteHint.getRuntimeModel();
         profile.vulkanApiMin = remoteHint.vulkanApiMin;
         profile.vulkanApiMax = remoteHint.vulkanApiMax;
-        profile.vulkanSdkVersion = remoteHint.vulkanSdkVersion;
-
         switch (remoteHint.type) {
             case CONTENT_TYPE_DXVK -> profile.fileList = synthesizeDxvkFiles(rootDir);
             case CONTENT_TYPE_VKD3D -> profile.fileList = synthesizeVkd3dFiles(rootDir);
-            case CONTENT_TYPE_VULKAN_SDK -> profile.fileList = synthesizeVulkanSdkFiles(rootDir);
             case CONTENT_TYPE_DGVOODOO -> profile.fileList = synthesizeDgVoodooFiles(rootDir);
             case CONTENT_TYPE_BOX64 -> profile.fileList = synthesizeSingleFile(rootDir, "box64", "${localbin}/box64");
             case CONTENT_TYPE_WOWBOX64 -> profile.fileList = synthesizeWowBox64Files(rootDir);
@@ -1633,10 +2079,6 @@ public class ContentsManager {
             }
             if (profile.vulkanApiMin > 0) object.put(ContentProfile.MARK_VULKAN_API_MIN, profile.vulkanApiMin);
             if (profile.vulkanApiMax > 0) object.put(ContentProfile.MARK_VULKAN_API_MAX, profile.vulkanApiMax);
-            if (profile.vulkanSdkVersion != null && !profile.vulkanSdkVersion.trim().isEmpty()) {
-                object.put(ContentProfile.MARK_VULKAN_SDK_VERSION, profile.vulkanSdkVersion.trim());
-            }
-
             JSONArray files = new JSONArray();
             if (profile.fileList != null) {
                 for (ContentProfile.ContentFile contentFile : profile.fileList) {
@@ -1664,12 +2106,13 @@ public class ContentsManager {
     }
 
     private void synthesizeWineFamilyProfile(File rootDir, ContentProfile profile) {
-        String binPath = findRelativeDirectory(rootDir, "bin");
-        String libPath = findRelativeDirectory(rootDir, "lib");
-        String prefixPackPath = findRelativeFile(rootDir, "prefixPack.tzst");
-        if (prefixPackPath == null) {
-            prefixPackPath = findRelativeFile(rootDir, "prefixPack.txz");
-        }
+        File binDir = WineUtils.resolveRuntimeBinDir(rootDir);
+        File libDir = WineUtils.resolveRuntimeLibDir(rootDir);
+        File prefixPack = WineUtils.resolveRuntimePrefixPack(rootDir);
+
+        String binPath = binDir != null ? relativizePath(rootDir, binDir) : null;
+        String libPath = libDir != null ? relativizePath(rootDir, libDir) : null;
+        String prefixPackPath = prefixPack != null ? relativizePath(rootDir, prefixPack) : null;
         if (binPath == null || libPath == null || prefixPackPath == null) return;
 
         profile.wineBinPath = binPath;
@@ -1747,19 +2190,6 @@ public class ContentsManager {
         item.target = targetPath;
         files.add(item);
         return files;
-    }
-
-    private List<ContentProfile.ContentFile> synthesizeVulkanSdkFiles(File rootDir) {
-        LinkedHashMap<String, ContentProfile.ContentFile> filesByTarget = new LinkedHashMap<>();
-        collectTreeMappings(rootDir, "usr/share/vulkan", "${sharedir}/vulkan", filesByTarget);
-        collectTreeMappings(rootDir, "usr/share/vulkan-sdk", "${sharedir}/vulkan-sdk", filesByTarget);
-        collectTreeMappings(rootDir, "share/vulkan", "${sharedir}/vulkan", filesByTarget);
-        collectTreeMappings(rootDir, "share/vulkan-sdk", "${sharedir}/vulkan-sdk", filesByTarget);
-        collectTreeMappings(rootDir, "usr/lib/vulkan", "${libdir}/vulkan", filesByTarget);
-        collectTreeMappings(rootDir, "usr/lib/vulkan-sdk", "${libdir}/vulkan-sdk", filesByTarget);
-        collectTreeMappings(rootDir, "lib/vulkan", "${libdir}/vulkan", filesByTarget);
-        collectTreeMappings(rootDir, "lib/vulkan-sdk", "${libdir}/vulkan-sdk", filesByTarget);
-        return new ArrayList<>(filesByTarget.values());
     }
 
     private List<ContentProfile.ContentFile> synthesizeDgVoodooFiles(File rootDir) {

@@ -13,6 +13,10 @@ This repo stores only application-layer documentation.
 ## Source Of Truth
 
 - `AGENTS.md` - repository-local Codex execution rules.
+- `docs/MASTER_ENGINEERING_DIRECTIVE.md` - hard engineering directive for
+  mandatory auto-fix execution, root-cause/class repair, whole
+  app/runtime/product surface coverage, full-harvest log handling, global
+  verification, and final closure reports.
 - `docs/CODEX_OPERATING_CONTRACT.md` - approval-gated review mode, execution
   gates, and documentation sync map.
 - `docs/CHAPTER2_FREEWINE_AESOLATOR_CONTRACT.md` - current integrated product
@@ -23,6 +27,9 @@ This repo stores only application-layer documentation.
 - `docs/ADB_WIFI_DEBUG.md` - local Termux Wi-Fi ADB pairing, reconnect, install, and launch helper runbook.
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md` - forensic sync contract for app/runtime diagnostics.
 - `docs/TERMUX_LOCAL_BUILD.md` - verified Termux ARM64 local build and Wi-Fi ADB install runbook.
+- `docs/ANDROID_BUILD_REPRO_AUDIT_2026-03-29.md` - repo-local audit of the
+  Android build lane with focus on configuration-cache-hostile inputs, host
+  drift, and deterministic root-lane closure.
 - `docs/PREFIX_PACK_TOOLKIT.md` - audited prefix-pack toolkit for VC++ AIO, Wine Mono, Wine Gecko, official DirectX June 2010, aligned repo/rootfs/Windows loaders, offline overlay packing, and direct device-side cache staging.
 - `docs/AJAY_PREFIX_COMPONENT_AUDIT.md` - Ajay Prefix Pro component audit that classifies what stays in `Contents/payload`, what can expand `prefix-pack`, and what remains on hold.
 - `docs/DONOR_REFLECTIVE_ROADMAP.md` - donor extraction roadmap with pre/during/post reflective gates.

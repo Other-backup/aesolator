@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/surface_runtime_scrim"
@@ -8,28 +9,79 @@
     android:gravity="center">
 
     <LinearLayout
-        android:layout_width="320dp"
+        android:layout_width="348dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/surface_card_background"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="18dp"
-        android:tag="theme_card">
+        android:background="@drawable/surface_runtime_taskmgr_background"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:minWidth="348dp"
+        android:paddingStart="22dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="20dp"
+        android:tag="preserve_background">
 
-        <ProgressBar
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="16dp"
-            android:indeterminate="true"
-            android:indeterminateDrawable="@drawable/progress_bar_indeterminate" />
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="88dp"
+            android:layout_gravity="center_horizontal"
+            android:foregroundGravity="center"
+            android:gravity="center"
+            android:padding="4dp"
+            android:translationX="-5dp">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/CircularProgressIndicator"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:max="100"
+                app:indicatorColor="@color/surface_runtime_taskmgr_border"
+                app:indicatorSize="72dp"
+                app:trackColor="@color/surface_runtime_taskmgr_header_bg"
+                app:trackThickness="6dp" />
+
+            <ImageView
+                android:id="@+id/IVPreloaderIcon"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:scaleType="centerInside"
+                android:src="@drawable/ae_icon_package"
+                android:tint="@color/surface_runtime_taskmgr_text" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/TextView"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:textColor="@color/surface_runtime_taskmgr_text"
             android:textSize="18sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVPreloaderHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:text="@string/preloader_hint"
+            android:textColor="@color/surface_runtime_taskmgr_muted"
+            android:textSize="11sp" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/LinearProgressIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:indeterminate="true"
+            android:max="100"
+            app:indicatorColor="@color/surface_runtime_taskmgr_border"
+            app:trackColor="@color/surface_runtime_taskmgr_header_bg"
+            app:trackThickness="7dp" />
     </LinearLayout>
 </FrameLayout>

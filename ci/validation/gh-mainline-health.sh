@@ -8,10 +8,9 @@ usage() {
   cat <<'EOF'
 usage: ci/validation/gh-mainline-health.sh [branch] [since_hours]
 
-Checks latest run state for the four critical workflows:
+Checks latest run state for the three critical workflows:
   - Build FreeWine 11 ARM64EC (WCP)
   - Build Graphics Driver ZIP Packages
-  - Build Vulkan SDK Contents Packages
   - Build Winlator ARM64EC (no-embedded-runtimes)
 
 Examples:
@@ -59,7 +58,6 @@ now = datetime.now(timezone.utc)
 targets = [
     "Build FreeWine 11 ARM64EC (WCP)",
     "Build Graphics Driver ZIP Packages",
-    "Build Vulkan SDK Contents Packages",
     "Build Winlator ARM64EC (no-embedded-runtimes)",
 ]
 

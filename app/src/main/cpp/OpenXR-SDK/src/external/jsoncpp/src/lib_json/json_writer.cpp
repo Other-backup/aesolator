@@ -870,7 +870,7 @@ struct CommentStyle {
   /// Decide whether to write comments.
   enum Enum {
     None, ///< Drop all comments.
-    Most, ///< Recover odd behavior of previous versions (not implemented yet).
+    Most, ///< Recover odd behavior of previous versions (unsupported yet).
     All   ///< Keep all comments.
   };
 };

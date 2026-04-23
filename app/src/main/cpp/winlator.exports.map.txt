@@ -1,6 +1,9 @@
 {
     global:
         Java_*;
+        globalEGLContext;
+        globalEGLDisplay;
+        globalEGLSurface;
     local:
         *;
 };

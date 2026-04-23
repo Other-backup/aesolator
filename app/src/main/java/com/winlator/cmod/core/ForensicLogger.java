@@ -129,7 +129,9 @@ public final class ForensicLogger {
                     try {
                         merged.put(key, fields.opt(key));
                     }
-                    catch (JSONException ignored) {}
+                    catch (JSONException ignored) {
+                        // Skip one malformed field and preserve the rest of the forensic payload.
+                    }
                 }
             }
         }
@@ -138,7 +140,9 @@ public final class ForensicLogger {
                 merged.put("error_class", error.getClass().getName());
                 merged.put("error_detail", String.valueOf(error.getMessage()));
             }
-            catch (JSONException ignored) {}
+            catch (JSONException ignored) {
+                // Keep the event even if one error detail cannot be encoded.
+            }
         }
         logEvent(context, "error", eventId, traceId, stage, message, merged);
     }
@@ -197,7 +201,9 @@ public final class ForensicLogger {
             try {
                 obj.put(key, value == null ? JSONObject.NULL : value);
             }
-            catch (JSONException ignored) {}
+            catch (JSONException ignored) {
+                // Preserve remaining fields when one value is not JSON-compatible.
+            }
         }
         return obj;
     }
@@ -295,7 +301,9 @@ public final class ForensicLogger {
             try {
                 out.put(prefix + key, source.opt(key));
             }
-            catch (JSONException ignored) {}
+            catch (JSONException ignored) {
+                // Preserve remaining prefixed fields when one value cannot be encoded.
+            }
         }
         return out;
     }
@@ -378,7 +386,7 @@ public final class ForensicLogger {
         }
         catch (IOException e) {
             externalError = e;
-            Log.w(TAG, "External forensic sink unavailable, trying app-private fallback", e);
+            Log.w(TAG, "External forensic sink unavailable, trying app-private secondary sink", e);
         }
 
         try {
@@ -404,7 +412,9 @@ public final class ForensicLogger {
             obj.put("thread_name", thread != null ? thread.getName() : "");
             obj.put("thread_id", thread != null ? thread.getId() : -1);
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) {
+            // Fatal crash emission is best-effort; keep the partial JSON payload intact.
+        }
 
         String line = obj.toString();
         logcat("error", line);

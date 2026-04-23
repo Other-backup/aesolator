@@ -5,6 +5,7 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.GraphicsDrivers;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
@@ -15,6 +16,8 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,32 +35,43 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
     }
 
     @Override
-    public boolean isSatisfied(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
-        return collectMissingParts(context, container, shortcut).isEmpty();
+    public boolean isSatisfied(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+        return collectMissingRequirements(dependencyContext, container, shortcut).isEmpty();
     }
 
     @Override
-    public String getLoadingMessage(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
-        List<String> missing = collectMissingParts(context, container, shortcut);
+    public String getLoadingMessage(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+        List<ManifestDependencyInstaller.RequiredContent> missing = collectMissingRequirements(dependencyContext, container, shortcut);
         if (missing.isEmpty()) return "Validating wrapper runtime payloads";
-        return "Missing wrapper runtime payloads: " + String.join(", ", missing);
+        return "Missing wrapper runtime payloads: " + ManifestDependencyInstaller.formatMissing(missing);
     }
 
     @Override
-    public void install(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
-        List<String> missing = collectMissingParts(context, container, shortcut);
-        String detail = missing.isEmpty()
-                ? "Wrapper runtime validation failed"
-                : "Missing wrapper runtime payloads: " + String.join(", ", missing);
+    public void install(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
+        List<ManifestDependencyInstaller.RequiredContent> missing = collectMissingRequirements(dependencyContext, container, shortcut);
+        if (!missing.isEmpty()) {
+            ManifestDependencyInstaller.installAvailable(
+                    dependencyContext,
+                    container == null ? "" : container.getContainerVariant(),
+                    missing,
+                    callbacks
+            );
+        }
+        List<ManifestDependencyInstaller.RequiredContent> unresolved = collectMissingRequirements(dependencyContext, container, shortcut);
+        if (unresolved.isEmpty()) {
+            callbacks.setLoadingProgress(1f);
+            return;
+        }
+        String detail = "Missing wrapper runtime payloads: " + ManifestDependencyInstaller.formatMissing(unresolved);
         callbacks.setLoadingMessage(detail);
         callbacks.setLoadingProgress(0f);
         throw new IllegalStateException(detail);
     }
 
-    private List<String> collectMissingParts(Context context, Container container, @Nullable Shortcut shortcut) {
-        ArrayList<String> missing = new ArrayList<>();
-        ContentsManager manager = new ContentsManager(context);
-        manager.syncContents();
+    private List<ManifestDependencyInstaller.RequiredContent> collectMissingRequirements(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut) {
+        ArrayList<ManifestDependencyInstaller.RequiredContent> missing = new ArrayList<>();
+        Context context = dependencyContext.getContext();
+        ContentsManager manager = dependencyContext.getContentsManager();
 
         String wrapper = resolveDxWrapper(container, shortcut).toLowerCase(Locale.ENGLISH);
         if (wrapper.isEmpty()) return missing;
@@ -66,22 +80,62 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
             KeyValueSet config = DXVKConfigDialog.parseConfig(resolveDxWrapperConfig(container, shortcut));
             String dxvkVersion = sanitizeVersion(config.get("version"), DefaultVersion.DXVK);
             if (!hasDxvkPayload(context, manager, dxvkVersion)) {
-                missing.add("dxvk-" + dxvkVersion);
+                missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_DXVK,
+                        dxvkVersion,
+                        "dxvk-" + dxvkVersion
+                ));
             }
 
             String vkd3dVersion = sanitizeVersion(config.get("vkd3dVersion"), "None");
             if (!"None".equalsIgnoreCase(vkd3dVersion) && !hasVkd3dPayload(context, manager, vkd3dVersion)) {
-                missing.add("vkd3d-" + vkd3dVersion);
+                missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
+                        vkd3dVersion,
+                        "vkd3d-" + vkd3dVersion
+                ));
             }
         }
 
         if (wrapper.contains("dgvoodoo")) {
             DgVoodooManager dgVoodooManager = new DgVoodooManager(context);
             KeyValueSet config = DgVoodooConfigDialog.parseConfig(resolveDxWrapperConfig(container, shortcut));
-            String shortcutPath = shortcut != null ? shortcut.path : "";
-            String resolvedArch = dgVoodooManager.resolvePreferredArch(shortcutPath, config.get("dgvoodooArch"));
+            WineUtils.WindowsLaunchTarget launchTarget = WineUtils.resolveWindowsLaunchTarget(
+                    container != null ? container.getRootDir() : null,
+                    shortcut != null ? shortcut.path : ""
+            );
+            String wineVersion = resolveWineVersion(container, shortcut);
+            WineInfo wineInfo = WineInfo.fromIdentifier(
+                    context,
+                    manager,
+                    wineVersion,
+                    ContentProfile.inferRuntimeModelFromEntryName(wineVersion)
+            );
+            String resolvedArch = dgVoodooManager.resolvePreferredArch(launchTarget, config.get("dgvoodooArch"), wineInfo);
             if (!dgVoodooManager.isArchInstalled(resolvedArch)) {
-                missing.add("dgvoodoo-" + resolvedArch);
+                String packageLane = DgVoodooManager.resolvePackageLaneForRuntimeArch(resolvedArch);
+                missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO,
+                        packageLane,
+                        "dgvoodoo-" + packageLane
+                ));
+            }
+
+            String graphicsDriver = resolveGraphicsDriver(container, shortcut);
+            if (GraphicsDrivers.isVortek(graphicsDriver)) {
+                String dxvkVersion = DgVoodooConfigDialog.resolveCompanionDxvkVersion(
+                        config,
+                        resolvedArch,
+                        true,
+                        manager.getInstalledVersionNames(ContentProfile.ContentType.CONTENT_TYPE_DXVK, true)
+                );
+                if (!hasDxvkPayload(context, manager, dxvkVersion)) {
+                    missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_DXVK,
+                        dxvkVersion,
+                        "dxvk-" + dxvkVersion
+                    ));
+                }
             }
         }
 
@@ -89,27 +143,13 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
     }
 
     private boolean hasDxvkPayload(Context context, ContentsManager manager, String version) {
-        return hasInstalledVersion(manager, ContentProfile.ContentType.CONTENT_TYPE_DXVK, version)
+        return manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_DXVK, version, true)
                 || hasEmbeddedArchive(context, "dxwrapper/dxvk-" + version + ".tzst");
     }
 
     private boolean hasVkd3dPayload(Context context, ContentsManager manager, String version) {
-        return hasInstalledVersion(manager, ContentProfile.ContentType.CONTENT_TYPE_VKD3D, version)
+        return manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_VKD3D, version, true)
                 || hasEmbeddedArchive(context, "dxwrapper/vkd3d-" + version + ".tzst");
-    }
-
-    private boolean hasInstalledVersion(ContentsManager manager, ContentProfile.ContentType type, String version) {
-        List<ContentProfile> profiles = manager.getProfiles(type);
-        if (profiles == null || version == null || version.trim().isEmpty()) return false;
-        String versionLower = version.toLowerCase(Locale.ENGLISH);
-        for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
-            String profileVersion = profile.verName == null ? "" : profile.verName.toLowerCase(Locale.ENGLISH);
-            if (profileVersion.equals(versionLower)) return true;
-            if (!profileVersion.isEmpty() && versionLower.startsWith(profileVersion + "-")) return true;
-            if (!versionLower.isEmpty() && profileVersion.startsWith(versionLower + "-")) return true;
-        }
-        return false;
     }
 
     private boolean hasEmbeddedArchive(Context context, String assetPath) {
@@ -128,6 +168,20 @@ final class WrapperRuntimePresenceDependency implements LaunchDependency {
                 ? shortcut.getExtra("dxwrapperConfig", container.getDXWrapperConfig())
                 : container.getDXWrapperConfig();
         return value == null ? "" : value;
+    }
+
+    private String resolveGraphicsDriver(Container container, @Nullable Shortcut shortcut) {
+        String value = shortcut != null
+                ? shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())
+                : container.getGraphicsDriver();
+        return value == null ? "" : value.trim();
+    }
+
+    private String resolveWineVersion(Container container, @Nullable Shortcut shortcut) {
+        String value = shortcut != null
+                ? shortcut.getExtra("wineVersion", container.getWineVersion())
+                : container.getWineVersion();
+        return value == null ? "" : value.trim();
     }
 
     private String sanitizeVersion(String value, String fallback) {

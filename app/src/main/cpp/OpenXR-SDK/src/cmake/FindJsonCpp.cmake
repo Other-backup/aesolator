@@ -361,7 +361,7 @@ if(NOT JSONCPP_FOUND)
 
 	if(JSONCPP_FOUND)
 		# We already know that the target doesn't exist, let's make it.
-		# TODO don't know why we get errors like:
+		# Notes don't know why we get errors like:
 		# error: 'JsonCpp::JsonCpp-NOTFOUND', needed by 'bin/osvr_json_to_c', missing and no known rule to make it
 		# when we do the imported target commented out below. So, instead, we make an interface
 		# target with an alias. Hmm.

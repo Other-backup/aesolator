@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 : "${ADB:=adb}"
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_ACTIVITY:=com.winlator.cmod.XServerDisplayActivity}"
 : "${WLT_CONTAINER_ID:=1}"
 : "${WLT_SERIAL:=}"
@@ -16,6 +16,8 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 : "${WLT_FAIL_ON_MISMATCH:=1}"
 : "${WLT_LAUNCH_WAIT_SEC:=5}"
 : "${WLT_OUT_DIR:=/tmp/forensic-adb-arm64-autotune-$(date +%Y%m%d_%H%M%S)}"
+WLT_APP_DATA_DIR=""
+WLT_WINE_CONTENTS_DIR=""
 
 log() { printf '[forensic-autotune] %s\n' "$*"; }
 warn() { printf '[forensic-autotune][warn] %s\n' "$*" >&2; }
@@ -50,6 +52,21 @@ adb_s() {
   else
     "${ADB}" "$@"
   fi
+}
+
+trim() {
+  local s="$1"
+  s="${s#${s%%[![:space:]]*}}"
+  s="${s%${s##*[![:space:]]}}"
+  printf '%s' "${s}"
+}
+
+resolve_app_data_dir() {
+  local app_dir
+  app_dir="$(adb_s shell "run-as ${WLT_PACKAGE} pwd" | tr -d '\r' | tail -n1)"
+  app_dir="$(trim "${app_dir}")"
+  [[ "${app_dir}" == /data/* ]] || fail "unexpected app data dir for ${WLT_PACKAGE}: ${app_dir:-<empty>}"
+  printf '%s\n' "${app_dir}"
 }
 
 collect_soc_props() {
@@ -162,16 +179,16 @@ PY
 select_profile_json_path() {
   local profile_path
   if [[ -n "${WLT_CONTENT_NAME}" ]]; then
-    profile_path="files/contents/Wine/${WLT_CONTENT_NAME}/profile.json"
-    adb_s shell "run-as ${WLT_PACKAGE} sh -c 'test -f ${profile_path}'" >/dev/null 2>&1 || \
+    profile_path="${WLT_WINE_CONTENTS_DIR}/${WLT_CONTENT_NAME}/profile.json"
+    adb_s exec-out run-as "${WLT_PACKAGE}" cat "${profile_path}" >/dev/null 2>&1 || \
       fail "profile.json not found for content: ${WLT_CONTENT_NAME}"
     printf '%s\n' "${profile_path}"
     return 0
   fi
 
   profile_path="$(
-    adb_s shell "run-as ${WLT_PACKAGE} sh -c 'for f in files/contents/Wine/*/profile.json; do [ -f \"\$f\" ] || continue; echo \"\$f\"; break; done'" \
-      | tr -d '\r' | head -n1
+    adb_s shell "run-as ${WLT_PACKAGE} find ${WLT_WINE_CONTENTS_DIR} -type f -name profile.json 2>/dev/null" \
+      | tr -d '\r' | sort | head -n1
   )"
   [[ -n "${profile_path}" ]] || fail "no installed Wine profile.json found in app-private contents"
   printf '%s\n' "${profile_path}"
@@ -180,7 +197,7 @@ select_profile_json_path() {
 extract_profile_json() {
   local profile_path="$1"
   local out_json="$2"
-  adb_s shell "run-as ${WLT_PACKAGE} sh -c 'cat ${profile_path}'" > "${out_json}" \
+  adb_s exec-out run-as "${WLT_PACKAGE}" cat "${profile_path}" > "${out_json}" \
     || fail "failed to read ${profile_path}"
 }
 
@@ -310,6 +327,8 @@ main() {
 
   ADB_SERIAL_PICKED="$(pick_serial)"
   [[ -n "${ADB_SERIAL_PICKED}" ]] || fail "no active adb device"
+  WLT_APP_DATA_DIR="$(resolve_app_data_dir)"
+  WLT_WINE_CONTENTS_DIR="${WLT_APP_DATA_DIR}/files/contents/Wine"
 
   mkdir -p "${WLT_OUT_DIR}"
   soc_props_file="${WLT_OUT_DIR}/soc-props.txt"

@@ -6,16 +6,14 @@ import android.util.Log;
 
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.WineUtils;
 
-import java.io.IOException;
-import java.nio.file.Files;
     import org.json.JSONException;
     import org.json.JSONObject;
 
     import java.io.File;
     import java.util.ArrayList;
     import java.util.Iterator;
-    import java.util.List;
     import java.util.UUID;
 
     public class Shortcut {
@@ -74,7 +72,7 @@ import java.nio.file.Files;
                         try {
                             extraData.put(key, value);
                         }
-                        catch (JSONException e) {}
+                        catch (JSONException e) { /* best-effort path; keep surrounding flow intact. */ }
                     }
                 }
             }
@@ -82,7 +80,7 @@ import java.nio.file.Files;
             this.name = FileUtils.getBasename(file.getPath());
             this.icon = icon;
             this.iconFile = iconFile;
-            this.path = StringUtils.unescape(execArgs.substring(execArgs.lastIndexOf("wine ") + 4));
+            this.path = StringUtils.unescape(WineUtils.extractWineExecPayload(execArgs));
             this.wmClass = wmClass;
 
             this.customCoverArtPath = getExtra("customCoverArtPath");
@@ -103,7 +101,7 @@ import java.nio.file.Files;
                 }
             }
 
-            // Fallback to standard cover art location
+            // degrade to standard cover art location
             File defaultCoverArtFile = new File(COVER_ART_DIR, this.name + ".png");
             if (defaultCoverArtFile.isFile()) {
                 this.coverArt = BitmapFactory.decodeFile(defaultCoverArtFile.getPath());
@@ -156,7 +154,7 @@ import java.nio.file.Files;
                 }
                 else extraData.remove(name);
             }
-            catch (JSONException e) {}
+            catch (JSONException e) { /* best-effort path; keep surrounding flow intact. */ }
         }
 
         public void saveData() {
@@ -173,7 +171,7 @@ import java.nio.file.Files;
                     String key = keys.next();
                     try {
                         content += key + "=" + extraData.getString(key) + "\n";
-                    } catch (JSONException e) {}
+                    } catch (JSONException e) { /* best-effort path; keep surrounding flow intact. */ }
                 }
             }
 
@@ -297,21 +295,8 @@ import java.nio.file.Files;
         }
 
         public String getExecutable() {
-            String exe = "";
-            try {
-                List<String> lines = Files.readAllLines(file.toPath());
-                for (String line : lines) {
-                    if (line.startsWith("Exec")) {
-                        exe = line.substring(line.lastIndexOf("\\") + 1, line.length()).replaceAll("\\s+$", "");
-                        break;
-                    }
-                }
-            }
-            catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            return exe;
+            String executable = WineUtils.resolveWindowsLaunchTarget(null, path).getExecutableName();
+            return executable.isEmpty() ? FileUtils.getName(path) : executable;
         }
 
     }

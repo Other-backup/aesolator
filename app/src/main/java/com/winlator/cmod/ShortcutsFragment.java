@@ -268,6 +268,10 @@ public class ShortcutsFragment extends Fragment {
                 intent.putExtra("container_id", shortcut.container.id);
                 intent.putExtra("shortcut_path", shortcut.file.getPath());
                 intent.putExtra("shortcut_name", shortcut.name); // Add this line to pass the shortcut name
+                String appId = shortcut.container.getSessionMetadata("appId", "");
+                if (!appId.isEmpty()) {
+                    intent.putExtra(LaunchSecurity.EXTRA_APP_ID, appId);
+                }
                 // Check if the shortcut has the disableXinput value; if not, default to false.
                 String disableXinputValue = shortcut.getExtra("disableXinput", "0"); // Get value from shortcut or use "0" (false) by default
                 intent.putExtra("disableXinput", disableXinputValue); // Use the actual value from the shortcut
@@ -426,7 +430,9 @@ public class ShortcutsFragment extends Fragment {
         try {
             shortcutManager.disableShortcuts(Collections.singletonList(shortcut.getExtra("uuid")),
                     context.getString(R.string.shortcut_not_available));
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.w("ShortcutsFragment", "Unable to disable pinned shortcut", e);
+        }
     }
 
     public void updateShortcutOnScreen(String shortLabel, String longLabel, int containerId, String shortcutPath, Icon icon, String uuid) {
@@ -439,7 +445,9 @@ public class ShortcutsFragment extends Fragment {
                     break;
                 }
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.w("ShortcutsFragment", "Unable to update pinned shortcut", e);
+        }
     }
 
     private GradientDrawable buildRowBackground(int accent, boolean isDarkMode) {

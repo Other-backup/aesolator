@@ -13,6 +13,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
@@ -77,7 +78,13 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
 
     @Override
     protected void applyAndroidBionicHostEnv(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
-        launchEnv.put("AERO_RUNTIME_EXECUTION_MODEL", "android_bionic_wowbox64_guest");
+        String effectiveEmulator = resolveEffectiveArm64EcEmulator();
+        launchEnv.put(
+                "AERO_RUNTIME_EXECUTION_MODEL",
+                "fexcore".equalsIgnoreCase(effectiveEmulator)
+                        ? "android_bionic_fex_guest"
+                        : "android_bionic_wowbox64_guest"
+        );
         launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
         launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "host_closure_preload");
         File androidHostLibDir = imageFs.getAndroidHostLibDir();
@@ -125,7 +132,8 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         if (shouldUseDirectArm64EcGuestLaunch(environment.getImageFs(), resolveEffectiveArm64EcEmulator(), isDesktopShellBootstrapLaunch())) {
             return false;
         }
-        File wineBinary = new File(getWineInfo().path, "bin/wine");
+        File runtimeRoot = getWineInfo().path == null ? null : new File(getWineInfo().path);
+        File wineBinary = WineUtils.resolveRuntimeWineBinary(runtimeRoot);
         return shouldWrapArm64EcWineWithBox64(wineBinary);
     }
 
@@ -135,15 +143,15 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             requestedEmulator = getShortcut().getExtra("emulator", requestedEmulator);
         }
         boolean desktopShellBootstrap = isDesktopShellBootstrapLaunch();
-        boolean fexRequested = "fexcore".equalsIgnoreCase(requestedEmulator);
-        return desktopShellBootstrap && fexRequested ? "wowbox64" : requestedEmulator;
+        return resolveEffectiveEmulator(environment.getImageFs(), requestedEmulator, desktopShellBootstrap);
     }
 
     private boolean isDesktopShellBootstrapLaunch() {
         String guestExecutable = getGuestExecutable();
         if (getShortcut() != null || guestExecutable == null) return false;
         String lowered = guestExecutable.toLowerCase(java.util.Locale.ROOT);
-        return lowered.contains("explorer /desktop=shell");
+        return lowered.contains("explorer /desktop=shell")
+                || lowered.contains("explorer.exe /desktop=shell");
     }
 
     private boolean shouldUseDirectArm64EcGuestLaunch(ImageFs imageFs, String effectiveEmulator, boolean desktopShellBootstrap) {
@@ -151,19 +159,11 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             return false;
         }
 
-        File system32Dir = new File(imageFs.wineprefix, "drive_c/windows/system32");
-        File wowbox64Dll = new File(system32Dir, "wowbox64.dll");
-        File wow64FexDll = new File(system32Dir, "libwow64fex.dll");
-        File arm64EcFexDll = new File(system32Dir, "libarm64ecfex.dll");
-
         if ("wowbox64".equalsIgnoreCase(effectiveEmulator)) {
-            return wowbox64Dll.isFile();
+            return hasWowbox64Payload(imageFs);
         }
         if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
-            if (desktopShellBootstrap) {
-                return wowbox64Dll.isFile();
-            }
-            return wow64FexDll.isFile() && arm64EcFexDll.isFile();
+            return hasFexArm64EcPayload(imageFs);
         }
         return false;
     }

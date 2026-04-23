@@ -2,59 +2,109 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    android:background="@drawable/surface_card_background"
+    android:background="@drawable/surface_runtime_taskmgr_row_selector"
+    android:clickable="true"
+    android:focusable="true"
     android:orientation="vertical"
-    android:padding="10dp"
-    android:tag="theme_card">
-
-    <TextView
-        android:id="@+id/TVLinuxName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textStyle="bold" />
+    android:minHeight="38dp"
+    android:paddingStart="8dp"
+    android:paddingTop="2dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="6dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
-            android:id="@+id/TVLinuxPid"
-            android:layout_width="wrap_content"
+            android:id="@+id/TVLinuxName"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:background="@drawable/surface_badge_background"
-            android:paddingStart="8dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="4dp"
-            android:tag="theme_badge" />
+            android:layout_weight="2.7"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVLinuxState"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.95"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVLinuxPid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.86"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8.3sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/TVLinuxCpu"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1" />
+            android:layout_weight="0.8"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8.3sp" />
 
         <TextView
             android:id="@+id/TVLinuxMemory"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1" />
+            android:layout_weight="1.02"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8.3sp" />
 
         <TextView
             android:id="@+id/TVLinuxIo"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textSize="12sp" />
+            android:layout_weight="1.02"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="8.3sp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/TVLinuxDetail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="1dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/surface_runtime_taskmgr_muted"
+        android:textSize="7.1sp" />
 </LinearLayout>

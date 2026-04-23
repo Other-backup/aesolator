@@ -16,6 +16,9 @@ public final class LaunchSecurity {
     private static final String PREFS_NAME = "aeso_launch_security";
     private static final String PREF_SECRET = "launch_secret_v1";
     private static final String EXTRA_XSERVER_SIGNATURE = "aeso_xserver_launch_sig";
+    public static final String EXTRA_APP_ID = "app_id";
+    public static final String EXTRA_LAUNCH_ROUTE_TOKEN = "aeso_launch_route_token";
+    public static final String EXTRA_TEMP_OVERRIDE_APP_ID = "aeso_temp_override_app_id";
     private static final int SECRET_SIZE_BYTES = 32;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -87,6 +90,9 @@ public final class LaunchSecurity {
                 + intent.getIntExtra("container_id", 0) + "|"
                 + safe(intent.getStringExtra("shortcut_path")) + "|"
                 + safe(intent.getStringExtra("shortcut_name")) + "|"
+                + safe(intent.getStringExtra(EXTRA_APP_ID)) + "|"
+                + safe(intent.getStringExtra(EXTRA_LAUNCH_ROUTE_TOKEN)) + "|"
+                + safe(intent.getStringExtra(EXTRA_TEMP_OVERRIDE_APP_ID)) + "|"
                 + safe(intent.getStringExtra("disableXinput")) + "|"
                 + safe(intent.getAction());
     }

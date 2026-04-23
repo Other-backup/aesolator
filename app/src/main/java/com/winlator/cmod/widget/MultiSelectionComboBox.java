@@ -26,6 +26,7 @@ public class MultiSelectionComboBox extends AppCompatTextView {
     private String[] items;
     private final ArraySet<String> selectedItemSet = new ArraySet<>();
     private String text = "";
+    private int popupWindowWidth = 0;
 
     public MultiSelectionComboBox(@NonNull Context context) {
         this(context, null);
@@ -57,6 +58,17 @@ public class MultiSelectionComboBox extends AppCompatTextView {
             setText(getSelectedItemsAsString());
     }
 
+    public void setDisplayText(String text) {
+        this.text = text != null ? text : "";
+        if (!this.text.isEmpty())
+            setText(selectedItemSet.size() + " " + this.text);
+        else
+            setText(getSelectedItemsAsString());
+    }
+
+    public void setPopupWindowWidth(int popupWindowWidth) {
+        this.popupWindowWidth = Math.max(0, popupWindowWidth);
+    }
 
     public void setSelectedItems(String[] selectedItems) {
         selectedItemSet.clear();
@@ -81,6 +93,15 @@ public class MultiSelectionComboBox extends AppCompatTextView {
             setText(selectedItemSet.size() + " " + text);
         else
             setText(getSelectedItemsAsString());
+    }
+
+    public String[] getSelectedItems() {
+        if (items == null || items.length == 0 || selectedItemSet.isEmpty()) return new String[0];
+        java.util.ArrayList<String> selectedItems = new java.util.ArrayList<>();
+        for (String item : items) {
+            if (selectedItemSet.contains(item)) selectedItems.add(item);
+        }
+        return selectedItems.toArray(new String[0]);
     }
 
     public String getSelectedItemsAsString() {
@@ -124,7 +145,7 @@ public class MultiSelectionComboBox extends AppCompatTextView {
         popupWindow.setAnchorView(this);
         int popupWidth = Math.max(
                 getWidth(),
-                AppUtils.getPreferredDialogWidth(getContext()) - (int) UnitUtils.dpToPx(32)
+                popupWindowWidth > 0 ? popupWindowWidth : AppUtils.getPreferredDialogWidth(getContext()) - (int) UnitUtils.dpToPx(32)
         );
         popupWindow.setWidth(popupWidth);
         popupWindow.setModal(true);

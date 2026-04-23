@@ -2,96 +2,137 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:fillViewport="true">
+    android:clipToPadding="false"
+    android:fillViewport="false"
+    android:paddingTop="1dp"
+    android:paddingBottom="2dp"
+    android:tag="compact_runtime_dialog preserve_background">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="8dp">
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:paddingStart="1dp"
+        android:paddingTop="0dp"
+        android:paddingEnd="1dp"
+        android:paddingBottom="2dp">
 
-        <TextView
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/input_controls_dialog_hint"
-            android:textSize="13sp" />
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <LinearLayout
-                style="@style/FieldSet"
-                android:tag="theme_card">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <Spinner
-                        android:id="@+id/SProfile"
-                        style="@style/ComboBox"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:spinnerMode="dropdown" />
-
-                    <ImageButton
-                        android:id="@+id/BTSettings"
-                        style="@style/ListMenuButton"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ae_icon_settings" />
-                </LinearLayout>
-            </LinearLayout>
+            android:layout_weight="0.88"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/surface_runtime_taskmgr_background"
+            android:orientation="vertical"
+            android:paddingStart="7dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="7dp"
+            android:tag="theme_card preserve_background">
 
             <TextView
-                style="@style/FieldSetLabel"
-                android:tag="theme_badge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="2"
+                android:text="@string/input_controls_dialog_hint"
+                android:textSize="7.9sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:background="@drawable/surface_runtime_taskmgr_header_background"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp"
                 android:text="@string/profile"
+                android:textColor="@color/surface_runtime_taskmgr_text"
+                android:textSize="8.7sp"
                 android:textStyle="bold" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp">
 
             <LinearLayout
-                style="@style/FieldSet"
-                android:tag="theme_card">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <CheckBox
-                    android:id="@+id/CBShowTouchscreenControls"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="@string/show_touchscreen_controls" />
+                <Spinner
+                    android:id="@+id/SProfile"
+                    style="@style/RuntimeComboBoxCompact"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:spinnerMode="dropdown" />
 
-                <CheckBox
-                    android:id="@+id/CBEnableTimeout"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:checked="false"
-                    android:text="@string/enable_touchscreen_timeout" />
-
-                <CheckBox
-                    android:id="@+id/CBEnableHaptics"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:checked="false"
-                    android:text="@string/enable_touchscreen_haptics" />
+                <ImageButton
+                    android:id="@+id/BTSettings"
+                    style="@style/RuntimeListMenuButton"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/ae_icon_settings" />
             </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.12"
+            android:layout_marginBottom="3dp"
+            android:background="@drawable/surface_runtime_taskmgr_background"
+            android:orientation="vertical"
+            android:paddingStart="7dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="7dp"
+            android:tag="theme_card preserve_background">
 
             <TextView
-                style="@style/FieldSetLabel"
-                android:tag="theme_badge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/surface_runtime_taskmgr_header_background"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp"
                 android:text="@string/input_controls"
+                android:textColor="@color/surface_runtime_taskmgr_text"
+                android:textSize="8.7sp"
                 android:textStyle="bold" />
-        </FrameLayout>
+
+            <CheckBox
+                android:id="@+id/CBShowTouchscreenControls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:checked="true"
+                android:text="@string/show_touchscreen_controls" />
+
+            <CheckBox
+                android:id="@+id/CBEnableTimeout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:checked="false"
+                android:text="@string/enable_touchscreen_timeout" />
+
+            <CheckBox
+                android:id="@+id/CBEnableHaptics"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:checked="false"
+                android:text="@string/enable_touchscreen_haptics" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:maxLines="2"
+                android:text="@string/input_controls_runtime_hint"
+                android:textSize="8.1sp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-04-20",
+  "status": "seed_matrix_not_device_proof",
+  "sources": {
+    "mesaPanfrost": "https://docs.mesa3d.org/drivers/panfrost.html",
+    "androidVulkanHal": "https://source.android.com/docs/core/graphics/implement-vulkan",
+    "aospHwvulkan": "https://android.googlesource.com/platform/frameworks/native/+/master/vulkan/include/hardware/hwvulkan.h",
+    "opensuseMali": "https://en.opensuse.org/ARM_Mali_GPU",
+    "realmeKernelCensus": "/data/data/com.termux/files/home/.cache/research/realme-kernel-opensource-intake-20260420",
+    "realmeGitTreeProbe": "/data/data/com.termux/files/home/.cache/research/realme-kernel-git-tree-probe-20260420",
+    "realmeFullGitTreeProbe": "/data/data/com.termux/files/home/.cache/research/realme-kernel-full-git-tree-probe-20260420",
+    "realmeKernelReducer": "/data/data/com.termux/files/home/tools/aemali_kernel_donor_reduce.py",
+    "ownerLaneRanking": "/data/data/com.termux/files/home/aesolator/docs/assets/aemali_kernel_owner_lane_ranking_2026-04-20.json",
+    "mt6833KernelReNotes": "/data/data/com.termux/files/home/aesolator/docs/AEMALI_MT6833_KERNEL_RE_NOTES_2026-04-20.md",
+    "localBookCorpus": "/data/data/com.termux/files/home/.codex/skills/local-corpus-knowledge-promotion/references/book-corpus-131-ledger-2026-04-17.md",
+    "targetedAemaliBooks": "/data/data/com.termux/files/home/.cache/research/aemali-books-corpus-20260420"
+  },
+  "routes": [
+    {
+      "routeId": "lima-utgard",
+      "owner": "Mesa Lima",
+      "models": ["Mali-400", "Mali-450"],
+      "architecture": "Utgard",
+      "openglEs": "supported-by-lima",
+      "opengl": "supported-by-lima",
+      "vulkan": null,
+      "panvk": false,
+      "defaultAemaliTarget": false,
+      "androidTransport": "render-node-required",
+      "kernelEvidenceClass": [
+        "mainline-utgard-lima"
+      ],
+      "ownerLanePriority": [
+        "mainline-source"
+      ],
+      "transportRequirements": [
+        "drm-render-node",
+        "mesa-lima-driver",
+        "non-vulkan-route"
+      ],
+      "supportClass": "compatibility",
+      "notes": "Not the first AeMali target; useful for Lima compatibility lane only."
+    },
+    {
+      "routeId": "panfrost-bifrost-v7-g76",
+      "owner": "Mesa Panfrost/PanVK",
+      "models": ["Mali-G31", "Mali-G51", "Mali-G52", "Mali-G76"],
+      "architecture": "Bifrost v7",
+      "openglEs": "3.1",
+      "opengl": "3.1",
+      "vulkan": "1.0",
+      "panvk": true,
+      "panvkConformant": false,
+      "defaultAemaliTarget": true,
+      "androidTransport": "render-node-required-or-blocked",
+      "kernelFloor": "5.10+ operational floor from distro evidence for Bifrost class",
+      "kernelEvidenceClass": [
+        "mainline-panfrost-source-tree",
+        "mediatek-vendor-kbase-ged",
+        "mediatek-display-drm"
+      ],
+      "ownerLanePriority": [
+        "vendor-kbase-diagnostics",
+        "mainline-source",
+        "android-bsp-integration"
+      ],
+      "rankedKernelDonors": {
+        "mainline-source": [
+          "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "realme-kernel-opensource/realme_GT8pro-AndroidB-common-source",
+          "NothingOSS/android_kernel_6.1_nothing_mt6878"
+        ],
+        "vendor-kbase-diagnostics": [
+          "realme-kernel-opensource/realme_8-5G_8S-5G_9-5G_Narzo30-5G_V13_Q3i_realme10_mt6833-AndroidS-kernel-source",
+          "AgentFabulous/begonia:a10-rebase",
+          "realme-kernel-opensource/realme_q2pro-AndroidS-kernel-source"
+        ],
+        "android-bsp-integration": [
+          "CherishOS-Devices/android_device_realme_RM6785:tiramisu",
+          "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "NothingOSS/android_kernel_6.1_nothing_mt6878"
+        ]
+      },
+      "transportRequirements": [
+        "drm-render-node-or-explicit-blocker",
+        "mesa-panfrost-gallium",
+        "mesa-panvk-vulkan-1.0-route",
+        "no-hal-claim-without-hwvulkan-proof"
+      ],
+      "diagnosticKeys": [
+        "aemali.gpu_model",
+        "aemali.render_node_present",
+        "aemali.panfrost_kernel_surface",
+        "aemali.vendor_kbase_surface",
+        "aemali.ged_dvfs_surface",
+        "aemali.transport_block_reason"
+      ],
+      "kernelDonorEvidence": [
+        {
+          "repo": "realme-kernel-opensource/realme_8-5G_8S-5G_9-5G_Narzo30-5G_V13_Q3i_realme10_mt6833-AndroidS-kernel-source",
+          "head": "d887c07ac1274da3a77cdd1ed38b79902789e986",
+          "paths": {
+            "drivers/misc/mediatek/gpu": 7755,
+            "drivers/misc/mediatek/gpu/gpu_mali": 4862,
+            "drivers/misc/mediatek/gpu/gpu_mali/mali_bifrost": 2354,
+            "drivers/misc/mediatek/gpu/gpu_mali/mali_valhall": 2507,
+            "drivers/misc/mediatek/gpu/ged/src": 18,
+            "drivers/misc/mediatek/gpu/ged/include": 20
+          }
+        }
+      ],
+      "supportClass": "first-live-target",
+      "notes": "First AeMali live target. Must stay Vulkan 1.0/non-conformant unless upstream evidence changes."
+    },
+    {
+      "routeId": "panfrost-valhall-v9-g57",
+      "owner": "Mesa Panfrost/PanVK",
+      "models": ["Mali-G57"],
+      "architecture": "Valhall v9",
+      "openglEs": "3.1",
+      "opengl": "3.1",
+      "vulkan": null,
+      "panvk": false,
+      "defaultAemaliTarget": false,
+      "androidTransport": "render-node-required-or-blocked",
+      "kernelFloor": "5.20+ operational floor from distro evidence",
+      "kernelEvidenceClass": [
+        "mainline-panfrost-source-tree",
+        "mediatek-vendor-kbase-ged",
+        "mediatek-display-drm"
+      ],
+      "ownerLanePriority": [
+        "mainline-source",
+        "vendor-kbase-diagnostics",
+        "android-bsp-integration"
+      ],
+      "transportRequirements": [
+        "drm-render-node-or-explicit-blocker",
+        "mesa-panfrost-gallium",
+        "no-panvk-claim-without-current-upstream-proof"
+      ],
+      "supportClass": "future-non-first-target",
+      "notes": "Important Android-era GPU, but not first target and not PanVK conformance target."
+    },
+    {
+      "routeId": "panvk-valhall-v10-g610",
+      "owner": "Mesa Panfrost/PanVK",
+      "models": ["Mali-G310", "Mali-G610"],
+      "architecture": "Valhall v10",
+      "openglEs": "3.1",
+      "opengl": "3.1",
+      "vulkan": "1.4",
+      "panvk": true,
+      "panvkConformantModels": ["Mali-G610"],
+      "defaultAemaliTarget": false,
+      "androidTransport": "render-node-required-or-blocked",
+      "kernelFloor": "6.10+ operational floor from distro evidence",
+      "kernelEvidenceClass": [
+        "mainline-panfrost-source-tree",
+        "mainline-panthor-source-tree",
+        "mediatek-vendor-kbase-ged",
+        "mediatek-display-drm"
+      ],
+      "ownerLanePriority": [
+        "mainline-source",
+        "android-bsp-integration",
+        "vendor-kbase-diagnostics"
+      ],
+      "rankedKernelDonors": {
+        "mainline-source": [
+          "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "realme-kernel-opensource/realme_GT8pro-AndroidB-common-source",
+          "NothingOSS/android_kernel_6.1_nothing_mt6878"
+        ],
+        "android-bsp-integration": [
+          "CherishOS-Devices/android_device_realme_RM6785:tiramisu",
+          "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "NothingOSS/android_kernel_6.1_nothing_mt6878"
+        ]
+      },
+      "transportRequirements": [
+        "drm-render-node-or-explicit-blocker",
+        "mesa-panfrost-gallium",
+        "mesa-panvk-vulkan-1.4-route",
+        "conformance-model-check"
+      ],
+      "supportClass": "second-conformance-target",
+      "notes": "Second AeMali target because PanVK conformance is documented on G610."
+    },
+    {
+      "routeId": "panvk-fifthgen-v12-v13",
+      "owner": "Mesa Panfrost/PanVK",
+      "models": ["Mali-G720", "Mali-G725"],
+      "architecture": "5th Gen v12/v13",
+      "openglEs": "3.1",
+      "opengl": "3.1",
+      "vulkan": "1.4",
+      "panvk": true,
+      "defaultAemaliTarget": false,
+      "androidTransport": "render-node-required-or-blocked",
+      "kernelFloor": "6.18+ operational floor from distro evidence",
+      "kernelEvidenceClass": [
+        "mainline-panthor-source-tree",
+        "mainline-panfrost-source-tree",
+        "mediatek-display-drm"
+      ],
+      "ownerLanePriority": [
+        "mainline-source",
+        "android-bsp-integration"
+      ],
+      "transportRequirements": [
+        "current-kernel-csf-route-or-explicit-blocker",
+        "mesa-panvk-vulkan-1.4-route",
+        "device-specific-proof"
+      ],
+      "supportClass": "future-upper-bound",
+      "notes": "Future upper-bound lane; not first target due kernel/runtime proof risk."
+    },
+    {
+      "routeId": "android-hal-vulkan-mali",
+      "owner": "Android vendor HAL",
+      "models": ["vendor-specific"],
+      "architecture": "vendor-specific",
+      "openglEs": "vendor-specific",
+      "opengl": "vendor-specific",
+      "vulkan": "vendor-specific",
+      "panvk": false,
+      "defaultAemaliTarget": false,
+      "androidTransport": "hwvulkan-hal",
+      "kernelEvidenceClass": [
+        "android-vendor-hal"
+      ],
+      "ownerLanePriority": [
+        "android-bsp-integration"
+      ],
+      "transportRequirements": [
+        "android-system-vulkan-loader",
+        "vendor-hwvulkan-module",
+        "no-mesa-panvk-identity"
+      ],
+      "supportClass": "separate-transport",
+      "notes": "Must not be presented as Mesa PanVK. Useful as fallback/stock route only."
+    }
+  ],
+  "routeDecisionOrder": [
+    "exact-device-proof",
+    "render-node-and-kernel-proof",
+    "mesa-support-matrix",
+    "vendor-kernel-donor-evidence",
+    "android-hal-fallback",
+    "unsupported-with-explicit-reason"
+  ],
+  "blockedUntil": [
+    "Arm HTML body harvest reduced to integrated evidence or blockers",
+    "selected Realme/Begonia kernel files mined with commit/path evidence",
+    "LLVM 22.1.1 CLC surface verified",
+    "real Mali device proof or explicit no-device blocker"
+  ]
+}

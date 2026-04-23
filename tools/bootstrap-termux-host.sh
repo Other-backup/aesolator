@@ -58,6 +58,54 @@ prepare_sdk_dirs() {
   mkdir -p "$SDK_ROOT" "$BOOTSTRAP_TMP_DIR"
 }
 
+extract_cmdline_tools_zip_safely() {
+  ZIP_PATH="$1"
+  DEST_ROOT="$2"
+  EXTRACT_TMP="$(mktemp -d "$BOOTSTRAP_TMP_DIR/cmdline-tools-extract.XXXXXX")"
+
+  python3 - "$ZIP_PATH" "$EXTRACT_TMP" <<'PY'
+import pathlib
+import sys
+import zipfile
+
+zip_path = pathlib.Path(sys.argv[1])
+extract_root = pathlib.Path(sys.argv[2])
+
+with zipfile.ZipFile(zip_path) as zf:
+    names = zf.namelist()
+    if not names:
+        raise SystemExit("empty zip archive")
+    for name in names:
+        pure = pathlib.PurePosixPath(name)
+        if pure.is_absolute() or ".." in pure.parts:
+            raise SystemExit(f"unsafe zip entry: {name}")
+        if pure.parts and pure.parts[0] != "cmdline-tools":
+            raise SystemExit(f"unexpected zip root entry: {name}")
+
+    for info in zf.infolist():
+        pure = pathlib.PurePosixPath(info.filename)
+        if not pure.parts:
+            continue
+        target = extract_root.joinpath(*pure.parts)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if info.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        with zf.open(info) as src, target.open("wb") as dst:
+            dst.write(src.read())
+PY
+
+  if [ ! -x "$EXTRACT_TMP/cmdline-tools/bin/sdkmanager" ]; then
+    rm -rf "$EXTRACT_TMP"
+    log "Extracted command-line tools are incomplete"
+    return 1
+  fi
+
+  rm -rf "$DEST_ROOT/latest" "$DEST_ROOT/cmdline-tools"
+  mv "$EXTRACT_TMP/cmdline-tools" "$DEST_ROOT/latest"
+  rm -rf "$EXTRACT_TMP"
+}
+
 install_sdk_cmdline_tools() {
   SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
   ZIP_PATH="$BOOTSTRAP_TMP_DIR/$CMDLINE_TOOLS_ZIP"
@@ -68,10 +116,8 @@ install_sdk_cmdline_tools() {
 
   log "Installing Android SDK command-line tools"
   download_file "$CMDLINE_TOOLS_URL" "$ZIP_PATH"
-  unzip -tq "$ZIP_PATH" >/dev/null
-  rm -rf "$SDK_ROOT/cmdline-tools/latest" "$SDK_ROOT/cmdline-tools/cmdline-tools"
-  unzip -q -o "$ZIP_PATH" -d "$SDK_ROOT/cmdline-tools"
-  mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+  mkdir -p "$SDK_ROOT/cmdline-tools"
+  extract_cmdline_tools_zip_safely "$ZIP_PATH" "$SDK_ROOT/cmdline-tools"
 }
 
 install_sdk_packages() {
@@ -98,7 +144,6 @@ write_local_properties() {
   mkdir -p "$REPO_ROOT"
   printf '%s\n' \
     "sdk.dir=$SDK_ROOT" \
-    "ndk.dir=$SDK_ROOT/ndk/$NDK_VERSION" \
     "cmake.dir=/data/data/com.termux/files/usr" >"$LOCAL_PROPERTIES"
 }
 
@@ -115,6 +160,20 @@ fetch_host_llvm() {
   else
     log "No GitHub token in shell; skipping host LLVM release fetch"
   fi
+}
+
+install_ndk_termux_shims() {
+  SHIM_SCRIPT="$REPO_ROOT/tools/install-ndk-termux-shims.sh"
+  if [ ! -f "$SHIM_SCRIPT" ]; then
+    log "NDK Termux shim script not present; skipping"
+    return 0
+  fi
+
+  log "Installing Termux-host NDK shim wrappers"
+  ANDROID_SDK_ROOT="$SDK_ROOT" \
+  AEO_ANDROID_NDK_VERSION="$NDK_VERSION" \
+  AEO_HOST_LLVM_VERSION="$HOST_LLVM_VERSION" \
+  sh "$SHIM_SCRIPT"
 }
 
 print_next_steps() {
@@ -140,6 +199,7 @@ main() {
   install_sdk_packages
   write_local_properties
   fetch_host_llvm
+  install_ndk_termux_shims
   print_next_steps
 }
 

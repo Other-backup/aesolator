@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="TabLayoutProcessScope" type="id" />
+    <item name="LLTabWindowsProcesses" type="id" />
+    <item name="TVWindowsListTitle" type="id" />
+    <item name="LLTableHead" type="id" />
+    <item name="FLWindowsProcessViewport" type="id" />
+    <item name="SVWindowsProcessList" type="id" />
+    <item name="LLProcessList" type="id" />
+    <item name="TVEmptyWindowsText" type="id" />
+    <item name="LLWindowsControlsCard" type="id" />
+    <item name="LLLinuxControlsCard" type="id" />
+    <item name="CBWindowsWindowedOnly" type="id" />
+    <item name="ETWindowsSearch" type="id" />
+    <item name="SWindowsSort" type="id" />
+    <item name="BTWindowsFilterAll" type="id" />
+    <item name="BTWindowsFilterWow64" type="id" />
+    <item name="BTWindowsFilterArm64ec" type="id" />
+    <item name="BTWindowsFilterNative" type="id" />
+</resources>

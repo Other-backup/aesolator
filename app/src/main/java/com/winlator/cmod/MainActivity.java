@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
@@ -31,11 +32,18 @@ import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.ImageUtils;
+import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.ContainerData;
+import com.winlator.cmod.container.ContainerUtils;
+import com.winlator.cmod.container.IntentLaunchManager;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
@@ -48,8 +56,11 @@ public class MainActivity extends AppCompatActivity {
     public static final byte EDIT_INPUT_CONTROLS_REQUEST_CODE = 3;
     public static final byte OPEN_DIRECTORY_REQUEST_CODE = 4;
     public static final byte OPEN_IMAGE_REQUEST_CODE = 5;
+    public static final byte OPEN_DRIVER_PACKAGE_REQUEST_CODE = 6;
 
     public final PreloaderDialog preloaderDialog = new PreloaderDialog(this);
+    private static Callback<Bitmap> imagePickerCallback;
+    private static Callback<Uri> driverPackagePickerCallback;
 
     private boolean editInputControls = false;
     private int selectedProfileId;
@@ -57,14 +68,26 @@ public class MainActivity extends AppCompatActivity {
     private boolean isDarkMode;
     private boolean pendingAllFilesAccessPrompt = false;
     private boolean pendingNotificationPermissionPrompt = false;
+    private long lastExitBackPressAtMs = 0L;
+    @Nullable
+    private Intent pendingExternalLaunchIntent;
+    private boolean externalLaunchInProgress = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Keep app-private prefix-pack assets current even before the runtime drawer is opened.
+        ImageFsInstaller.ensurePrefixPackToolkit(this, ImageFs.find(this));
+
+        Intent startupIntent = getIntent();
+        pendingExternalLaunchIntent = IntentLaunchManager.INSTANCE.parseLaunchIntent(startupIntent) != null
+                ? new Intent(startupIntent)
+                : null;
+
         SharedPreferences startupPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         boolean isBigPictureModeEnabled = startupPreferences.getBoolean("enable_big_picture_mode", false);
-        if (isBigPictureModeEnabled) {
+        if (pendingExternalLaunchIntent == null && isBigPictureModeEnabled) {
             startActivity(new Intent(MainActivity.this, BigPictureActivity.class));
             finish();
             return;
@@ -85,15 +108,14 @@ public class MainActivity extends AppCompatActivity {
         File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
         if (!winlatorDir.exists()) winlatorDir.mkdirs();
 
-        Intent intent = getIntent();
+        Intent intent = startupIntent;
         editInputControls = intent.getBooleanExtra("edit_input_controls", false);
         if (editInputControls) {
             selectedProfileId = intent.getIntExtra("selected_profile_id", 0);
             openMainMenuItem(R.id.main_menu_input_controls, false);
         } else {
-            int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
-
-            if (!requestAppPermissions()) {
+            boolean permissionsRequested = requestAppPermissions();
+            if (!permissionsRequested) {
                 ImageFsInstaller.installIfNeeded(this);
             }
 
@@ -104,10 +126,20 @@ public class MainActivity extends AppCompatActivity {
                             && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                             != PackageManager.PERMISSION_GRANTED;
 
-            if (selectedMenuItemId > 0) {
-                openMainMenuItem(selectedMenuItemId, false);
-            } else {
-                showHomeDashboard(false);
+            if (consumePendingExternalLaunchIntent()) {
+                updateActionBarNavigationState();
+                applyThemeChrome();
+                applyThemeAssetTintPass();
+                return;
+            }
+
+            if (pendingExternalLaunchIntent == null) {
+                int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
+                if (selectedMenuItemId > 0) {
+                    openMainMenuItem(selectedMenuItemId, false);
+                } else {
+                    openPreferredStartupSurface(false);
+                }
             }
         }
 
@@ -167,6 +199,9 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 ImageFsInstaller.installIfNeeded(this);
+                if (consumePendingExternalLaunchIntent()) {
+                    return;
+                }
             } else {
                 finish();
             }
@@ -180,6 +215,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (isHomeDashboardVisible()) {
+            if (sharedPreferences != null && sharedPreferences.getBoolean("warn_before_exit", false)) {
+                long now = SystemClock.elapsedRealtime();
+                if (now - lastExitBackPressAtMs > 2000L) {
+                    lastExitBackPressAtMs = now;
+                    AppUtils.showToast(this, R.string.back_press_exit_warning);
+                    return;
+                }
+            }
             finish();
             return;
         }
@@ -187,20 +230,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean requestAppPermissions() {
-        boolean hasWritePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-        boolean hasReadPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-        boolean hasManageStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager();
-
-        if (hasWritePermission && hasReadPermission && hasManageStoragePermission) {
+        if (hasRequiredAppPermissions()) {
             return false;
         }
 
+        boolean hasWritePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        boolean hasReadPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         if (!hasWritePermission || !hasReadPermission) {
             String[] permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE);
         }
 
         return true;
+    }
+
+    private boolean hasRequiredAppPermissions() {
+        boolean hasWritePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        boolean hasReadPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        boolean hasManageStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager();
+        return hasWritePermission && hasReadPermission && hasManageStoragePermission;
     }
 
     @Override
@@ -289,6 +337,14 @@ public class MainActivity extends AppCompatActivity {
         show(new MainMenuGridFragment(), reverse);
     }
 
+    private void openPreferredStartupSurface(boolean reverse) {
+        if (sharedPreferences != null && sharedPreferences.getBoolean("show_shortcuts_first", false)) {
+            show(new ShortcutsFragment(), reverse);
+            return;
+        }
+        showHomeDashboard(reverse);
+    }
+
     private void show(Fragment fragment, boolean reverse) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         if (reverse) {
@@ -316,6 +372,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        consumePendingExternalLaunchIntent();
         boolean latestDark = PreferenceManager.getDefaultSharedPreferences(this).getBoolean("dark_mode", false);
         if (latestDark != isDarkMode) isDarkMode = latestDark;
         View decor = getWindow() != null ? getWindow().getDecorView() : null;
@@ -330,6 +387,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        pendingExternalLaunchIntent = IntentLaunchManager.INSTANCE.parseLaunchIntent(intent) != null
+                ? new Intent(intent)
+                : null;
+
+        if (consumePendingExternalLaunchIntent()) {
+            updateActionBarNavigationState();
+            applyThemeChrome();
+            applyThemeAssetTintPass();
+            return;
+        }
 
         editInputControls = intent.getBooleanExtra("edit_input_controls", false);
         if (editInputControls) {
@@ -340,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
             if (selectedMenuItemId > 0) {
                 openMainMenuItem(selectedMenuItemId, false);
             } else {
-                showHomeDashboard(false);
+                openPreferredStartupSurface(false);
             }
         }
 
@@ -355,7 +422,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDeferredStartupPromptsIfNeeded() {
-        if (editInputControls || !isHomeDashboardVisible()) return;
+        if (editInputControls || externalLaunchInProgress || pendingExternalLaunchIntent != null || !isHomeDashboardVisible()) return;
 
         if (pendingAllFilesAccessPrompt) {
             pendingAllFilesAccessPrompt = false;
@@ -377,6 +444,94 @@ public class MainActivity extends AppCompatActivity {
         if (showBack) {
             actionBar.setHomeAsUpIndicator(R.drawable.ae_icon_back);
         }
+    }
+
+    private boolean consumePendingExternalLaunchIntent() {
+        if (externalLaunchInProgress || pendingExternalLaunchIntent == null) return false;
+        if (!hasRequiredAppPermissions()) return false;
+
+        Intent launchIntent = pendingExternalLaunchIntent;
+        pendingExternalLaunchIntent = null;
+        IntentLaunchManager.LaunchRequest launchRequest = IntentLaunchManager.INSTANCE.parseLaunchIntent(launchIntent);
+        if (launchRequest == null) return false;
+
+        externalLaunchInProgress = true;
+        preloaderDialog.show(R.string.creating_container);
+        Thread launchThread = new Thread(() -> processExternalLaunchRequest(launchRequest), "aeso-external-launch");
+        launchThread.setDaemon(true);
+        launchThread.start();
+        return true;
+    }
+
+    private void processExternalLaunchRequest(IntentLaunchManager.LaunchRequest launchRequest) {
+        String appId = launchRequest.getAppId();
+        ContainerData configOverride = launchRequest.getContainerConfig();
+        boolean temporaryOverrideActive = false;
+
+        try {
+            if (configOverride != null) {
+                IntentLaunchManager.INSTANCE.applyTemporaryConfigOverride(this, appId, configOverride);
+                temporaryOverrideActive = true;
+            } else if (IntentLaunchManager.INSTANCE.hasTemporaryOverride(appId)) {
+                IntentLaunchManager.INSTANCE.restoreOriginalConfiguration(this, appId);
+                IntentLaunchManager.INSTANCE.clearTemporaryOverride(appId);
+            }
+
+            Container container = temporaryOverrideActive
+                    ? ContainerUtils.INSTANCE.getOrCreateContainerWithOverride(this, appId)
+                    : ContainerUtils.INSTANCE.getOrCreateContainer(this, appId);
+
+            Intent xserverIntent = new Intent(this, XServerDisplayActivity.class);
+            xserverIntent.putExtra("container_id", container.id);
+            xserverIntent.putExtra(LaunchSecurity.EXTRA_APP_ID, appId);
+            xserverIntent.putExtra(LaunchSecurity.EXTRA_LAUNCH_ROUTE_TOKEN, buildExternalLaunchRouteToken(appId));
+            if (temporaryOverrideActive) {
+                xserverIntent.putExtra(LaunchSecurity.EXTRA_TEMP_OVERRIDE_APP_ID, appId);
+            }
+            LaunchSecurity.signXServerLaunchIntent(this, xserverIntent);
+
+            boolean finalTemporaryOverrideActive = temporaryOverrideActive;
+            runOnUiThread(() -> {
+                externalLaunchInProgress = false;
+                preloaderDialog.close();
+                startActivity(xserverIntent);
+                if (!finalTemporaryOverrideActive) {
+                    IntentLaunchManager.INSTANCE.clearTemporaryOverride(appId);
+                }
+                finish();
+            });
+        } catch (Exception error) {
+            if (temporaryOverrideActive) {
+                IntentLaunchManager.INSTANCE.restoreOriginalConfiguration(this, appId);
+                IntentLaunchManager.INSTANCE.clearTemporaryOverride(appId);
+            }
+            ForensicLogger.logEvent(
+                    this,
+                    "error",
+                    "MAIN_EXTERNAL_LAUNCH_FAILED",
+                    null,
+                    "main",
+                    "external_launch_failed",
+                    ForensicLogger.fields(
+                            "app_id", appId,
+                            "error_class", error.getClass().getName(),
+                            "error_detail", String.valueOf(error.getMessage())
+                    )
+            );
+            runOnUiThread(() -> {
+                externalLaunchInProgress = false;
+                preloaderDialog.close();
+                AppUtils.showToast(this, "Failed to prepare external launch");
+                if (!isFinishing()) {
+                    showHomeDashboard(false);
+                    updateActionBarNavigationState();
+                }
+            });
+        }
+    }
+
+    private String buildExternalLaunchRouteToken(String appId) {
+        return appId + "|" + SystemClock.elapsedRealtimeNanos();
     }
 
     private void applyThemeAssetTintPass() {
@@ -499,31 +654,38 @@ public class MainActivity extends AppCompatActivity {
 
             String creditsAndThirdPartyAppsHTML = String.join("<br />",
                     "<b>Ae.solator</b> by Ae team",
-                    "<b>Stack:</b> FreeWine 11 + lane-based graphics stack + package lanes",
-                    "<b>Runtime donor lines:</b> FreeWine 11 baseline, driver archives, wrapper lanes and Android container integration",
+                    "<b>Product line:</b> Ae.solator + FreeWine11 + WCP Archive",
                     "---",
-                    "<b>Winlator donor bases</b>",
-                    "BrunoSX / Winlator (<a href=\"https://github.com/brunodev85/winlator\">github.com/brunodev85/winlator</a>)",
-                    "coffincolors / winlator (<a href=\"https://github.com/coffincolors/winlator\">github.com/coffincolors/winlator</a>)",
-                    "StevenMXZ / Winlator-Ludashi (<a href=\"https://github.com/StevenMXZ/Winlator-Ludashi\">github.com/StevenMXZ/Winlator-Ludashi</a>)",
+                    "<b>Primary Wine / Proton source lines</b>",
+                    "WineHQ / Wine upstream (<a href=\"https://www.winehq.org\">winehq.org</a>)",
+                    "Valve Proton / proton-wine 11 (<a href=\"https://github.com/ValveSoftware/wine\">github.com/ValveSoftware/wine</a>)",
+                    "AndreRH Wine ARM64EC / Hangover references (<a href=\"https://github.com/AndreRH/wine\">github.com/AndreRH/wine</a>)",
+                    "GameNative Wine / Proton Android-facing line (<a href=\"https://github.com/GameNative/wine\">github.com/GameNative/wine</a>)",
+                    "Valve Proton packaging context (<a href=\"https://github.com/ValveSoftware/Proton\">github.com/ValveSoftware/Proton</a>)",
                     "---",
-                    "FreeWine 11 baseline research: AndreRH + upstream Wine / Valve work",
-                    "Termux Package (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-package</a>)",
-                    "Wine (<a href=\"https://www.winehq.org\">winehq.org</a>)",
-                    "Box64 (<a href=\"https://github.com/ptitSeb/box64\">github.com/ptitSeb/box64</a>)",
-                    "FEX-Emu (<a href=\"https://github.com/FEX-Emu/FEX\">github.com/FEX-Emu/FEX</a>)",
-                    "Mesa / Turnip / Zink (<a href=\"https://gitlab.freedesktop.org/mesa/mesa\">gitlab.freedesktop.org/mesa/mesa</a>)",
+                    "<b>Android app and runtime donor lines</b>",
+                    "BrunoSX / Winlator and WFM (<a href=\"https://github.com/brunodev85/winlator\">github.com/brunodev85/winlator</a>)",
+                    "SEGAINDEED / winlator-bionic-vortek (<a href=\"https://github.com/SEGAINDEED/winlator-bionic-vortek\">github.com/SEGAINDEED/winlator-bionic-vortek</a>)",
+                    "Xnick417x / Winlator-Bionic-Nightly-wcp (<a href=\"https://github.com/Xnick417x/Winlator-Bionic-Nightly-wcp\">github.com/Xnick417x/Winlator-Bionic-Nightly-wcp</a>)",
+                    "Pipetto-crypto / gladiorenderer (<a href=\"https://github.com/Pipetto-crypto/gladiorenderer\">github.com/Pipetto-crypto/gladiorenderer</a>)",
+                    "leegao / bionic-vulkan-wrapper (<a href=\"https://github.com/leegao/bionic-vulkan-wrapper\">github.com/leegao/bionic-vulkan-wrapper</a>)",
+                    "---",
+                    "<b>Runtime components and graphics providers</b>",
+                    "Mesa / Panfrost / PanVK / Lima / Turnip / Zink / VirGL (<a href=\"https://gitlab.freedesktop.org/mesa/mesa\">gitlab.freedesktop.org/mesa/mesa</a>)",
+                    "VirGLRenderer (<a href=\"https://gitlab.freedesktop.org/virgl/virglrenderer\">gitlab.freedesktop.org/virgl/virglrenderer</a>)",
                     "DXVK (<a href=\"https://github.com/doitsujin/dxvk\">github.com/doitsujin/dxvk</a>)",
-                    "VKD3D (<a href=\"https://gitlab.winehq.org/wine/vkd3d\">gitlab.winehq.org/wine/vkd3d</a>)",
-                    "D8VK (<a href=\"https://github.com/AlpyneDreams/d8vk\">github.com/AlpyneDreams/d8vk</a>)",
+                    "VKD3D-Proton (<a href=\"https://github.com/HansKristian-Work/vkd3d-proton\">github.com/HansKristian-Work/vkd3d-proton</a>)",
                     "dgVoodoo2 (<a href=\"https://github.com/dege-diosg/dgVoodoo2\">github.com/dege-diosg/dgVoodoo2</a>)",
+                    "FEX-Emu (<a href=\"https://github.com/FEX-Emu/FEX\">github.com/FEX-Emu/FEX</a>)",
+                    "Box64 (<a href=\"https://github.com/ptitSeb/box64\">github.com/ptitSeb/box64</a>)",
                     "libadrenotools (<a href=\"https://github.com/bylaws/libadrenotools\">github.com/bylaws/libadrenotools</a>)",
+                    "Termux Packages (<a href=\"https://github.com/termux/termux-packages\">github.com/termux/termux-packages</a>)",
                     "---",
-                    "<b>Graphics donor archives</b>",
+                    "<b>Graphics package feeds</b>",
+                    "GameNative Drivers (<a href=\"https://gamenative.app/drivers/\">gamenative.app/drivers</a>)",
                     "StevenMXZ Turnip CI (<a href=\"https://github.com/StevenMXZ/freedreno_turnip-CI\">github.com/StevenMXZ/freedreno_turnip-CI</a>)",
                     "whitebelyash Turnip CI (<a href=\"https://github.com/whitebelyash/freedreno_turnip-CI\">github.com/whitebelyash/freedreno_turnip-CI</a>)",
-                    "MrPurple Turnip (<a href=\"https://github.com/MrPurple666/purple-turnip\">github.com/MrPurple666/purple-turnip</a>)",
-                    "GameNative Drivers (<a href=\"https://gamenative.app/drivers/\">gamenative.app/drivers</a>)"
+                    "MrPurple Turnip (<a href=\"https://github.com/MrPurple666/purple-turnip\">github.com/MrPurple666/purple-turnip</a>)"
             );
 
             TextView tvCreditsAndThirdPartyApps = dialog.findViewById(R.id.TVCreditsAndThirdPartyApps);
@@ -551,8 +713,42 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == OPEN_IMAGE_REQUEST_CODE && resultCode == RESULT_OK) {
             Bitmap bitmap = ImageUtils.getBitmapFromUri(this, data.getData(), 1280);
             if (bitmap == null) return;
+            Callback<Bitmap> callback = consumeImagePickerCallback();
+            if (callback != null) {
+                callback.call(bitmap);
+                return;
+            }
             File userWallpaperFile = WineThemeManager.getUserWallpaperFile(this);
             ImageUtils.save(bitmap, userWallpaperFile, Bitmap.CompressFormat.PNG, 100);
+        } else if (requestCode == OPEN_IMAGE_REQUEST_CODE) {
+            consumeImagePickerCallback();
+        } else if (requestCode == OPEN_DRIVER_PACKAGE_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            Callback<Uri> callback = consumeDriverPackagePickerCallback();
+            if (callback != null) callback.call(data.getData());
+        } else if (requestCode == OPEN_DRIVER_PACKAGE_REQUEST_CODE) {
+            consumeDriverPackagePickerCallback();
         }
+    }
+
+    public static void setImagePickerCallback(@Nullable Callback<Bitmap> callback) {
+        imagePickerCallback = callback;
+    }
+
+    @Nullable
+    public static Callback<Bitmap> consumeImagePickerCallback() {
+        Callback<Bitmap> callback = imagePickerCallback;
+        imagePickerCallback = null;
+        return callback;
+    }
+
+    public static void setDriverPackagePickerCallback(@Nullable Callback<Uri> callback) {
+        driverPackagePickerCallback = callback;
+    }
+
+    @Nullable
+    public static Callback<Uri> consumeDriverPackagePickerCallback() {
+        Callback<Uri> callback = driverPackagePickerCallback;
+        driverPackagePickerCallback = null;
+        return callback;
     }
 }

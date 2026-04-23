@@ -1,0 +1,94 @@
+{
+  "supportMatrixAsset": "/data/data/com.termux/files/home/aesolator/docs/assets/aemali_support_matrix_2026-04-20.json",
+  "ownerLaneRankingSource": "/data/data/com.termux/files/home/aesolator/docs/assets/aemali_kernel_owner_lane_ranking_2026-04-20.json",
+  "researchLedgerSource": "/data/data/com.termux/files/home/aesolator/docs/GRAPHICS_GLOBAL_RESEARCH_LEDGER_2026-04-19.md",
+  "bookSynthesisSource": "/data/data/com.termux/files/home/aesolator/docs/AEMALI_HABR_ARM_BOOK_SYNTHESIS_2026-04-20.md",
+  "productContractSource": "/data/data/com.termux/files/home/aesolator/docs/GRAPHICS_WRAPPER_CONTRACT_2026-04-19.md",
+  "localBookCorpusSource": "/data/data/com.termux/files/home/.codex/skills/local-corpus-knowledge-promotion/references/book-corpus-131-ledger-2026-04-17.md",
+  "targetedBookCorpusSource": "/data/data/com.termux/files/home/.cache/research/aemali-books-corpus-20260420",
+  "name": "AeMali Gallium",
+  "version": "26.1.0-prototype",
+  "driverVersion": "26.1.0-prototype",
+  "providerLane": "aemali-gallium",
+  "sourceRepo": "https://gitlab.freedesktop.org/mesa/mesa",
+  "artifactName": "aemali-gallium-26.1.0-prototype.tzst",
+  "libraryName": "usr/lib/libEGL.so",
+  "rootLibraryPath": "usr/lib/libEGL.so",
+  "driverKind": "aemali-gallium",
+  "transport": "drm-render-node-experimental",
+  "androidRoute": "experimental-userspace-gl-overlay",
+  "policyEnv": "AEMALI_OPENGL=1",
+  "kernelContract": "panfrost-or-lima-render-node",
+  "supportMatrixSource": "https://docs.mesa3d.org/drivers/panfrost.html",
+  "routeId": "panfrost-bifrost-v7-g76",
+  "ownerLane": "vendor-kbase-diagnostics",
+  "ownerLanePriority": [
+    "vendor-kbase-diagnostics",
+    "mainline-source",
+    "android-bsp-integration"
+  ],
+  "supportClass": "first-live-target",
+  "kernelEvidenceClass": [
+    "mainline-panfrost-source-tree",
+    "mediatek-vendor-kbase-ged",
+    "mediatek-display-drm"
+  ],
+  "transportRequirements": [
+    "drm-render-node-or-explicit-blocker",
+    "mesa-panfrost-or-lima-gallium",
+    "opengl-es-route",
+    "no-hal-claim-without-hwvulkan-proof"
+  ],
+  "rankedKernelDonors": [
+    "realme-kernel-opensource/realme_8-5G_8S-5G_9-5G_Narzo30-5G_V13_Q3i_realme10_mt6833-AndroidS-kernel-source",
+    "AgentFabulous/begonia:a10-rebase",
+    "realme-kernel-opensource/realme_q2pro-AndroidS-kernel-source"
+  ],
+  "diagnosticKeys": [
+    "aemali.gpu_model",
+    "aemali.render_node_present",
+    "aemali.panfrost_kernel_surface",
+    "aemali.vendor_kbase_surface",
+    "aemali.ged_dvfs_surface",
+    "aemali.transport_block_reason"
+  ],
+  "preferredGalliumDriver": "panfrost",
+  "supportedGalliumDrivers": [
+    "panfrost",
+    "lima",
+    "zink",
+    "softpipe"
+  ],
+  "supportedArchitectures": [
+    "Utgard",
+    "Midgard",
+    "Bifrost",
+    "Valhall",
+    "5th Gen"
+  ],
+  "supportedRouteIds": [
+    "lima-utgard",
+    "panfrost-bifrost-v7-g76",
+    "panfrost-valhall-v9-g57",
+    "panvk-valhall-v10-g610",
+    "panvk-fifthgen-v12-v13"
+  ],
+  "supportedOpenGlModels": [
+    "Mali-400",
+    "Mali-450",
+    "Mali-G31",
+    "Mali-G51",
+    "Mali-G52",
+    "Mali-G76",
+    "Mali-G57",
+    "Mali-G310",
+    "Mali-G610",
+    "Mali-G720",
+    "Mali-G725"
+  ],
+  "fallbackGalliumDriver": "softpipe",
+  "requiresRenderNode": true,
+  "experimental": true,
+  "graphicsStackProfile": "aemali-universal",
+  "notes": "First AeMali live target. Must stay Vulkan 1.0/non-conformant unless upstream evidence changes. AeMali Gallium stays the OpenGL/GLES half of the Mesa user-space plane. It is not Android stock-HAL truth and it must remain separate from wrapper-only Gladio/Vortek ownership."
+}

@@ -10,7 +10,7 @@ Scope: static post-patch inventory before the first honest compile.
 | --- | --- | --- |
 | RootFS base selection | Closed | `ImageFsInstaller` accepts only donor `imagefs_bionic.txz` / `imagefs_gamenative.txz` as live base archives |
 | Legacy rootfs baggage | Closed | old `imagefs.txz` and `imagefs.txz.02` moved out of `app/src/main/assets` into `.legacy_rootfs/` |
-| RootFS marker normalization | Closed | stale `.provider` / `.layout` values are normalized to `gamenative` / `ubuntufs` and launch writes donor markers only |
+| RootFS marker normalization | Closed | stale `.provider` / `.layout` values normalize through live provider/layout inference, and launch/install paths no longer auto-stamp missing markers as `gamenative` / `ubuntufs` |
 | `Wine` / `Proton` install roots | Closed | canonical `runtime-<model>-<family>-<version>-<verCode>` roots in shared `/opt` |
 | `Wine` / `Proton` resolver | Closed | no silent cross-family fallback; `runtimeModel` now participates in resolution |
 | Container launch to launcher model | Closed | `XServerDisplayActivity` enforces rootfs prep for requested runtime model before launcher creation |

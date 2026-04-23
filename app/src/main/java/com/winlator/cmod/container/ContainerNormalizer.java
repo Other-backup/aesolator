@@ -161,7 +161,7 @@ public final class ContainerNormalizer {
                 obj.put("lc_all", lcAll);
                 obj.put("changed_fields", changedFieldsJson());
             }
-            catch (JSONException ignored) {}
+            catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
             return obj;
         }
     }

@@ -22,7 +22,7 @@ head_subject="$(git -C "${WINLATOR_SRC_DIR}" show -s --format='%s' HEAD)"
 printf '%s\n' "${head_sha}" > "${OUT_DIR}/head-sha.txt"
 printf '%s\n' "${head_subject}" > "${OUT_DIR}/head-subject.txt"
 
-# Prefer same-day recency for reflective analysis; fallback to fixed commit count.
+# Prefer same-day recency for reflective analysis; degrade to fixed commit count.
 if git -C "${WINLATOR_SRC_DIR}" log --since="${UPSTREAM_SINCE}" --pretty=format:'%H|%ad|%an|%s' --date=iso-strict | grep -q .; then
   git -C "${WINLATOR_SRC_DIR}" log \
     --since="${UPSTREAM_SINCE}" \

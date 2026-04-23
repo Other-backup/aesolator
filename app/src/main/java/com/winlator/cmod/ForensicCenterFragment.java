@@ -4,11 +4,20 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.content.SharedPreferences;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.format.DateFormat;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,12 +38,15 @@ import com.winlator.cmod.core.ForensicIssueComposer;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.widget.LogView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Date;
 import java.util.Locale;
@@ -42,6 +54,7 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ForensicCenterFragment extends Fragment {
+    private static final String TAG = "ForensicCenterFragment";
     private SharedPreferences preferences;
 
     @Nullable
@@ -229,47 +242,372 @@ public class ForensicCenterFragment extends Fragment {
 
         ContentDialog dialog = new ContentDialog(context, R.layout.forensic_log_viewer_dialog);
         dialog.setTitle(R.string.diagnostics_forensic_log_title);
+        dialog.setIcon(R.drawable.ae_icon_diagnostics);
         dialog.setBottomBarText(null);
         View dialogMessage = dialog.findViewById(R.id.TVMessage);
         if (dialogMessage != null) dialogMessage.setVisibility(View.GONE);
 
         TextView tvFile = dialog.findViewById(R.id.TVForensicLogFile);
         TextView tvStats = dialog.findViewById(R.id.TVForensicLogStats);
-        TextView tvBody = dialog.findViewById(R.id.TVForensicLogBody);
-        tvFile.setText(getString(R.string.diagnostics_forensic_log_file, latestFile != null ? latestFile.getName() : "-"));
-        tvStats.setText(buildLogViewerStats(latestFile, tail));
-        tvBody.setText(tail);
+        TextView tvTicker = dialog.findViewById(R.id.TVForensicLogTicker);
+        LogView logView = dialog.findViewById(R.id.LVForensicLogBody);
+        Handler handler = new Handler(Looper.getMainLooper());
+        final boolean[] autoRefresh = new boolean[] {true};
+        final String[] currentTail = new String[] {tail};
+        final File[] currentFile = new File[] {latestFile};
+
+        Runnable applyTail = () -> {
+            File activeFile = currentFile[0];
+            String activeTail = currentTail[0];
+            if (tvFile != null) {
+                if (activeFile != null) {
+                    tvFile.setVisibility(View.VISIBLE);
+                    tvFile.setText(getString(R.string.diagnostics_forensic_log_file, activeFile.getName()));
+                } else {
+                    tvFile.setVisibility(View.GONE);
+                }
+            }
+            if (tvStats != null) {
+                tvStats.setText(buildCompactLogViewerStats(activeFile, activeTail));
+            }
+            if (tvTicker != null) {
+                tvTicker.setText(getString(
+                        autoRefresh[0]
+                                ? R.string.diagnostics_forensic_log_live
+                                : R.string.diagnostics_forensic_log_paused,
+                        DateFormat.format("HH:mm:ss", new Date())
+                ));
+                tvTicker.setSelected(true);
+            }
+            if (tvFile != null) tvFile.setSelected(true);
+            if (tvStats != null) tvStats.setSelected(true);
+            if (logView != null) {
+                logView.replaceRawText(formatForensicTailForConsolePlain(activeTail));
+            }
+        };
+        applyTail.run();
 
         View btConfirm = dialog.findViewById(R.id.BTConfirm);
         View btCancel = dialog.findViewById(R.id.BTCancel);
-        if (btConfirm instanceof TextView) {
-            ((TextView) btConfirm).setText(R.string.diagnostics_forensic_log_report);
-        }
-        if (btCancel instanceof TextView) {
-            ((TextView) btCancel).setText(R.string.cancel);
-        }
-
-        final String finalTail = tail;
-        dialog.setOnConfirmCallback(() -> {
-            ContentDialog.confirm(
-                    context,
-                    R.string.diagnostics_forensic_report_privacy_warning,
-                    () -> reportForensicIssue(finalTail, latestFile)
-            );
-        });
+        if (btConfirm != null) btConfirm.setVisibility(View.GONE);
+        if (btCancel != null) btCancel.setVisibility(View.GONE);
 
         View btExport = dialog.findViewById(R.id.BTForensicExportLog);
-        btExport.setOnClickListener(v -> exportForensicSnapshot(finalTail));
+        btExport.setOnClickListener(v -> exportForensicSnapshot(currentTail[0]));
 
         View btCopy = dialog.findViewById(R.id.BTForensicCopyLog);
         btCopy.setOnClickListener(v -> {
             ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard == null) return;
-            clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", finalTail));
+            clipboard.setPrimaryClip(ClipData.newPlainText("forensic_log_tail", currentTail[0]));
             AppUtils.showToast(context, R.string.copied_to_clipboard);
         });
+        View btPause = dialog.findViewById(R.id.BTForensicPauseLog);
+        if (btPause instanceof TextView) {
+            ((TextView) btPause).setText(R.string.pause);
+            btPause.setOnClickListener(v -> {
+                autoRefresh[0] = !autoRefresh[0];
+                ((TextView) btPause).setText(autoRefresh[0] ? R.string.pause : R.string.resume);
+                applyTail.run();
+            });
+        }
+        View btClose = dialog.findViewById(R.id.BTForensicCloseLog);
+        if (btClose != null) {
+            btClose.setOnClickListener(v -> dialog.dismiss());
+        }
 
         dialog.show();
+        styleForensicLogViewerDialog(dialog);
+        final Runnable[] refreshRunnable = new Runnable[1];
+        refreshRunnable[0] = new Runnable() {
+            @Override
+            public void run() {
+                if (!dialog.isShowing()) return;
+                if (autoRefresh[0]) {
+                    File nextFile = ForensicLogger.getLatestLogFile(context);
+                    String nextTail = ForensicLogger.readLatestTraceTail(context, 1200, 150000);
+                    if (nextTail == null || nextTail.trim().isEmpty()) {
+                        nextTail = getString(R.string.diagnostics_forensic_log_empty);
+                    }
+                    currentFile[0] = nextFile;
+                    currentTail[0] = nextTail;
+                    applyTail.run();
+                } else if (tvTicker != null) {
+                    tvTicker.setText(getString(R.string.diagnostics_forensic_log_paused, DateFormat.format("HH:mm:ss", new Date())));
+                }
+                handler.postDelayed(this, 1250L);
+            }
+        };
+        handler.postDelayed(refreshRunnable[0], 1250L);
+        View bottomBar = dialog.findViewById(R.id.LLBottomBar);
+        if (bottomBar != null) bottomBar.setVisibility(View.GONE);
+        dialog.setOnDismissListener(ignored -> handler.removeCallbacksAndMessages(null));
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            dialog.getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.992f),
+                    Math.round(AppUtils.getScreenHeight() * 0.986f)
+            );
+        }
+        ViewGroup.LayoutParams contentParams = dialog.getContentView().getLayoutParams();
+        if (contentParams != null) {
+            contentParams.height = Math.round(AppUtils.getScreenHeight() * 0.976f);
+            dialog.getContentView().setLayoutParams(contentParams);
+        }
+        dialog.getContentView().setMinimumHeight(Math.round(AppUtils.getScreenHeight() * 0.976f));
+    }
+
+    private void styleForensicLogViewerDialog(ContentDialog dialog) {
+        if (dialog == null || getContext() == null) return;
+        Context context = getContext();
+        int horizontalPadding = Math.round(context.getResources().getDisplayMetrics().density * 3f);
+        int topPadding = Math.round(context.getResources().getDisplayMetrics().density * 3f);
+        View root = dialog.getContentView();
+        if (root != null) {
+            root.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            root.setPadding(horizontalPadding, topPadding, horizontalPadding, topPadding);
+        }
+        View frameLayout = dialog.findViewById(R.id.FrameLayout);
+        if (frameLayout != null) {
+            frameLayout.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+        View titleBar = dialog.findViewById(R.id.LLTitleBar);
+        if (titleBar != null) {
+            titleBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            titleBar.setPadding(horizontalPadding, topPadding, horizontalPadding, 0);
+        }
+        View bottomBar = dialog.findViewById(R.id.LLBottomBar);
+        if (bottomBar != null) {
+            bottomBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+        TextView titleView = dialog.findViewById(R.id.TVTitle);
+        if (titleView != null) {
+            titleView.setTextColor(ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text));
+        }
+        TextView messageView = dialog.findViewById(R.id.TVMessage);
+        if (messageView != null) {
+            messageView.setTextColor(ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_muted));
+        }
+        android.widget.ImageView iconView = dialog.findViewById(R.id.IVIcon);
+        if (iconView != null) {
+            iconView.setColorFilter(ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text));
+        }
+        View titleBack = dialog.findViewById(R.id.BTTitleBack);
+        if (titleBack instanceof android.widget.ImageButton) {
+            ((android.widget.ImageButton) titleBack).setColorFilter(ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text));
+            titleBack.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+        }
+        restyleForensicActionButton(dialog.findViewById(R.id.BTForensicCopyLog));
+        restyleForensicActionButton(dialog.findViewById(R.id.BTForensicExportLog));
+        restyleForensicActionButton(dialog.findViewById(R.id.BTForensicPauseLog));
+        restyleForensicActionButton(dialog.findViewById(R.id.BTForensicCloseLog));
+    }
+
+    private void restyleForensicActionButton(View buttonView) {
+        if (!(buttonView instanceof TextView) || getContext() == null) return;
+        buttonView.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+        ((TextView) buttonView).setTextColor(ContextCompat.getColor(getContext(), R.color.surface_runtime_button_text));
+    }
+
+    private String buildCompactLogViewerStats(File latestFile, String tail) {
+        ForensicConfig.Snapshot snapshot = ForensicConfig.fromPreferences(preferences);
+        int lineCount = tail == null || tail.isEmpty() ? 0 : tail.split("\n").length;
+        long fileSize = latestFile != null && latestFile.isFile() ? latestFile.length() : 0L;
+        int infoCount = 0;
+        int warnCount = 0;
+        int errorCount = 0;
+        if (tail != null && !tail.isEmpty()) {
+            String[] lines = tail.split("\n");
+            for (String line : lines) {
+                if (line == null || line.trim().isEmpty()) continue;
+                try {
+                    JSONObject obj = new JSONObject(line);
+                    String severity = resolveForensicSeverity(obj);
+                    if ("info".equals(severity)) infoCount++;
+                    else if ("warn".equals(severity) || "warning".equals(severity)) warnCount++;
+                    else if ("error".equals(severity)) errorCount++;
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return "file " + (latestFile != null ? latestFile.getName() : "-")
+                + "  •  size " + fileSize + " B"
+                + "  •  lines " + lineCount
+                + "  •  info " + infoCount
+                + "  •  warn " + warnCount
+                + "  •  err " + errorCount
+                + "  •  " + clipRuntimeSummary(ForensicConfig.buildRuntimeSummary(snapshot));
+    }
+
+    private String clipRuntimeSummary(String summary) {
+        if (summary == null) return "-";
+        String normalized = summary.replace('\n', ' ').replace('\r', ' ').trim();
+        if (normalized.length() <= 52) return normalized;
+        return normalized.substring(0, 49) + "...";
+    }
+
+    private CharSequence formatForensicTailForConsole(String tail) {
+        if (tail == null || tail.trim().isEmpty()) {
+            return getString(R.string.diagnostics_forensic_log_empty);
+        }
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+        String[] lines = tail.split("\n");
+        for (String line : lines) {
+            if (line == null || line.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append('\n');
+            builder.append(formatForensicConsoleLine(line));
+        }
+        return builder.length() > 0 ? builder : getString(R.string.diagnostics_forensic_log_empty);
+    }
+
+    private String formatForensicTailForConsolePlain(String tail) {
+        if (tail == null || tail.trim().isEmpty()) {
+            return getString(R.string.diagnostics_forensic_log_empty);
+        }
+        StringBuilder builder = new StringBuilder();
+        String[] lines = tail.split("\n");
+        for (String line : lines) {
+            if (line == null || line.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append('\n');
+            builder.append(formatForensicConsoleLinePlain(line));
+        }
+        return builder.length() > 0 ? builder.toString() : getString(R.string.diagnostics_forensic_log_empty);
+    }
+
+    private String formatForensicConsoleLinePlain(String rawLine) {
+        try {
+            JSONObject obj = new JSONObject(rawLine);
+            String timestamp = compactForensicTimestamp(obj.optString("ts", ""));
+            String severity = padRight(resolveForensicSeverity(obj).toUpperCase(Locale.US), 5);
+            String stage = clipForensicValue(obj.optString("stage", "-"), 16);
+            String eventId = clipForensicValue(obj.optString("event_id", "-"), 34);
+            String message = clipForensicValue(obj.optString("message", ""), 88);
+            StringBuilder builder = new StringBuilder();
+            builder.append(timestamp)
+                    .append("  ")
+                    .append(severity)
+                    .append("  ")
+                    .append(stage)
+                    .append("  ")
+                    .append(eventId);
+            if (!message.isEmpty()) builder.append("  ").append(message);
+            String extras = buildForensicExtraSummary(obj);
+            if (!extras.isEmpty()) builder.append("\n             ").append(extras);
+            return builder.toString();
+        } catch (Exception ignored) {
+            return rawLine;
+        }
+    }
+
+    private CharSequence formatForensicConsoleLine(String rawLine) {
+        try {
+            JSONObject obj = new JSONObject(rawLine);
+            String timestamp = compactForensicTimestamp(obj.optString("ts", ""));
+            String severity = padRight(resolveForensicSeverity(obj).toUpperCase(Locale.US), 5);
+            String stage = clipForensicValue(obj.optString("stage", "-"), 16);
+            String eventId = clipForensicValue(obj.optString("event_id", "-"), 34);
+            String message = clipForensicValue(obj.optString("message", ""), 88);
+            SpannableStringBuilder builder = new SpannableStringBuilder();
+            appendForensicSpan(builder, timestamp, 0xFF7FB4D4, Typeface.BOLD);
+            builder.append("  ");
+            appendForensicSpan(builder, severity, resolveForensicSeverityColor(resolveForensicSeverity(obj)), Typeface.BOLD);
+            builder.append("  ");
+            appendForensicSpan(builder, stage, 0xFF93B9CF, Typeface.BOLD);
+            builder.append("  ");
+            appendForensicSpan(builder, eventId, 0xFFE8F5FF, Typeface.BOLD);
+            if (!message.isEmpty()) {
+                builder.append("  ");
+                appendForensicSpan(builder, message, 0xFFD8E6F0, Typeface.NORMAL);
+            }
+            String extras = buildForensicExtraSummary(obj);
+            if (!extras.isEmpty()) {
+                builder.append("\n             ");
+                appendForensicSpan(builder, extras, 0xFF9CB5C7, Typeface.NORMAL);
+            }
+            return builder;
+        } catch (Exception ignored) {
+            return rawLine;
+        }
+    }
+
+    private int resolveForensicSeverityColor(String severity) {
+        if ("error".equals(severity)) return 0xFFFF8E7C;
+        if ("warn".equals(severity) || "warning".equals(severity)) return 0xFFF3C969;
+        return 0xFF7BE0D6;
+    }
+
+    private void appendForensicSpan(SpannableStringBuilder builder, String text, int color, int style) {
+        if (text == null || text.isEmpty()) return;
+        int start = builder.length();
+        builder.append(text);
+        int end = builder.length();
+        builder.setSpan(new ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (style != Typeface.NORMAL) {
+            builder.setSpan(new StyleSpan(style), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+    }
+
+    private String buildForensicExtraSummary(JSONObject obj) {
+        JSONArray names = obj.names();
+        if (names == null || names.length() == 0) return "";
+        ArrayList<String> parts = new ArrayList<>();
+        for (int i = 0; i < names.length(); i++) {
+            String key = names.optString(i, "");
+            if (key.isEmpty()) continue;
+            if ("ts".equals(key)
+                    || "event_id".equals(key)
+                    || "severity".equals(key)
+                    || "level".equals(key)
+                    || "trace_id".equals(key)
+                    || "stage".equals(key)
+                    || "message".equals(key)) {
+                continue;
+            }
+            Object value = obj.opt(key);
+            if (value == null) continue;
+            String stringValue = clipForensicValue(String.valueOf(value), 44);
+            if (stringValue.isEmpty()) continue;
+            parts.add(key + "=" + stringValue);
+            if (parts.size() >= 4) break;
+        }
+        if (parts.isEmpty()) return "";
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < parts.size(); i++) {
+            if (i > 0) builder.append("  ");
+            builder.append(parts.get(i));
+        }
+        return builder.toString();
+    }
+
+    private String resolveForensicSeverity(JSONObject obj) {
+        String severity = obj.optString("severity", "").trim().toLowerCase(Locale.US);
+        if (!severity.isEmpty()) return severity;
+        return obj.optString("level", "").trim().toLowerCase(Locale.US);
+    }
+
+    private String compactForensicTimestamp(String timestamp) {
+        if (timestamp == null) return "--:--:--.---";
+        String normalized = timestamp.trim();
+        if (normalized.length() >= 23 && normalized.charAt(10) == 'T') {
+            return normalized.substring(11, 23);
+        }
+        return clipForensicValue(normalized, 12);
+    }
+
+    private String clipForensicValue(String value, int maxLength) {
+        if (value == null) return "";
+        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
+        if (normalized.length() <= maxLength) return normalized;
+        if (maxLength <= 3) return normalized.substring(0, Math.max(0, maxLength));
+        return normalized.substring(0, maxLength - 3) + "...";
+    }
+
+    private String padRight(String value, int width) {
+        String normalized = value != null ? value : "";
+        if (normalized.length() >= width) return normalized.substring(0, width);
+        StringBuilder builder = new StringBuilder(normalized);
+        while (builder.length() < width) builder.append(' ');
+        return builder.toString();
     }
 
     private String buildLogViewerStats(File latestFile, String tail) {
@@ -301,10 +639,10 @@ public class ForensicCenterFragment extends Fragment {
                 try {
                     JSONObject obj = new JSONObject(line);
                     jsonRecords++;
-                    String level = obj.optString("level", "").trim().toLowerCase(Locale.US);
-                    if ("info".equals(level)) infoCount++;
-                    else if ("warn".equals(level)) warnCount++;
-                    else if ("error".equals(level)) errorCount++;
+                    String severity = resolveForensicSeverity(obj);
+                    if ("info".equals(severity)) infoCount++;
+                    else if ("warn".equals(severity) || "warning".equals(severity)) warnCount++;
+                    else if ("error".equals(severity)) errorCount++;
                 } catch (Exception ignored) {
                 }
             }
@@ -388,7 +726,9 @@ public class ForensicCenterFragment extends Fragment {
                 exitCode = process.waitFor();
                 output = builder.toString().trim();
                 success = exitCode == 0;
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.e(TAG, "Root capture script failed before completion", e);
+                output = e.getMessage() != null ? e.getMessage().trim() : "";
             }
 
             final boolean finalSuccess = success;

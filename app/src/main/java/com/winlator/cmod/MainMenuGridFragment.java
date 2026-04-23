@@ -44,7 +44,7 @@ public class MainMenuGridFragment extends Fragment {
             new MenuCardEntry(R.id.main_menu_new_container, R.string.new_container, R.string.main_menu_hint_new_container, R.drawable.ae_icon_add, R.color.contents_lane_wine, R.color.contents_lane_wine_dark),
             new MenuCardEntry(R.id.main_menu_shortcuts, R.string.shortcuts, R.string.main_menu_hint_shortcuts, R.drawable.ae_icon_duplicate, R.color.colorPrimary, R.color.colorAccentDark),
             new MenuCardEntry(R.id.main_menu_big_picture, R.string.big_picture_mode, R.string.main_menu_hint_big_picture, R.drawable.ic_big_picture_mode, R.color.contents_lane_proton, R.color.contents_lane_proton_dark),
-            new MenuCardEntry(R.id.main_menu_contents, R.string.contents, R.string.main_menu_hint_contents, R.drawable.ae_icon_download, R.color.contents_lane_vulkansdk, R.color.contents_lane_vulkansdk_dark),
+            new MenuCardEntry(R.id.main_menu_contents, R.string.contents, R.string.main_menu_hint_contents, R.drawable.ae_icon_download, R.color.contents_lane_wine, R.color.contents_lane_wine_dark),
             new MenuCardEntry(R.id.main_menu_adrenotools_gpu_drivers, R.string.adrenotools_gpu_drivers, R.string.main_menu_hint_graphics, R.drawable.ae_icon_turnip_lane, R.color.contents_lane_turnip, R.color.contents_lane_turnip_dark),
             new MenuCardEntry(R.id.main_menu_diagnostics, R.string.diagnostics, R.string.main_menu_hint_forensic, R.drawable.ae_icon_diagnostics, R.color.contents_lane_dgvoodoo, R.color.contents_lane_dgvoodoo_dark),
             new MenuCardEntry(R.id.main_menu_settings, R.string.settings, R.string.main_menu_hint_settings, R.drawable.ae_icon_settings, R.color.contents_lane_opengl, R.color.contents_lane_opengl_dark),

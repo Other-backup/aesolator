@@ -43,6 +43,24 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
+# Auto-wire the local Termux-hosted aapt2 binary when available.
+# This keeps the authoritative root wrapper usable on-device without requiring
+# callers to source an extra shell helper just to avoid the desktop Maven
+# aapt2 binary.
+TERMUX_AAPT2_DEFAULT="/data/data/com.termux/files/usr/bin/aapt2"
+if [ -z "${AEO_AAPT2_OVERRIDE:-}" ] && [ -x "$TERMUX_AAPT2_DEFAULT" ] ; then
+    AEO_AAPT2_OVERRIDE="$TERMUX_AAPT2_DEFAULT"
+fi
+case " ${GRADLE_OPTS:-} " in
+  *"org.gradle.project.android.aapt2FromMavenOverride="* ) ;;
+  *)
+    if [ -n "${AEO_AAPT2_OVERRIDE:-}" ] && [ -x "$AEO_AAPT2_OVERRIDE" ] ; then
+        GRADLE_OPTS="${GRADLE_OPTS:+$GRADLE_OPTS }-Dorg.gradle.project.android.aapt2FromMavenOverride=$AEO_AAPT2_OVERRIDE"
+        export GRADLE_OPTS
+    fi
+    ;;
+esac
+
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 

@@ -6,14 +6,13 @@ from pathlib import Path
 
 ALLOWED_CHANNELS = {"stable", "beta", "nightly"}
 ALLOWED_DELIVERY = {"remote", "embedded", ""}
-ALLOWED_TYPES = {"wine", "proton", "vulkansdk", "turnipdriver", "opengldriver", "dgvoodoo", "dxvk", "vkd3d"}
-ALLOWED_INTERNAL_TYPES = {"wine", "proton", "protonge", "protonwine", "vulkansdk", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
+ALLOWED_TYPES = {"wine", "proton", "turnipdriver", "opengldriver", "dgvoodoo", "dxvk", "vkd3d"}
+ALLOWED_INTERNAL_TYPES = {"wine", "proton", "protonge", "protonwine", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
 EXPECTED_TYPE_BY_INTERNAL = {
     "wine": "wine",
     "proton": "proton",
     "protonge": "proton",
     "protonwine": "proton",
-    "vulkansdk": "vulkansdk",
     "turnip": "turnipdriver",
     "freedreno": "opengldriver",
     "dgvoodoo": "dgvoodoo",
@@ -23,7 +22,6 @@ EXPECTED_TYPE_BY_INTERNAL = {
 EXPECTED_DISPLAY_BY_TYPE = {
     "wine": "Wine",
     "proton": "Proton",
-    "vulkansdk": "Vulkan SDK",
     "turnipdriver": "Turnip",
     "opengldriver": "OpenGL Driver",
     "dgvoodoo": "dgVoodoo",
@@ -31,7 +29,6 @@ EXPECTED_DISPLAY_BY_TYPE = {
     "vkd3d": "VKD3D",
 }
 WINE_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-[0-9]+(?:\.[0-9]+)*)?-(x86|x86_64|arm64ec)$")
-VULKAN_SDK_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*-(arm64|x86_64)$")
 GRAPHICS_PROVIDER_VERSION_RE = re.compile(r"^(?:rolling|[0-9]+(?:\.[0-9]+)*)-arm64$")
 DGVOODOO_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-(x86_64|arm64ec))?$")
 DXVK_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*(?:-[0-9]+)?(?:-gplasync)?(?:-arm64ec)?$")
@@ -43,7 +40,6 @@ EXPECTED_SOURCE_REPO_BY_INTERNAL = {
     "proton": RUNTIME_RELEASE_REPO,
     "protonge": RUNTIME_RELEASE_REPO,
     "protonwine": RUNTIME_RELEASE_REPO,
-    "vulkansdk": RUNTIME_RELEASE_REPO,
     "turnip": GRAPHICS_RELEASE_REPO,
     "freedreno": GRAPHICS_RELEASE_REPO,
     "dgvoodoo": RUNTIME_RELEASE_REPO,
@@ -69,7 +65,6 @@ def main() -> None:
     seen = set()
     nightly_seen = 0
     stable_seen = 0
-    vulkan_sdk_arches = set()
     turnip_rows = 0
     freedreno_rows = 0
     dgvoodoo_rows = 0
@@ -110,8 +105,6 @@ def main() -> None:
             fail(f"entry {idx} type must be one of {sorted(ALLOWED_TYPES)}: {type_name}")
         if type_key in {"wine", "proton"}:
             version_ok = WINE_VERSION_RE.match(ver_name)
-        elif type_key == "vulkansdk":
-            version_ok = VULKAN_SDK_VERSION_RE.match(ver_name)
         elif type_key == "dgvoodoo":
             version_ok = DGVOODOO_VERSION_RE.match(ver_name)
         elif type_key == "dxvk":
@@ -122,10 +115,7 @@ def main() -> None:
             version_ok = GRAPHICS_PROVIDER_VERSION_RE.match(ver_name)
         if not version_ok:
             fail(f"entry {idx} verName is not valid for {type_name}: {ver_name}")
-        if type_key == "vulkansdk":
-            sdk_arch = ver_name.rsplit("-", 1)[-1]
-            vulkan_sdk_arches.add(sdk_arch)
-        elif type_key == "turnipdriver":
+        if type_key == "turnipdriver":
             turnip_rows += 1
         elif type_key == "opengldriver":
             freedreno_rows += 1
@@ -177,19 +167,6 @@ def main() -> None:
                 fail(f"entry {idx} protonwine internalType requires protonwine* releaseTag: {release_tag}")
             if "protonwine" not in artifact_name:
                 fail(f"entry {idx} protonwine internalType requires protonwine* artifactName: {artifact_name}")
-        elif internal_type == "vulkansdk":
-            if "vulkan-sdk" not in release_tag:
-                fail(f"entry {idx} vulkansdk internalType requires vulkan-sdk* releaseTag: {release_tag}")
-            if "vulkan-sdk" not in artifact_name:
-                fail(f"entry {idx} vulkansdk internalType requires vulkan-sdk* artifactName: {artifact_name}")
-            if "arm64" in ver_name and "arm64" not in release_tag:
-                fail(f"entry {idx} arm64 VulkanSDK row requires arm64 releaseTag: {release_tag}")
-            if "arm64" in ver_name and "arm64" not in artifact_name:
-                fail(f"entry {idx} arm64 VulkanSDK row requires arm64 artifactName: {artifact_name}")
-            if "x86_64" in ver_name and "x86_64" not in release_tag:
-                fail(f"entry {idx} x86_64 VulkanSDK row requires x86_64 releaseTag: {release_tag}")
-            if "x86_64" in ver_name and "x86_64" not in artifact_name:
-                fail(f"entry {idx} x86_64 VulkanSDK row requires x86_64 artifactName: {artifact_name}")
         elif internal_type == "turnip":
             if "turnip" not in release_tag:
                 fail(f"entry {idx} turnip internalType requires turnip* releaseTag: {release_tag}")
@@ -280,8 +257,6 @@ def main() -> None:
 
     if stable_seen == 0:
         fail("no stable entries found")
-    if vulkan_sdk_arches and vulkan_sdk_arches != {"arm64", "x86_64"}:
-        fail(f"vulkansdk entries must cover exactly arm64 and x86_64; got {sorted(vulkan_sdk_arches)}")
     if turnip_rows not in {0, 1}:
         fail(f"turnipdriver entries must appear once at most; got {turnip_rows}")
     if freedreno_rows not in {0, 1}:

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.util.Log;
 
 import androidx.annotation.IntRange;
 
@@ -32,23 +33,15 @@ public abstract class ImageUtils {
     }
 
     public static Bitmap getBitmapFromUri(Context context, Uri uri, BitmapFactory.Options options) {
-        InputStream is = null;
         Bitmap bitmap = null;
-        try {
-            is = context.getContentResolver().openInputStream(uri);
+        try (InputStream is = context.getContentResolver().openInputStream(uri)) {
             if (options != null) {
                 bitmap = BitmapFactory.decodeStream(is, null, options);
             }
             else bitmap = BitmapFactory.decodeStream(is);
         }
         catch (IOException e) {
-            e.printStackTrace();
-        }
-        finally {
-            try {
-                if (is != null) is.close();
-            }
-            catch (IOException e) {}
+            Log.w("ImageUtils", "Failed to decode bitmap from uri " + uri, e);
         }
         return bitmap;
     }
@@ -58,11 +51,9 @@ public abstract class ImageUtils {
     }
 
     public static Bitmap getBitmapFromUri(Context context, Uri uri, int maxSize) {
-        InputStream is = null;
         BitmapFactory.Options options = new BitmapFactory.Options();
 
-        try {
-            is = context.getContentResolver().openInputStream(uri);
+        try (InputStream is = context.getContentResolver().openInputStream(uri)) {
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeStream(is, null, options);
             int inSampleSize = calculateInSampleSize(options, maxSize);
@@ -70,13 +61,7 @@ public abstract class ImageUtils {
             options.inSampleSize = inSampleSize;
         }
         catch (IOException e) {
-            e.printStackTrace();
-        }
-        finally {
-            try {
-                if (is != null) is.close();
-            }
-            catch (IOException e) {}
+            Log.w("ImageUtils", "Failed to read bitmap bounds from uri " + uri, e);
         }
 
         return getBitmapFromUri(context, uri, options);

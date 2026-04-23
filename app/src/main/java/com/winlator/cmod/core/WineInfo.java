@@ -124,7 +124,7 @@ public class WineInfo implements Parcelable {
     @NonNull
     public static WineInfo fromIdentifier(Context context, ContentsManager contentsManager, String identifier, String requestedRuntimeModel) {
         ImageFs imageFs = ImageFs.find(context);
-        String fallbackPath = imageFs.getMainWineDir().getPath();
+        String fallbackPath = WineUtils.resolveCanonicalRuntimeRoot(imageFs.getMainWineDir()).getPath();
 
         Log.d("WineInfo", "Creating WineInfo from identifier " + identifier);
 
@@ -147,8 +147,7 @@ public class WineInfo implements Parcelable {
         String path = "";
 
         if (wineProfile != null && wineProfile.isWineProtonFamily()) {
-            File runtimeRoot = contentsManager.getRuntimeRootDir(wineProfile);
-            path = runtimeRoot != null ? runtimeRoot.getPath() : contentsManager.getInstallDir(context, wineProfile).getPath();
+            path = resolveInstalledRuntimePath(context, contentsManager, wineProfile);
             parsed = parseProfileIdentifier(wineProfile);
             if (parsed == null) parsed = parseIdentifier(stripRuntimeModelToken(stripEntryVersionCodeSuffix(normalizedIdentifier)));
         }
@@ -161,32 +160,42 @@ public class WineInfo implements Parcelable {
             parsed = parseIdentifier(stripRuntimeModelToken(stripEntryVersionCodeSuffix(normalizedIdentifier)));
         }
 
-        if (path.isEmpty()) {
-            String[] wineVersions = context.getResources().getStringArray(R.array.wine_entries);
-            for (String wineVersion : wineVersions) {
-                if (wineVersion.equalsIgnoreCase(normalizedIdentifier)) {
-                    path = imageFs.getRootDir().getPath() + "/opt/" + normalizedIdentifier;
-                    break;
-                }
-            }
-        }
-
         if (parsed != null) {
             if (path.isEmpty()) {
-                File optDir = new File(imageFs.getRootDir(), "/opt/" + stripRuntimeModelToken(normalizedIdentifier));
-                if (optDir.isDirectory()) {
-                    path = optDir.getPath();
-                }
+                path = resolveEmbeddedRuntimePath(context, imageFs, normalizedIdentifier);
             }
-
-            if (path.isEmpty()) {
-                path = fallbackPath;
-            }
-
             return new WineInfo(parsed.type, parsed.version, parsed.arch, path);
         }
 
         return new WineInfo(MAIN_WINE_VERSION.type, MAIN_WINE_VERSION.version, MAIN_WINE_VERSION.arch, fallbackPath);
+    }
+
+    private static String resolveInstalledRuntimePath(Context context, ContentsManager contentsManager, ContentProfile profile) {
+        if (contentsManager == null || profile == null || !contentsManager.isInstalledProfileUsable(profile)) return "";
+
+        File runtimeRoot = contentsManager.getRuntimeRootDir(profile);
+        File resolvedRoot = runtimeRoot != null ? runtimeRoot : contentsManager.getInstallDir(context, profile);
+        File canonicalRoot = WineUtils.resolveCanonicalRuntimeRoot(resolvedRoot);
+        return canonicalRoot != null && WineUtils.hasRuntimePayload(canonicalRoot) ? canonicalRoot.getPath() : "";
+    }
+
+    private static String resolveEmbeddedRuntimePath(Context context, ImageFs imageFs, String normalizedIdentifier) {
+        if (context == null || imageFs == null || normalizedIdentifier == null || normalizedIdentifier.isEmpty()) return "";
+
+        String[] wineVersions = context.getResources().getStringArray(R.array.wine_entries);
+        for (String wineVersion : wineVersions) {
+            if (wineVersion.equalsIgnoreCase(normalizedIdentifier)) {
+                return resolveOptRuntimePath(imageFs, normalizedIdentifier);
+            }
+        }
+
+        return resolveOptRuntimePath(imageFs, stripRuntimeModelToken(normalizedIdentifier));
+    }
+
+    private static String resolveOptRuntimePath(ImageFs imageFs, String runtimeToken) {
+        if (imageFs == null || runtimeToken == null || runtimeToken.trim().isEmpty()) return "";
+        File candidate = WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "/opt/" + runtimeToken.trim()));
+        return candidate != null && WineUtils.hasRuntimePayload(candidate) ? candidate.getPath() : "";
     }
 
     public static boolean isMainWineVersion(String wineVersion) {

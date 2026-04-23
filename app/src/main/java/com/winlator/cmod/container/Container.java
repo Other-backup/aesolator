@@ -6,11 +6,13 @@ import android.util.Log;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box86_64.Box86_64Preset;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
+import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.fexcore.FEXCorePreset;
@@ -21,6 +23,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 
@@ -36,9 +39,9 @@ public class Container {
     public static final String EXTERNAL_DISPLAY_MODE_HYBRID = "hybrid";
     public static final String DEFAULT_EXTERNAL_DISPLAY_MODE = EXTERNAL_DISPLAY_MODE_OFF;
 
-    public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
+    public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true AERO_WINE_SYNC_BACKEND=auto TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
-    public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
+    public static final String DEFAULT_GRAPHICS_DRIVER = GraphicsDrivers.WRAPPER;
     public static final String DEFAULT_AUDIO_DRIVER = "alsa";
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
@@ -48,10 +51,13 @@ public class Container {
     public static final String DEFAULT_DXWRAPPERCONFIG = "version=" + DefaultVersion.DXVK + ",framerate=0,async=0,asyncCache=0" + ",vkd3dVersion=" + DefaultVersion.VKD3D + ",vkd3dLevel=12_1" + ",csmt=3" + ",gpuName=NVIDIA GeForce GTX 480" + ",videoMemorySize=2048" + ",strict_shader_math=1" + ",OffscreenRenderingMode=fbo" + ",renderer=gl";
     public static final String DEFAULT_GRAPHICSDRIVERCONFIG =
             "vulkanVersion=1.4" + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=mailbox" + ";syncFrame=0" + ";disablePresentWait=0" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
+    public static final String GRAPHICS_CONFIG_LEGACY_REQUESTED_DRIVER = "legacyRequestedDriver";
+    public static final String GRAPHICS_CONFIG_LEGACY_PROVIDER_HINT = "legacyProviderHint";
+    public static final String GRAPHICS_CONFIG_LEGACY_POLICY = "legacyPolicy";
     public static final String DEFAULT_DDRAWRAPPER = "none";
     public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1";
     public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1";
-    public static final String DEFAULT_DRIVES = "F:" + Environment.getExternalStorageDirectory().getAbsolutePath() + "D:" + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+    public static final String DEFAULT_DRIVES = buildDefaultDrives();
     public static final byte STARTUP_SELECTION_NORMAL = 0;
     public static final byte STARTUP_SELECTION_ESSENTIAL = 1;
     public static final byte STARTUP_SELECTION_AGGRESSIVE = 2;
@@ -128,6 +134,30 @@ public class Container {
 
     private ContainerManager containerManager;
 
+    private static String buildDefaultDrives() {
+        String externalRoot = resolveExternalStoragePath();
+        String downloadsRoot = resolveDownloadsPath(externalRoot);
+        return "F:" + externalRoot + "D:" + downloadsRoot;
+    }
+
+    private static String resolveExternalStoragePath() {
+        try {
+            File dir = Environment.getExternalStorageDirectory();
+            if (dir != null) return dir.getAbsolutePath();
+        } catch (Throwable ignored) {
+        }
+        return "/storage/emulated/0";
+    }
+
+    private static String resolveDownloadsPath(String externalRoot) {
+        try {
+            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            if (dir != null) return dir.getAbsolutePath();
+        } catch (Throwable ignored) {
+        }
+        return externalRoot + "/Download";
+    }
+
     public Container(int id) {
         this.id = id;
         this.name = "Container-" + id;
@@ -168,11 +198,110 @@ public class Container {
     }
 
     public String getGraphicsDriver() {
-        return graphicsDriver;
+        return normalizeGraphicsDriver(graphicsDriver);
     }
 
     public void setGraphicsDriver(String graphicsDriver) {
-        this.graphicsDriver = graphicsDriver;
+        this.graphicsDriver = normalizeGraphicsDriver(graphicsDriver);
+    }
+
+    public static String normalizeGraphicsDriver(String graphicsDriver) {
+        String normalized = GraphicsDrivers.normalize(graphicsDriver);
+        if (normalized.isEmpty()) return DEFAULT_GRAPHICS_DRIVER;
+        if (GraphicsDrivers.isKnown(normalized)) return normalized;
+        if (isLegacyGraphicsCompatToken(normalized)) return DEFAULT_GRAPHICS_DRIVER;
+        return normalized;
+    }
+
+    public static String extractLegacyGraphicsProviderHint(String graphicsDriver) {
+        String raw = GraphicsDrivers.normalize(graphicsDriver == null ? "" : graphicsDriver);
+        if (raw.isEmpty()) return "";
+        if (GraphicsDrivers.isKnown(raw)) return "";
+        if (raw.contains("turnip")) return "turnip-vulkan";
+        if (raw.contains("zink")) return "zink-opengl";
+        if (raw.contains("llvmpipe")) return "llvmpipe-software";
+        return "";
+    }
+
+    public static String extractLegacyGraphicsPolicy(String graphicsDriver) {
+        String hint = extractLegacyGraphicsProviderHint(graphicsDriver);
+        if (hint.isEmpty()) return "";
+        if (hint.endsWith("-route")) return "route-degraded";
+        if ("llvmpipe-software".equals(hint)) return "software-secondary path";
+        return "provider-compat";
+    }
+
+    public static String extractLegacyGraphicsRequestedDriver(String graphicsDriver) {
+        String normalized = GraphicsDrivers.normalize(graphicsDriver == null ? "" : graphicsDriver);
+        if (normalized.isEmpty() || DEFAULT_GRAPHICS_DRIVER.equals(normalized)) return "";
+        if (GraphicsDrivers.isKnown(normalized)) return "";
+        return isLegacyGraphicsCompatToken(normalized) ? normalized : "";
+    }
+
+    public static String reconcileLegacyGraphicsConfig(String rawGraphicsDriver, String graphicsDriverConfig) {
+        String normalizedDriver = normalizeGraphicsDriver(rawGraphicsDriver);
+        if (GraphicsDrivers.usesKeyValueConfig(normalizedDriver)) {
+            return graphicsDriverConfig == null ? "" : graphicsDriverConfig;
+        }
+
+        HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(
+                graphicsDriverConfig == null || graphicsDriverConfig.trim().isEmpty()
+                        ? DEFAULT_GRAPHICSDRIVERCONFIG
+                        : graphicsDriverConfig
+        );
+        String requestedDriver = extractLegacyGraphicsRequestedDriver(rawGraphicsDriver);
+        String existingRequestedDriver = trimConfigValue(config.get(GRAPHICS_CONFIG_LEGACY_REQUESTED_DRIVER));
+
+        // Preserve existing donor-imported wrapper route metadata when a wrapper-normalized route is re-saved unchanged.
+        if (requestedDriver.isEmpty() && DEFAULT_GRAPHICS_DRIVER.equals(normalizedDriver) && !existingRequestedDriver.isEmpty()) {
+            requestedDriver = existingRequestedDriver;
+        }
+
+        if (requestedDriver.isEmpty()) {
+            config.remove(GRAPHICS_CONFIG_LEGACY_REQUESTED_DRIVER);
+            config.remove(GRAPHICS_CONFIG_LEGACY_PROVIDER_HINT);
+            config.remove(GRAPHICS_CONFIG_LEGACY_POLICY);
+        } else {
+            config.put(GRAPHICS_CONFIG_LEGACY_REQUESTED_DRIVER, requestedDriver);
+            config.put(GRAPHICS_CONFIG_LEGACY_PROVIDER_HINT, extractLegacyGraphicsProviderHint(requestedDriver));
+            config.put(GRAPHICS_CONFIG_LEGACY_POLICY, extractLegacyGraphicsPolicy(requestedDriver));
+        }
+
+        return GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
+    }
+
+    public static String resolveLegacyGraphicsRequestedDriver(String graphicsDriver, String graphicsDriverConfig) {
+        String configuredValue = extractGraphicsConfigValue(graphicsDriverConfig, GRAPHICS_CONFIG_LEGACY_REQUESTED_DRIVER);
+        return configuredValue.isEmpty() ? extractLegacyGraphicsRequestedDriver(graphicsDriver) : configuredValue;
+    }
+
+    public static String resolveLegacyGraphicsProviderHint(String graphicsDriver, String graphicsDriverConfig) {
+        String configuredValue = extractGraphicsConfigValue(graphicsDriverConfig, GRAPHICS_CONFIG_LEGACY_PROVIDER_HINT);
+        if (!configuredValue.isEmpty()) return configuredValue;
+        String requestedDriver = resolveLegacyGraphicsRequestedDriver(graphicsDriver, graphicsDriverConfig);
+        return requestedDriver.isEmpty() ? extractLegacyGraphicsProviderHint(graphicsDriver) : extractLegacyGraphicsProviderHint(requestedDriver);
+    }
+
+    public static String resolveLegacyGraphicsPolicy(String graphicsDriver, String graphicsDriverConfig) {
+        String configuredValue = extractGraphicsConfigValue(graphicsDriverConfig, GRAPHICS_CONFIG_LEGACY_POLICY);
+        if (!configuredValue.isEmpty()) return configuredValue;
+        String requestedDriver = resolveLegacyGraphicsRequestedDriver(graphicsDriver, graphicsDriverConfig);
+        return requestedDriver.isEmpty() ? extractLegacyGraphicsPolicy(graphicsDriver) : extractLegacyGraphicsPolicy(requestedDriver);
+    }
+
+    private static boolean isLegacyGraphicsCompatToken(String normalized) {
+        return normalized.contains("turnip")
+                || normalized.contains("llvmpipe")
+                || normalized.contains("zink");
+    }
+
+    private static String extractGraphicsConfigValue(String graphicsDriverConfig, String key) {
+        HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
+        return trimConfigValue(config.get(key));
+    }
+
+    private static String trimConfigValue(String value) {
+        return value == null ? "" : value.trim();
     }
 
     public String getGraphicsDriverVersion() {
@@ -1061,12 +1190,9 @@ public class Container {
 
             if (data.has("graphicsDriver")) {
                 String graphicsDriver = data.getString("graphicsDriver");
-                if (graphicsDriver.equals("turnip-zink") || graphicsDriver.equals("turnip")) {
-                    data.put("graphicsDriver", "wrapper");
-                }
-                else if (graphicsDriver.equals("llvmpipe")) {
-                    data.put("graphicsDriver", "wrapper");
-                }
+                String graphicsDriverConfig = data.optString("graphicsDriverConfig", DEFAULT_GRAPHICSDRIVERCONFIG);
+                data.put("graphicsDriver", normalizeGraphicsDriver(graphicsDriver));
+                data.put("graphicsDriverConfig", reconcileLegacyGraphicsConfig(graphicsDriver, graphicsDriverConfig));
             }
 
             if (data.has("envVars") && data.has("extraData")) {

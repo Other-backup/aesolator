@@ -1,0 +1,1269 @@
+{
+  "generated_at": "2026-04-20T09:52:08Z",
+  "inputs": {
+    "mainline_enablement": "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json",
+    "vendor_enablement": "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json",
+    "nothing_enablement": "/data/data/com.termux/files/home/.cache/research/nothing-kernel-mt6878-20260420/enablement.json"
+  },
+  "lanes": {
+    "mainline_source": {
+      "title": "Mainline Source Donors",
+      "entries": [
+        {
+          "donor": "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panthor-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 300,
+          "source_score": 27,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost",
+            "contains_panthor"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_DRM_PANTHOR=m",
+            "CONFIG_DRM_LIMA=y",
+            "CONFIG_DRM_PANFROST=y"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost",
+            "panthor"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Top mainline source donor with Panthor present alongside Panfrost/Lima and Mediatek DRM.",
+          "rank": 1
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_GT8pro-AndroidB-common-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panthor-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 300,
+          "source_score": 27,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost",
+            "contains_panthor"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_DRM_PANTHOR=m",
+            "CONFIG_DRM_LIMA=y",
+            "CONFIG_DRM_PANFROST=y"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost",
+            "panthor"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Top mainline source donor with Panthor present alongside Panfrost/Lima and Mediatek DRM.",
+          "rank": 2
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_C75-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 259,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6768_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 3
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_pad2-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 4
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_pad2-AndroidT-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 5
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_gt-neo3-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 6
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_gt-neo3-AndroidT-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 7
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_11_mt6789-AndroidT-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 8
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_11_4g-AndroidV-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 9
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_10_mt6789-AndroidT-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 10
+        },
+        {
+          "donor": "realme-kernel-opensource/realmePad2Lite-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 11
+        },
+        {
+          "donor": "realme-kernel-opensource/realme11_4g-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 12
+        },
+        {
+          "donor": "realme-kernel-opensource/realme10-AndroidU-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 255,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 13
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_10_mt6789-AndroidS-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 253,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_MT6893_SUPPORT=m",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r30p0 mt6893\"",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 14
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_C85_5G-AndroidV-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 251,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6873\"",
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6853\"",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6853\""
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 15
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_16_5G-AndroidB-kernel-source",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 251,
+          "source_score": 18,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPUFREQ_V2=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6873\"",
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6853\"",
+            "CONFIG_MTK_GPU_SUPPORT=m",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0 mt6853\""
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Mainline Panfrost/Lima source-tree donor with Android-facing defconfig hooks; route still unproven.",
+          "rank": 16
+        },
+        {
+          "donor": "NothingOSS/android_kernel_6.1_nothing_mt6878",
+          "lane": "mainline-source",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 192,
+          "source_score": 17,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/nothing-kernel-mt6878-20260420/enablement.json",
+            "/data/data/com.termux/files/home/.cache/research/nothing-kernel-mt6878-20260420/dt_render_probe_20260420.txt"
+          ],
+          "rationale": "Independent non-Realme Android 6.1 MT6878 reference: mainline Panfrost/Lima enabled in defconfig, but explicit MT6878/Tetris DT proof is still absent.",
+          "rank": 17
+        }
+      ]
+    },
+    "vendor_kbase_diagnostics": {
+      "title": "Vendor Kbase Diagnostics Donors",
+      "entries": [
+        {
+          "donor": "realme-kernel-opensource/realme_8-5G_8S-5G_9-5G_Narzo30-5G_V13_Q3i_realme10_mt6833-AndroidS-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 331,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r32p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r32p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json",
+            "/data/data/com.termux/files/home/aesolator/docs/AEMALI_MT6833_KERNEL_RE_NOTES_2026-04-20.md"
+          ],
+          "rationale": "Densest MT6833 AndroidS vendor-kbase/GED donor with dedicated owner-file extraction and RE note.",
+          "rank": 1
+        },
+        {
+          "donor": "AgentFabulous/begonia:a10-rebase",
+          "provenance": "manual-existing-ledger",
+          "evidence": [
+            "/data/data/com.termux/files/home/aesolator/docs/AEMALI_DONOR_BOOK_KERNEL_EXECUTION_ROADMAP_2026-04-20.md",
+            "/data/data/com.termux/files/home/aesolator/docs/AEMALI_MT6833_KERNEL_RE_NOTES_2026-04-20.md"
+          ],
+          "rationale": "MT6785 / Mali-G76 MC4 vendor-kernel archaeology for the first live target SoC class.",
+          "score": 320,
+          "route_status": "manual-target-g76-reference",
+          "rank": 2
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_q2pro-AndroidS-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 319,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r32p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r32p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 3
+        },
+        {
+          "donor": "realme-kernel-opensource/realmeV3_realmeX7_realmeX7Pro_AndroidQ-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 317,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r21p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r21p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r21p0\""
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 4
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_realme6-AndroidR-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 307,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\""
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 5
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_X7max_GTneo_Q3pro-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 307,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 6
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_8-5G_Narzo30-5G_8S-5G-AndroidR-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 307,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\""
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 7
+        },
+        {
+          "donor": "realme-kernel-opensource/realme6_6s_6i_7__nazro_30_20Pro__AndroidR-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 307,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SWPM_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali valhall r25p0\""
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 8
+        },
+        {
+          "donor": "realme-kernel-opensource/realme7_narzo20pro_AndroidQ-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 293,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 9
+        },
+        {
+          "donor": "realme-kernel-opensource/realme3-3i-AndroidQ-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 293,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 10
+        },
+        {
+          "donor": "realme-kernel-opensource/realme6-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 281,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 11
+        },
+        {
+          "donor": "realme-kernel-opensource/realmeC3-narzo10A-narzo10-6i-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 275,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r20p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 12
+        },
+        {
+          "donor": "realme-kernel-opensource/realme7_realme8_Narzo30_Narzo20pro-AndroidS-kernel-source",
+          "lane": "vendor-kbase-diagnostics",
+          "provenance": "machine",
+          "class": "mediatek-vendor-kbase-ged",
+          "route_status": "vendor-kbase-enabled-candidate",
+          "score": 251,
+          "source_score": 24,
+          "flags": [
+            "contains_mtk_drm",
+            "contains_mtk_ged",
+            "contains_mtk_gpu",
+            "contains_mtk_mali_kbase"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y",
+            "CONFIG_MTK_GPU_SUPPORT=y",
+            "CONFIG_MTK_GPU_VERSION=\"mali bifrost r25p0\"",
+            "CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y"
+          ],
+          "defconfig_signals": [
+            "mediatek_gpu"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/realme-kernel-enablement-probe-20260420/enablement.partial.json"
+          ],
+          "rationale": "Dense MediaTek vendor-kbase/GED donor for diagnostics, DVFS, tuner, power, and BSP behavior.",
+          "rank": 13
+        }
+      ]
+    },
+    "android_bsp_integration": {
+      "title": "Android BSP Integration Donors",
+      "entries": [
+        {
+          "donor": "CherishOS-Devices/android_device_realme_RM6785:tiramisu",
+          "provenance": "manual-existing-ledger",
+          "evidence": [
+            "/data/data/com.termux/files/home/aesolator/docs/AEMALI_DONOR_BOOK_KERNEL_EXECUTION_ROADMAP_2026-04-20.md"
+          ],
+          "rationale": "Android BSP-facing donor for display/power/config integration rather than low-level GPU compiler work.",
+          "score": 330,
+          "route_status": "manual-device-bsp-reference",
+          "rank": 1
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_neo8-AndroidB-common-source",
+          "lane": "android-bsp-integration",
+          "provenance": "machine",
+          "class": "mainline-panthor-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 306,
+          "source_score": 27,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost",
+            "contains_panthor"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_DRM_PANTHOR=m",
+            "CONFIG_DRM_LIMA=y",
+            "CONFIG_DRM_PANFROST=y"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost",
+            "panthor"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Android common-source kernel donor with mainline graphics hooks and Mediatek DRM glue.",
+          "rank": 2
+        },
+        {
+          "donor": "realme-kernel-opensource/realme_GT8pro-AndroidB-common-source",
+          "lane": "android-bsp-integration",
+          "provenance": "machine",
+          "class": "mainline-panthor-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 306,
+          "source_score": 27,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost",
+            "contains_panthor"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m",
+            "CONFIG_DRM_PANTHOR=m",
+            "CONFIG_DRM_LIMA=y",
+            "CONFIG_DRM_PANFROST=y"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost",
+            "panthor"
+          ],
+          "dt_signals": [
+            "mediatek_gpu"
+          ],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/aemali-mainline-kernel-enablement-20260420/enablement.json"
+          ],
+          "rationale": "Android common-source kernel donor with mainline graphics hooks and Mediatek DRM glue.",
+          "rank": 3
+        },
+        {
+          "donor": "NothingOSS/android_kernel_6.1_nothing_mt6878",
+          "lane": "android-bsp-integration",
+          "provenance": "machine",
+          "class": "mainline-panfrost-source-tree",
+          "route_status": "mainline-source-present-enable-unproven",
+          "score": 192,
+          "source_score": 17,
+          "flags": [
+            "contains_lima",
+            "contains_mtk_drm",
+            "contains_panfrost"
+          ],
+          "explicit_enabled_lines": [
+            "CONFIG_DRM_LIMA=m",
+            "CONFIG_DRM_PANFROST=m"
+          ],
+          "defconfig_signals": [
+            "lima",
+            "mali_dt",
+            "mediatek_gpu",
+            "panfrost"
+          ],
+          "dt_signals": [],
+          "evidence": [
+            "/data/data/com.termux/files/home/.cache/research/nothing-kernel-mt6878-20260420/enablement.json",
+            "/data/data/com.termux/files/home/.cache/research/nothing-kernel-mt6878-20260420/dt_render_probe_20260420.txt"
+          ],
+          "rationale": "Android 6.1 MT6878 reference for config/module policy and upstream-style Mediatek DTS coverage.",
+          "rank": 4
+        }
+      ]
+    }
+  }
+}

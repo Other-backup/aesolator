@@ -256,19 +256,19 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
     };
 
     private float pickHighestRefreshRate() {
-    	android.view.Display display = getWindowManager().getDefaultDisplay();
-    	android.view.Display.Mode[] modes = display.getSupportedModes();
-    	
-    	float maxRefresh = 0f;
-    	
-    	for (android.view.Display.Mode mode : modes) {
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode[] modes = display.getSupportedModes();
+
+        float maxRefresh = 0f;
+
+        for (android.view.Display.Mode mode : modes) {
 			if (mode.getRefreshRate() > maxRefresh)
-    	    	maxRefresh = mode.getRefreshRate();
-    	}
+                maxRefresh = mode.getRefreshRate();
+        }
 
-    	Log.d("XServerDisplayActivity", "Picking refresh rate " + maxRefresh);
+        Log.d("XServerDisplayActivity", "Picking refresh rate " + maxRefresh);
 
-    	return maxRefresh;
+        return maxRefresh;
     }
 
 
@@ -281,7 +281,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
         params.preferredRefreshRate = pickHighestRefreshRate();
         getWindow().setAttributes(params);
-        
+
         setContentView(R.layout.xserver_display_activity);
 
         preloaderDialog = new PreloaderDialog(this);
@@ -604,10 +604,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                     preloaderDialog.closeOnUiThread();
                     winStarted[0] = true;
                 }
-                    
+
                 if (frameRatingWindowId == window.id) frameRating.update();
             }
-           
+
             @Override
             public void onMapWindow(Window window) {
                 // Log the class name of the mapped window
@@ -618,7 +618,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             @Override
             public void onModifyWindowProperty(Window window, Property property) {
                 changeFrameRatingVisibility(window, property);
-            }    
+            }
 
             @Override
             public void onUnmapWindow(Window window) {
@@ -1163,7 +1163,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             container.putExtra("startupSelection", startupSelection);
             containerDataChanged = true;
         }
-        
+
         extractInputDLLs();
 
         if (containerDataChanged) container.saveData();
@@ -1309,7 +1309,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
 
         // Reset dxwrapper config
         dxwrapperConfig = null;
-        
+
     }
 
     private void createWrapperScript(String path, String content) {
@@ -1758,7 +1758,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         );
         envVars.put("WRAPPER_VK_VERSION", vulkanVersion.effectiveVersion);
         envVars.put("WINLATOR_DETECTED_VK_VERSION", detectedVkVersion == null ? "" : detectedVkVersion);
-        envVars.put("AERO_VULKAN_SDK_LATEST", vulkanVersion.sdkLatest);
         envVars.put("AERO_VULKAN_VERSION_REQUESTED", vulkanVersion.requestedLane);
         envVars.put("AERO_VULKAN_VERSION_DETECTED", vulkanVersion.detectedVersion);
         envVars.put("AERO_VULKAN_VERSION_EFFECTIVE", vulkanVersion.effectiveVersion);
@@ -1772,7 +1771,6 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                         "detected_version", vulkanVersion.detectedVersion,
                         "effective_version", vulkanVersion.effectiveVersion,
                         "effective_lane", vulkanVersion.effectiveLane,
-                        "sdk_latest", vulkanVersion.sdkLatest,
                         "reason", vulkanVersion.reason,
                         "driver_id", versionProbeDriverId,
                         "system_vulkan", useSystemVulkan ? "1" : "0"));
@@ -1790,7 +1788,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
         String maxDeviceMemory = graphicsDriverConfig.get("maxDeviceMemory");
         if (maxDeviceMemory != null && Integer.parseInt(maxDeviceMemory) > 0)
             envVars.put("WRAPPER_VMEM_MAX_SIZE", maxDeviceMemory);
-        
+
         String presentMode = graphicsDriverConfig.get("presentMode");
         if (presentMode.contains("immediate")) {
             envVars.put("WRAPPER_MAX_IMAGE_COUNT", "1");
@@ -1883,7 +1881,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             }
         }
 
-        // Fallback to existing input handling
+        // degrade to existing input handling
         return (!inputControlsView.onKeyEvent(event) && !winHandler.onKeyEvent(event) && xServer.keyboard.onKeyEvent(event)) ||
                 (!ExternalController.isGameController(event.getDevice()) && super.dispatchKeyEvent(event));
     }
@@ -1999,7 +1997,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
             return 0;
         }
     }
-    
+
     private void extractWinComponentFiles() {
         Log.d("XServerDisplayActivity", "Extracting WinComponents");
         File rootDir = imageFs.getRootDir();

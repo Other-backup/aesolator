@@ -15,6 +15,7 @@ import com.winlator.cmod.core.MSLink;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.util.Arrays;
@@ -54,12 +55,18 @@ public class ContainerManager {
 
         for (File file : files) {
             if (!file.isDirectory()) continue;
-            if (!file.getName().startsWith(ImageFs.USER + "-")) continue;
+            String dirName = file.getName();
+            if (!dirName.startsWith(ImageFs.USER + "-")) continue;
+            Integer containerId = parseContainerIdFromHomeDirName(dirName);
+            if (containerId == null) {
+                Log.d("ContainerManager", "Ignoring auxiliary container home: " + dirName);
+                continue;
+            }
             try {
                 Container container = new Container(
-                        Integer.parseInt(file.getName().replace(ImageFs.USER + "-", "")), this
+                        containerId, this
                 );
-                container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
+                container.setRootDir(file);
                 File configFile = container.getConfigFile();
                 if (!configFile.isFile()) {
                     if (tryRecoverOrphanContainer(container, file)) {
@@ -82,6 +89,19 @@ public class ContainerManager {
             } catch (JSONException | NumberFormatException | NullPointerException e) {
                 Log.e("ContainerManager", "Skipping broken container: " + file.getName(), e);
             }
+        }
+    }
+
+    private Integer parseContainerIdFromHomeDirName(String dirName) {
+        if (dirName == null) return null;
+        String prefix = ImageFs.USER + "-";
+        if (!dirName.startsWith(prefix)) return null;
+        String suffix = dirName.substring(prefix.length());
+        if (suffix.isEmpty()) return null;
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -172,6 +192,8 @@ public class ContainerManager {
             if (!profileFile.isFile()) continue;
             ContentProfile profile = manager.readProfile(profileFile);
             if (profile == null || profile.type != type) continue;
+            File runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(installRoot);
+            if (runtimeRoot == null || !WineUtils.hasRuntimePayload(runtimeRoot)) continue;
             String dirName = installRoot.getName();
             int dashIndex = dirName.lastIndexOf('-');
             if (dashIndex <= 0 || dashIndex >= dirName.length() - 1) continue;
@@ -209,10 +231,23 @@ public class ContainerManager {
 
 
     public void activateContainer(Container container) {
-        container.setRootDir(new File(homeDir, ImageFs.USER+"-"+container.id));
-        File file = new File(homeDir, ImageFs.USER);
-        file.delete();
-        FileUtils.symlink("./"+ImageFs.USER+"-"+container.id, file.getPath());
+        activateContainerHome(homeDir, container);
+    }
+
+    public static File resolveContainerHomeDir(File homeDir, int containerId) {
+        return new File(homeDir, ImageFs.USER + "-" + containerId);
+    }
+
+    public static void activateContainerHome(File homeDir, Container container) {
+        if (homeDir == null || container == null) return;
+
+        File targetDir = resolveContainerHomeDir(homeDir, container.id);
+        container.setRootDir(targetDir);
+        if (!targetDir.exists()) targetDir.mkdirs();
+
+        File activeHomeLink = new File(homeDir, ImageFs.USER);
+        FileUtils.delete(activeHomeLink);
+        FileUtils.symlink("./" + ImageFs.USER + "-" + container.id, activeHomeLink.getPath());
     }
 
     public void createContainerAsync(final JSONObject data, ContentsManager contentsManager, Callback<Container> callback) {
@@ -265,6 +300,8 @@ public class ContainerManager {
                 return null;
             }
 
+            container.setNeedsUnpacking(false);
+
 //            // Extract the selected graphics driver files
 //            String driverVersion = container.getGraphicsDriverVersion();
 //            if (!extractGraphicsDriverFiles(driverVersion, containerDir, null)) {
@@ -313,6 +350,7 @@ public class ContainerManager {
         dstContainer.setBox64Preset(srcContainer.getBox64Preset());
         dstContainer.setDesktopTheme(srcContainer.getDesktopTheme());
         dstContainer.setWineVersion(srcContainer.getWineVersion());
+        dstContainer.setNeedsUnpacking(false);
         dstContainer.saveData();
 
         maxContainerId++;
@@ -361,10 +399,17 @@ public class ContainerManager {
     }
 
     private void extractCommonDlls(WineInfo wineInfo, String srcName, String dstName, File containerDir, OnExtractFileListener onExtractFileListener) throws JSONException {
-        File srcDir = new File(wineInfo.path + "/lib/wine/" + srcName);
+        File runtimeRoot = wineInfo.path == null ? null : new File(wineInfo.path);
+        File wineLibDir = WineUtils.resolveRuntimeWineLibDir(runtimeRoot);
+        File srcDir = wineLibDir == null ? null : new File(wineLibDir, srcName);
 
-        if (!srcDir.isDirectory()) {
-            throw new JSONException("Missing Wine runtime directory: " + srcDir.getAbsolutePath());
+        if (srcDir == null || !srcDir.isDirectory()) {
+            String expectedDir = srcDir != null
+                    ? srcDir.getAbsolutePath()
+                    : runtimeRoot == null
+                    ? ""
+                    : new File(runtimeRoot, "lib/wine/" + srcName).getAbsolutePath();
+            throw new JSONException("Missing Wine runtime directory: " + expectedDir);
         }
 
         File[] srcfiles = srcDir.listFiles(file -> file.isFile());
@@ -374,8 +419,10 @@ public class ContainerManager {
 
         for (File file : srcfiles) {
             String dllName = file.getName();
-            if (dllName.equals("iexplore.exe") && wineInfo.isArm64EC() && srcName.equals("aarch64-windows"))
-                file = new File(wineInfo.path + "/lib/wine/" + "i386-windows/iexplore.exe");
+            if (dllName.equals("iexplore.exe") && wineInfo.isArm64EC() && srcName.equals("aarch64-windows")) {
+                File wow32Iexplore = wineLibDir == null ? null : new File(wineLibDir, "i386-windows/iexplore.exe");
+                if (wow32Iexplore != null && wow32Iexplore.isFile()) file = wow32Iexplore;
+            }
             if (dllName.equals("tabtip.exe") || dllName.equals("icu.dll"))
                 continue;
             File dstFile = new File(containerDir, ".wine/drive_c/windows/" + dstName + "/" + dllName);
@@ -393,14 +440,13 @@ public class ContainerManager {
             return false;
         }
 
-        File tzstFile = new File(wineInstallPath, "prefixPack.tzst");
-        if (tzstFile.isFile()) {
-            return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, tzstFile, destinationDir);
-        }
-
-        File txzFile = new File(wineInstallPath, "prefixPack.txz");
-        if (txzFile.isFile()) {
-            return TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, txzFile, destinationDir);
+        File runtimeRoot = new File(wineInstallPath);
+        File prefixPack = WineUtils.resolveRuntimePrefixPack(runtimeRoot);
+        if (prefixPack != null && prefixPack.isFile()) {
+            TarCompressorUtils.Type archiveType = prefixPack.getName().endsWith(".tzst")
+                    ? TarCompressorUtils.Type.ZSTD
+                    : TarCompressorUtils.Type.XZ;
+            return TarCompressorUtils.extract(archiveType, prefixPack, destinationDir);
         }
 
         return false;

@@ -9,8 +9,13 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.ManifestComponentHelper;
+import com.winlator.cmod.contents.ManifestEntry;
+import com.winlator.cmod.contents.ManifestInstallResult;
+import com.winlator.cmod.contents.ManifestInstaller;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
@@ -29,14 +34,14 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
     }
 
     @Override
-    public boolean isSatisfied(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+    public boolean isSatisfied(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+        Context context = dependencyContext.getContext();
         String selectedWine = resolveWineIdentifier(container, shortcut);
         if (selectedWine == null || selectedWine.trim().isEmpty()) {
             return true;
         }
 
-        ContentsManager manager = new ContentsManager(context);
-        manager.syncContents();
+        ContentsManager manager = dependencyContext.getContentsManager();
         String requestedRuntimeModel = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
         String inferredRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(selectedWine.trim());
         if (!inferredRuntimeModel.isEmpty()) {
@@ -45,18 +50,16 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
         String canonicalEntry = manager.resolveBestRuntimeEntry(selectedWine.trim(), requestedRuntimeModel);
         ContentProfile profile = manager.resolveBestRuntimeProfile(canonicalEntry, requestedRuntimeModel);
         if (profile != null && profile.isWineProtonFamily()) {
-            return hasValidProfileLayout(context, profile);
+            return hasValidProfileLayout(context, manager, profile);
         }
 
-        File fallbackOptPath = new File(ImageFs.find(context).getRootDir(), "opt/" + canonicalEntry);
+        File fallbackOptPath = WineUtils.resolveCanonicalRuntimeRoot(new File(ImageFs.find(context).getRootDir(), "opt/" + canonicalEntry));
         if (fallbackOptPath.isDirectory()) {
-            File wineBinary = new File(fallbackOptPath, "bin/wine");
-            return wineBinary.isFile();
+            return WineUtils.hasRuntimePayload(fallbackOptPath);
         }
 
         File mainOptPath = ImageFs.find(context).getMainWineDir();
-        File mainWineBinary = new File(mainOptPath, "bin/wine");
-        if (mainWineBinary.isFile()) {
+        if (WineUtils.hasRuntimePayload(mainOptPath)) {
             if (!WineInfo.isMainWineVersion(canonicalEntry)) {
                 Log.w(TAG, "Custom runtime missing, falling back to canonical main wine: " + canonicalEntry);
             }
@@ -67,21 +70,41 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
     }
 
     @Override
-    public String getLoadingMessage(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+    public String getLoadingMessage(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
         return "Validating Wine/Proton runtime package";
     }
 
     @Override
-    public void install(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
+    public void install(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
+        Context context = dependencyContext.getContext();
         String selectedWine = resolveWineIdentifier(container, shortcut);
-        ContentsManager manager = new ContentsManager(context);
-        manager.syncContents();
+        ContentsManager manager = dependencyContext.getContentsManager();
         String requestedRuntimeModel = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
         String inferredRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(selectedWine);
         if (!inferredRuntimeModel.isEmpty()) {
             requestedRuntimeModel = inferredRuntimeModel;
         }
         String canonicalEntry = manager.resolveBestRuntimeEntry(selectedWine, requestedRuntimeModel);
+        ContentProfile.ContentType manifestType = resolveManifestType(manager, canonicalEntry, selectedWine);
+        ManifestEntry entry = ManifestComponentHelper.findManifestEntryForTypeVersion(
+                dependencyContext.getManifest(),
+                manifestType,
+                canonicalEntry,
+                requestedRuntimeModel
+        );
+        if (entry != null) {
+            callbacks.setLoadingMessage("Installing runtime package from manifest: " + canonicalEntry);
+            callbacks.setLoadingProgress(0f);
+            ManifestInstallResult result = ManifestInstaller.downloadAndInstallContent(context, entry, manifestType, callbacks::setLoadingProgress);
+            manager.syncContents();
+            if (result.success) {
+                return;
+            }
+            throw new IllegalStateException(result.message.isEmpty()
+                    ? "Runtime package install failed: " + canonicalEntry
+                    : result.message);
+        }
+
         callbacks.setLoadingMessage("Missing Wine/Proton runtime package: " + canonicalEntry);
         callbacks.setLoadingProgress(0f);
         throw new IllegalStateException("Runtime package is missing or incomplete: " + canonicalEntry);
@@ -95,19 +118,29 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
         return value == null ? "" : value.trim();
     }
 
-    private boolean hasValidProfileLayout(Context context, ContentProfile profile) {
+    private boolean hasValidProfileLayout(Context context, ContentsManager manager, ContentProfile profile) {
+        if (profile != null && profile.isWineProtonFamily()) {
+            return manager.isInstalledProfileUsable(profile);
+        }
+
         File installDir = ContentsManager.getInstallDir(context, profile);
         if (!installDir.isDirectory()) return false;
 
         File profileJson = new File(installDir, ContentsManager.PROFILE_NAME);
         if (!profileJson.isFile()) return false;
 
-        if (!profile.isWineProtonFamily()) return true;
+        return true;
+    }
 
-        File binDir = new File(installDir, profile.wineBinPath == null ? "" : profile.wineBinPath);
-        File libDir = new File(installDir, profile.wineLibPath == null ? "" : profile.wineLibPath);
-        File prefixPack = new File(installDir, profile.winePrefixPack == null ? "" : profile.winePrefixPack);
-
-        return binDir.isDirectory() && libDir.isDirectory() && prefixPack.isFile();
+    private ContentProfile.ContentType resolveManifestType(ContentsManager manager, String canonicalEntry, String selectedWine) {
+        ContentProfile resolvedProfile = manager.getProfileByEntryName(canonicalEntry);
+        if (resolvedProfile != null && resolvedProfile.type != null) {
+            return resolvedProfile.type;
+        }
+        String combined = ((canonicalEntry == null ? "" : canonicalEntry) + " " + (selectedWine == null ? "" : selectedWine))
+                .toLowerCase();
+        return combined.contains("proton")
+                ? ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                : ContentProfile.ContentType.CONTENT_TYPE_WINE;
     }
 }

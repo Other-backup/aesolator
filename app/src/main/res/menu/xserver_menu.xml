@@ -33,6 +33,10 @@
             android:icon="@drawable/ae_icon_task_manager"
             android:title="@string/task_manager" />
         <item
+            android:id="@+id/main_menu_active_windows"
+            android:icon="@drawable/ae_icon_front"
+            android:title="@string/active_windows" />
+        <item
             android:id="@+id/main_menu_magnifier"
             android:icon="@drawable/ae_icon_magnifier"
             android:title="@string/magnifier" />

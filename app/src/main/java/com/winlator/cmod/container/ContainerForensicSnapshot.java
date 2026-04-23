@@ -34,7 +34,7 @@ public final class ContainerForensicSnapshot {
                 obj.put("runtime_drift_fields", normalized.changedFieldsJson());
             }
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return obj;
     }
 }

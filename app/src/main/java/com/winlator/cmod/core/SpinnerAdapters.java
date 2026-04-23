@@ -42,6 +42,7 @@ public final class SpinnerAdapters {
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
                 styleText(view, textColor, true);
+                view.setBackgroundColor(Color.TRANSPARENT);
                 return view;
             }
 
@@ -79,6 +80,7 @@ public final class SpinnerAdapters {
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
                 styleText(view, textColor, true);
+                view.setBackgroundColor(Color.TRANSPARENT);
                 return view;
             }
 
@@ -105,6 +107,32 @@ public final class SpinnerAdapters {
 
     public static <T> ArrayAdapter<T> createGeneric(Context context, T[] values) {
         return createGeneric(context, isDarkMode(context), values);
+    }
+
+    public static <T> ArrayAdapter<T> createRuntimeGeneric(Context context, List<T> values) {
+        final int textColor = ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text);
+        final int dropdownBackground = R.drawable.surface_runtime_dropdown_item_selector;
+        ArrayAdapter<T> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                styleText(view, textColor, true);
+                view.setBackgroundColor(Color.TRANSPARENT);
+                return view;
+            }
+
+            @NonNull
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                styleText(view, textColor, false);
+                view.setBackgroundResource(dropdownBackground);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_compact);
+        return adapter;
     }
 
     public static boolean isDarkMode(Context context) {
@@ -141,6 +169,51 @@ public final class SpinnerAdapters {
     public static void applySurface(Spinner spinner) {
         if (spinner == null) return;
         applySurface(spinner, isDarkMode(spinner.getContext()));
+    }
+
+    public static void applyRuntimeSurface(Spinner spinner) {
+        if (spinner == null) return;
+        spinner.setBackgroundResource(R.drawable.surface_runtime_combo_box);
+        spinner.setPopupBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+    }
+
+    public static ArrayAdapter<String> createRuntime(Context context, List<String> values) {
+        final int textColor = ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text);
+        final int dropdownBackground = R.drawable.surface_runtime_dropdown_item_selector;
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_compact, new ArrayList<>(values)) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                styleText(view, textColor, true);
+                view.setBackgroundColor(Color.TRANSPARENT);
+                return view;
+            }
+
+            @NonNull
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                styleText(view, textColor, false);
+                view.setBackgroundResource(dropdownBackground);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_compact);
+        return adapter;
+    }
+
+    public static void applyRuntimeSurface(MultiSelectionComboBox comboBox) {
+        if (comboBox == null) return;
+        comboBox.setBackgroundResource(R.drawable.surface_runtime_combo_box);
+        comboBox.setTextColor(ContextCompat.getColor(comboBox.getContext(), R.color.surface_runtime_taskmgr_text));
+        comboBox.setSingleLine(true);
+        comboBox.setMaxLines(1);
+        comboBox.setHorizontallyScrolling(true);
+        comboBox.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        comboBox.setMarqueeRepeatLimit(-1);
+        comboBox.setSelected(true);
+        comboBox.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, null, null);
     }
 
     public static void applySurfaceRecursively(View view, boolean isDarkMode) {

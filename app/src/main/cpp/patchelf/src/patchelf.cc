@@ -233,7 +233,7 @@ struct ElfType
 
     bool is32Bit = contents[EI_CLASS] == ELFCLASS32;
 
-    // FIXME: endianness
+    // NOTE: endianness
     return ElfType { is32Bit, is32Bit ? (reinterpret_cast<Elf32_Ehdr *>(contents))->e_machine : (reinterpret_cast<Elf64_Ehdr *>(contents))->e_machine };
 }
 
@@ -1286,7 +1286,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 auto newIndex = getSectionIndex(section); // inefficient
                 //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
-                /* Rewrite st_value.  FIXME: we should do this for all
+                /* Rewrite st_value.  NOTE: we should do this for all
                    types, but most don't actually change. */
                 if (ELF32_ST_TYPE(rdi(sym->st_info)) == STT_SECTION)
                     wri(sym->st_value, rdi(shdrs.at(newIndex).sh_addr));

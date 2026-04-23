@@ -38,15 +38,20 @@ import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
+import com.winlator.cmod.container.GraphicsDrivers;
 import com.winlator.cmod.contentdialog.AddEnvVarDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
+import com.winlator.cmod.contentdialog.MesaOpenGLConfigDialog;
 import com.winlator.cmod.contentdialog.ShortcutSettingsDialog;
+import com.winlator.cmod.contentdialog.VirGLConfigDialog;
+import com.winlator.cmod.contentdialog.VortekConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
@@ -58,6 +63,7 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.core.WineInfo;
@@ -98,6 +104,7 @@ public class ContainerDetailFragment extends Fragment {
     private PreloaderDialog preloaderDialog;
     private JSONArray gpuCards;
     private Callback<String> openDirectoryCallback;
+    private boolean runtimeSelectionRefreshQueued;
 
     private static boolean isDarkMode;
 
@@ -139,7 +146,10 @@ public class ContainerDetailFragment extends Fragment {
         try {
             gpuCards = new JSONArray(FileUtils.readString(getContext(), "gpu_cards.json"));
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.w("ContainerDetailFragment", "Failed to parse gpu_cards.json", e);
+            gpuCards = new JSONArray();
+        }
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
@@ -271,6 +281,21 @@ public class ContainerDetailFragment extends Fragment {
             loadWineVersionSpinner(view, sWineVersion, sBox64Version);
         }
         updateRuntimeSelectionUi(view);
+        if (isRuntimeSelectionAvailable(sWineVersion) || runtimeSelectionRefreshQueued) return;
+
+        runtimeSelectionRefreshQueued = true;
+        contentsManager.syncContentsAsync(() -> {
+            runtimeSelectionRefreshQueued = false;
+            if (!isAdded()) return;
+            View currentView = getView();
+            if (currentView == null) return;
+            Spinner currentWineVersion = currentView.findViewById(R.id.SWineVersion);
+            Spinner currentBox64Version = currentView.findViewById(R.id.SBox64Version);
+            if (currentWineVersion != null && currentBox64Version != null) {
+                loadWineVersionSpinner(currentView, currentWineVersion, currentBox64Version);
+            }
+            updateRuntimeSelectionUi(currentView);
+        });
     }
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
@@ -431,6 +456,9 @@ public class ContainerDetailFragment extends Fragment {
 
         final View vGraphicsDriverConfig = view.findViewById(R.id.BTGraphicsDriverConfig);
         vGraphicsDriverConfig.setTag(isEditMode() ? container.getGraphicsDriverConfig() : Container.DEFAULT_GRAPHICSDRIVERCONFIG);
+        final String oldGraphicsDriverConfig = vGraphicsDriverConfig.getTag() instanceof String
+                ? (String) vGraphicsDriverConfig.getTag()
+                : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
 
         loadGraphicsDriverSpinner(sGraphicsDriver, sDXWrapper, vGraphicsDriverConfig,
                 isEditMode() ? container.getGraphicsDriver() : Container.DEFAULT_GRAPHICS_DRIVER,
@@ -550,8 +578,7 @@ public class ContainerDetailFragment extends Fragment {
         FEXCorePresetManager.loadSpinner(sFEXCorePreset, isEditMode() ? container.getFEXCorePreset() : preferences.getString("fexcore_preset", FEXCorePreset.INTERMEDIATE));
 
         String selectedDriver = getSelectedText(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
-        List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), sGraphicsItemsList));
+        updateGraphicsDriverSpinner(context, sGraphicsDriver);
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
 
@@ -596,15 +623,20 @@ public class ContainerDetailFragment extends Fragment {
                 String name = etName.getText().toString();
                 String screenSize = getScreenSize(view);
                 String envVars = envVarsView.getEnvVars();
-                String graphicsDriver = getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
+                String selectedGraphicsDriver = getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
+                String graphicsDriver = Container.normalizeGraphicsDriver(selectedGraphicsDriver);
                 String graphicsDriverConfig = vGraphicsDriverConfig.getTag() instanceof String
                         ? (String) vGraphicsDriverConfig.getTag()
-                        : "";
-                HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
-                String graphicsDriverVersion = config.get("version");
-                if (graphicsDriverVersion == null || graphicsDriverVersion.trim().isEmpty()) {
-                    config.put("version", DefaultVersion.WRAPPER);
-                    graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
+                        : GraphicsDrivers.defaultConfig(graphicsDriver);
+                graphicsDriverConfig = GraphicsDrivers.sanitizeConfigShape(graphicsDriver, graphicsDriverConfig);
+                if (!GraphicsDrivers.usesKeyValueConfig(graphicsDriver)) {
+                    graphicsDriverConfig = Container.reconcileLegacyGraphicsConfig(selectedGraphicsDriver, graphicsDriverConfig);
+                    HashMap<String, String> config = GraphicsDrivers.parseConfig(graphicsDriver, graphicsDriverConfig);
+                    String graphicsDriverVersion = config.get("version");
+                    if (graphicsDriverVersion == null || graphicsDriverVersion.trim().isEmpty()) {
+                        config.put("version", new AdrenotoolsManager(context).getPreferredWrapperDriverId());
+                        graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
+                    }
                 }
                 String dxwrapper = getSelectedIdentifier(sDXWrapper, Container.DEFAULT_DXWRAPPER);
                 String dxwrapperConfig = vDXWrapperConfig.getTag() instanceof String
@@ -637,10 +669,13 @@ public class ContainerDetailFragment extends Fragment {
                     requestedRuntimeModel = selectedRuntimeProfile.getRuntimeModel();
                 }
                 WineInfo selectedWineInfo = WineInfo.fromIdentifier(context, contentsManager, selectedWineVersion, requestedRuntimeModel);
-                boolean runtimePathExists = selectedWineInfo.path != null && new File(selectedWineInfo.path).exists();
+                File selectedRuntimeRoot = selectedWineInfo.path == null || selectedWineInfo.path.trim().isEmpty()
+                        ? null
+                        : new File(selectedWineInfo.path);
+                boolean runtimeReady = selectedRuntimeRoot != null && WineUtils.hasRuntimePayload(selectedRuntimeRoot);
                 ForensicLogger.logEvent(
                         context,
-                        runtimePathExists ? "info" : "warn",
+                        runtimeReady ? "info" : "warn",
                         "NEW_CONTAINER_RUNTIME_RESOLVE",
                         null,
                         "containers",
@@ -652,7 +687,8 @@ public class ContainerDetailFragment extends Fragment {
                                 "resolved_arch", selectedWineInfo.getArch(),
                                 "resolved_path", selectedWineInfo.path,
                                 "runtime_model", requestedRuntimeModel,
-                                "path_exists", runtimePathExists,
+                                "path_exists", selectedRuntimeRoot != null && selectedRuntimeRoot.exists(),
+                                "runtime_ready", runtimeReady,
                                 "profile_found", selectedRuntimeProfile != null,
                                 "profile_type", selectedRuntimeProfile != null && selectedRuntimeProfile.type != null
                                         ? selectedRuntimeProfile.type.toString()
@@ -661,7 +697,7 @@ public class ContainerDetailFragment extends Fragment {
                                 "profile_ver_code", selectedRuntimeProfile != null ? selectedRuntimeProfile.verCode : -1
                         )
                 );
-                if (!runtimePathExists) {
+                if (!runtimeReady) {
                     AppUtils.showToast(context, R.string.install_runtime_before_container);
                     return;
                 }
@@ -756,6 +792,15 @@ public class ContainerDetailFragment extends Fragment {
                     container.putExtra("upscalerBackend", cbContainerFgEnable.isChecked() ? "mobfgsr" : null);
                     container.saveData();
                     saveWineRegistryKeys(view);
+                    boolean requireRestart = GraphicsDrivers.isMediaTekWrapperFamily(graphicsDriver)
+                            && VortekConfigDialog.isRequireRestart(oldGraphicsDriverConfig, graphicsDriverConfig);
+                    if (requireRestart) {
+                        ContentDialog.confirm(
+                                context,
+                                R.string.the_settings_have_been_changed_do_you_want_to_restart_the_app,
+                                () -> AppUtils.restartApplication(context)
+                        );
+                    }
                     getActivity().onBackPressed();
                 } else {
                     // Create new container with specified properties
@@ -765,7 +810,7 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("envVars", envVars);
                     data.put("cpuList", cpuList);
                     data.put("cpuListWoW64", cpuListWoW64);
-                    data.put("graphicsDriver", graphicsDriver);
+                    data.put("graphicsDriver", Container.normalizeGraphicsDriver(graphicsDriver));
                     data.put("graphicsDriverConfig", graphicsDriverConfig);
                     data.put("dxwrapper", dxwrapper);
                     data.put("dxwrapperConfig", dxwrapperConfig);
@@ -806,6 +851,7 @@ public class ContainerDetailFragment extends Fragment {
                             return;
                         }
                         this.container = container;
+                        syncPendingWallpaperToContainerIfNeeded(desktopTheme, container);
                         saveWineRegistryKeys(view);
                         Activity activity = getActivity();
                         if (activity != null) {
@@ -839,6 +885,20 @@ public class ContainerDetailFragment extends Fragment {
         }
     }
 
+    private void syncPendingWallpaperToContainerIfNeeded(String desktopTheme, Container targetContainer) {
+        if (!isAdded() || targetContainer == null || desktopTheme == null || desktopTheme.trim().isEmpty()) return;
+        WineThemeManager.ThemeInfo themeInfo = new WineThemeManager.ThemeInfo(desktopTheme);
+        if (themeInfo.backgroundType != WineThemeManager.BackgroundType.IMAGE) return;
+        File sourceWallpaper = WineThemeManager.getUserWallpaperFile(ImageFs.find(requireContext()).getRootDir());
+        if (!sourceWallpaper.isFile()) return;
+        File targetWallpaper = WineThemeManager.getUserWallpaperFile(targetContainer.getRootDir());
+        File parent = targetWallpaper.getParentFile();
+        if (parent != null && !parent.isDirectory()) {
+            parent.mkdirs();
+        }
+        FileUtils.copy(sourceWallpaper, targetWallpaper);
+    }
+
     private void createWineConfigurationTab(View view) {
         Context context = getContext();
 
@@ -846,6 +906,10 @@ public class ContainerDetailFragment extends Fragment {
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
         sDesktopTheme.setSelection(desktopTheme.theme.ordinal());
         final ImagePickerView ipvDesktopBackgroundImage = view.findViewById(R.id.IPVDesktopBackgroundImage);
+        File targetWallpaperFile = isEditMode() && container != null
+                ? WineThemeManager.getUserWallpaperFile(container.getRootDir())
+                : WineThemeManager.getUserWallpaperFile(ImageFs.find(requireContext()).getRootDir());
+        ipvDesktopBackgroundImage.setTargetFile(targetWallpaperFile);
         final ColorPickerView cpvDesktopBackgroundColor = view.findViewById(R.id.CPVDesktopBackgroundColor);
         cpvDesktopBackgroundColor.setColor(desktopTheme.backgroundColor);
 
@@ -903,7 +967,9 @@ public class ContainerDetailFragment extends Fragment {
                 values.add(item.getString("name"));
             }
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.w("ContainerDetailFragment", "Failed to populate GPU card spinner", e);
+        }
 
         spinner.setAdapter(SpinnerAdapters.create(getContext(), resolveDarkMode(getContext()), values));
         spinner.setSelection(selectedPosition);
@@ -934,7 +1000,9 @@ public class ContainerDetailFragment extends Fragment {
 
         String desktopTheme = theme+","+type+","+cpvDesktopBackground.getColorAsString();
         if (type == WineThemeManager.BackgroundType.IMAGE) {
-            File userWallpaperFile = WineThemeManager.getUserWallpaperFile(getContext());
+            File userWallpaperFile = isEditMode() && container != null
+                    ? WineThemeManager.getUserWallpaperFile(container.getRootDir())
+                    : WineThemeManager.getUserWallpaperFile(ImageFs.find(requireContext()).getRootDir());
             desktopTheme += ","+(userWallpaperFile.isFile() ? userWallpaperFile.lastModified() : "0");
         }
         return desktopTheme;
@@ -967,12 +1035,26 @@ public class ContainerDetailFragment extends Fragment {
 
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
+        final String initialGraphicsDriver = GraphicsDrivers.getTopLevelSelectableDriver(selectedGraphicsDriver);
+        Object initialGraphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
+        String initialGraphicsDriverConfig = initialGraphicsDriverConfigTag instanceof String
+                ? (String) initialGraphicsDriverConfigTag
+                : GraphicsDrivers.defaultConfig(selectedGraphicsDriver);
+        vGraphicsDriverConfig.setTag(
+                GraphicsDrivers.migrateToUnifiedTopLevelConfig(selectedGraphicsDriver, initialGraphicsDriverConfig)
+        );
 
         // Update the spinner with the available graphics driver options
         updateGraphicsDriverSpinner(context, sGraphicsDriver);
 
         Runnable update = () -> {
-            String graphicsDriver = getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER);
+            String graphicsDriver = Container.normalizeGraphicsDriver(getSelectedIdentifier(sGraphicsDriver, Container.DEFAULT_GRAPHICS_DRIVER));
+            Object graphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
+            String graphicsDriverConfig = graphicsDriverConfigTag instanceof String
+                    ? (String) graphicsDriverConfigTag
+                    : GraphicsDrivers.defaultConfig(graphicsDriver);
+            graphicsDriverConfig = GraphicsDrivers.sanitizeConfigShape(graphicsDriver, graphicsDriverConfig);
+            vGraphicsDriverConfig.setTag(graphicsDriverConfig);
 
             // Update the DXWrapper spinner
             ArrayList<String> items = new ArrayList<>();
@@ -985,7 +1067,17 @@ public class ContainerDetailFragment extends Fragment {
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
                 try {
-                    new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, null).show();
+                    if (GraphicsDrivers.isVortek(graphicsDriver)) {
+                        new VortekConfigDialog(vGraphicsDriverConfig).show();
+                    } else if (GraphicsDrivers.isVirgl(graphicsDriver)) {
+                        new VirGLConfigDialog(vGraphicsDriverConfig).show();
+                    } else if (GraphicsDrivers.isMesaOpenGlBridge(graphicsDriver)) {
+                        new MesaOpenGLConfigDialog(vGraphicsDriverConfig, graphicsDriver).show();
+                    } else if (GraphicsDrivers.isGladio(graphicsDriver)) {
+                        new VortekConfigDialog(vGraphicsDriverConfig, graphicsDriver).show();
+                    } else {
+                        new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, null).show();
+                    }
                 } catch (Throwable t) {
                     Log.e(TAG, "Failed to open graphics driver config dialog", t);
                     ForensicLogger.error(
@@ -1017,7 +1109,7 @@ public class ContainerDetailFragment extends Fragment {
         });
 
         // Set the spinner's initial selection
-        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, selectedGraphicsDriver);
+        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, initialGraphicsDriver);
         update.run();
     }
 
@@ -1297,30 +1389,14 @@ public class ContainerDetailFragment extends Fragment {
                 embeddedCount++;
             }
         }
-        List<ContentProfile> wineProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE);
-        int localWineCount = 0;
-        if (wineProfiles != null) {
-            for (ContentProfile profile : wineProfiles) {
-                if (profile == null || !profile.locallyInstalled) continue;
-                String runtimeEntry = contentsManager.resolveBestRuntimeEntry(ContentsManager.getEntryName(profile));
-                if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
-                    wineVersionSet.add(runtimeEntry);
-                }
-                localWineCount++;
-            }
-        }
-        List<ContentProfile> protonProfiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON);
-        int localProtonCount = 0;
-        if (protonProfiles != null) {
-            for (ContentProfile profile : protonProfiles) {
-                if (profile == null || !profile.locallyInstalled) continue;
-                String runtimeEntry = contentsManager.resolveBestRuntimeEntry(ContentsManager.getEntryName(profile));
-                if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
-                    wineVersionSet.add(runtimeEntry);
-                }
-                localProtonCount++;
-            }
-        }
+        wineVersionSet.addAll(contentsManager.getInstalledRuntimeEntries(
+                null,
+                true,
+                ContentProfile.ContentType.CONTENT_TYPE_WINE,
+                ContentProfile.ContentType.CONTENT_TYPE_PROTON
+        ));
+        int localWineCount = contentsManager.countInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE, true);
+        int localProtonCount = contentsManager.countInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON, true);
         ArrayList<String> wineVersions = new ArrayList<>(wineVersionSet);
         boolean hasWineVersion = !wineVersions.isEmpty();
         if (!hasWineVersion) {
@@ -1391,10 +1467,7 @@ public class ContainerDetailFragment extends Fragment {
     }
 
     public static void updateGraphicsDriverSpinner(Context context, Spinner spinner) {
-        String[] originalItems = context.getResources().getStringArray(R.array.graphics_driver_entries);
-        List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
-
-        // Set the adapter with the combined list
+        List<String> itemList = GraphicsDrivers.getSelectableEntries(context);
         spinner.setAdapter(SpinnerAdapters.create(context, resolveDarkMode(context), itemList));
     }
 
@@ -1415,7 +1488,7 @@ public class ContainerDetailFragment extends Fragment {
         List<ContentProfile> profiles = manager.getProfiles(
                 isArm64EC ? ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64 : ContentProfile.ContentType.CONTENT_TYPE_BOX64
         );
-        appendInstalledContentVersions(itemList, profiles);
+        appendInstalledContentVersions(itemList, manager, profiles);
 
         boolean hasVersions = !itemList.isEmpty();
         if (!hasVersions) {
@@ -1441,12 +1514,9 @@ public class ContainerDetailFragment extends Fragment {
             if (imageFs == null) return false;
             File wineDir = WineInfo.isMainWineVersion(version)
                     ? imageFs.getMainWineDir()
-                    : new File(imageFs.getRootDir(), "opt/" + version);
+                    : WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "opt/" + version));
             if (!wineDir.isDirectory()) return false;
-            File wineBin = new File(wineDir, "bin/wine");
-            File wine64Bin = new File(wineDir, "bin/wine64");
-            File wineLib = new File(wineDir, "lib/wine");
-            return wineBin.isFile() || wine64Bin.isFile() || wineLib.isDirectory();
+            return WineUtils.hasRuntimePayload(wineDir);
         } catch (Exception ignored) {
             return false;
         }
@@ -1456,10 +1526,10 @@ public class ContainerDetailFragment extends Fragment {
         return FileUtils.getSize(context, assetPath) > 0;
     }
 
-    private static void appendInstalledContentVersions(List<String> targetList, List<ContentProfile> profiles) {
+    private static void appendInstalledContentVersions(List<String> targetList, ContentsManager manager, List<ContentProfile> profiles) {
         if (profiles == null) return;
         for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
+            if (profile == null || manager == null || !manager.isInstalledProfileUsable(profile)) continue;
             if (profile.verName == null || profile.verName.trim().isEmpty()) continue;
             if (!targetList.contains(profile.verName)) {
                 targetList.add(profile.verName);

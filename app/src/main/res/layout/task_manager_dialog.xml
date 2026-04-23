@@ -1,264 +1,146 @@
 <?xml version="1.0" encoding="utf-8"?>
-<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:padding="4dp">
+    android:orientation="vertical">
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:id="@+id/LLTaskManagerBody"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="560dp"
+            android:id="@+id/LLTabLinuxProcesses"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:background="@drawable/surface_card_background"
-            android:tag="theme_card"
+            android:layout_weight="1"
+            android:layout_marginEnd="2dp"
+            android:gravity="top"
             android:orientation="vertical"
-            android:padding="12dp">
-
-            <com.google.android.material.tabs.TabLayout
-                android:id="@+id/TabLayoutProcessScope"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/tab_layout_background"
-                app:tabGravity="fill"
-                app:tabMode="fixed">
-
-                <com.google.android.material.tabs.TabItem
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/task_manager_tab_windows" />
-
-                <com.google.android.material.tabs.TabItem
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/task_manager_tab_linux" />
-            </com.google.android.material.tabs.TabLayout>
+            android:padding="0dp">
 
             <LinearLayout
-                android:id="@+id/LLTabWindowsProcesses"
+                android:id="@+id/LLLinuxProcessSurface"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <EditText
-                        android:id="@+id/ETWindowsSearch"
-                        style="@style/EditText"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_weight="1"
-                        android:hint="@string/task_manager_windows_search_hint"
-                        android:inputType="text"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:textSize="14sp" />
-
-                    <Spinner
-                        android:id="@+id/SWindowsSort"
-                        style="@style/ComboBox"
-                        android:layout_width="160dp"
-                        android:layout_height="36dp"
-                        android:layout_marginStart="8dp"
-                        android:entries="@array/task_manager_windows_sort_entries" />
-                </LinearLayout>
-
-                <CheckBox
-                    android:id="@+id/CBWindowsWindowedOnly"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="@string/task_manager_windows_only_windowed" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/BTWindowsFilterAll"
-                        style="@style/ButtonNeutral"
-                        android:layout_width="0dp"
-                        android:layout_height="32dp"
-                        android:layout_weight="1"
-                        android:minHeight="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/task_manager_filter_all"
-                        android:textSize="12sp" />
-
-                    <Button
-                        android:id="@+id/BTWindowsFilterWow64"
-                        style="@style/ButtonNeutral"
-                        android:layout_width="0dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:minHeight="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/task_manager_filter_wow64"
-                        android:textSize="12sp" />
-
-                    <Button
-                        android:id="@+id/BTWindowsFilterArm64ec"
-                        style="@style/ButtonNeutral"
-                        android:layout_width="0dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:minHeight="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/task_manager_filter_arm64ec"
-                        android:textSize="12sp" />
-
-                    <Button
-                        android:id="@+id/BTWindowsFilterNative"
-                        style="@style/ButtonNeutral"
-                        android:layout_width="0dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:minHeight="0dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/task_manager_filter_native"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/LLTableHead"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:text="@string/process_name" />
-
-                    <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="60dp"
-                        android:text="@string/pid" />
-
-                    <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="110dp"
-                        android:text="@string/memory" />
-
-                    <View
-                        style="@style/TableHeadBackground"
-                        android:layout_width="80dp" />
-                </LinearLayout>
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:minHeight="220dp">
-
-                    <ScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent">
-
-                        <LinearLayout
-                            android:id="@+id/LLProcessList"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical" />
-                    </ScrollView>
-
-                    <TextView
-                        android:id="@+id/TVEmptyWindowsText"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:text="@string/no_items_to_display"
-                        android:visibility="gone" />
-                </FrameLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/LLTabLinuxProcesses"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
+                android:background="@drawable/surface_runtime_taskmgr_background"
                 android:orientation="vertical"
-                android:visibility="gone">
+                android:padding="1dp">
 
-                <CheckBox
-                    android:id="@+id/CBLinuxRuntimeOnly"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/TVLinuxListTitle"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
-                    android:checked="true"
-                    android:text="@string/task_manager_linux_runtime_only" />
+                    android:background="@drawable/surface_runtime_taskmgr_header_background"
+                    android:paddingStart="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="4dp"
+                    android:text="@string/task_manager_linux_list_title"
+                    android:textColor="@color/surface_runtime_taskmgr_text"
+                    android:textSize="11.6sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:id="@+id/LLLinuxTableHead"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="0dp"
+                    android:background="@drawable/surface_runtime_taskmgr_header_background"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="3dp">
 
                     <TextView
-                        style="@style/TableHeadBackground"
+                        style="@style/TextView"
                         android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:text="@string/process_name" />
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2.55"
+                        android:ellipsize="end"
+                        android:gravity="start|center_vertical"
+                        android:maxLines="1"
+                        android:text="@string/task_manager_process_detail_header"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="56dp"
-                        android:text="@string/pid" />
+                        style="@style/TextView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0.95"
+                        android:gravity="center"
+                        android:text="@string/state"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="64dp"
-                        android:text="@string/cpu_short" />
+                        style="@style/TextView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0.86"
+                        android:gravity="center"
+                        android:text="@string/pid"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="90dp"
-                        android:text="@string/memory" />
+                        style="@style/TextView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0.8"
+                        android:gravity="center"
+                        android:text="@string/cpu_short"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        style="@style/TableHeadBackground"
-                        android:layout_width="110dp"
-                        android:text="@string/task_manager_io" />
+                        style="@style/TextView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.02"
+                        android:gravity="center"
+                        android:text="@string/memory"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        style="@style/TextView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.02"
+                        android:gravity="center"
+                        android:text="@string/task_manager_io"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <FrameLayout
+                    android:id="@+id/FLLinuxProcessViewport"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:minHeight="220dp">
+                    android:layout_marginTop="0dp"
+                    android:layout_marginBottom="1dp"
+                    android:layout_weight="1">
 
-                    <ScrollView
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/RVLinuxProcessList"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent">
-
-                        <LinearLayout
-                            android:id="@+id/LLLinuxProcessList"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical" />
-                    </ScrollView>
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:fadeScrollbars="false"
+                        android:paddingBottom="0dp"
+                        android:scrollbarStyle="outsideInset" />
 
                     <TextView
                         android:id="@+id/TVEmptyLinuxText"
@@ -266,41 +148,144 @@
                         android:layout_height="match_parent"
                         android:gravity="center"
                         android:text="@string/task_manager_linux_no_items"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="12sp"
                         android:visibility="gone" />
                 </FrameLayout>
             </LinearLayout>
         </LinearLayout>
 
         <ScrollView
-            android:layout_width="220dp"
+            android:id="@+id/SVTaskManagerSidebar"
+            android:layout_width="84dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="8dp">
+            android:layout_marginStart="1dp"
+            android:fadeScrollbars="false"
+            android:fillViewport="true"
+            android:scrollbarStyle="outsideInset">
 
             <LinearLayout
+                android:id="@+id/LLTaskManagerSidebarContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
                 <LinearLayout
+                android:id="@+id/LLSelectedLinuxProcessCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/surface_runtime_taskmgr_background"
+                android:orientation="vertical"
+                android:padding="4dp">
+
+                    <TextView
+                        android:id="@+id/TVSelectedLinuxProcessTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/task_manager_selected_process"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="11.4sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/TVSelectedLinuxProcessName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="10.2sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/TVSelectedLinuxProcessMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:maxLines="2"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="8.4sp" />
+
+                    <TextView
+                        android:id="@+id/TVSelectedLinuxProcessCommand"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="8.1sp" />
+
+                    <Button
+                        android:id="@+id/BTLinuxInspect"
+                        style="@style/ButtonInlineRuntimeNeutral"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="0dp"
+                        android:text="@string/task_manager_action_inspect" />
+
+                    <Button
+                        android:id="@+id/BTLinuxPauseResume"
+                        style="@style/ButtonInlineRuntimeNeutral"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="0dp"
+                        android:text="@string/task_manager_action_pause" />
+
+                    <Button
+                        android:id="@+id/BTLinuxTerminate"
+                        style="@style/ButtonInlineRuntimeNeutral"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="0dp"
+                        android:text="@string/task_manager_action_terminate" />
+
+                    <Button
+                        android:id="@+id/BTLinuxKill"
+                        style="@style/ButtonInlineRuntimePositive"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="0dp"
+                        android:text="@string/task_manager_action_kill" />
+
+                    <CheckBox
+                        android:id="@+id/CBLinuxRuntimeOnly"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:checked="true"
+                        android:text="@string/task_manager_linux_runtime_only"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/LLTaskManagerCpuCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/surface_card_background"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/surface_runtime_taskmgr_background"
                     android:orientation="vertical"
-                    android:padding="12dp"
-                    android:tag="theme_card">
+                    android:padding="4dp">
 
                     <TextView
                         android:id="@+id/TVCPUTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="?attr/colorControlNormal"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="11.8sp"
                         android:textStyle="bold" />
 
                     <LinearLayout
                         android:id="@+id/LLCPUInfo"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
                         android:orientation="vertical" />
                 </LinearLayout>
 
@@ -308,72 +293,111 @@
                     android:id="@+id/LLTaskManagerMemoryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/surface_card_background"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/surface_runtime_taskmgr_background"
                     android:orientation="vertical"
-                    android:padding="12dp"
-                    android:tag="theme_card">
+                    android:padding="4dp">
 
                     <TextView
                         android:id="@+id/TVMemoryTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="?attr/colorControlNormal"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="11.8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/TVMemoryInfo"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="10.2sp" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/LLTaskManagerTelemetryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/surface_card_background"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/surface_runtime_taskmgr_background"
                     android:orientation="vertical"
-                    android:padding="12dp"
-                    android:tag="theme_card">
+                    android:padding="4dp">
 
                     <TextView
                         android:id="@+id/TVHostTelemetryTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/task_manager_runtime_telemetry"
-                        android:textColor="?attr/colorControlNormal"
+                        android:textColor="@color/surface_runtime_taskmgr_text"
+                        android:textSize="11.8sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/TVHostLoadInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textSize="13sp" />
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="9.6sp" />
 
                     <TextView
                         android:id="@+id/TVHostNetInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textSize="13sp" />
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="9.6sp" />
 
                     <TextView
                         android:id="@+id/TVHostPressureInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textSize="13sp" />
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="9.6sp" />
 
                     <TextView
                         android:id="@+id/TVProcessCountersInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textSize="13sp" />
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/surface_runtime_taskmgr_muted"
+                        android:textSize="9.6sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/LLTaskManagerActionsCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/surface_runtime_taskmgr_background"
+                    android:orientation="vertical"
+                    android:padding="4dp">
+
+                    <Button
+                        android:id="@+id/BTRuntimeRunCommand"
+                        style="@style/ButtonInlineRuntimeNeutral"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        android:minHeight="0dp"
+                        android:text="@string/task_manager_run_command" />
+
+                    <Button
+                        android:id="@+id/BTRuntimeClose"
+                        style="@style/ButtonInlineRuntimeNeutral"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="0dp"
+                        android:text="@string/close" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
-</HorizontalScrollView>
+</LinearLayout>

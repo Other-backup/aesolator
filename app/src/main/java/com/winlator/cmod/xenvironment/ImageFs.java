@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,7 +14,14 @@ import java.util.Locale;
 
 public class ImageFs {
     public static final String ROOTFS_PROVIDER_GAMENATIVE = "gamenative";
+    public static final String ROOTFS_PROVIDER_WAIM = "waim";
+    public static final String ROOTFS_PROVIDER_MOZE = "moze";
+    public static final String ROOTFS_PROVIDER_ROOTFS_WINLATOR = "rootfs-winlator";
+    public static final String ROOTFS_PROVIDER_COMMUNITY = "community";
+    public static final String ROOTFS_PROVIDER_CUSTOM = "custom";
     public static final String ROOTFS_LAYOUT_UBUNTUFS = "ubuntufs";
+    public static final String ROOTFS_LAYOUT_IMAGEFS = "imagefs";
+    public static final String ROOTFS_LAYOUT_CUSTOM = "custom";
     public static final String USER = "xuser";
     public static final String HOME_PATH = "/home/"+USER;
     public static final String CACHE_PATH = HOME_PATH+"/.cache";
@@ -28,11 +36,8 @@ public class ImageFs {
 
     private ImageFs(File rootDir) {
         this.rootDir = rootDir;
-        winePath = resolveMainWineDir(rootDir).getPath();
-        home_path = rootDir + HOME_PATH;
-        cache_path = rootDir + CACHE_PATH;
-        config_path = rootDir + CONFIG_PATH;
-        wineprefix = rootDir + WINEPREFIX;
+        winePath = WineUtils.resolveCanonicalRuntimeRoot(resolveMainWineDir(rootDir)).getPath();
+        setHomeDir(resolveActiveHomeDir(rootDir));
     }
 
     private static File resolveMainWineDir(File rootDir) {
@@ -49,8 +54,35 @@ public class ImageFs {
         return new ImageFs(rootDir);
     }
 
+    private static File resolveActiveHomeDir(File rootDir) {
+        File defaultHomeDir = new File(rootDir, HOME_PATH);
+        try {
+            File canonicalHomeDir = defaultHomeDir.getCanonicalFile();
+            if (canonicalHomeDir.exists()) return canonicalHomeDir;
+        }
+        catch (IOException ignored) {
+        }
+        return defaultHomeDir;
+    }
+
+    public void setHomeDir(File homeDir) {
+        File resolvedHomeDir = homeDir != null ? homeDir : new File(rootDir, HOME_PATH);
+        home_path = resolvedHomeDir.getPath();
+        cache_path = new File(resolvedHomeDir, ".cache").getPath();
+        config_path = new File(resolvedHomeDir, ".config").getPath();
+        wineprefix = new File(resolvedHomeDir, ".wine").getPath();
+    }
+
     public File getRootDir() {
         return rootDir;
+    }
+
+    public File getHomeDir() {
+        return new File(home_path);
+    }
+
+    public File getWinePrefixDir() {
+        return new File(wineprefix);
     }
 
     public boolean isValid() {
@@ -115,9 +147,10 @@ public class ImageFs {
     public String getRootfsProvider() {
         File providerFile = getRootfsProviderFile();
         if (providerFile.exists()) {
-            return normalizeRootfsProvider(FileUtils.readLines(providerFile).get(0));
+            String normalized = normalizeRootfsProvider(FileUtils.readLines(providerFile).get(0));
+            if (!normalized.isEmpty()) return normalized;
         }
-        return ROOTFS_PROVIDER_GAMENATIVE;
+        return inferRootfsProvider();
     }
 
     public void createRootfsProviderFile(String provider) {
@@ -125,7 +158,8 @@ public class ImageFs {
         File file = getRootfsProviderFile();
         try {
             file.createNewFile();
-            FileUtils.writeString(file, normalizeRootfsProvider(provider));
+            String normalized = normalizeRootfsProvider(provider);
+            FileUtils.writeString(file, normalized.isEmpty() ? inferRootfsProvider() : normalized);
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -135,9 +169,10 @@ public class ImageFs {
     public String getRootfsLayout() {
         File layoutFile = getRootfsLayoutFile();
         if (layoutFile.exists()) {
-            return normalizeRootfsLayout(FileUtils.readLines(layoutFile).get(0));
+            String normalized = normalizeRootfsLayout(FileUtils.readLines(layoutFile).get(0));
+            if (!normalized.isEmpty()) return normalized;
         }
-        return ROOTFS_LAYOUT_UBUNTUFS;
+        return inferRootfsLayout();
     }
 
     public void createRootfsLayoutFile(String layout) {
@@ -145,7 +180,8 @@ public class ImageFs {
         File file = getRootfsLayoutFile();
         try {
             file.createNewFile();
-            FileUtils.writeString(file, normalizeRootfsLayout(layout));
+            String normalized = normalizeRootfsLayout(layout);
+            FileUtils.writeString(file, normalized.isEmpty() ? inferRootfsLayout() : normalized);
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -160,12 +196,48 @@ public class ImageFs {
         return ROOTFS_LAYOUT_UBUNTUFS.equalsIgnoreCase(getRootfsLayout());
     }
 
+    private String inferRootfsProvider() {
+        String normalizedVariant = getVariant() == null ? "" : getVariant().trim().toLowerCase(Locale.US);
+        if (normalizedVariant.contains("gamenative")) return ROOTFS_PROVIDER_GAMENATIVE;
+        return ROOTFS_PROVIDER_CUSTOM;
+    }
+
+    private String inferRootfsLayout() {
+        File usrBinDir = new File(rootDir, "usr/bin");
+        File usrEtcDir = new File(rootDir, "usr/etc");
+        File usrLibDir = new File(rootDir, "usr/lib");
+        File binDir = new File(rootDir, "bin");
+        File etcDir = new File(rootDir, "etc");
+        File libDir = new File(rootDir, "lib");
+        File lib64Dir = new File(rootDir, "lib64");
+        boolean imageFsSurface = (usrBinDir.isDirectory() || usrEtcDir.isDirectory() || usrLibDir.isDirectory())
+                && (getCompatTmpDir().exists()
+                || FileUtils.isSymlink(binDir)
+                || FileUtils.isSymlink(etcDir)
+                || FileUtils.isSymlink(libDir)
+                || FileUtils.isSymlink(lib64Dir));
+        if (imageFsSurface) return ROOTFS_LAYOUT_IMAGEFS;
+        if (binDir.exists() || etcDir.exists() || libDir.exists()) return ROOTFS_LAYOUT_UBUNTUFS;
+        return ROOTFS_LAYOUT_CUSTOM;
+    }
+
     private static String normalizeRootfsProvider(String provider) {
-        return ROOTFS_PROVIDER_GAMENATIVE;
+        String normalized = provider == null ? "" : provider.trim().toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return "";
+        if (normalized.contains("gamenative") || normalized.contains("game native")) return ROOTFS_PROVIDER_GAMENATIVE;
+        if (normalized.contains("waim")) return ROOTFS_PROVIDER_WAIM;
+        if (normalized.contains("moze") || normalized.contains("winlator-glibc")) return ROOTFS_PROVIDER_MOZE;
+        if (normalized.contains("rootfs-winlator")) return ROOTFS_PROVIDER_ROOTFS_WINLATOR;
+        if (normalized.contains("community")) return ROOTFS_PROVIDER_COMMUNITY;
+        return ROOTFS_PROVIDER_CUSTOM;
     }
 
     private static String normalizeRootfsLayout(String layout) {
-        return ROOTFS_LAYOUT_UBUNTUFS;
+        String normalized = layout == null ? "" : layout.trim().toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return "";
+        if (normalized.contains("ubuntufs") || normalized.contains("ubuntu")) return ROOTFS_LAYOUT_UBUNTUFS;
+        if (normalized.contains("imagefs")) return ROOTFS_LAYOUT_IMAGEFS;
+        return ROOTFS_LAYOUT_CUSTOM;
     }
 
     public String getWinePath() {
@@ -173,7 +245,10 @@ public class ImageFs {
     }
 
     public void setWinePath(String winePath) {
-        this.winePath = winePath;
+        File requestedRoot = winePath == null || winePath.trim().isEmpty()
+                ? resolveMainWineDir(rootDir)
+                : new File(winePath);
+        this.winePath = WineUtils.resolveCanonicalRuntimeRoot(requestedRoot).getPath();
     }
 
     public File getConfigDir() {
@@ -209,7 +284,7 @@ public class ImageFs {
     }
 
     public File getMainWineDir() {
-        return resolveMainWineDir(rootDir);
+        return WineUtils.resolveCanonicalRuntimeRoot(resolveMainWineDir(rootDir));
     }
 
     public File getTmpDir() {

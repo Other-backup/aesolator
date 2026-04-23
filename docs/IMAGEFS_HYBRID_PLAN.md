@@ -111,6 +111,11 @@ Local transfer status as of `2026-03-15`:
   `generateCompactContainerPattern()` helper adapted to the bridged main runtime
   path, so donor `container_pattern_gamenative` can be re-derived without
   assuming only one historical layout
+- rootfs provider/layout truth is no longer silently rewritten at launch when
+  `.winlator/.provider` or `.winlator/.layout` are missing:
+  `ImageFs` now infers provider/layout from live marker+payload truth first,
+  and launcher paths persist that inferred truth instead of pinning
+  `gamenative/ubuntufs` by default
 - donor overlays `redirect.tzst` and `extras.tzst` are now staged in local
   assets for later diffing and controlled deployment
 - local `imagefs.txz.02` is now explicitly classified as orphan baggage:

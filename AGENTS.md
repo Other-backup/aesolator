@@ -17,6 +17,127 @@ runtime-binding, documentation alignment, and repository contract integrity.
 - The canonical cross-repo description of these modes lives in
   `docs/CODEX_OPERATING_CONTRACT.md`.
 
+## Master Engineering Directive
+
+- The hard engineering directive for this repository lives in
+  `docs/MASTER_ENGINEERING_DIRECTIVE.md` and is summarized in
+  `docs/CODEX_OPERATING_CONTRACT.md`.
+- The Black Diamond layer from the workspace root
+  `.codex/rules/OMEGA_BLACK_DIAMOND_MONOLITH.md` is mandatory when app work
+  participates in Chapter 2 donor transfer, graphics/runtime routing, package
+  truth, or device-proof closure. Use hostile self-audit, evidence ledgers,
+  and explicit accept / preserve / merge / synthesize / reject decisions
+  instead of donor-copy or local-familiarity bias.
+- `oh-my-codex` is a process donor only. Its role, scoped-update,
+  verification, state-provenance, and cleanup rules may strengthen app work,
+  but its roles/hooks/runtime metadata cannot override this repository's
+  source-of-truth, Android security, graphics/runtime, or Chapter 2 contracts.
+  Cleanup and dedupe must be ledger-first and delete only proven cache/tmp
+  residue; ambiguous app data, screenshots, logs, artifacts, and drivers stay
+  `review-only`.
+- App-side work must repair classes across UI, runtime binding, Contents,
+  container/rootfs pathing, provider routing, forensics, packaging consumers,
+  and device behavior instead of patching one visible symptom.
+- Evidence must precede edits:
+  local source proof, app/runtime logs, device forensics, package/rootfs
+  truth, and donor/upstream comparison when donor logic is being transferred.
+- Do not chase partial build/runtime tails.
+  For broad harvests, wait for the complete stopping point, then classify the
+  full log/evidence set and fix the whole affected union.
+  When the harvest is a full build wave, treat the full log from the first
+  line to the last line as the repair surface. Do not consume only the tail or
+  first visible failure family and call the wave closed.
+- For a whole-tree app/runtime source pass, debt and incompleteness markers
+  such as `FIXME`, `TODO`, `HACK`, `XXX`, `WORKAROUND`, `LATER`, `stub`,
+  `placeholder`, and `unimplemented` are part of the same frontier.
+  Do not cherry-pick only selected marker classes when the task is declared
+  whole-tree closure.
+- For whole-project remediation, do not restrict work to a selected library,
+  dialog, graphics lane, or feature slice.
+  Scan the complete `aesolator` code surface file-by-file and line-by-line,
+  then repair against that full app/runtime owner map.
+- When the user asks for `%` or `как там` during an active build/runtime
+  harvest, answer with the global percent of remaining work across the active
+  frontier, not only local tail progress. If the denominator is estimated,
+  state that and name the basis.
+- For graphics/XServer donor work, shipped native renderer binaries are part
+  of the ownership surface. Do not claim transfer from Java/assets parity
+  alone; first record dependencies, exported JNI surface, hard-coded package
+  or cache paths, loader-visible strings, and hex anchors where those affect
+  route ownership.
+- For Chapter 2 graphics stack work that spans Mesa/OpenGL/Vulkan/X11,
+  read `.codex/skills/chapter2-graphics-stack-closure/SKILL.md` and use
+  `docs/LINUX_GRAPHICS_CORPUS_LEDGER_2026-04-16.md` as the durable corpus map
+  before widening the patch.
+- For Mesa/Zink/Turnip/VirGL source payloads, do not use Mesa or VirGL `main`
+  as the default shipped source. Use the freshest regularly updated non-main
+  beta/RC line, record commit/date/source ledger, and keep `main` as comparison
+  evidence only unless an explicit override is documented.
+- On Android KGSL Adreno, Zink over Turnip is the default Mesa OpenGL route;
+  Freedreno Gallium OpenGL must be selectable but not assumed until a
+  device-specific route is proven.
+- Advisory-only behavior is forbidden when remediation is possible:
+  apply app/source/config/docs/tooling/runtime-binding fixes directly and
+  verify instead of stopping at recommendations or manual steps.
+- Do not leave new `FIXME`, `TODO`, `HACK`, `XXX`, `WORKAROUND`, `LATER`, or
+  equivalent debt markers behind your own app/runtime remediation.
+  Close the owner-class fully, or move the blocker into explicit
+  evidence-backed reporting/rules/todos instead of code/resource residue.
+- Contract clarity, stable shared abstractions, and systemic consistency
+  outrank local convenience:
+  app/runtime/device contracts must become explicit and testable where
+  practical, and repeated launch/rootfs/provider fixes must collapse into
+  shared helpers or validation when safe.
+- Use safe deep research for high-impact Android/Wine/donor/package/graphics
+  decisions when it materially improves correctness, security, or reliability.
+  If an app/runtime/graphics contract is unclear or still unimplemented, widen
+  through the full relevant local source surface, matching skills, official
+  docs/specs, upstream and donor repositories, issues, changelogs, reverse-
+  engineering evidence, and multilingual open-web material before fixing it.
+  For omega-level or zero-residual closure requests, continue widening through
+  the materially relevant local corpus/books, local donor trees, broad GitHub
+  donor pools, official docs/specs, upstream history, issues/changelogs,
+  reverse-engineering evidence, and multilingual open-web engineering sources
+  until the remediation design is evidence-sufficient and the next canonical
+  whole-tree omega registry rerun reflects zero active residual for the app
+  lane or an explicit environment blocker is recorded.
+  Do not stop at one familiar donor, one search pass, or one lowered
+  residual.
+- If local books or parsed Habr articles are used to steer graphics/runtime/app
+  decisions, treat them as unified reread + deep-research frontier inputs, not
+  as integrated knowledge from extraction/scrape alone.
+  Structural reread is not final semantic integration; run
+  `/data/data/com.termux/files/home/tools/run_knowledge_semantic_read.py`
+  before using corpus claims to create/update skills, rules, docs, or product
+  doctrine.
+  For the 2026-04-17 131-book corpus, pair graphics/runtime/app work with the
+  matching book-corpus overlay skill:
+  `book-corpus-graphics-frontier`,
+  `book-corpus-native-runtime-frontier`,
+  `book-corpus-android-re-frontier`, or
+  `book-corpus-systems-language-frontier`.
+  Keep before/during/after reflection artifacts and execute the frontier; do
+  not replace it with feature suggestions.
+- Security-first app work is mandatory:
+  protect secrets, app-private data, package trust, network boundaries,
+  permissions, rollback safety, telemetry, and logging hygiene.
+- Archive extraction/install lanes for rootfs, imagefs, prefixPack, Contents,
+  graphics drivers, and runtime packages must use shared canonical
+  destination-root guards for ZIP/TAR/TXZ/TZST/WCP entries, revalidate
+  callback-remapped paths, never chmod symlink entries, and keep
+  traversal/sibling-prefix/absolute-path unit coverage.
+- If context is insufficient, expand across UI, lifecycle, runtime binding,
+  Contents, rootfs/imagefs, provider routing, command bridges, forensics,
+  tests, configs, scripts, CI, package consumers, device state, and donor
+  history before editing.
+- Final closure must report root cause, affected surface, defect class,
+  systemic fix, verification, residual risk, and hardening follow-up.
+- For omega-zero closure requests, the current canonical parser or whole-tree
+  registry residual is a blocking gate:
+  iterate evidence -> source remediation -> verification -> canonical omega
+  rerun until the measured residual for the active app lane reaches zero or a
+  concrete blocker is documented with evidence.
+
 ## Approval-Gated Staff Review Mode
 
 When this mode is active:
@@ -168,6 +289,16 @@ When this mode is active:
   fragmenting it into per-subsystem commits. Stage and document intermediate
   steps, but do not cut a new transfer commit until the batch reaches an
   agreed closure point.
+- If the user says the graphics/XServer donor transfer must be whole and
+  without intermediate builds, widen the active lane to include
+  `XServerDisplayActivity`, `XServer`/`GLX`, container UI, runtime env and
+  forensics, JNI/native renderer components, bundled assets, donor source, and
+  shipped native `.so` evidence.
+  Build/install/device loops stay closed until that whole lane is reconciled.
+  Reverse engineering for this lane is not optional notes work:
+  keep a deterministic dossier over source and binaries, including
+  imports/exports, section truth, strings, symbol surface, and hex-anchored
+  offsets where they explain route ownership or ABI/runtime behavior.
 
 ## Working Contract
 
@@ -190,6 +321,16 @@ When this mode is active:
   `docs/TERMUX_LOCAL_BUILD.md`, `docs/DEVICE_MIGRATION_BOOTSTRAP.md`,
   `docs/ADB_HARVARD_DEVICE_FORENSICS.md`, `docs/SECOND_DEV_ROADMAP.md`, and
   `docs/SECOND_DEV_REFLECTIVE_JOURNAL.md`.
+- The authoritative Android build lane is the repo-root Gradle entrypoint.
+  Do not treat `app/gradlew`, nested wrapper versions, or nested
+  `app/gradle.properties` as a second authoritative build path.
+- `preBuild` must stay deterministic:
+  it may verify bundled assets and generated JNI state,
+  but it must not fetch donor artifacts from the network or mutate
+  `app/src/main/assets`.
+- Treat `local.properties` and shell exports as explicit bootstrap inputs,
+  not as a reason to move host probing and hard failures into eager
+  configuration when task-time validation is enough.
 - Report changes to the first developer as concise implementation notes with:
   scope, files touched, contract impact, verification status, and open risks.
 - Do not leave accidental build-side tails in the tree; restore or explain
@@ -198,6 +339,26 @@ When this mode is active:
   goal, context, decision, tradeoff, verification status, and next step.
 - Prefer reflective, contract-first integration over blind donor copying or
   cosmetic-only edits without documentation sync.
+- Reverse-engineering and native-binary forensics are now part of the default
+  app-side workflow when the live tail reaches wrapper libs, PE payloads,
+  JNI/native bridges, or stripped binaries.
+  Default reverse-engineering spine:
+  `reverse-engineering`,
+  `rev-symbol`,
+  `rev-struct`,
+  `radare2-hatchery`,
+  `cantordust-viz`.
+  Keep the chosen/rejected rationale in
+  `/data/data/com.termux/files/home/.codex/REVERSE_ENGINEERING_SELECTION.md`.
+- In this repo, treat `P4nda0s/reverse-skills` as a narrow `IDA-NO-MCP`
+  export donor and `plurigrid/asi` as a curated reverse-engineering donor.
+  Do not bulk-import the rest of the `ASI` skill zoo into live workflow unless
+  a fresh dossier proves it belongs to the current `Ae.solator` frontier.
+- Skill intake here must cover the whole app/runtime lifecycle, not only the
+  currently failing layer.
+  Keep curating useful skills for donor research, Android/device forensics,
+  native/runtime debugging, reverse engineering, packaging checks, UI review,
+  and documentation capture, then actually route matching tasks through them.
 - When the user asks for `deep search`, `omega level`, `full reflection`, or a
   source choice, respond with a source-backed comparison:
   why the chosen upstream won, which alternatives were held, exact pinned
@@ -209,6 +370,22 @@ When this mode is active:
   Pull a broad GitHub candidate pool first, then keep both the shortlist and
   the rejected-but-reviewed donors in docs so the next pass inherits the full
   search space instead of restarting it.
+- For external workflow/plugin tool intake on this Android/bionic host, do not
+  reject a tool only because upstream ships it as `bun`-first.
+  If the source is license-compatible and runs through a local Node bridge,
+  prefer a bionic-safe wrapper over giving up on the tool entirely.
+- Before adopting donor logic or pinning a new web-backed payload source, build
+  a deterministic dossier first:
+  repo map for donor repos and source-intake recon for download/source pages.
+  Keep license/runtime facts, provenance, same-origin artifacts, and challenge
+  markers visible before updating the live catalog or tool surface.
+- `Mapr` is concept-donor-only in this repo:
+  use its deterministic recon ideas for `prefix-pack` source intake, but do
+  not vendor or redistribute its code here.
+- `Plandex` is concept-donor-only in this repo for project-map, staged change
+  sandbox, and controlled apply/exec/debug loops.
+  Prefer transplanting those patterns into first-party `Ae.solator` tooling
+  rather than pretending the whole product belongs in this tree.
 - In this repo, `deep search` means one combined closure loop:
   latest screenshot batch + freshest forensic bundle + local code-path audit +
   donor/upstream comparison + fresh device proof.
@@ -601,6 +778,14 @@ When this mode is active:
   `libevshim.so`, `libdummyvk.so`, `libvirglrenderer.so`,
   `libvortekrenderer.so`. Record whether each belongs in APK `jniLibs`,
   guest `usr/lib`, or both before calling the lane closed.
+- For `Vortek/Gladio/AeMali` closure, do not leave `AeMali Gallium` as a
+  bundled-only special case while `Vortek`, `Gladio`, and `VirGL` already have
+  custom package lifecycle support. Package parity is part of the contract:
+  bundled asset discovery, custom import/remove, root-overlay deploy,
+  display-version truth, route degradation semantics, and metadata/env parity.
+- For AeMali/Mesa/VirGL graphics compile lanes, `-j8` is the default product
+  build law. Helper defaults must not regress to `-j4` or host-dependent
+  `nproc` unless a concrete device-stability blocker is logged.
 - For native bootstrap regressions on this ROM, do not leave
   `System.loadLibrary("winlator")` scattered across leaf classes. Route
   `libwinlator` loading through one central loader with synchronous forensic

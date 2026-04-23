@@ -177,7 +177,7 @@ public final class ForensicIssueComposer {
                 obj.put("supplemental", supplementalMetadata);
             }
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return obj;
     }
 

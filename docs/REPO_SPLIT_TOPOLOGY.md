@@ -12,8 +12,6 @@ Final delivery split for Ae.solator.
   - Archive release host for:
     - `aesolator-latest` (APK lane)
     - `freewine11-arm64ec-latest`
-    - `vulkan-sdk-arm64-latest`
-    - `vulkan-sdk-x86_64-latest`
     - `dxvk-gplasync-latest`
     - `dxvk-gplasync-arm64ec-latest`
     - `vkd3d-proton-latest`
@@ -33,7 +31,7 @@ Final delivery split for Ae.solator.
 
 1. `contents/contents.json` and artifact maps must use the real release owner per lane.
 2. Aesolator APK release lane is owned by `wcp-runtime-lanes` (`aesolator-latest`).
-3. DXVK/VKD3D/VulkanSDK must route to `wcp-runtime-lanes`.
+3. DXVK/VKD3D WCP lanes must route to `wcp-runtime-lanes`.
 4. Turnip/OpenGL lanes route to `wcp-graphics-lanes`; dgVoodoo WCP routes to `wcp-runtime-lanes`.
 5. Legacy monorepo is excluded from active release routing.
 

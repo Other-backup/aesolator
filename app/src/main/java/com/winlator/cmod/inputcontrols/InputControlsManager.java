@@ -90,7 +90,7 @@ public class InputControlsManager {
                 }
             }
         }
-        catch (IOException e) {}
+        catch (IOException e) { /* best-effort path; keep surrounding flow intact. */ }
     }
 
     public void loadProfiles(boolean ignoreTemplates) {
@@ -144,7 +144,7 @@ public class InputControlsManager {
             if (data.has("template")) data.remove("template");
             FileUtils.writeString(newFile, data.toString());
         }
-        catch (JSONException e) {}
+        catch (JSONException e) { /* best-effort path; keep surrounding flow intact. */ }
 
         ControlsProfile profile = loadProfile(context, newFile);
         profiles.add(profile);

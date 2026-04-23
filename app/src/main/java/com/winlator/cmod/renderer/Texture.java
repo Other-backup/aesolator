@@ -17,6 +17,7 @@ public class Texture {
     protected int format = GLES11Ext.GL_BGRA;
     protected boolean needsUpdate = true;
     protected byte unpackAlignment = 4; // or add a getter method
+    private boolean flipY = false;
 
 
     public void allocateTexture(short width, short height, ByteBuffer data) {
@@ -88,6 +89,14 @@ public class Texture {
         this.needsUpdate = needsUpdate;
     }
 
+    public boolean isFlipY() {
+        return flipY;
+    }
+
+    public void setFlipY(boolean flipY) {
+        this.flipY = flipY;
+    }
+
     public void updateFromDrawable(Drawable drawable) {
         ByteBuffer data = drawable.getData();
         if (data == null) return;
@@ -120,6 +129,14 @@ public class Texture {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
         if (XrActivity.isEnabled(null)) XrActivity.getInstance().bindFramebuffer();
+    }
+
+    public void copyFromReadBuffer(short width, short height) {
+        if (!isAllocated()) allocateTexture(width, height, null);
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
+        GLES20.glCopyTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 0, 0, width, height, 0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
     }
 
     public void destroy() {

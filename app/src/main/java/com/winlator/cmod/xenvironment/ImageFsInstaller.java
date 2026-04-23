@@ -16,8 +16,11 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DownloadProgressDialog;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
+import com.winlator.cmod.contents.PrefixPackCatalog;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,12 +34,14 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class ImageFsInstaller {
-    public static final byte LATEST_VERSION = 26;
+    public static final byte LATEST_VERSION = 27;
     private static final String GLIBC_IMAGEFS_ARCHIVE = "imagefs_gamenative.txz";
     private static final String BIONIC_IMAGEFS_ARCHIVE = "imagefs_bionic.txz";
     private static final String GLIBC_PATCH_ARCHIVE = "imagefs_patches_gamenative.tzst";
@@ -62,6 +67,10 @@ public abstract class ImageFsInstaller {
     private static final int DOWNLOAD_BUFFER_SIZE = 64 * 1024;
     private static final String IMAGEFS_LIB_RUNPATH_MARKER = ".elf_runpath_sanitizer_version";
     private static final String IMAGEFS_LIB_RUNPATH_MARKER_VERSION = "2";
+    private static final String PREFIX_PACK_ASSET_ROOT = "prefixpack";
+    private static final String PREFIX_PACK_VERSION_ASSET = PREFIX_PACK_ASSET_ROOT + "/VERSION";
+    private static final String PREFIX_PACK_CATALOG_ASSET = PREFIX_PACK_ASSET_ROOT + "/catalog.tsv";
+    private static final String PREFIX_PACK_ROOTFS_DIR = "opt/ae/prefix-pack";
     private static final String DOWNLOAD_USER_AGENT =
             "Mozilla/5.0 (Android 14; Mobile; rv:124.0) Gecko/124.0 Ae.solator/ImageFsInstaller";
 
@@ -91,6 +100,14 @@ public abstract class ImageFsInstaller {
             return assets != null && Arrays.asList(assets).contains(assetName);
         } catch (Exception ignored) {
             return false;
+        }
+    }
+
+    private static String readAssetString(Context context, String assetPath) {
+        try {
+            return FileUtils.readString(context, assetPath);
+        } catch (Exception ignored) {
+            return "";
         }
     }
 
@@ -124,13 +141,9 @@ public abstract class ImageFsInstaller {
         ImageFs imageFs = ImageFs.find(context);
         String requestedVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
         boolean variantMismatch = !imageFs.getVariant().isEmpty() && !requestedVariant.equalsIgnoreCase(imageFs.getVariant());
-        boolean providerMismatch = !ImageFs.ROOTFS_PROVIDER_GAMENATIVE.equalsIgnoreCase(imageFs.getRootfsProvider());
-        boolean layoutMismatch = !ImageFs.ROOTFS_LAYOUT_UBUNTUFS.equalsIgnoreCase(imageFs.getRootfsLayout());
         return !imageFs.isValid()
                 || imageFs.getVersion() < LATEST_VERSION
-                || variantMismatch
-                || providerMismatch
-                || layoutMismatch;
+                || variantMismatch;
     }
 
     private static String[] getBundledWineEntries(Context context, String containerVariant) {
@@ -148,11 +161,23 @@ public abstract class ImageFsInstaller {
     }
 
     private static String resolveInstalledRootfsProvider(String archiveName) {
-        return ImageFs.ROOTFS_PROVIDER_GAMENATIVE;
+        String normalized = archiveName == null ? "" : archiveName.trim().toLowerCase(Locale.US);
+        if (normalized.contains("gamenative")) return ImageFs.ROOTFS_PROVIDER_GAMENATIVE;
+        if (normalized.contains("waim")) return ImageFs.ROOTFS_PROVIDER_WAIM;
+        if (normalized.contains("moze")) return ImageFs.ROOTFS_PROVIDER_MOZE;
+        if (normalized.contains("rootfs")) return ImageFs.ROOTFS_PROVIDER_ROOTFS_WINLATOR;
+        if (normalized.contains("community") || normalized.contains("nightly")
+                || normalized.contains("alexoqool") || normalized.contains("xnick")) {
+            return ImageFs.ROOTFS_PROVIDER_COMMUNITY;
+        }
+        return ImageFs.ROOTFS_PROVIDER_CUSTOM;
     }
 
     private static String resolveInstalledRootfsLayout(String archiveName) {
-        return ImageFs.ROOTFS_LAYOUT_UBUNTUFS;
+        String normalized = archiveName == null ? "" : archiveName.trim().toLowerCase(Locale.US);
+        if (normalized.contains("imagefs")) return ImageFs.ROOTFS_LAYOUT_IMAGEFS;
+        if (normalized.contains("ubuntufs") || normalized.contains("ubuntu")) return ImageFs.ROOTFS_LAYOUT_UBUNTUFS;
+        return ImageFs.ROOTFS_LAYOUT_CUSTOM;
     }
 
     private static void ensureDirectory(File directory, int mode) {
@@ -220,7 +245,7 @@ public abstract class ImageFsInstaller {
             return true;
         }
 
-        Log.w("ImageFsInstaller", "Primary download failed for " + archiveName + ", retrying with fallback");
+        Log.w("ImageFsInstaller", "Primary download failed for " + archiveName + ", retrying with secondary path");
         if (downloadFile(ROOTFS_FALLBACK_BASE_URL + archiveName, destination, onProgress, progressStart, progressSpan)) {
             return true;
         }
@@ -406,10 +431,7 @@ public abstract class ImageFsInstaller {
 
     public static void installDriversFromAssets(final MainActivity activity) {
         AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(activity);
-        String[] adrenotoolsAssetDrivers = activity.getResources().getStringArray(R.array.wrapper_graphics_driver_version_entries);
-
-        for (String driver : adrenotoolsAssetDrivers)
-            adrenotoolsManager.extractDriverFromResources(driver);
+        adrenotoolsManager.extractBundledDriverResources();
     }
 
     private static void chmodIfExists(File file) {
@@ -507,7 +529,135 @@ public abstract class ImageFsInstaller {
         chmodTree(new File(rootDir, "usr/lib/android-host"), 0755);
         chmodIfExists(new File(rootDir, "generate_interfaces_file.exe"));
         chmodIfExists(new File(rootDir, "Steamless/Steamless.CLI.exe"));
+        chmodIfExists(new File(rootDir, "opt/mono-gecko-offline/wine-mono-11.0.0-x86.msi"));
         chmodIfExists(new File(rootDir, "opt/mono-gecko-offline/wine-mono-9.0.0-x86.msi"));
+        installPrefixPackToolkit(context, rootDir);
+    }
+
+    private static boolean copyAssetTree(Context context, String assetRoot, File destinationRoot) {
+        try {
+            AssetManager assetManager = context.getAssets();
+            String[] children = assetManager.list(assetRoot);
+            if (children == null) return false;
+            if (!destinationRoot.exists()) destinationRoot.mkdirs();
+            FileUtils.chmod(destinationRoot, 0771);
+
+            if (children.length == 0) {
+                try (InputStream inputStream = assetManager.open(assetRoot);
+                     OutputStream outputStream = new FileOutputStream(destinationRoot)) {
+                    byte[] buffer = new byte[16 * 1024];
+                    int read;
+                    while ((read = inputStream.read(buffer)) > 0) {
+                        outputStream.write(buffer, 0, read);
+                    }
+                }
+                return true;
+            }
+
+            for (String child : children) {
+                String childAssetPath = assetRoot + "/" + child;
+                String[] grandChildren = assetManager.list(childAssetPath);
+                File destination = new File(destinationRoot, child);
+                if (grandChildren != null && grandChildren.length > 0) {
+                    if (!copyAssetTree(context, childAssetPath, destination)) return false;
+                } else {
+                    File parent = destination.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    try (InputStream inputStream = assetManager.open(childAssetPath);
+                         OutputStream outputStream = new FileOutputStream(destination)) {
+                        byte[] buffer = new byte[16 * 1024];
+                        int read;
+                        while ((read = inputStream.read(buffer)) > 0) {
+                            outputStream.write(buffer, 0, read);
+                        }
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e("ImageFsInstaller", "Unable to copy asset tree: " + assetRoot, e);
+            return false;
+        }
+    }
+
+    private static int countPresentPrefixPackCacheFiles(File cacheDir, List<PrefixPackCatalog.Entry> entries) {
+        if (cacheDir == null || !cacheDir.isDirectory() || entries == null) return 0;
+        int count = 0;
+        for (PrefixPackCatalog.Entry entry : entries) {
+            if (entry == null) continue;
+            File cacheFile = new File(cacheDir, entry.fileName);
+            if (cacheFile.isFile() && cacheFile.length() > 0L) count++;
+        }
+        return count;
+    }
+
+    private static void installPrefixPackToolkit(Context context, File rootDir) {
+        if (context == null || rootDir == null) return;
+        File toolkitDir = new File(rootDir, PREFIX_PACK_ROOTFS_DIR);
+        if (toolkitDir.exists() && !toolkitDir.isDirectory()) {
+            FileUtils.delete(toolkitDir);
+        }
+        ensureDirectory(toolkitDir, 0771);
+        if (!copyAssetTree(context, PREFIX_PACK_ASSET_ROOT, toolkitDir)) {
+            Log.e("ImageFsInstaller", "prefix-pack toolkit deploy failed");
+            return;
+        }
+
+        chmodTree(new File(toolkitDir, "bin"), 0755);
+        chmodIfExists(new File(toolkitDir, "README.txt"));
+        chmodIfExists(new File(toolkitDir, "catalog.tsv"));
+        chmodIfExists(new File(toolkitDir, "VERSION"));
+        ensureDirectory(new File(toolkitDir, "cache"), 0771);
+    }
+
+    public static void ensurePrefixPackToolkit(Context context, ImageFs imageFs) {
+        if (context == null || imageFs == null) return;
+
+        String expectedVersion = readAssetString(context, PREFIX_PACK_VERSION_ASSET).trim();
+        File toolkitDir = new File(imageFs.getRootDir(), PREFIX_PACK_ROOTFS_DIR);
+        File versionFile = new File(toolkitDir, "VERSION");
+        String installedVersion = versionFile.isFile() ? FileUtils.readString(versionFile).trim() : "";
+
+        if (!expectedVersion.isEmpty()
+                && expectedVersion.equals(installedVersion)
+                && new File(toolkitDir, "catalog.tsv").isFile()
+                && new File(toolkitDir, "bin/prefixpack-prefetch.sh").isFile()
+                && new File(toolkitDir, "windows/prefix-pack-common.cmd").isFile()
+                && new File(toolkitDir, "windows/prefix-pack-loader.cmd").isFile()) {
+            logPrefixPackToolkitReady(context, expectedVersion, toolkitDir);
+            return;
+        }
+
+        installPrefixPackToolkit(context, imageFs.getRootDir());
+        logPrefixPackToolkitReady(context, expectedVersion, toolkitDir);
+    }
+
+    private static void logPrefixPackToolkitReady(Context context, String expectedVersion, File toolkitDir) {
+        File cacheDir = new File(toolkitDir, "cache");
+        List<PrefixPackCatalog.Entry> entries = PrefixPackCatalog.parse(readAssetString(context, PREFIX_PACK_CATALOG_ASSET));
+        int downloadableCount = PrefixPackCatalog.countByMode(entries, PrefixPackCatalog.MODE_DOWNLOAD);
+        int manualCount = PrefixPackCatalog.countByMode(entries, PrefixPackCatalog.MODE_MANUAL_PAGE);
+        int cachedCount = countPresentPrefixPackCacheFiles(cacheDir, entries);
+        PrefixPackCatalog.Entry vcppEntry = PrefixPackCatalog.findById(entries, "vcpp_aio");
+
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "PREFIX_PACK_TOOLKIT_READY",
+                null,
+                "rootfs",
+                "prefix_pack_toolkit_ready",
+                ForensicLogger.fields(
+                        "toolkit_version", expectedVersion,
+                        "toolkit_dir", toolkitDir.getAbsolutePath(),
+                        "cache_dir", cacheDir.getAbsolutePath(),
+                        "catalog_entry_count", entries.size(),
+                        "downloadable_entry_count", downloadableCount,
+                        "manual_entry_count", manualCount,
+                        "cached_entry_count", cachedCount,
+                        "vcpp_release_url", vcppEntry != null ? vcppEntry.sourceUrl : ""
+                )
+        );
     }
 
     public static void ensureBionicHostSupport(Context context, ImageFs imageFs) {
@@ -741,10 +891,8 @@ public abstract class ImageFsInstaller {
     public static void installIfNeeded(final MainActivity activity) {
         ImageFs imageFs = ImageFs.find(activity);
         String requestedVariant = resolveInstallVariant(imageFs, null);
-        boolean providerMismatch = !ImageFs.ROOTFS_PROVIDER_GAMENATIVE.equalsIgnoreCase(imageFs.getRootfsProvider());
-        boolean layoutMismatch = !ImageFs.ROOTFS_LAYOUT_UBUNTUFS.equalsIgnoreCase(imageFs.getRootfsLayout());
         boolean variantMismatch = !imageFs.getVariant().isEmpty() && !requestedVariant.equalsIgnoreCase(imageFs.getVariant());
-        if (!imageFs.isValid() || imageFs.getVersion() < LATEST_VERSION || variantMismatch || providerMismatch || layoutMismatch) {
+        if (!imageFs.isValid() || imageFs.getVersion() < LATEST_VERSION || variantMismatch) {
             installFromAssets(activity, null);
         }
     }
@@ -815,8 +963,13 @@ public abstract class ImageFsInstaller {
             File[] dstFiles;
             ImageFs imageFs = ImageFs.find(context);
             File mainWineDir = imageFs.getMainWineDir();
-            File wineSystem32Dir = new File(mainWineDir, "lib/wine/x86_64-windows");
-            File wineSysWoW64Dir = new File(mainWineDir, "lib/wine/i386-windows");
+            File runtimeWineLibDir = WineUtils.resolveRuntimeWineLibDir(mainWineDir);
+            if (runtimeWineLibDir == null) {
+                Log.e("ImageFsInstaller", "Missing runtime lib/wine directory while compacting container pattern");
+                return;
+            }
+            File wineSystem32Dir = new File(runtimeWineLibDir, "x86_64-windows");
+            File wineSysWoW64Dir = new File(runtimeWineLibDir, "i386-windows");
 
             File containerPatternDir = new File(context.getCacheDir(), "container_pattern_gamenative");
             FileUtils.delete(containerPatternDir);

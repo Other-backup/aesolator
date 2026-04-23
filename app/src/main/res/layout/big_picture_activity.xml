@@ -329,7 +329,7 @@
                     <Button
                         android:id="@+id/selectMp3Button"
                         style="@style/ButtonNeutral"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/big_picture_select_mp3"
                         android:layout_marginBottom="16dp" />
@@ -337,7 +337,8 @@
                     <!-- Reset MP3 Button -->
                     <Button
                         android:id="@+id/resetMp3Button"
-                        android:layout_width="wrap_content"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/big_picture_reset_mp3"
                         android:layout_marginBottom="16dp" />
@@ -376,7 +377,8 @@
                     <!-- Disable BG Music Button -->
                     <Button
                         android:id="@+id/disableBgMusicButton"
-                        android:layout_width="wrap_content"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/big_picture_disable_bg_music"
                         android:layout_marginTop="16dp" />
@@ -413,7 +415,8 @@
 
                         <Button
                             android:id="@+id/selectWallpaperButton"
-                            android:layout_width="wrap_content"
+                            style="@style/ButtonNeutral"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/big_picture_select_wallpaper"
                             android:visibility="gone" />
@@ -454,7 +457,8 @@
 
                     <Button
                         android:id="@+id/selectPngFolderButton"
-                        android:layout_width="wrap_content"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/big_picture_select_animation_folder" />
 

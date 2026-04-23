@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 
 public abstract class GPUHelper {
     public static final int VK_API_VERSION_1_3 = vkMakeVersion(1, 3, 0);
+    public static final int VK_API_VERSION_1_4 = vkMakeVersion(1, 4, 0);
     private static final Executor IO = Executors.newSingleThreadExecutor();
     private static final CompletableFuture<Integer> API_VERSION_FUTURE =
             CompletableFuture.supplyAsync(GPUHelper::vkGetApiVersion, IO);
@@ -47,6 +48,10 @@ public abstract class GPUHelper {
         }
     }
 
+    public static int vkVersionPatch(int version) {
+        return version & 0xFFF;
+    }
+
     public static int vkMakeVersion(String value) {
         Pattern pattern = Pattern.compile("([0-9]+)\\.([0-9]+)\\.?([0-9]+)?");
         Matcher matcher = pattern.matcher(value);
@@ -73,5 +78,15 @@ public abstract class GPUHelper {
 
     public static int vkVersionMinor(int version) {
         return (version >> 12) & 1023;
+    }
+
+    public static int vkMinVersion(int first, int second) {
+        if (first == 0) return second;
+        if (second == 0) return first;
+        return Integer.compareUnsigned(first, second) <= 0 ? first : second;
+    }
+
+    public static String vkVersionToString(int version) {
+        return vkVersionMajor(version) + "." + vkVersionMinor(version) + "." + vkVersionPatch(version);
     }
 }

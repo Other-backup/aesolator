@@ -15,11 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-ALLOWED_INTERNAL_TYPES = {"wine", "vulkansdk", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
-ALLOWED_TYPES = {"Wine", "VulkanSDK", "TurnipDriver", "OpenGLDriver", "DgVoodoo", "DXVK", "VKD3D"}
+ALLOWED_INTERNAL_TYPES = {"wine", "turnip", "freedreno", "dgvoodoo", "dxvk", "vkd3d"}
+ALLOWED_TYPES = {"Wine", "TurnipDriver", "OpenGLDriver", "DgVoodoo", "DXVK", "VKD3D"}
 EXPECTED_TYPE_BY_INTERNAL = {
     "wine": "Wine",
-    "vulkansdk": "VulkanSDK",
     "turnip": "TurnipDriver",
     "freedreno": "OpenGLDriver",
     "dgvoodoo": "DgVoodoo",
@@ -28,7 +27,6 @@ EXPECTED_TYPE_BY_INTERNAL = {
 }
 EXPECTED_DISPLAY_BY_TYPE = {
     "Wine": "Wine",
-    "VulkanSDK": "Vulkan SDK",
     "TurnipDriver": "Turnip",
     "OpenGLDriver": "OpenGL Driver",
     "DgVoodoo": "dgVoodoo",
@@ -39,7 +37,6 @@ RUNTIME_RELEASE_REPO = "kosoymiki/wcp-runtime-lanes"
 GRAPHICS_RELEASE_REPO = "kosoymiki/wcp-graphics-lanes"
 TARGET_RELEASE_REPO_BY_INTERNAL = {
     "wine": RUNTIME_RELEASE_REPO,
-    "vulkansdk": RUNTIME_RELEASE_REPO,
     "turnip": GRAPHICS_RELEASE_REPO,
     "freedreno": GRAPHICS_RELEASE_REPO,
     "dgvoodoo": RUNTIME_RELEASE_REPO,
@@ -70,8 +67,6 @@ DEPRECATED_WORKFLOWS = (
 ARTIFACT_EXPECTED_ENTRIES = {
     "freewine11": {"internalType": "wine", "artifactName": "freewine11-arm64ec.wcp"},
     "wine11": {"internalType": "wine", "artifactName": "freewine11-arm64ec.wcp"},
-    "vulkansdkarm64": {"internalType": "vulkansdk", "artifactName": "vulkan-sdk-arm64.wcp"},
-    "vulkansdkx86_64": {"internalType": "vulkansdk", "artifactName": "vulkan-sdk-x86_64.wcp"},
     "aedxvkgplasync": {"internalType": "dxvk", "artifactName": "dxvk-gplasync.wcp"},
     "aedxvkgplasyncarm64ec": {"internalType": "dxvk", "artifactName": "dxvk-gplasync-arm64ec.wcp"},
     "aevkd3dproton": {"internalType": "vkd3d", "artifactName": "vkd3d-proton.wcp"},
@@ -212,11 +207,6 @@ def check_contents_schema(
         else:
             if not artifact_name.endswith(".wcp"):
                 fail(f"entry[{idx}] artifactName must end with .wcp; got {artifact_name}", failures)
-        if internal_type == "vulkansdk":
-            if "vulkan-sdk" not in release_tag:
-                fail(f"entry[{idx}] vulkansdk releaseTag must contain vulkan-sdk; got {release_tag}", failures)
-            if "vulkan-sdk" not in artifact_name:
-                fail(f"entry[{idx}] vulkansdk artifactName must contain vulkan-sdk; got {artifact_name}", failures)
         if internal_type == "turnip":
             if "turnip" not in release_tag:
                 fail(f"entry[{idx}] turnip releaseTag must contain turnip; got {release_tag}", failures)
@@ -381,16 +371,18 @@ def check_contents_validator_contract(root: Path, failures: List[str]) -> None:
 
 
 def check_release_publish_contract(root: Path, failures: List[str]) -> None:
-    publish_script = root / "ci/release/publish-0.9c.sh"
+    publish_script = root / "ci/release/publish-0.9q.sh"
+    app_notes_template = root / "ci/release/templates/winlator-v0.9q.ru-en.md"
     notes_template = root / "ci/release/templates/wcp-stable.ru-en.md"
-    notes_prepare = root / "ci/release/prepare-0.9c-notes.sh"
+    notes_prepare = root / "ci/release/prepare-0.9q-notes.sh"
 
-    for path in (publish_script, notes_template, notes_prepare):
+    for path in (publish_script, app_notes_template, notes_template, notes_prepare):
         if not path.is_file():
             fail(f"required release contract file missing: {path}", failures)
             return
 
     publish_text = publish_script.read_text(encoding="utf-8", errors="ignore")
+    app_template_text = app_notes_template.read_text(encoding="utf-8", errors="ignore")
     template_text = notes_template.read_text(encoding="utf-8", errors="ignore")
     prepare_text = notes_prepare.read_text(encoding="utf-8", errors="ignore")
 
@@ -406,6 +398,12 @@ def check_release_publish_contract(root: Path, failures: List[str]) -> None:
 
     if "freewine11-arm64ec" not in template_text:
         fail("wcp-stable notes template must describe freewine11 lane metadata", failures)
+
+    if "Ae.solator 0.9q" not in app_template_text:
+        fail("app notes template must describe Ae.solator 0.9q", failures)
+
+    if "winlator-v0.9q.md" not in prepare_text:
+        fail("prepare release notes flow must produce winlator-v0.9q.md", failures)
 
     if 'wcp-stable.md' not in prepare_text:
         fail("prepare release notes flow must produce wcp-stable.md", failures)

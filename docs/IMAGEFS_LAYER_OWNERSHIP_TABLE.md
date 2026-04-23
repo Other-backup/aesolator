@@ -73,6 +73,10 @@ What is closed:
 - donor prefix/audio overlays are classified
 - local `imagefs.txz` versus donor `bionic` / `glibc` roles are separated
 - `imagefs.txz.02` is explicitly classified as orphan baggage
+- launch/install paths no longer auto-stamp missing rootfs markers as
+  `gamenative/ubuntufs`; missing `.provider` / `.layout` now resolve through
+  honest payload/layout inference and unknown install archives stay `custom`
+  instead of being rewritten to legacy donor defaults
 
 What remains before the first honest compile:
 

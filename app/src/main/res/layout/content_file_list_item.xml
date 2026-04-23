@@ -2,22 +2,29 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="6dp"
-    android:background="@drawable/surface_card_background"
+    android:layout_marginTop="4dp"
+    android:background="@drawable/surface_runtime_taskmgr_row_background"
     android:orientation="vertical"
-    android:padding="10dp"
-    android:tag="theme_card">
+    android:paddingStart="10dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="8dp"
+    android:tag="preserve_background">
 
     <TextView
         android:id="@+id/TVFileSource"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@color/surface_runtime_taskmgr_text"
+        android:textSize="9.6sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/TVFileTarget"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textSize="13sp" />
+        android:layout_marginTop="3dp"
+        android:textColor="@color/surface_runtime_taskmgr_muted"
+        android:textSize="8.5sp"
+        android:typeface="monospace" />
 </LinearLayout>

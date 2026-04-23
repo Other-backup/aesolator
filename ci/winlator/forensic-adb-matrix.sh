@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_ACTIVITY:=com.winlator.cmod.XServerDisplayActivity}"
 : "${WLT_CONTAINER_ID:=1}"
 : "${WLT_LOGCAT_LINES:=400}"

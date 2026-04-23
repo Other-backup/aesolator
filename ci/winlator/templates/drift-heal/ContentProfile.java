@@ -30,7 +30,6 @@ public class ContentProfile {
     public enum ContentType {
         CONTENT_TYPE_WINE("Wine"),
         CONTENT_TYPE_PROTON("Proton"),
-        CONTENT_TYPE_VULKAN_SDK("VulkanSDK"),
         CONTENT_TYPE_TURNIP_DRIVER("TurnipDriver"),
         CONTENT_TYPE_OPENGL_DRIVER("OpenGLDriver"),
         CONTENT_TYPE_DGVOODOO("DgVoodoo"),
@@ -94,7 +93,6 @@ public class ContentProfile {
         if (displayCategory != null && !displayCategory.trim().isEmpty()) return displayCategory.trim();
         if (isProtonLike()) return "Proton";
         if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
-        if (type == ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
         if (type == ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
         if (type == ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";
         if (type == ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";

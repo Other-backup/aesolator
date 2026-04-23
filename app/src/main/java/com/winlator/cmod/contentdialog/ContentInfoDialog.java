@@ -1,6 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
+import android.graphics.drawable.ColorDrawable;
 import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.view.LayoutInflater;
@@ -9,17 +10,23 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.ContentProfile;
+import com.winlator.cmod.contents.ContentStateUi;
+import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.core.AppUtils;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
 public class ContentInfoDialog extends ContentDialog {
+    private final int fileCount;
+
     public ContentInfoDialog(Context context, ContentProfile profile) {
         super(context, R.layout.content_info_dialog);
         setIcon(R.drawable.ae_icon_about);
@@ -28,6 +35,7 @@ public class ContentInfoDialog extends ContentDialog {
         TextView tvType = findViewById(R.id.TVType);
         TextView tvVersion = findViewById(R.id.TVVersion);
         TextView tvVersionCode = findViewById(R.id.TVVersionCode);
+        TextView tvStatus = findViewById(R.id.TVStatus);
         TextView tvSource = findViewById(R.id.TVSource);
         TextView tvReleaseTag = findViewById(R.id.TVReleaseTag);
         TextView tvArtifact = findViewById(R.id.TVArtifact);
@@ -36,11 +44,14 @@ public class ContentInfoDialog extends ContentDialog {
         TextView tvDescription = findViewById(R.id.TVDesc);
         TextView tvReleaseNotes = findViewById(R.id.TVReleaseNotes);
         RecyclerView recyclerView = findViewById(R.id.recyclerView);
+        ContentsManager manager = new ContentsManager(context);
+        manager.syncContents();
 
-        tvType.setText(profile.type.toString());
+        tvType.setText(resolveTypeLabel(profile));
         tvVersion.setText(profile.verName);
         tvVersionCode.setText(String.valueOf(profile.verCode));
         tvDescription.setText(profile.desc);
+        bindOptionalRow(findViewById(R.id.LLInfoStatus), tvStatus, ContentStateUi.getStatusLabel(context, manager, profile, true));
         bindOptionalRow(findViewById(R.id.LLInfoSource), tvSource, firstNonEmpty(profile.sourceLabel, profile.sourceRepo));
         bindOptionalRow(findViewById(R.id.LLInfoReleaseTag), tvReleaseTag, profile.releaseTag);
         bindOptionalRow(findViewById(R.id.LLInfoArtifact), tvArtifact, profile.artifactName);
@@ -48,8 +59,45 @@ public class ContentInfoDialog extends ContentDialog {
         bindOptionalRow(findViewById(R.id.LLInfoPublishedAt), tvPublishedAt, profile.publishedAt);
         bindOptionalSection(findViewById(R.id.FLReleaseNotes), tvReleaseNotes, profile.releaseNotes);
 
-        recyclerView.setAdapter(new ContentInfoFileAdapter(profile.fileList == null ? Collections.emptyList() : profile.fileList));
+        List<ContentProfile.ContentFile> files = profile.fileList == null ? Collections.emptyList() : profile.fileList;
+        fileCount = files.size();
+        recyclerView.setAdapter(new ContentInfoFileAdapter(files));
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
+        recyclerView.setHasFixedSize(false);
+        recyclerView.setItemAnimator(null);
+        recyclerView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.952f),
+                    Math.round(AppUtils.getScreenHeight() * 0.902f)
+            );
+        }
+        ViewGroup.LayoutParams params = getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = Math.round(AppUtils.getScreenHeight() * 0.848f);
+            getContentView().setLayoutParams(params);
+        }
+        getContentView().setMinimumHeight(Math.round(AppUtils.getScreenHeight() * 0.848f));
+        RecyclerView recyclerView = findViewById(R.id.recyclerView);
+        if (recyclerView != null) {
+            ViewGroup.LayoutParams recyclerParams = recyclerView.getLayoutParams();
+            if (recyclerParams != null) {
+                int estimatedRowsHeight = Math.max(dp(148), fileCount * dp(56));
+                recyclerParams.height = Math.min(Math.round(AppUtils.getScreenHeight() * 0.44f), estimatedRowsHeight);
+                recyclerView.setLayoutParams(recyclerParams);
+            }
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(getContext().getResources().getDisplayMetrics().density * value);
     }
 
     private void bindOptionalRow(View row, TextView valueView, String value) {
@@ -91,6 +139,23 @@ public class ContentInfoDialog extends ContentDialog {
         return normalized;
     }
 
+    private String resolveTypeLabel(ContentProfile profile) {
+        if (profile == null || profile.type == null) return "";
+        return switch (profile.type) {
+            case CONTENT_TYPE_WINE -> "Wine";
+            case CONTENT_TYPE_PROTON -> "Proton";
+            case CONTENT_TYPE_DXVK -> "DXVK";
+            case CONTENT_TYPE_VKD3D -> "VKD3D-Proton";
+            case CONTENT_TYPE_DGVOODOO -> "dgVoodoo";
+            case CONTENT_TYPE_BOX64 -> "Box64";
+            case CONTENT_TYPE_WOWBOX64 -> "WowBox64";
+            case CONTENT_TYPE_FEXCORE -> "FEXCore";
+            case CONTENT_TYPE_TURNIP_DRIVER -> "Turnip Driver";
+            case CONTENT_TYPE_OPENGL_DRIVER -> "OpenGL Driver";
+            default -> profile.type.toString();
+        };
+    }
+
     public static class ContentInfoFileAdapter extends RecyclerView.Adapter<ContentInfoFileAdapter.ViewHolder> {
         private static class ViewHolder extends RecyclerView.ViewHolder {
             private final TextView tvSource;
@@ -112,13 +177,17 @@ public class ContentInfoDialog extends ContentDialog {
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new ContentInfoFileAdapter.ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.content_file_list_item, parent, false));
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.content_file_list_item, parent, false);
+            view.setBackgroundResource(R.drawable.surface_runtime_taskmgr_row_background);
+            return new ContentInfoFileAdapter.ViewHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             holder.tvSource.setText(data.get(position).source);
             holder.tvtarget.setText(data.get(position).target);
+            holder.tvSource.setTextColor(ContextCompat.getColor(holder.itemView.getContext(), R.color.surface_runtime_taskmgr_text));
+            holder.tvtarget.setTextColor(ContextCompat.getColor(holder.itemView.getContext(), R.color.surface_runtime_taskmgr_muted));
         }
 
         @Override

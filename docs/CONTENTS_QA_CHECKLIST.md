@@ -12,6 +12,9 @@
   `WCP Archive` (FreeWine + VulkanSDK + DXVK + VKD3D + dgVoodoo WCP) and
   `wcp-graphics-lanes` (Turnip + OpenGL provider ZIP lanes).
   What remains open is behavioral QA, not metadata/model drift.
+- Remote feed normalization and `GitHub API 403 -> atom/expanded-assets`
+  fallback ownership are now centralized in code; the remaining open work for
+  those lanes is behavioral confirmation, not duplicate parser cleanup.
 - Current blocker snapshot: `adb` is available, but there is no attached device
   in this session yet, so device-side closure cannot be executed right now.
 - Treat this file as the authoritative remaining-plan document for contents work;
@@ -37,7 +40,7 @@
 - [x] Runtime/archive entries point to `wcp-runtime-lanes` (`freewine11`, `vulkan-sdk-*`, `dxvk*`, `vkd3d*`)
 - [x] Provider ZIP entries point to graphics release repo (`wcp-graphics-lanes`) (`aeturnip`, `aeopengl-driver`)
 - [x] `dgVoodoo` entries point to archive release repo (`wcp-runtime-lanes`) as split WCP lanes (`dgvoodoo-x86_64.wcp`, `dgvoodoo-arm64ec.wcp`)
-- [x] Stable bundle release flow keeps `wcp-stable` publish lane in `ci/release/publish-0.9c.sh`
+- [x] Stable bundle release flow keeps `wcp-stable` publish lane in `ci/release/publish-0.9q.sh`
 - [x] `channel`, `delivery`, `displayCategory`, `sourceRepo`, `releaseTag` are present
 - [x] Wine-family entries carry `internalType=wine`; Proton legacy lanes are removed from active overlay
 

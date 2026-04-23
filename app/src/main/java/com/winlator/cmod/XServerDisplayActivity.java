@@ -9,11 +9,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -24,13 +26,18 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.widget.AdapterView;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.Spinner;
+import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -44,15 +51,25 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
+import com.winlator.cmod.box64.Box64EditPresetDialog;
+import com.winlator.cmod.box64.Box64Preset;
+import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.IntentLaunchManager;
 import com.winlator.cmod.container.ContainerManager;
+import com.winlator.cmod.container.GraphicsDrivers;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.contentdialog.ActiveWindowsDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.DebugDialog;
 import com.winlator.cmod.contentdialog.DgVoodooConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
+import com.winlator.cmod.contentdialog.MesaOpenGLConfigDialog;
+import com.winlator.cmod.contentdialog.PrefixPackToolkitDialog;
 import com.winlator.cmod.contentdialog.ScreenEffectDialog;
+import com.winlator.cmod.contentdialog.VirGLConfigDialog;
+import com.winlator.cmod.contentdialog.VortekConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contract.RuntimeSignalContract;
 import com.winlator.cmod.contents.ContentProfile;
@@ -60,7 +77,14 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.contents.Downloader;
-import com.winlator.cmod.contents.GamehubFeedNormalizer;
+import com.winlator.cmod.contents.GladioOpenGLDriverPackageManager;
+import com.winlator.cmod.contents.MesaOpenGLDriverPackageManager;
+import com.winlator.cmod.contents.RemoteFeedPayloadLoader;
+import com.winlator.cmod.contents.RemoteProfileFeedMerger;
+import com.winlator.cmod.contents.RuntimeFeedRegistry;
+import com.winlator.cmod.contents.VirGLDriverPackageManager;
+import com.winlator.cmod.contents.VortekWrapperPackageManager;
+import com.winlator.cmod.contents.VortekVulkanDriverPackageManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
@@ -69,6 +93,7 @@ import com.winlator.cmod.core.FileDebugLogger;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.core.GPUHelper;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.LaunchSecurity;
@@ -82,11 +107,17 @@ import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
+import com.winlator.cmod.core.VortekExtensionPolicy;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineStartMenuCreator;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.core.WineUtils;
+import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
+import com.winlator.cmod.fexcore.FEXCoreManager;
+import com.winlator.cmod.fexcore.FEXCorePreset;
+import com.winlator.cmod.fexcore.FEXCorePresetManager;
+import com.winlator.cmod.graphics.GraphicsElfCompatibility;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
@@ -102,6 +133,7 @@ import com.winlator.cmod.renderer.effects.NTSCCombinedEffect;
 import com.winlator.cmod.renderer.effects.ToonEffect;
 import com.winlator.cmod.runtimeprofile.RuntimeProfile;
 import com.winlator.cmod.runtimeprofile.RuntimeProfileManager;
+import com.winlator.cmod.runtimeprofile.WineSyncPolicy;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.LogView;
@@ -122,6 +154,8 @@ import com.winlator.cmod.xenvironment.components.NetworkInfoUpdateComponent;
 import com.winlator.cmod.xenvironment.components.PulseAudioComponent;
 import com.winlator.cmod.xenvironment.components.SteamClientComponent;
 import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
+import com.winlator.cmod.xenvironment.components.VirGLRendererComponent;
+import com.winlator.cmod.xenvironment.components.VortekRendererComponent;
 import com.winlator.cmod.xenvironment.components.WineRequestComponent;
 import com.winlator.cmod.xenvironment.components.XServerComponent;
 import com.winlator.cmod.xserver.Pointer;
@@ -129,6 +163,7 @@ import com.winlator.cmod.xserver.Property;
 import com.winlator.cmod.xserver.ScreenInfo;
 import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.WindowManager;
+import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import org.json.JSONArray;
@@ -137,12 +172,18 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -160,6 +201,8 @@ import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 public class XServerDisplayActivity extends AppCompatActivity {
     public static String NOTIFICATION_CHANNEL_ID = "Aesolator";
     public static int NOTIFICATION_ID = -1;
+    private static final String NOEXEC_LAUNCH_MIRROR_DIR = "AeLaunchMirror";
+    private static final String NOEXEC_LAUNCH_MIRROR_STAMP = ".aelaunchmirror.json";
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
@@ -176,7 +219,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private FrameRating frameRating = null;
     private Runnable editInputControlsCallback;
     private Shortcut shortcut;
+    @Nullable
+    private WineUtils.WindowsLaunchTarget effectiveShortcutLaunchTarget;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
+    private String legacyGraphicsRequestedDriver = "";
+    private String legacyGraphicsProviderHint = "";
+    private String legacyGraphicsPolicy = "";
+    private String rawGraphicsDriverConfig = Container.DEFAULT_GRAPHICSDRIVERCONFIG;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
     private String emulator = Container.DEFAULT_EMULATOR;
@@ -231,13 +280,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String upscalerValidationSource = "global_profile";
     PreloaderDialog preloaderDialog = null;
     private Runnable configChangedCallback = null;
+    private Runnable pendingBootstrapRunnable = null;
+    private String pendingBootstrapSource = "";
+    private boolean guestBootstrapSubmitted = false;
+    private boolean bootstrapWaitingForFocus = false;
     private boolean isPaused = false;
     private boolean isRelativeMouseMovement = false;
     private final LinkedHashSet<Integer> mappedApplicationWindowIds = new LinkedHashSet<>();
+    private static final String DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER = "winhandler_shell";
+    private static final String DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER = "direct_explorer";
+    private static final long DESKTOP_SHELL_DIRECT_EXPLORER_FALLBACK_DELAY_MS = 6000L;
     private volatile boolean desktopShellBootstrapActive = false;
+    private volatile String desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
+    private volatile boolean desktopShellWinHandlerFallbackAttempted = false;
+    private volatile boolean desktopShellDetachedFallbackActive = false;
     private volatile boolean guestLauncherExited = false;
     private volatile int guestLauncherExitStatus = Integer.MIN_VALUE;
-    private boolean desktopGestureExclusionListenerAttached = false;
+    private volatile long lastTrackedApplicationWindowMappedAtMs = 0L;
+    private volatile String lastTrackedApplicationWindowClassName = "";
+    private final Set<View> desktopGestureExclusionTrackedViews =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private boolean bootstrapFirstDrawObserved = false;
 
     // Inside the XServerDisplayActivity class
     private SensorManager sensorManager;
@@ -252,24 +315,95 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Runnable savePlaytimeRunnable;
     private static final long SAVE_INTERVAL_MS = 1000;
     private final ExecutorService exitTeardownExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService runtimeBootstrapExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "XServerBootstrap");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final AtomicBoolean exitInProgress = new AtomicBoolean(false);
+    private int activeLaunchContainerId = 0;
+    private String activeLaunchShortcutPath = "";
+    private String activeLaunchAppId = "";
+    private String activeLaunchRouteToken = "";
+    private String activeTemporaryOverrideAppId = "";
+    private boolean activeTemporaryOverrideRestored = false;
+    private int launchBindingGeneration = 1;
 
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
     private static final long DESKTOP_RUNTIME_PAUSE_GRACE_MS = 1800L;
+    private static final long DESKTOP_RUNTIME_STOP_BOOTSTRAP_GRACE_MS = 12000L;
+    private static final long DESKTOP_RUNTIME_STOP_BOOTSTRAP_MAX_MS = 180000L;
     private static final long DESKTOP_SHELL_TERMINATION_GRACE_MS = 8000L;
+    private static final long DESKTOP_SHELL_PRELOADER_FALLBACK_INITIAL_DELAY_MS = 3500L;
+    private static final long DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS = 1200L;
+    private static final int DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS = 60;
+    private static final long DESKTOP_SHELL_WINHANDLER_INIT_TIMEOUT_MS = 5000L;
+    private static final long DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS =
+            DESKTOP_SHELL_PRELOADER_FALLBACK_INITIAL_DELAY_MS
+                    + (DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS * DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS);
     private final Handler runtimePauseHandler = new Handler(Looper.getMainLooper());
     private boolean deferredDesktopPauseScheduled = false;
+    private long deferredDesktopPauseDeadlineAtMs = 0L;
     private boolean deferredGuestTerminationScheduled = false;
     private long desktopShellBootstrapStartedAtMs = 0L;
+    private volatile boolean guestVisualReady = false;
     private int debugStartProbeTargetX = Integer.MIN_VALUE;
     private int debugStartProbeTargetY = Integer.MIN_VALUE;
     private int debugStartProbeTapCount = 1;
     private int debugStartProbeTapIntervalMs = 110;
+    private boolean debugAutoOpenTaskManagerArmed = false;
+    private boolean debugAutoOpenTaskManagerExecuted = false;
+    private boolean debugAutoOpenRuntimeDrawerArmed = false;
+    private boolean debugAutoOpenRuntimeDrawerExecuted = false;
+    private boolean debugAutoOpenLogsArmed = false;
+    private boolean debugAutoOpenLogsExecuted = false;
+    private boolean debugAutoOpenPrefixPackArmed = false;
+    private boolean debugAutoOpenPrefixPackExecuted = false;
+    private String debugAutoInstallPrefixPackTarget = "";
+    private boolean forensicModeLaunch = false;
+    private String forensicTraceId = "";
+    private String forensicRouteSource = "";
+    private static final long DEBUG_PREFIXPACK_FALLBACK_INITIAL_DELAY_MS = 6500L;
+    private static final long DEBUG_PREFIXPACK_FALLBACK_RETRY_MS = 900L;
+    private static final int DEBUG_PREFIXPACK_FALLBACK_MAX_ATTEMPTS = 18;
     private final Runnable deferredDesktopPauseRunnable = new Runnable() {
         @Override
         public void run() {
             deferredDesktopPauseScheduled = false;
+            deferredDesktopPauseDeadlineAtMs = 0L;
+            if (!shouldAutoSuspendRuntimeOnLifecycle()) {
+                logDesktopRuntimePauseSkipped("deferred_background_pause_policy_skip");
+                return;
+            }
+            int trackedWindowCount = getTrackedApplicationWindowCount();
+            DesktopShellBootstrapProof proof = desktopShellBootstrapActive
+                    ? collectDesktopShellBootstrapProof()
+                    : null;
+            if (shouldRenewDeferredDesktopRuntimePause(proof, trackedWindowCount)) {
+                scheduleDeferredDesktopRuntimePause(DESKTOP_RUNTIME_STOP_BOOTSTRAP_GRACE_MS);
+                ForensicLogger.logEvent(
+                        XServerDisplayActivity.this,
+                        "info",
+                        "XSERVER_RUNTIME_PAUSE_RENEWED",
+                        null,
+                        "xserver",
+                        "desktop_runtime_pause_renewed_for_live_bootstrap",
+                        ForensicLogger.fields(
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                                "tracked_window_count", trackedWindowCount,
+                                "grace_ms", DESKTOP_RUNTIME_STOP_BOOTSTRAP_GRACE_MS,
+                                "max_grace_ms", DESKTOP_RUNTIME_STOP_BOOTSTRAP_MAX_MS,
+                                "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                                "shell_launcher_present", proof != null && proof.shellLauncherPresent,
+                                "shell_process_present", proof != null && proof.explorerProcessPresent,
+                                "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                                "wineserver_present", proof != null && proof.wineserverPresent,
+                                "suspend_policy", getEffectiveSuspendPolicy()
+                        )
+                );
+                return;
+            }
             pauseDesktopRuntime("deferred_background_pause");
         }
     };
@@ -278,6 +412,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         public void run() {
             deferredGuestTerminationScheduled = false;
             int trackedCount = getTrackedApplicationWindowCount();
+            DesktopShellBootstrapProof proof = desktopShellBootstrapActive
+                    ? collectDesktopShellBootstrapProof()
+                    : null;
             if (!desktopShellBootstrapActive || !guestLauncherExited || trackedCount > 0) {
                 ForensicLogger.logEvent(
                         XServerDisplayActivity.this,
@@ -290,6 +427,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                 "tracked_window_count", trackedCount,
                                 "desktop_shell_bootstrap", desktopShellBootstrapActive,
                                 "guest_launcher_exited", guestLauncherExited
+                        )
+                );
+                return;
+            }
+            if (shouldKeepDesktopShellAliveAfterPrimaryTermination(proof, trackedCount)) {
+                scheduleDeferredGuestTermination(guestLauncherExitStatus);
+                ForensicLogger.logEvent(
+                        XServerDisplayActivity.this,
+                        "info",
+                        "GUEST_PROGRAM_TERMINATION_DEFER_RENEWED",
+                        null,
+                        "xserver",
+                        "guest_program_termination_grace_renewed",
+                        ForensicLogger.fields(
+                                "tracked_window_count", trackedCount,
+                                "guest_launcher_exit_status", guestLauncherExitStatus,
+                                "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                                "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                "fallback_active", desktopShellDetachedFallbackActive
                         )
                 );
                 return;
@@ -384,6 +540,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (touchpadView != null) touchpadView.toggleFullscreen();
         if (inputControlsView != null) inputControlsView.post(inputControlsView::invalidate);
         if (configChangedCallback != null) {
+            logBootstrapCheckpoint(
+                    "XSERVER_BOOTSTRAP_CONFIG_CALLBACK_RUN",
+                    "bootstrap_configuration_callback_running",
+                    "current_orientation", newConfig.orientation,
+                    "activity_has_focus", hasWindowFocus(),
+                    "activity_finishing", isFinishing(),
+                    "activity_destroyed", isDestroyed()
+            );
             configChangedCallback.run();
             configChangedCallback = null;
         }
@@ -429,7 +593,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!getClass().equals(XServerDisplayActivity.class)) return false;
         if (LaunchSecurity.hasXServerLaunchSignature(intent)) return true;
         return intent.hasExtra("shortcut_name")
-                || intent.hasExtra("disableXinput");
+                || intent.hasExtra("disableXinput")
+                || intent.hasExtra(LaunchSecurity.EXTRA_APP_ID)
+                || intent.hasExtra(LaunchSecurity.EXTRA_LAUNCH_ROUTE_TOKEN)
+                || intent.hasExtra(LaunchSecurity.EXTRA_TEMP_OVERRIDE_APP_ID);
     }
 
 
@@ -473,6 +640,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         Intent launchIntent = getIntent();
+        forensicModeLaunch = launchIntent != null && launchIntent.getBooleanExtra("forensic_mode", false);
+        forensicTraceId = launchIntent != null ? safeTrim(launchIntent.getStringExtra("forensic_trace_id")) : "";
+        forensicRouteSource = launchIntent != null ? safeTrim(launchIntent.getStringExtra("forensic_route_source")) : "";
         boolean debugBuild = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         boolean hasExplicitProbeTarget = launchIntent != null
                 && launchIntent.hasExtra("aeso_debug_probe_tap_x")
@@ -487,6 +657,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             debugStartProbeTapCount = Math.max(1, Math.min(4, launchIntent.getIntExtra("aeso_debug_probe_tap_count", 1)));
             debugStartProbeTapIntervalMs = Math.max(40, Math.min(400, launchIntent.getIntExtra("aeso_debug_probe_tap_interval_ms", 110)));
+            debugAutoOpenTaskManagerArmed = launchIntent.getBooleanExtra("aeso_debug_open_task_manager", false);
+            debugAutoOpenRuntimeDrawerArmed = launchIntent.getBooleanExtra("aeso_debug_open_runtime_drawer", false);
+            debugAutoOpenLogsArmed = launchIntent.getBooleanExtra("aeso_debug_open_logs", false);
+            debugAutoOpenPrefixPackArmed = launchIntent.getBooleanExtra("aeso_debug_open_prefix_pack", false);
+            debugAutoInstallPrefixPackTarget = launchIntent.getStringExtra("aeso_debug_prefix_pack_install_target");
         }
         String launchTrustState = LaunchSecurity.getXServerLaunchTrustState(this, launchIntent);
         ForensicLogger.logEvent(
@@ -499,16 +674,43 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ForensicLogger.fields(
                         "container_id", launchIntent != null ? launchIntent.getIntExtra("container_id", 0) : 0,
                         "shortcut_path", launchIntent != null ? launchIntent.getStringExtra("shortcut_path") : "",
+                        "app_id", resolveIntentLaunchAppId(launchIntent),
+                        "launch_route_token", resolveIntentLaunchRouteToken(launchIntent),
+                        "temporary_override_app_id", resolveIntentTemporaryOverrideAppId(launchIntent),
                         "debug_start_probe_armed", debugStartProbeArmed,
                         "debug_probe_target_x", debugStartProbeTargetX,
                         "debug_probe_target_y", debugStartProbeTargetY,
                         "debug_probe_tap_count", debugStartProbeTapCount,
                         "debug_probe_tap_interval_ms", debugStartProbeTapIntervalMs,
+                        "debug_auto_open_task_manager_armed", debugAutoOpenTaskManagerArmed,
+                        "debug_auto_open_runtime_drawer_armed", debugAutoOpenRuntimeDrawerArmed,
+                        "debug_auto_open_logs_armed", debugAutoOpenLogsArmed,
+                        "debug_auto_open_prefix_pack_armed", debugAutoOpenPrefixPackArmed,
+                        "debug_prefix_pack_install_target", debugAutoInstallPrefixPackTarget,
                         "requires_signature", requiresSignedLaunchIntent(launchIntent),
                         "has_signature", LaunchSecurity.hasXServerLaunchSignature(launchIntent),
                         "trust_state", launchTrustState
                 )
         );
+        if (forensicModeLaunch || !forensicTraceId.isEmpty()) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "ROUTE_INTENT_RECEIVED",
+                    forensicTraceIdOrNull(),
+                    "xserver",
+                    "route_intent_received",
+                    ForensicLogger.fields(
+                            "container_id", launchIntent != null ? launchIntent.getIntExtra("container_id", 0) : 0,
+                            "shortcut_path", launchIntent != null ? launchIntent.getStringExtra("shortcut_path") : "",
+                            "app_id", resolveIntentLaunchAppId(launchIntent),
+                            "launch_route_token", resolveIntentLaunchRouteToken(launchIntent),
+                            "forensic_mode", forensicModeLaunch,
+                            "forensic_route_source", forensicRouteSource,
+                            "debug_start_probe_armed", debugStartProbeArmed
+                    )
+            );
+        }
         if (requiresSignedLaunchIntent(launchIntent)
                 && !LaunchSecurity.isTrustedXServerLaunchIntent(this, launchIntent)) {
             ForensicLogger.logEvent(
@@ -578,6 +780,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
+        scheduleDebugPrefixPackFallback();
 
 
         // Handler and Runnable to manage timeout for hiding controls
@@ -593,11 +796,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
 
         contentsManager = new ContentsManager(this);
-        contentsManager.syncContents();
-
-        xserverRootView = findViewById(R.id.XServerRoot);
-
         imageFs = ImageFs.find(this);
+        ImageFsInstaller.ensurePrefixPackToolkit(this, imageFs);
 
         String screenSize = Container.DEFAULT_SCREEN_SIZE;
         containerManager = new ContainerManager(this);
@@ -653,7 +853,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return;
         }
 
-        containerManager.activateContainer(container);
+        rememberActiveLaunchTarget(
+                containerId,
+                shortcutPath,
+                resolveEffectiveLaunchAppId(launchIntent, container),
+                resolveIntentLaunchRouteToken(launchIntent),
+                resolveIntentTemporaryOverrideAppId(launchIntent)
+        );
+        bindActiveContainerState(container);
 
         if (shortcutPath != null && !shortcutPath.isEmpty()) {
             shortcut = new Shortcut(container, new File(shortcutPath));
@@ -679,9 +886,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (ensureLaunchRootfsReady(wineVersion, effectiveRuntimeModel)) {
             return;
         }
+
+        contentsManager.syncContents();
+        effectiveRuntimeModel = resolveLaunchRuntimeModel(requestedWineVersion);
+        wineVersion = resolveEffectiveLaunchWineVersion(requestedWineVersion, effectiveRuntimeModel);
         if (ensureSelectedRuntimeReady(wineVersion, effectiveRuntimeModel)) {
             return;
         }
+
+        xserverRootView = findViewById(R.id.XServerRoot);
+        applyDesktopGestureExclusion(getWindow() != null ? getWindow().getDecorView() : null);
+        applyDesktopGestureExclusion(findViewById(R.id.FLXServerDisplay));
+        applyDesktopGestureExclusion(xserverRootView);
+        armGuestBootstrapAfterFirstDraw(getWindow() != null ? getWindow().getDecorView() : null, "decor_predraw");
+        armGuestBootstrapAfterFirstDraw(xserverRootView, "activity_root_predraw");
+
         selectedRuntimeProfile = resolveLaunchRuntimeCandidate(wineVersion, effectiveRuntimeModel);
         String canonicalWineVersion = selectedRuntimeProfile != null
                 ? ContentsManager.getEntryName(selectedRuntimeProfile)
@@ -698,15 +917,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         imageFs.setWinePath(wineInfo.path);
 
-        boolean enableLogs = preferences.getBoolean("enable_wine_debug", false)
-                || preferences.getBoolean("enable_box64_logs", false);
+        ForensicConfig.Snapshot requestedForensicSnapshot = ForensicConfig.load(this);
+        ForensicConfig.Snapshot runtimeForensicSnapshot = resolveRuntimeForensicSnapshot(requestedForensicSnapshot);
+        boolean enableLogs = runtimeForensicSnapshot.enableWineDebug
+                || runtimeForensicSnapshot.enableBox64Logs
+                || forensicModeLaunch;
 
         ProcessHelper.removeAllDebugCallbacks();
         if (enableLogs) {
             LogView.setFilename(getExecutable());
             ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
         }
-        installForensicRuntimeLogCallbacks(ForensicConfig.load(this));
+        installForensicRuntimeLogCallbacks(runtimeForensicSnapshot);
         ForensicLogger.logEvent(
                 this,
                 "info",
@@ -716,6 +938,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "runtime_debug_hooks_installed",
                 ForensicLogger.fields(
                         "enable_logs", enableLogs,
+                        "forensic_mode", forensicModeLaunch,
+                        "requested_runtime_summary", ForensicConfig.buildRuntimeSummary(requestedForensicSnapshot),
+                        "effective_runtime_summary", ForensicConfig.buildRuntimeSummary(runtimeForensicSnapshot),
                         "runtime_profile_present", selectedRuntimeProfile != null,
                         "wine_version", canonicalWineVersion,
                         "runtime_model", effectiveRuntimeModel
@@ -753,7 +978,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
         parseUpscalerLaunchSettings(shortcut);
 
-        this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
+        legacyGraphicsRequestedDriver = Container.resolveLegacyGraphicsRequestedDriver(graphicsDriver, graphicsDriverConfig);
+        legacyGraphicsProviderHint = Container.resolveLegacyGraphicsProviderHint(graphicsDriver, graphicsDriverConfig);
+        legacyGraphicsPolicy = Container.resolveLegacyGraphicsPolicy(graphicsDriver, graphicsDriverConfig);
+        graphicsDriver = Container.normalizeGraphicsDriver(graphicsDriver);
+        rawGraphicsDriverConfig = GraphicsDrivers.sanitizeConfigShape(graphicsDriver, graphicsDriverConfig);
+        this.graphicsDriverConfig = GraphicsDrivers.parseConfig(graphicsDriver, rawGraphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
         ForensicLogger.logEvent(
                 this,
@@ -764,6 +994,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "runtime_launch_configuration_parsed",
                 ForensicLogger.fields(
                         "graphics_driver", graphicsDriver,
+                        "graphics_driver_legacy_requested", legacyGraphicsRequestedDriver,
+                        "graphics_driver_legacy_hint", legacyGraphicsProviderHint,
+                        "graphics_driver_legacy_policy", legacyGraphicsPolicy,
                         "audio_driver", audioDriver,
                         "emulator", emulator,
                         "dxwrapper", dxwrapper,
@@ -874,23 +1107,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
             throw error;
         }
 
-        boolean[] winStarted = {false};
-
-        Runnable[] markGuestWindowStarted = new Runnable[1];
-        markGuestWindowStarted[0] = () -> {
-            if (!winStarted[0]) {
-                xServerView.getRenderer().setCursorVisible(true);
-                preloaderDialog.closeOnUiThread();
-                winStarted[0] = true;
-            }
-        };
-
         // Add the OnWindowModificationListener for dynamic workarounds
         xServer.windowManager.addOnWindowModificationListener(new WindowManager.OnWindowModificationListener() {
             @Override
             public void onUpdateWindowContent(Window window) {
-                if (!winStarted[0] && window.isApplicationWindow()) {
-                    markGuestWindowStarted[0].run();
+                if (!guestVisualReady && isTrackedVisualWindow(window)) {
+                    logBootstrapWindowCandidate(
+                            "XSERVER_WINDOW_CONTENT_CANDIDATE",
+                            "info",
+                            "desktop_shell_window_content_candidate",
+                            window
+                    );
+                    markGuestVisualReady("window_content", window, null);
                 }
 
                 if (frameRatingWindowId == window.id) frameRating.update();
@@ -898,7 +1126,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onMapWindow(Window window) {
-                if (!winStarted[0] && window.isApplicationWindow()) {
+                if (desktopShellBootstrapActive && !guestVisualReady) {
+                    logBootstrapWindowCandidate(
+                            "XSERVER_WINDOW_MAPPED",
+                            "info",
+                            "desktop_shell_window_mapped",
+                            window
+                    );
+                }
+                if (!guestVisualReady && isTrackedVisualWindow(window)) {
                     ForensicLogger.logEvent(
                             XServerDisplayActivity.this,
                             "warn",
@@ -911,7 +1147,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                     "window_id", window.id
                             )
                     );
-                    markGuestWindowStarted[0].run();
+                    markGuestVisualReady("window_map", window, null);
                 }
                 // Log the class name of the mapped window
                 Log.d("XServerDisplayActivity", "onMapWindow: Detected window className: " + window.getClassName());
@@ -946,7 +1182,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 public void onFailed(Exception e) {
                     try {
                         finalIn.close();
-                    } catch (Exception e2) {}
+                    } catch (Exception e2) {
+                        Log.w("XServerDisplayActivity", "Failed to close MIDI soundfont stream", e2);
+                    }
                 }
             };
             try {
@@ -955,7 +1193,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     MidiManager.load(in, callback);
                 } else
                     MidiManager.load(new File(MidiManager.getSoundFontDir(this), midiSoundFont), callback);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                Log.e("XServerDisplayActivity", "Failed to load MIDI soundfont " + midiSoundFont, e);
+            }
         }
 
         // Check if a profile is defined by the shortcut
@@ -969,11 +1209,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
             notificationIntent.putExtra("shortcut_path", shortcut.file.getPath());
             notificationIntent.putExtra("shortcut_name", shortcut.name);
         }
+        if (!activeLaunchAppId.isEmpty()) {
+            notificationIntent.putExtra(LaunchSecurity.EXTRA_APP_ID, activeLaunchAppId);
+        }
+        if (!activeLaunchRouteToken.isEmpty()) {
+            notificationIntent.putExtra(LaunchSecurity.EXTRA_LAUNCH_ROUTE_TOKEN, activeLaunchRouteToken);
+        }
+        if (!activeTemporaryOverrideAppId.isEmpty()) {
+            notificationIntent.putExtra(LaunchSecurity.EXTRA_TEMP_OVERRIDE_APP_ID, activeTemporaryOverrideAppId);
+        }
         notificationIntent.putExtra("disableXinput", xinputDisabledFromShortcut ? "1" : "0");
         LaunchSecurity.signXServerLaunchIntent(this, notificationIntent);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_ab_gear_0011)
+                .setSmallIcon(R.drawable.ic_settings)
                 .setContentTitle(getString(R.string.notification_runtime_title))
                 .setContentText(getString(R.string.notification_runtime_text))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -983,25 +1232,109 @@ public class XServerDisplayActivity extends AppCompatActivity {
         NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, builder.build());
 
         Runnable runnable = () -> {
-            setupUI();
-            if (controlsProfile.isEmpty()) {
-                // No profile defined, run the simulated dialog confirmation for input controls
-                simulateConfirmInputControlsDialog();
-            }
-            Executors.newSingleThreadExecutor().execute(() -> {
-                setupWineSystemFiles();
-                extractGraphicsDriverFiles();
-                changeWineAudioDriver();
-                try {
-                    setupXEnvironment();
-                } catch (PackageManager.NameNotFoundException e) {
-                    throw new RuntimeException(e);
+            logBootstrapCheckpoint(
+                    "XSERVER_BOOTSTRAP_RUNNABLE_BEGIN",
+                    "bootstrap_runnable_entered",
+                    "current_orientation", getResources().getConfiguration().orientation,
+                    "activity_has_focus", hasWindowFocus(),
+                    "activity_finishing", isFinishing(),
+                    "activity_destroyed", isDestroyed()
+            );
+            try {
+                setupUI();
+                logBootstrapCheckpoint(
+                        "XSERVER_BOOTSTRAP_UI_READY",
+                        "bootstrap_ui_ready",
+                        "activity_has_focus", hasWindowFocus(),
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                );
+                if (controlsProfile.isEmpty()) {
+                    // No profile defined, run the simulated dialog confirmation for input controls
+                    simulateConfirmInputControlsDialog();
+                    logBootstrapCheckpoint(
+                            "XSERVER_BOOTSTRAP_CONTROLS_DIALOG_SIMULATED",
+                            "bootstrap_controls_dialog_simulated"
+                    );
                 }
-            });
+                logBootstrapCheckpoint(
+                        "XSERVER_BOOTSTRAP_ASYNC_SUBMIT",
+                        "bootstrap_async_submitted",
+                        "activity_has_focus", hasWindowFocus(),
+                        "activity_finishing", isFinishing(),
+                        "activity_destroyed", isDestroyed()
+                );
+                runtimeBootstrapExecutor.execute(() -> {
+                    logBootstrapCheckpoint(
+                            "XSERVER_BOOTSTRAP_ASYNC_BEGIN",
+                            "bootstrap_async_entered",
+                            "activity_has_focus", hasWindowFocus(),
+                            "activity_finishing", isFinishing(),
+                            "activity_destroyed", isDestroyed()
+                    );
+                    try {
+                        long stageStartedAt = System.currentTimeMillis();
+                        logBootstrapCheckpoint("XSERVER_BOOTSTRAP_SYSTEM_FILES_BEGIN", "bootstrap_system_files_begin");
+                        setupWineSystemFiles();
+                        logBootstrapCheckpoint(
+                                "XSERVER_BOOTSTRAP_SYSTEM_FILES_READY",
+                                "bootstrap_system_files_ready",
+                                "duration_ms", System.currentTimeMillis() - stageStartedAt
+                        );
+
+                        stageStartedAt = System.currentTimeMillis();
+                        logBootstrapCheckpoint("XSERVER_BOOTSTRAP_GRAPHICS_FILES_BEGIN", "bootstrap_graphics_files_begin");
+                        extractGraphicsDriverFiles();
+                        logBootstrapCheckpoint(
+                                "XSERVER_BOOTSTRAP_GRAPHICS_FILES_READY",
+                                "bootstrap_graphics_files_ready",
+                                "duration_ms", System.currentTimeMillis() - stageStartedAt
+                        );
+
+                        stageStartedAt = System.currentTimeMillis();
+                        logBootstrapCheckpoint("XSERVER_BOOTSTRAP_AUDIO_DRIVER_BEGIN", "bootstrap_audio_driver_begin");
+                        changeWineAudioDriver();
+                        logBootstrapCheckpoint(
+                                "XSERVER_BOOTSTRAP_AUDIO_DRIVER_READY",
+                                "bootstrap_audio_driver_ready",
+                                "duration_ms", System.currentTimeMillis() - stageStartedAt
+                        );
+
+                        stageStartedAt = System.currentTimeMillis();
+                        logBootstrapCheckpoint("XSERVER_BOOTSTRAP_ENV_BEGIN", "bootstrap_environment_begin");
+                        setupXEnvironment();
+                        logBootstrapCheckpoint(
+                                "XSERVER_BOOTSTRAP_ENV_READY",
+                                "bootstrap_environment_ready",
+                                "duration_ms", System.currentTimeMillis() - stageStartedAt,
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive
+                        );
+                    } catch (Throwable error) {
+                        throw rethrowBootstrapFailure(
+                                "XSERVER_BOOTSTRAP_ASYNC_FAILED",
+                                "bootstrap_async_failed_before_guest_submit",
+                                error,
+                                "activity_has_focus", hasWindowFocus(),
+                                "activity_finishing", isFinishing(),
+                                "activity_destroyed", isDestroyed(),
+                                "desktop_shell_bootstrap", desktopShellBootstrapActive
+                        );
+                    }
+                });
+            } catch (Throwable error) {
+                throw rethrowBootstrapFailure(
+                        "XSERVER_BOOTSTRAP_RUNNABLE_FAILED",
+                        "bootstrap_runnable_failed_before_async_submit",
+                        error,
+                        "activity_has_focus", hasWindowFocus(),
+                        "activity_finishing", isFinishing(),
+                        "activity_destroyed", isDestroyed()
+                );
+            }
         };
 
         boolean landscapeReady = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
         boolean portraitScreenInfo = xServer.screenInfo.height > xServer.screenInfo.width;
+        prearmDesktopShellBootstrapIfNeeded("orientation_gate");
         ForensicLogger.logEvent(
                 this,
                 "info",
@@ -1020,9 +1353,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (portraitScreenInfo && !landscapeReady) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-            configChangedCallback = runnable;
+            logBootstrapCheckpoint(
+                    "XSERVER_BOOTSTRAP_CONFIG_CALLBACK_ARMED",
+                    "bootstrap_configuration_callback_armed",
+                    "requested_orientation", ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            );
+            configChangedCallback = () -> armGuestBootstrapAfterFocus(runnable, "orientation_config_ready");
         } else {
-            runnable.run();
+            armGuestBootstrapAfterFocus(runnable, "create_ready");
         }
     }
 
@@ -1097,7 +1435,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "requested_entry", normalizedWineVersion,
                         "promoted_entry", promotedEntry,
                         "runtime_model", runtimeModel,
-                        "locally_installed", fallbackProfile.locallyInstalled,
+                        "locally_installed", contentsManager.isInstalledProfilePresent(fallbackProfile),
+                        "installed_present", contentsManager.isInstalledProfilePresent(fallbackProfile),
+                        "installed_usable", contentsManager.isInstalledProfileUsable(fallbackProfile),
                         "source_label", fallbackProfile.sourceLabel
                 )
         );
@@ -1192,7 +1532,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private int computePreferredLaunchRuntimeScore(@NonNull ContentProfile profile) {
         int score = 0;
-        if (profile.locallyInstalled) score += 40;
+        if (contentsManager.isInstalledProfileUsable(profile)) score += 40;
+        else if (contentsManager.isInstalledProfilePresent(profile)) score += 10;
         if (profile.isProtonLike()) score += 20;
         String archTag = profile.getArchitectureTag();
         if ("arm64ec".equalsIgnoreCase(archTag)) score += 12;
@@ -1217,11 +1558,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return false;
         }
 
+        final int launchGeneration = launchBindingGeneration;
+        final Intent restartIntent = new Intent(getIntent());
+
         ForensicLogger.logEvent(
                 this,
                 "warn",
                 "XSERVER_ROOTFS_REINSTALL_REQUIRED",
-                null,
+                forensicTraceIdOrNull(),
                 "xserver",
                 "rootfs_reinstall_required_before_launch",
                 ForensicLogger.fields(
@@ -1235,6 +1579,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
 
         preloaderDialog.show(R.string.installing_system_files);
+        logBootstrapCheckpoint(
+                "XSERVER_ROOTFS_REINSTALL_BEGIN",
+                "rootfs_reinstall_started_before_guest_bootstrap",
+                "wine_version", wineVersion,
+                "runtime_model", runtimeModel
+        );
         Executors.newSingleThreadExecutor().execute(() -> {
             boolean success = false;
             try {
@@ -1251,19 +1601,36 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             final boolean installSucceeded = success;
             runOnUiThread(() -> {
+                if (!isLaunchBindingCurrent(launchGeneration)) {
+                    preloaderDialog.closeOnUiThread();
+                    return;
+                }
                 preloaderDialog.closeOnUiThread();
                 if (!installSucceeded) {
+                    logBootstrapCheckpoint(
+                            "XSERVER_ROOTFS_REINSTALL_FAILED",
+                            "rootfs_reinstall_failed_before_guest_bootstrap",
+                            "wine_version", wineVersion,
+                            "runtime_model", runtimeModel
+                    );
                     AppUtils.showToast(this, R.string.unable_to_install_system_files);
                     finish();
                     return;
                 }
 
-                Intent restartIntent = new Intent(getIntent());
-                restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                startActivity(restartIntent);
-                overridePendingTransition(0, 0);
-                finish();
-                overridePendingTransition(0, 0);
+                logBootstrapCheckpoint(
+                        "XSERVER_ROOTFS_REINSTALL_READY",
+                        "rootfs_reinstall_completed_before_guest_bootstrap",
+                        "wine_version", wineVersion,
+                        "runtime_model", runtimeModel
+                );
+                logBootstrapCheckpoint(
+                        "XSERVER_ROOTFS_RELAUNCH_REQUESTED",
+                        "rootfs_relaunch_requested_after_reinstall",
+                        "wine_version", wineVersion,
+                        "runtime_model", runtimeModel
+                );
+                recreateForLaunchRelaunch(restartIntent);
             });
         });
         return true;
@@ -1271,6 +1638,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private boolean ensureSelectedRuntimeReady(String wineVersion, String runtimeModel) {
         ContentProfile launchProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
+        final int launchGeneration = launchBindingGeneration;
+        final Intent restartIntent = new Intent(getIntent());
         if (launchProfile == null) {
             if (!shouldAttemptRemoteRuntimeBootstrap(wineVersion, runtimeModel)) {
                 return false;
@@ -1282,6 +1651,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 boolean ready = hydratedProfile != null && (isRuntimeProfileReady(hydratedProfile)
                         || (hydratedProfile.isRemoteDownloadable() && installRemoteRuntimeProfile(hydratedProfile)));
                 runOnUiThread(() -> {
+                    if (!isLaunchBindingCurrent(launchGeneration)) {
+                        preloaderDialog.closeOnUiThread();
+                        return;
+                    }
                     preloaderDialog.closeOnUiThread();
                     if (!ready) {
                         AppUtils.showToast(this, R.string.unable_to_install_content);
@@ -1289,12 +1662,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         return;
                     }
 
-                    Intent restartIntent = new Intent(getIntent());
                     restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                    startActivity(restartIntent);
-                    overridePendingTransition(0, 0);
-                    finish();
-                    overridePendingTransition(0, 0);
+                    recreateForLaunchRelaunch(restartIntent);
                 });
             });
             return true;
@@ -1326,6 +1695,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Executors.newSingleThreadExecutor().execute(() -> {
             boolean installed = installRemoteRuntimeProfile(launchProfile);
             runOnUiThread(() -> {
+                if (!isLaunchBindingCurrent(launchGeneration)) {
+                    preloaderDialog.closeOnUiThread();
+                    return;
+                }
                 preloaderDialog.closeOnUiThread();
                 if (!installed) {
                     AppUtils.showToast(this, R.string.unable_to_install_content);
@@ -1333,12 +1706,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     return;
                 }
 
-                Intent restartIntent = new Intent(getIntent());
                 restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                startActivity(restartIntent);
-                overridePendingTransition(0, 0);
-                finish();
-                overridePendingTransition(0, 0);
+                recreateForLaunchRelaunch(restartIntent);
             });
         });
         return true;
@@ -1353,17 +1722,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean isRuntimeProfileReady(@Nullable ContentProfile profile) {
-        if (profile == null || !profile.locallyInstalled || !profile.isWineProtonFamily()) {
-            return false;
-        }
-        File runtimeRoot = contentsManager.getRuntimeRootDir(profile);
-        if (runtimeRoot == null || !runtimeRoot.isDirectory()) {
-            return false;
-        }
-        File binDir = new File(contentsManager.getInstallDir(this, profile), profile.wineBinPath);
-        File libDir = new File(contentsManager.getInstallDir(this, profile), profile.wineLibPath);
-        File prefixPack = new File(contentsManager.getInstallDir(this, profile), profile.winePrefixPack);
-        return binDir.isDirectory() && libDir.isDirectory() && prefixPack.isFile();
+        return profile != null
+                && profile.isWineProtonFamily()
+                && contentsManager.isInstalledProfileUsable(profile);
     }
 
     @Nullable
@@ -1417,47 +1778,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             String bundledArchive = readAssetText("contents.json");
             if (bundledArchive != null && !bundledArchive.trim().isEmpty()) {
-                payloads.add(bundledArchive);
+                payloads.add(RemoteFeedPayloadLoader.normalizePayload(
+                        bundledArchive,
+                        ContentsManager.REMOTE_WINE_PROTON_OVERLAY
+                ));
             }
 
-            String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim().toLowerCase(Locale.US);
-            boolean wantsNightlies = ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))
-                    || normalizedWineVersion.startsWith("proton-");
-            if (wantsNightlies) {
-                String nightliesReleases = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES);
-                String normalizedNightlies = GamehubFeedNormalizer.normalizeNightliesReleaseFeed(nightliesReleases);
-                if (normalizedNightlies == null || normalizedNightlies.trim().isEmpty() || "[]".equals(normalizedNightlies.trim())) {
-                    String atom = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM);
-                    List<GamehubFeedNormalizer.ReleaseFeedEntry> entries =
-                            GamehubFeedNormalizer.parseGitHubReleaseAtom(atom, "The412Banner/Nightlies");
-                    ArrayList<String> atomPayloads = new ArrayList<>();
-                    for (GamehubFeedNormalizer.ReleaseFeedEntry entry : entries) {
-                        if (entry == null || !entry.isValid()) continue;
-                        String expandedAssetsUrl = "https://github.com/The412Banner/Nightlies/releases/expanded_assets/" + entry.tag.trim();
-                        String html = Downloader.downloadString(expandedAssetsUrl);
-                        String normalizedHtml = GamehubFeedNormalizer.normalizeExpandedAssetsHtml(
-                                html,
-                                entry,
-                                GamehubFeedNormalizer.NIGHTLIES_FEED_ID,
-                                GamehubFeedNormalizer.NIGHTLIES_LABEL,
-                                GamehubFeedNormalizer.NIGHTLIES_REPO_RELEASES,
-                                "The412Banner nightly package"
-                        );
-                        if (normalizedHtml != null && !normalizedHtml.trim().isEmpty() && !"[]".equals(normalizedHtml.trim())) {
-                            atomPayloads.add(normalizedHtml);
-                        }
-                        if (atomPayloads.size() >= 4) break;
-                    }
-                    normalizedNightlies = mergeRemoteProfilePayloads(atomPayloads);
-                }
-                if (normalizedNightlies != null && !normalizedNightlies.trim().isEmpty() && !"[]".equals(normalizedNightlies.trim())) {
-                    payloads.add(normalizedNightlies);
-                }
+            for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getLaunchHydrationFeeds(runtimeModel, wineVersion)) {
+                RemoteFeedPayloadLoader.FeedLoadResult result =
+                        RuntimeFeedRegistry.looksLikeNightliesSource(feed.sourceRepo + " " + feed.url)
+                                ? RemoteFeedPayloadLoader.loadNightliesPayload()
+                                : RemoteFeedPayloadLoader.loadNormalizedFeed(feed);
+                if (result.hasPayload()) payloads.add(result.payload);
             }
 
-            String merged = mergeRemoteProfilePayloads(payloads);
+            String merged = RemoteProfileFeedMerger.mergePayloads(payloads);
             if (!merged.trim().isEmpty() && !"[]".equals(merged.trim())) {
-                contentsManager.setNightliesRemoteProfiles(merged);
+                contentsManager.setHydratedRuntimeProfiles(merged);
             }
         } catch (Exception e) {
             Log.w("XServerDisplayActivity", "Unable to hydrate runtime profiles for launch", e);
@@ -1478,23 +1815,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private String mergeRemoteProfilePayloads(List<String> payloads) {
-        JSONArray merged = new JSONArray();
-        if (payloads == null) return merged.toString();
-        for (String payload : payloads) {
-            if (payload == null || payload.trim().isEmpty()) continue;
-            try {
-                JSONArray array = new JSONArray(payload);
-                for (int i = 0; i < array.length(); i++) {
-                    JSONObject object = array.optJSONObject(i);
-                    if (object != null) merged.put(object);
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return merged.toString();
     }
 
     private boolean installRemoteRuntimeProfile(ContentProfile remoteProfile) {
@@ -1558,6 +1878,173 @@ public class XServerDisplayActivity extends AppCompatActivity {
         contentsManager.syncContents();
         ContentProfile installed = contentsManager.resolveBestRuntimeProfile(ContentsManager.getEntryName(remoteProfile), remoteProfile.getRuntimeModel());
         return isRuntimeProfileReady(installed != null ? installed : remoteProfile);
+    }
+
+    private String normalizeSha256(String value) {
+        if (value == null) return "";
+        String normalized = value.trim().toLowerCase(Locale.US).replaceAll("[^0-9a-f]", "");
+        return normalized.length() == 64 ? normalized : "";
+    }
+
+    private String chooseRemotePayloadSuffix(ContentProfile remoteProfile, String fallback) {
+        String remoteUrl = remoteProfile == null || remoteProfile.remoteUrl == null
+                ? ""
+                : remoteProfile.remoteUrl.toLowerCase(Locale.US);
+        if (remoteUrl.endsWith(".zip")) return ".zip";
+        if (remoteUrl.endsWith(".tzst")) return ".tzst";
+        if (remoteUrl.endsWith(".txz")) return ".txz";
+        if (remoteUrl.endsWith(".wcp.zst")) return ".wcp.zst";
+        if (remoteUrl.endsWith(".wcp.xz")) return ".wcp.xz";
+        if (remoteUrl.endsWith(".wcp")) return ".wcp";
+        return fallback;
+    }
+
+    private String stripArchiveSuffix(String value) {
+        if (value == null) return "";
+        String normalized = value.trim();
+        String lower = normalized.toLowerCase(Locale.US);
+        String[] suffixes = {".zip", ".wcp.zst", ".wcp.xz", ".wcp", ".txz", ".tzst", ".tar.xz", ".tar.zst", ".tar"};
+        for (String suffix : suffixes) {
+            if (lower.endsWith(suffix)) {
+                return normalized.substring(0, normalized.length() - suffix.length()).trim();
+            }
+        }
+        return normalized;
+    }
+
+    @Nullable
+    private ContentProfile.ContentType resolveGraphicsProfileTypeForLane(String providerLane) {
+        String normalizedLane = safeTrim(providerLane).toLowerCase(Locale.US);
+        return switch (normalizedLane) {
+            case "freedreno-opengl", "zink-opengl", "aemali-gallium" ->
+                    ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER;
+            case "turnip-vulkan", "aemali-panvk" ->
+                    ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER;
+            default -> null;
+        };
+    }
+
+    @Nullable
+    private ContentProfile resolveGraphicsRemoteProfileForLane(String providerLane,
+                                                              @Nullable AdrenotoolsManager.DriverPackageInfo referenceInfo) {
+        if (contentsManager == null) return null;
+        ContentProfile.ContentType contentType = resolveGraphicsProfileTypeForLane(providerLane);
+        if (contentType == null) return null;
+
+        LinkedHashSet<String> hints = new LinkedHashSet<>();
+        if (referenceInfo != null) {
+            if (!safeTrim(referenceInfo.entryId).isEmpty()) hints.add(referenceInfo.entryId);
+            if (!safeTrim(referenceInfo.name).isEmpty()) hints.add(referenceInfo.name);
+            if (!safeTrim(referenceInfo.artifactName).isEmpty()) hints.add(stripArchiveSuffix(referenceInfo.artifactName));
+            if (!safeTrim(referenceInfo.releaseTag).isEmpty()) hints.add(referenceInfo.releaseTag);
+        }
+        if (contentType == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER) {
+            hints.add("rolling-arm64");
+        }
+
+        for (String hint : hints) {
+            if (hint == null || hint.trim().isEmpty()) continue;
+            ContentProfile profile = contentsManager.findProfileByVersion(contentType, hint, false);
+            if (profile != null && profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty()) {
+                return profile;
+            }
+        }
+        return null;
+    }
+
+    private boolean installRemoteGraphicsProfile(ContentProfile remoteProfile) {
+        if (remoteProfile == null || remoteProfile.remoteUrl == null || remoteProfile.remoteUrl.trim().isEmpty()) {
+            return false;
+        }
+
+        File downloadDir = new File(getCacheDir(), "contents-graphics-downloads");
+        if (!downloadDir.exists() && !downloadDir.mkdirs()) {
+            return false;
+        }
+
+        File payloadFile = new File(
+                downloadDir,
+                ContentsManager.getEntryName(remoteProfile) + chooseRemotePayloadSuffix(remoteProfile, ".zip")
+        );
+
+        boolean downloaded = Downloader.downloadFile(remoteProfile.remoteUrl, payloadFile);
+        String expectedSha256 = normalizeSha256(remoteProfile.remoteSha256);
+        if (downloaded && !expectedSha256.isEmpty()) {
+            String actualSha256 = normalizeSha256(Downloader.sha256Hex(payloadFile));
+            if (!expectedSha256.equals(actualSha256)) {
+                downloaded = false;
+            }
+        }
+        if (!downloaded || !payloadFile.isFile()) {
+            if (payloadFile.exists()) payloadFile.delete();
+            return false;
+        }
+
+        String installedDriverName = "";
+        try {
+            installedDriverName = new AdrenotoolsManager(this).installDriver(Uri.fromFile(payloadFile), remoteProfile);
+        } catch (Exception ignored) {
+        } finally {
+            if (payloadFile.exists()) payloadFile.delete();
+        }
+        if (installedDriverName == null || installedDriverName.trim().isEmpty()) {
+            return false;
+        }
+
+        contentsManager.syncContents();
+        return true;
+    }
+
+    @Nullable
+    private AdrenotoolsManager.DriverPackageInfo ensureGraphicsProviderLaneInstalled(
+            AdrenotoolsManager adrenotoolsManager,
+            String providerLane,
+            @Nullable AdrenotoolsManager.DriverPackageInfo referenceInfo
+    ) {
+        if (adrenotoolsManager == null) return null;
+        String normalizedLane = safeTrim(providerLane);
+        if (normalizedLane.isEmpty()) return null;
+
+        AdrenotoolsManager.DriverPackageInfo resolved = adrenotoolsManager.resolvePreferredDriverForLane(normalizedLane, referenceInfo);
+        if (resolved != null) return resolved;
+
+        ContentProfile remoteProfile = resolveGraphicsRemoteProfileForLane(normalizedLane, referenceInfo);
+        ForensicLogger.logEvent(
+                this,
+                remoteProfile == null ? "warn" : "info",
+                "GRAPHICS_COMPANION_PROVIDER_INSTALL_ATTEMPT",
+                null,
+                "graphics_provider",
+                remoteProfile == null ? "graphics_companion_provider_missing_from_catalog" : "graphics_companion_provider_install_attempt",
+                ForensicLogger.fields(
+                        "provider_lane", normalizedLane,
+                        "reference_entry", referenceInfo == null ? "" : firstNonEmpty(referenceInfo.entryId, referenceInfo.name),
+                        "reference_provider_lane", referenceInfo == null ? "" : referenceInfo.providerLane,
+                        "remote_entry", remoteProfile == null ? "" : ContentsManager.getEntryName(remoteProfile),
+                        "remote_url", remoteProfile == null ? "" : firstNonEmpty(remoteProfile.remoteUrl, "")
+                )
+        );
+        if (remoteProfile == null) return null;
+
+        boolean installed = installRemoteGraphicsProfile(remoteProfile);
+        resolved = adrenotoolsManager.resolvePreferredDriverForLane(normalizedLane, referenceInfo);
+        ForensicLogger.logEvent(
+                this,
+                installed && resolved != null ? "info" : "warn",
+                "GRAPHICS_COMPANION_PROVIDER_INSTALL_RESULT",
+                null,
+                "graphics_provider",
+                installed && resolved != null ? "graphics_companion_provider_ready" : "graphics_companion_provider_install_failed",
+                ForensicLogger.fields(
+                        "provider_lane", normalizedLane,
+                        "reference_entry", referenceInfo == null ? "" : firstNonEmpty(referenceInfo.entryId, referenceInfo.name),
+                        "remote_entry", ContentsManager.getEntryName(remoteProfile),
+                        "install_succeeded", installed ? "1" : "0",
+                        "resolved_entry", resolved == null ? "" : resolved.entryId,
+                        "resolved_package", resolved == null ? "" : resolved.name
+                )
+        );
+        return resolved;
     }
 
     private boolean parseBoolean(String value) {
@@ -1657,9 +2144,50 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        boolean launchTargetChanged = hasLaunchTargetChanged(intent);
+        setIntent(intent);
+        logBootstrapCheckpoint(
+                "XSERVER_NEW_INTENT_RECEIVED",
+                "xserver_activity_received_new_intent",
+                "container_id", intent != null ? intent.getIntExtra("container_id", 0) : 0,
+                "shortcut_path", intent != null ? intent.getStringExtra("shortcut_path") : "",
+                "app_id", resolveIntentLaunchAppId(intent),
+                "launch_route_token", resolveIntentLaunchRouteToken(intent),
+                "activity_has_focus", hasWindowFocus(),
+                "guest_bootstrap_submitted", guestBootstrapSubmitted,
+                "launch_target_changed", launchTargetChanged
+        );
+        if (launchTargetChanged) {
+            restoreTemporaryOverrideIfNeeded("new_intent_recreate");
+            launchBindingGeneration++;
+            logBootstrapCheckpoint(
+                    "XSERVER_NEW_INTENT_RECREATE",
+                    "xserver_activity_recreate_for_new_launch_target",
+                    "current_container_id", activeLaunchContainerId,
+                    "incoming_container_id", resolveIntentContainerId(intent),
+                    "current_shortcut_path", activeLaunchShortcutPath,
+                    "incoming_shortcut_path", normalizeShortcutPath(intent != null ? intent.getStringExtra("shortcut_path") : null),
+                    "current_app_id", activeLaunchAppId,
+                    "incoming_app_id", resolveIntentLaunchAppId(intent),
+                    "current_launch_route_token", activeLaunchRouteToken,
+                    "incoming_launch_route_token", resolveIntentLaunchRouteToken(intent),
+                    "guest_bootstrap_submitted", guestBootstrapSubmitted
+            );
+            recreate();
+            return;
+        }
+        maybeRunPendingGuestBootstrap("new_intent");
+    }
+
+
+    @Override
     public void onResume() {
         super.onResume();
         cancelDeferredDesktopRuntimePause("resume");
+        AppUtils.hideSystemUI(this);
+        refreshDesktopGestureExclusion();
         boolean gyroEnabled = preferences.getBoolean("gyro_enabled", true);
 
         if (gyroEnabled) {
@@ -1674,6 +2202,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         startTime = System.currentTimeMillis();
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
         ProcessHelper.resumeAllWineProcesses();
+        maybeRunPendingGuestBootstrap("resume");
     }
 
     @Override
@@ -1687,6 +2216,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         boolean enteringPictureInPicture = isInPictureInPictureMode();
+        if (!shouldAutoSuspendRuntimeOnLifecycle()) {
+            cancelDeferredDesktopRuntimePause("pause_suspend_policy");
+            logDesktopRuntimePauseSkipped("pause_suspend_policy");
+            return;
+        }
         boolean deferDesktopRuntimePause = !enteringPictureInPicture && shouldKeepDesktopRuntimeActiveOnPause();
 
         if (!enteringPictureInPicture && !deferDesktopRuntimePause) {
@@ -1792,6 +2326,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (environment != null) environment.stopEnvironmentComponents();
             ProcessHelper.terminateAllWineProcesses();
             waitForWineProcessesToTerminate(1500);
+            cleanupWineTrashAfterShutdown();
 
             ForensicLogger.logEvent(
                     this,
@@ -1830,8 +2365,57 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private void cleanupWineTrashAfterShutdown() {
+        if (container == null || container.getRootDir() == null) return;
+        File trashDir = new File(container.getRootDir(), ".local/share/Trash");
+        File[] children = trashDir.listFiles();
+        if (children == null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_TRASH_CLEANUP_SKIPPED",
+                    null,
+                    "xserver",
+                    "wine_xdg_trash_missing_or_unreadable",
+                    ForensicLogger.fields("trash_dir", trashDir.getAbsolutePath())
+            );
+            return;
+        }
+        if (children.length == 0) {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_TRASH_CLEANUP_EMPTY",
+                    null,
+                    "xserver",
+                    "wine_xdg_trash_already_empty",
+                    ForensicLogger.fields("trash_dir", trashDir.getAbsolutePath())
+            );
+            return;
+        }
+
+        int deleted = 0;
+        for (File child : children) {
+            if (FileUtils.delete(child)) deleted++;
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_TRASH_CLEANUP_DONE",
+                null,
+                "xserver",
+                "wine_xdg_trash_cleanup_complete",
+                ForensicLogger.fields(
+                        "trash_dir", trashDir.getAbsolutePath(),
+                        "deleted_count", deleted,
+                        "total_count", children.length
+                )
+        );
+    }
+
     private void exit() {
         if (!exitInProgress.compareAndSet(false, true)) return;
+        restoreTemporaryOverrideIfNeeded("runtime_exit");
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         ForensicLogger.logEvent(
                 this,
@@ -1848,13 +2432,46 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        restoreTemporaryOverrideIfNeeded("activity_destroy");
         super.onDestroy();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if (deferredDesktopPauseScheduled) {
+        if (!shouldAutoSuspendRuntimeOnLifecycle()) {
+            cancelDeferredDesktopRuntimePause("stop_suspend_policy");
+            logDesktopRuntimePauseSkipped("stop_suspend_policy");
+            savePlaytimeData();
+            handler.removeCallbacks(savePlaytimeRunnable);
+            return;
+        }
+        int trackedWindowCount = getTrackedApplicationWindowCount();
+        DesktopShellBootstrapProof proof = null;
+        if (desktopShellBootstrapActive) {
+            proof = collectDesktopShellBootstrapProof();
+        }
+        if (shouldKeepDesktopRuntimeActiveAcrossStop(proof, trackedWindowCount)) {
+            scheduleDeferredDesktopRuntimePause(DESKTOP_RUNTIME_STOP_BOOTSTRAP_GRACE_MS);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_RUNTIME_PAUSE_STOP_DEFERRED",
+                    null,
+                    "xserver",
+                    "desktop_runtime_pause_deferred_during_live_bootstrap_stop",
+                    ForensicLogger.fields(
+                            "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                            "tracked_window_count", trackedWindowCount,
+                            "grace_ms", DESKTOP_RUNTIME_STOP_BOOTSTRAP_GRACE_MS,
+                            "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                            "shell_launcher_present", proof != null && proof.shellLauncherPresent,
+                            "shell_process_present", proof != null && proof.explorerProcessPresent,
+                            "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                            "wineserver_present", proof != null && proof.wineserverPresent
+                    )
+            );
+        } else if (deferredDesktopPauseScheduled) {
             cancelDeferredDesktopRuntimePause("stop");
             pauseDesktopRuntime("stop_background_pause");
         }
@@ -1885,13 +2502,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
         bindRuntimeDrawerAction(R.id.LLRuntimeActionPauseResume, R.id.main_menu_pause);
         bindRuntimeDrawerAction(R.id.LLRuntimeActionPip, R.id.main_menu_pip_mode);
         bindRuntimeDrawerAction(R.id.LLRuntimeActionTaskManager, R.id.main_menu_task_manager);
+        bindRuntimeDrawerAction(R.id.LLRuntimeActionActiveWindows, R.id.main_menu_active_windows);
         bindRuntimeDrawerAction(R.id.LLRuntimeActionMagnifier, R.id.main_menu_magnifier);
         bindRuntimeDrawerAction(R.id.LLRuntimeActionLogs, R.id.main_menu_logs);
+        View prefixPackRow = findViewById(R.id.LLRuntimeActionPrefixPack);
+        if (prefixPackRow != null) {
+            prefixPackRow.setOnClickListener(v -> {
+                hideRuntimeDrawer();
+                showPrefixPackGuide();
+            });
+        }
+        View runtimeProfilesRow = findViewById(R.id.LLRuntimeActionRuntimeProfiles);
+        if (runtimeProfilesRow != null) {
+            runtimeProfilesRow.setOnClickListener(v -> {
+                hideRuntimeDrawer();
+                showRuntimeProfilesDialog();
+            });
+        }
         bindRuntimeDrawerAction(R.id.LLRuntimeActionExit, R.id.main_menu_exit);
 
         runtimeDrawerView.post(() -> runtimeDrawerView.setTranslationX(getRuntimeDrawerHiddenOffset()));
         refreshRuntimeDrawerState();
-        applyRuntimeThemeAssetPass();
     }
 
     private void bindRuntimeDrawerAction(int rowId, int actionId) {
@@ -1914,6 +2545,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         runtimeDrawerVisible = true;
         runtimeDrawerScrim.setVisibility(View.VISIBLE);
         runtimeDrawerView.setVisibility(View.VISIBLE);
+        if (runtimeDrawerView instanceof android.widget.ScrollView) {
+            runtimeDrawerView.scrollTo(0, 0);
+            runtimeDrawerView.post(() -> {
+                if (runtimeDrawerVisible && runtimeDrawerView != null) {
+                    runtimeDrawerView.scrollTo(0, 0);
+                    runtimeDrawerView.requestLayout();
+                }
+            });
+        }
         runtimeDrawerScrim.animate().cancel();
         runtimeDrawerView.animate().cancel();
         runtimeDrawerScrim.setAlpha(0f);
@@ -1946,11 +2586,922 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (xserverRootView != null) ThemeAssetPainter.apply(this, xserverRootView, isDarkMode);
     }
 
+    private String trimToEmpty(@Nullable String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            String normalized = trimToEmpty(value);
+            if (!normalized.isEmpty()) return normalized;
+        }
+        return "";
+    }
+
+    private String joinNonEmptyCsv(String... values) {
+        if (values == null || values.length == 0) return "";
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            String normalized = trimToEmpty(value);
+            if (normalized.isEmpty()) continue;
+            if (builder.length() > 0) builder.append(',');
+            builder.append(normalized);
+        }
+        return builder.toString();
+    }
+
+    private String humanizeGraphicsLane(String lane) {
+        String normalized = trimToEmpty(lane).toLowerCase(Locale.US);
+        return switch (normalized) {
+            case "aemali-panvk" -> "AeMali PanVK";
+            case "aemali-gallium" -> "AeMali Gallium";
+            case "turnip-vulkan" -> "Turnip Vulkan";
+            case "freedreno-opengl" -> "Mesa OpenGL";
+            case "zink-opengl" -> "Mesa OpenGL";
+            case "virgl-universal" -> "VirGL Universal";
+            case "gladio-opengl" -> "Gladio OpenGL";
+            case "vortek-wrapper-vulkan" -> "Vortek Vulkan";
+            case "system-graphics" -> "System Graphics";
+            case "wrapper" -> "Wrapper";
+            case "system" -> "System";
+            case "" -> getString(R.string.not_set);
+            default -> {
+                String[] tokens = normalized.replace('_', ' ').replace('-', ' ').split("\\s+");
+                StringBuilder builder = new StringBuilder();
+                for (String token : tokens) {
+                    if (token.isEmpty()) continue;
+                    if (builder.length() > 0) builder.append(' ');
+                    builder.append(Character.toUpperCase(token.charAt(0)));
+                    if (token.length() > 1) builder.append(token.substring(1));
+                }
+                yield builder.length() > 0 ? builder.toString() : getString(R.string.not_set);
+            }
+        };
+    }
+
+    private String humanizeDxWrapper(String wrapper) {
+        String normalized = trimToEmpty(wrapper).toLowerCase(Locale.US);
+        if (normalized.contains("dxvk")) return "DXVK+VKD3D";
+        if (normalized.contains("dgvoodoo")) return "dgVoodoo";
+        if (normalized.contains("wine")) return "WineD3D";
+        return normalized.isEmpty() ? getString(R.string.not_set) : humanizeGraphicsLane(normalized);
+    }
+
+    private boolean supportsDgVoodooVulkanBridge(String rawGraphicsDriver) {
+        String normalized = Container.normalizeGraphicsDriver(rawGraphicsDriver);
+        return GraphicsDrivers.isWrapper(normalized)
+                || GraphicsDrivers.isVortek(normalized)
+                || GraphicsDrivers.isGladio(normalized)
+                || GraphicsDrivers.isVirgl(normalized)
+                || GraphicsDrivers.isAeMaliGallium(normalized);
+    }
+
+    private void logNoexecDosDriveState(@Nullable File rootDir) {
+        if (container == null || rootDir == null) return;
+        StringBuilder noexecDrives = new StringBuilder();
+        for (String[] drive : container.drivesIterator()) {
+            if (drive == null || drive.length < 2) continue;
+            String letter = trimToEmpty(drive[0]).toUpperCase(Locale.US);
+            String hostPath = trimToEmpty(drive[1]);
+            if (letter.isEmpty() || hostPath.isEmpty()) continue;
+            if (!shouldMirrorNoexecLaunchTarget(rootDir, new File(hostPath))) continue;
+            if (noexecDrives.length() > 0) noexecDrives.append(',');
+            noexecDrives.append(letter).append(':').append(hostPath);
+        }
+        String value = noexecDrives.toString();
+        setOrClearEnv("AERO_NOEXEC_DOS_DRIVES", value);
+        if (value.isEmpty()) return;
+        ForensicLogger.logEvent(
+                this,
+                "warn",
+                "NOEXEC_DOS_DRIVE_DETECTED",
+                null,
+                "xserver",
+                "noexec_dos_drive_detected",
+                ForensicLogger.fields(
+                        "noexec_dos_drives", value,
+                        "effect", "wine_pe_mmap_from_this_drive_can_fail_without_exec_safe_mirror"
+                )
+        );
+    }
+
+    private String resolveDxWrapperStatusText() {
+        if (!trimToEmpty(dxwrapper).toLowerCase(Locale.US).contains("dgvoodoo")) {
+            return humanizeDxWrapper(dxwrapper);
+        }
+
+        String arch = firstNonEmpty(
+                envVars.get("AERO_DGVOODOO_PACKAGE_LANE"),
+                envVars.get("AERO_DGVOODOO_ARCH_ACTIVE"),
+                envVars.get("AERO_DGVOODOO_ARCH_REQUESTED"),
+                getString(R.string.not_set)
+        );
+        String route = firstNonEmpty(
+                envVars.get("AERO_DGVOODOO_ROUTE_STATE"),
+                "1".equals(trimToEmpty(envVars.get("AERO_DGVOODOO_STAGE_READY"))) ? "dgvoodoo" : "wined3d-fallback"
+        );
+        String forceD3d11 = "1".equals(trimToEmpty(envVars.get("AERO_DGVOODOO_FORCE_D3D11"))) ? "on" : "off";
+        return getString(R.string.runtime_graphics_status_dxwrapper_dgvoodoo, arch, route, forceD3d11);
+    }
+
+    private String humanizeAudioDriver(String driver) {
+        String normalized = trimToEmpty(driver).toLowerCase(Locale.US);
+        if ("alsa".equals(normalized)) return "ALSA";
+        if (normalized.contains("pulse")) return "PulseAudio";
+        return normalized.isEmpty() ? getString(R.string.not_set) : humanizeGraphicsLane(normalized);
+    }
+
+    private String humanizeUpscalerBackend(String backend) {
+        String normalized = trimToEmpty(backend).toLowerCase(Locale.US);
+        return switch (normalized) {
+            case "mobfgsr" -> "MobFGSR";
+            case "vkbasalt" -> "vkBasalt";
+            case "", "off" -> getString(R.string.runtime_graphics_status_framegen_off);
+            default -> humanizeGraphicsLane(normalized);
+        };
+    }
+
+    private String humanizeFramegenMode(String mode) {
+        String normalized = trimToEmpty(mode).toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return "auto";
+        return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
+    }
+
+    private String buildProviderSummary(String lane, String packageName, String version) {
+        String label = humanizeGraphicsLane(lane);
+        String pkg = trimToEmpty(packageName);
+        String ver = trimToEmpty(version);
+        if (pkg.isEmpty() && ver.isEmpty()) return label;
+        if (pkg.isEmpty()) return label + " | " + ver;
+        if (ver.isEmpty()) return label + " | " + pkg;
+        if (pkg.equalsIgnoreCase(ver)) return label + " | " + pkg;
+        return label + " | " + pkg + " • " + ver;
+    }
+
+    private String resolveConfiguredGraphicsSelection() {
+        String configuredVersion = GraphicsDrivers.getDisplayVersion(this, graphicsDriver, rawGraphicsDriverConfig);
+        return firstNonEmpty(
+                envVars.get("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE"),
+                envVars.get("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY"),
+                configuredVersion,
+                graphicsDriver
+        );
+    }
+
+    private String resolveRuntimeGraphicsPrimaryText() {
+        String lane = firstNonEmpty(envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE"), graphicsDriver);
+        String packageName = firstNonEmpty(
+                envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE"),
+                envVars.get("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE"),
+                resolveConfiguredGraphicsSelection()
+        );
+        String version = firstNonEmpty(
+                envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION"),
+                GraphicsDrivers.getDisplayVersion(this, graphicsDriver, rawGraphicsDriverConfig)
+        );
+        String summary = buildProviderSummary(lane, packageName, version);
+        return summary.equals(getString(R.string.not_set)) ? getString(R.string.runtime_graphics_status_unresolved) : summary;
+    }
+
+    private String resolveRuntimeGraphicsSecondaryText() {
+        String companion = buildProviderSummary(
+                firstNonEmpty(envVars.get("AERO_GRAPHICS_COMPANION_PROVIDER_LANE"), envVars.get("AERO_GRAPHICS_OPENGL_PROVIDER")),
+                firstNonEmpty(envVars.get("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE"), envVars.get("AERO_OPENGL_PACKAGE")),
+                firstNonEmpty(envVars.get("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION"), envVars.get("AERO_OPENGL_VERSION"))
+        );
+        return getString(
+                R.string.runtime_graphics_status_secondary,
+                companion,
+                resolveDxWrapperStatusText(),
+                humanizeAudioDriver(audioDriver)
+        );
+    }
+
+    private String resolveRuntimeGraphicsTertiaryText() {
+        String framegen = upscalerFrameGeneration && !UPSCALER_BACKEND_OFF.equalsIgnoreCase(upscalerBackend)
+                ? getString(
+                R.string.runtime_graphics_status_framegen_on,
+                humanizeUpscalerBackend(upscalerBackend),
+                humanizeFramegenMode(upscalerFramegenMode)
+        )
+                : getString(R.string.runtime_graphics_status_framegen_off);
+        String vulkanApi = firstNonEmpty(
+                envVars.get("AERO_VULKAN_API_SELECTED"),
+                envVars.get("WRAPPER_VK_VERSION"),
+                graphicsDriverConfig != null ? graphicsDriverConfig.get("vulkanVersion") : ""
+        );
+        if (vulkanApi.isEmpty()) vulkanApi = getString(R.string.not_set);
+        String selection = resolveConfiguredGraphicsSelection();
+        String legacyRequestedDriver = trimToEmpty(envVars.get("AERO_GRAPHICS_LEGACY_REQUESTED_DRIVER"));
+        String legacyPolicy = trimToEmpty(envVars.get("AERO_GRAPHICS_LEGACY_POLICY"));
+        if (!legacyRequestedDriver.isEmpty()) {
+            String legacyLabel = humanizeGraphicsLane(legacyRequestedDriver);
+            String legacyPrefix = "route-degraded".equals(legacyPolicy) ? "requested " : "compat ";
+            selection = selection.isEmpty() ? legacyPrefix + legacyLabel : selection + " | " + legacyPrefix + legacyLabel;
+        }
+        if (selection.isEmpty()) selection = getString(R.string.not_set);
+        return getString(R.string.runtime_graphics_status_tertiary, framegen, vulkanApi, selection);
+    }
+
+    private void applyRuntimeGraphicsStatusCardStyle() {
+        View card = findViewById(R.id.LLRuntimeGraphicsStatusCard);
+        if (card == null) return;
+
+        card.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        int textColor = ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text);
+        int[] textIds = new int[] {
+                R.id.TVRuntimeGraphicsStatusLabel,
+                R.id.TVRuntimeGraphicsPrimary,
+                R.id.TVRuntimeGraphicsSecondary,
+                R.id.TVRuntimeGraphicsTertiary
+        };
+        for (int id : textIds) {
+            TextView textView = findViewById(id);
+            if (textView != null) textView.setTextColor(textColor);
+        }
+    }
+
+    private void applyRuntimeDrawerSurfaceStyle() {
+        if (runtimeDrawerView != null) {
+            runtimeDrawerView.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+
+        View headerCard = findViewById(R.id.LLRuntimeDrawerHeaderCard);
+        if (headerCard != null) {
+            headerCard.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+        View closeButton = findViewById(R.id.BTCloseRuntimeDrawer);
+        if (closeButton != null) {
+            closeButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+        }
+
+        int brightText = ContextCompat.getColor(this, R.color.surface_table_head_text);
+        int mutedText = ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_muted);
+        int accentText = ContextCompat.getColor(this, R.color.surface_button_positive_text);
+        int[] headerTextIds = new int[] {
+                R.id.TVRuntimeDrawerContainerName,
+                R.id.TVRuntimeDrawerShortcutName,
+                R.id.TVRuntimeDrawerRoute,
+                R.id.TVRuntimeDrawerHint
+        };
+        for (int id : headerTextIds) {
+            TextView textView = findViewById(id);
+            if (textView != null) textView.setTextColor(brightText);
+        }
+        android.widget.ImageButton headerClose = findViewById(R.id.BTCloseRuntimeDrawer);
+        if (headerClose != null) headerClose.setColorFilter(accentText);
+        TextView headerBadge = findViewById(R.id.TVRuntimeDrawerHeaderBadge);
+        if (headerBadge != null) {
+            headerBadge.setBackgroundResource(R.drawable.surface_runtime_taskmgr_badge_background);
+            headerBadge.setTextColor(brightText);
+        }
+
+        int[] rowIds = new int[] {
+                R.id.LLRuntimeActionKeyboard,
+                R.id.LLRuntimeActionInputControls,
+                R.id.LLRuntimeActionRelativeMouse,
+                R.id.LLRuntimeActionScreenEffects,
+                R.id.LLRuntimeActionFullscreen,
+                R.id.LLRuntimeActionPauseResume,
+                R.id.LLRuntimeActionPip,
+                R.id.LLRuntimeActionTaskManager,
+                R.id.LLRuntimeActionMagnifier,
+                R.id.LLRuntimeActionLogs,
+                R.id.LLRuntimeActionPrefixPack,
+                R.id.LLRuntimeActionRuntimeProfiles,
+                R.id.LLRuntimeActionExit
+        };
+        for (int id : rowIds) {
+            View row = findViewById(id);
+            if (row != null) row.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+
+        int[] rowTitleIds = new int[] {
+                R.id.TVRuntimeActionKeyboardTitle,
+                R.id.TVRuntimeActionInputControlsTitle,
+                R.id.TVRuntimeActionRelativeMouseTitle,
+                R.id.TVRuntimeActionScreenEffectsTitle,
+                R.id.TVRuntimeActionFullscreenTitle,
+                R.id.TVRuntimeActionPauseResumeTitle,
+                R.id.TVRuntimeActionPipTitle,
+                R.id.TVRuntimeActionTaskManagerTitle,
+                R.id.TVRuntimeActionMagnifierTitle,
+                R.id.TVRuntimeActionLogsTitle,
+                R.id.TVRuntimeActionPrefixPackTitle,
+                R.id.TVRuntimeActionRuntimeProfilesTitle,
+                R.id.TVRuntimeActionExitTitle
+        };
+        for (int id : rowTitleIds) {
+            TextView textView = findViewById(id);
+            if (textView != null) textView.setTextColor(brightText);
+        }
+        int[] rowSummaryIds = new int[] {
+                R.id.TVRuntimeActionKeyboardSummary,
+                R.id.TVRuntimeActionInputControlsSummary,
+                R.id.TVRuntimeActionRelativeMouseSummary,
+                R.id.TVRuntimeActionScreenEffectsSummary,
+                R.id.TVRuntimeActionFullscreenSummary,
+                R.id.TVRuntimeActionPauseResumeSummary,
+                R.id.TVRuntimeActionPipSummary,
+                R.id.TVRuntimeActionTaskManagerSummary,
+                R.id.TVRuntimeActionMagnifierSummary,
+                R.id.TVRuntimeActionLogsSummary,
+                R.id.TVRuntimeActionPrefixPackSummary,
+                R.id.TVRuntimeActionRuntimeProfilesSummary,
+                R.id.TVRuntimeActionExitSummary
+        };
+        for (int id : rowSummaryIds) {
+            TextView textView = findViewById(id);
+            if (textView != null) textView.setTextColor(mutedText);
+        }
+
+        int[] iconIds = new int[] {
+                R.id.IVRuntimeActionKeyboard,
+                R.id.IVRuntimeActionInputControls,
+                R.id.IVRuntimeActionRelativeMouse,
+                R.id.IVRuntimeActionScreenEffects,
+                R.id.IVRuntimeActionFullscreen,
+                R.id.IVRuntimeActionPauseResume,
+                R.id.IVRuntimeActionPip,
+                R.id.IVRuntimeActionTaskManager,
+                R.id.IVRuntimeActionMagnifier,
+                R.id.IVRuntimeActionLogs,
+                R.id.IVRuntimeActionPrefixPack,
+                R.id.IVRuntimeActionRuntimeProfiles,
+                R.id.IVRuntimeActionExit
+        };
+        for (int id : iconIds) {
+            android.widget.ImageView icon = findViewById(id);
+            if (icon != null) icon.setColorFilter(brightText);
+        }
+
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionInputControls,
+                new int[] {R.id.TVRuntimeActionInputControlsTitle, R.id.TVRuntimeActionInputControlsSummary},
+                R.id.IVRuntimeActionInputControls,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionScreenEffects,
+                new int[] {R.id.TVRuntimeActionScreenEffectsTitle, R.id.TVRuntimeActionScreenEffectsSummary},
+                R.id.IVRuntimeActionScreenEffects,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionTaskManager,
+                new int[] {R.id.TVRuntimeActionTaskManagerTitle, R.id.TVRuntimeActionTaskManagerSummary},
+                R.id.IVRuntimeActionTaskManager,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionPrefixPack,
+                new int[] {R.id.TVRuntimeActionPrefixPackTitle, R.id.TVRuntimeActionPrefixPackSummary},
+                R.id.IVRuntimeActionPrefixPack,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionRuntimeProfiles,
+                new int[] {R.id.TVRuntimeActionRuntimeProfilesTitle, R.id.TVRuntimeActionRuntimeProfilesSummary},
+                R.id.IVRuntimeActionRuntimeProfiles,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionLogs,
+                new int[] {R.id.TVRuntimeActionLogsTitle, R.id.TVRuntimeActionLogsSummary},
+                R.id.IVRuntimeActionLogs,
+                isDarkMode ? R.drawable.surface_table_head_background_dark : R.drawable.surface_table_head_background,
+                ContextCompat.getColor(this, R.color.surface_table_head_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionExit,
+                new int[] {R.id.TVRuntimeActionExitTitle, R.id.TVRuntimeActionExitSummary},
+                R.id.IVRuntimeActionExit,
+                isDarkMode ? R.drawable.surface_table_head_background_dark : R.drawable.surface_table_head_background,
+                ContextCompat.getColor(this, R.color.surface_table_head_text)
+        );
+    }
+
+    private void styleRuntimeDrawerActionHighlight(int rowId, int[] textIds, int iconId, int backgroundRes, int textColor) {
+        View row = findViewById(rowId);
+        if (row != null) row.setBackgroundResource(backgroundRes);
+        if (textIds != null) {
+            for (int id : textIds) {
+                TextView textView = findViewById(id);
+                if (textView != null) textView.setTextColor(textColor);
+            }
+        }
+        android.widget.ImageView icon = findViewById(iconId);
+        if (icon != null) icon.setColorFilter(textColor);
+    }
+
+    private void styleRuntimeNestedDialog(ContentDialog dialog) {
+        if (dialog == null) return;
+        int brightText = ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text);
+        int mutedText = ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_muted);
+
+        View root = dialog.getContentView();
+        if (root != null) {
+            root.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            root.setPadding(dp(7), dp(5), dp(7), dp(5));
+        }
+
+        View frameLayout = dialog.findViewById(R.id.FrameLayout);
+        if (frameLayout != null) frameLayout.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+
+        View titleBar = dialog.findViewById(R.id.LLTitleBar);
+        if (titleBar != null) {
+            titleBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            titleBar.setPadding(dp(7), dp(5), dp(7), 0);
+        }
+
+        View bottomBar = dialog.findViewById(R.id.LLBottomBar);
+        if (bottomBar != null) {
+            bottomBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            bottomBar.setPadding(0, 0, 0, 0);
+        }
+
+        TextView titleView = dialog.findViewById(R.id.TVTitle);
+        if (titleView != null) titleView.setTextColor(brightText);
+
+        TextView messageView = dialog.findViewById(R.id.TVMessage);
+        if (messageView != null) messageView.setTextColor(brightText);
+
+        android.widget.ImageView iconView = dialog.findViewById(R.id.IVIcon);
+        if (iconView != null) iconView.setColorFilter(brightText);
+
+        View titleBackButton = dialog.findViewById(R.id.BTTitleBack);
+        if (titleBackButton instanceof android.widget.ImageButton) {
+            ((android.widget.ImageButton) titleBackButton).setColorFilter(brightText);
+            titleBackButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            ViewGroup.LayoutParams layoutParams = titleBackButton.getLayoutParams();
+            if (layoutParams != null) {
+                layoutParams.width = dp(36);
+                layoutParams.height = dp(36);
+                titleBackButton.setLayoutParams(layoutParams);
+            }
+        }
+
+        android.widget.Button confirmButton = dialog.findViewById(R.id.BTConfirm);
+        if (confirmButton != null) {
+            confirmButton.setBackgroundResource(R.drawable.surface_runtime_button_positive);
+            confirmButton.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_button_positive_text));
+            ViewGroup.LayoutParams layoutParams = confirmButton.getLayoutParams();
+            if (layoutParams != null) {
+                layoutParams.height = dp(34);
+                confirmButton.setLayoutParams(layoutParams);
+            }
+        }
+        android.widget.Button cancelButton = dialog.findViewById(R.id.BTCancel);
+        if (cancelButton != null && cancelButton.getVisibility() == View.VISIBLE) {
+            cancelButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            cancelButton.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_button_text));
+            ViewGroup.LayoutParams layoutParams = cancelButton.getLayoutParams();
+            if (layoutParams != null) {
+                layoutParams.height = dp(34);
+                cancelButton.setLayoutParams(layoutParams);
+            }
+        }
+
+        tintRuntimeDialogTree(dialog.getInflatedLayout() != null ? dialog.getInflatedLayout() : root, brightText, mutedText);
+    }
+
+    private int dp(int value) {
+        return Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                value,
+                getResources().getDisplayMetrics()
+        ));
+    }
+
+    private boolean hasRuntimeTagToken(@Nullable View view, String token) {
+        if (view == null || token == null || token.trim().isEmpty()) return false;
+        Object tag = view.getTag();
+        if (!(tag instanceof String)) return false;
+        String[] tokens = ((String) tag).trim().split("[\\s,;|]+");
+        for (String candidate : tokens) {
+            if (token.equals(candidate)) return true;
+        }
+        return false;
+    }
+
+    private void tintRuntimeDialogTree(@Nullable View view, int brightText, int mutedText) {
+        if (view == null) return;
+
+        boolean preserveBackground = hasRuntimeTagToken(view, "preserve_background");
+        boolean themeCard = hasRuntimeTagToken(view, "theme_card");
+        boolean themeBadge = hasRuntimeTagToken(view, "theme_badge");
+        if (themeCard && !preserveBackground) {
+            view.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        } else if (themeBadge && view instanceof TextView) {
+            if (!preserveBackground) {
+                view.setBackgroundResource(R.drawable.surface_runtime_taskmgr_badge_background);
+            }
+            ((TextView) view).setTextColor(brightText);
+        }
+
+        if (view instanceof CheckBox) {
+            CheckBox checkBox = (CheckBox) view;
+            checkBox.setTextColor(brightText);
+            androidx.core.widget.CompoundButtonCompat.setButtonTintList(checkBox, ColorStateList.valueOf(brightText));
+        } else if (view instanceof Spinner spinner) {
+            SpinnerAdapters.applyRuntimeSurface(spinner);
+        } else if (view instanceof TextView) {
+            ((TextView) view).setTextColor(brightText);
+        } else if (view instanceof android.widget.Button) {
+            android.widget.Button button = (android.widget.Button) view;
+            int id = button.getId();
+            if (id == R.id.BTConfirm || id == R.id.BTReset) {
+                button.setBackgroundResource(R.drawable.surface_runtime_button_positive);
+                button.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_button_positive_text));
+            } else {
+                button.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+                button.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_button_text));
+            }
+        } else if (view instanceof android.widget.ImageButton) {
+            android.widget.ImageButton imageButton = (android.widget.ImageButton) view;
+            imageButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            imageButton.setColorFilter(brightText);
+        } else if (view instanceof android.widget.EditText) {
+            android.widget.EditText editText = (android.widget.EditText) view;
+            editText.setTextColor(brightText);
+            editText.setHintTextColor(mutedText);
+            editText.setBackgroundResource(R.drawable.surface_runtime_taskmgr_input_background);
+        }
+
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                tintRuntimeDialogTree(group.getChildAt(i), brightText, mutedText);
+            }
+        }
+    }
+
+    private void showPrefixPackGuide() {
+        String autoInstallTarget = debugAutoInstallPrefixPackTarget;
+        debugAutoInstallPrefixPackTarget = "";
+        new PrefixPackToolkitDialog(this, autoInstallTarget).show();
+    }
+
+    private String resolveBox64PresetDisplayName(String presetId) {
+        Box64Preset preset = Box64PresetManager.getPreset("box64", this, presetId);
+        if (preset != null && preset.name != null && !preset.name.trim().isEmpty()) {
+            return preset.name.trim();
+        }
+        return presetId == null || presetId.trim().isEmpty() ? getString(R.string.not_set) : presetId.trim();
+    }
+
+    private String resolveFexPresetDisplayName(String presetId) {
+        FEXCorePreset preset = FEXCorePresetManager.getPreset(this, presetId);
+        if (preset != null && preset.name != null && !preset.name.trim().isEmpty()) {
+            return preset.name.trim();
+        }
+        return presetId == null || presetId.trim().isEmpty() ? getString(R.string.not_set) : presetId.trim();
+    }
+
+    private String resolveRuntimeProfilesDrawerSummary() {
+        if (shortcut != null) {
+            return getString(R.string.runtime_drawer_runtime_profiles_unavailable);
+        }
+        boolean fexPrimary = isRuntimeProfilesFexPrimary();
+        if (fexPrimary) {
+            return getString(
+                    R.string.runtime_profile_current_route_fex,
+                    firstNonEmpty(container != null ? container.getFEXCoreVersion() : "", DefaultVersion.FEXCORE),
+                    resolveFexPresetDisplayName(container != null ? container.getFEXCorePreset() : FEXCorePreset.INTERMEDIATE)
+            );
+        }
+        return getString(
+                R.string.runtime_profile_current_route_box,
+                firstNonEmpty(container != null ? container.getBox64Version() : "", DefaultVersion.BOX64),
+                resolveBox64PresetDisplayName(container != null ? container.getBox64Preset() : Box64Preset.COMPATIBILITY)
+        );
+    }
+
+    private WineInfo resolveCurrentRuntimeWineInfo() {
+        if (wineInfo != null) return wineInfo;
+        if (container == null || contentsManager == null) return null;
+        try {
+            return WineInfo.fromIdentifier(
+                    this,
+                    contentsManager,
+                    container.getWineVersion(),
+                    ContentProfile.inferRuntimeModelFromEntryName(container.getWineVersion())
+            );
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isRuntimeProfilesFexPrimary() {
+        WineInfo activeWineInfo = resolveCurrentRuntimeWineInfo();
+        return activeWineInfo == null || activeWineInfo.isArm64EC();
+    }
+
+    private void promoteRuntimeStringSpinner(@Nullable Spinner spinner) {
+        if (spinner == null) return;
+        SpinnerAdapter currentAdapter = spinner.getAdapter();
+        if (currentAdapter == null) {
+            SpinnerAdapters.applyRuntimeSurface(spinner);
+            return;
+        }
+        int selection = spinner.getSelectedItemPosition();
+        ArrayList<String> items = new ArrayList<>();
+        for (int i = 0; i < currentAdapter.getCount(); i++) {
+            Object item = currentAdapter.getItem(i);
+            items.add(item != null ? item.toString() : "");
+        }
+        spinner.setAdapter(SpinnerAdapters.createRuntime(this, items));
+        if (!items.isEmpty()) {
+            spinner.setSelection(Math.max(0, Math.min(selection, items.size() - 1)), false);
+        }
+        SpinnerAdapters.applyRuntimeSurface(spinner);
+    }
+
+    private void loadRuntimeBox64PresetSpinner(@Nullable Spinner spinner, @Nullable String selectedId) {
+        if (spinner == null) return;
+        ArrayList<Box64Preset> presets = Box64PresetManager.getPresets("box64", this);
+        int selectedPosition = 0;
+        String normalizedSelectedId = selectedId != null ? selectedId : Box64Preset.COMPATIBILITY;
+        for (int i = 0; i < presets.size(); i++) {
+            if (normalizedSelectedId.equals(presets.get(i).id)) {
+                selectedPosition = i;
+                break;
+            }
+        }
+        spinner.setAdapter(SpinnerAdapters.createRuntimeGeneric(this, presets));
+        spinner.setSelection(selectedPosition, false);
+        SpinnerAdapters.applyRuntimeSurface(spinner);
+    }
+
+    private void loadRuntimeFexPresetSpinner(@Nullable Spinner spinner, @Nullable String selectedId) {
+        if (spinner == null) return;
+        ArrayList<FEXCorePreset> presets = FEXCorePresetManager.getPresets(this);
+        int selectedPosition = 0;
+        String normalizedSelectedId = selectedId != null ? selectedId : FEXCorePreset.INTERMEDIATE;
+        for (int i = 0; i < presets.size(); i++) {
+            if (normalizedSelectedId.equals(presets.get(i).id)) {
+                selectedPosition = i;
+                break;
+            }
+        }
+        spinner.setAdapter(SpinnerAdapters.createRuntimeGeneric(this, presets));
+        spinner.setSelection(selectedPosition, false);
+        SpinnerAdapters.applyRuntimeSurface(spinner);
+    }
+
+    private void showRuntimeProfilesDialog() {
+        if (container == null) return;
+        if (shortcut != null) {
+            showToast(this, R.string.runtime_drawer_runtime_profiles_unavailable);
+            return;
+        }
+
+        ContentDialog dialog = new ContentDialog(this, R.layout.runtime_emulator_profile_dialog);
+        dialog.setTitle(R.string.runtime_profiles);
+        dialog.setIcon(R.drawable.ae_icon_env_var);
+
+        boolean fexPrimary = isRuntimeProfilesFexPrimary();
+        Spinner box64VersionSpinner = dialog.findViewById(R.id.SRuntimeProfileBox64Version);
+        Spinner box64PresetSpinner = dialog.findViewById(R.id.SRuntimeProfileBox64Preset);
+        Spinner fexVersionSpinner = dialog.findViewById(R.id.SRuntimeProfileFexVersion);
+        Spinner fexPresetSpinner = dialog.findViewById(R.id.SRuntimeProfileFexPreset);
+        TextView currentRouteView = dialog.findViewById(R.id.TVRuntimeProfileCurrent);
+        TextView modeBadgeView = dialog.findViewById(R.id.TVRuntimeProfileModeBadge);
+        TextView modeSummaryView = dialog.findViewById(R.id.TVRuntimeProfileModeSummary);
+        View fexCard = dialog.findViewById(R.id.LLRuntimeProfileFexCard);
+        View box64Card = dialog.findViewById(R.id.LLRuntimeProfileBox64Card);
+
+        if (fexCard != null) fexCard.setVisibility(fexPrimary ? View.VISIBLE : View.GONE);
+        if (box64Card != null) box64Card.setVisibility(fexPrimary ? View.GONE : View.VISIBLE);
+
+        if (box64VersionSpinner != null) {
+            ContainerDetailFragment.loadBox64VersionSpinner(this, container, contentsManager, box64VersionSpinner, false);
+            promoteRuntimeStringSpinner(box64VersionSpinner);
+        }
+        if (box64PresetSpinner != null) {
+            loadRuntimeBox64PresetSpinner(box64PresetSpinner, container.getBox64Preset());
+        }
+        if (fexVersionSpinner != null) {
+            FEXCoreManager.loadFEXCoreVersion(this, contentsManager, fexVersionSpinner, container.getFEXCoreVersion());
+            promoteRuntimeStringSpinner(fexVersionSpinner);
+        }
+        if (fexPresetSpinner != null) {
+            loadRuntimeFexPresetSpinner(fexPresetSpinner, container.getFEXCorePreset());
+        }
+
+        Runnable refreshCurrentRoute = () -> {
+            if (currentRouteView == null) return;
+            String selectedBox64Version = box64VersionSpinner != null && box64VersionSpinner.getSelectedItem() != null
+                    ? box64VersionSpinner.getSelectedItem().toString()
+                    : container.getBox64Version();
+            String selectedBox64Preset = box64PresetSpinner != null
+                    ? Box64PresetManager.getSpinnerSelectedId(box64PresetSpinner)
+                    : container.getBox64Preset();
+            String selectedFexVersion = fexVersionSpinner != null && fexVersionSpinner.getSelectedItem() != null
+                    ? fexVersionSpinner.getSelectedItem().toString()
+                    : container.getFEXCoreVersion();
+            String selectedFexPreset = fexPresetSpinner != null
+                    ? FEXCorePresetManager.getSpinnerSelectedId(fexPresetSpinner)
+                    : container.getFEXCorePreset();
+            if (fexPrimary) {
+                currentRouteView.setText(getString(
+                        R.string.runtime_profile_current_route_fex,
+                        firstNonEmpty(selectedFexVersion, DefaultVersion.FEXCORE),
+                        resolveFexPresetDisplayName(selectedFexPreset)
+                ));
+            } else {
+                currentRouteView.setText(getString(
+                        R.string.runtime_profile_current_route_box,
+                        firstNonEmpty(selectedBox64Version, DefaultVersion.BOX64),
+                        resolveBox64PresetDisplayName(selectedBox64Preset)
+                ));
+            }
+        };
+        refreshCurrentRoute.run();
+
+        if (modeBadgeView != null) {
+            modeBadgeView.setText(fexPrimary
+                    ? R.string.runtime_profile_route_fex_badge
+                    : R.string.runtime_profile_route_box_badge);
+            modeBadgeView.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text));
+            modeBadgeView.setBackgroundResource(R.drawable.surface_runtime_taskmgr_header_background);
+        }
+        if (modeSummaryView != null) {
+            modeSummaryView.setText(fexPrimary
+                    ? R.string.runtime_profile_fex_summary
+                    : R.string.runtime_profile_box64_summary);
+            modeSummaryView.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_muted));
+        }
+
+        AdapterView.OnItemSelectedListener refreshListener = new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                refreshCurrentRoute.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                refreshCurrentRoute.run();
+            }
+        };
+        if (box64VersionSpinner != null) box64VersionSpinner.setOnItemSelectedListener(refreshListener);
+        if (box64PresetSpinner != null) box64PresetSpinner.setOnItemSelectedListener(refreshListener);
+        if (fexVersionSpinner != null) fexVersionSpinner.setOnItemSelectedListener(refreshListener);
+        if (fexPresetSpinner != null) fexPresetSpinner.setOnItemSelectedListener(refreshListener);
+
+        TextView runtimeHintView = dialog.findViewById(R.id.TVRuntimeProfileHint);
+        if (runtimeHintView != null) {
+            runtimeHintView.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_muted));
+        }
+
+        View box64AddButton = dialog.findViewById(R.id.BTRuntimeProfileBox64Add);
+        if (box64AddButton instanceof ImageButton) {
+            box64AddButton.setOnClickListener(v -> {
+                Box64EditPresetDialog editDialog = new Box64EditPresetDialog(this, "box64", null);
+                editDialog.setOnConfirmCallback(() -> {
+                    if (box64PresetSpinner != null) {
+                        loadRuntimeBox64PresetSpinner(box64PresetSpinner, container.getBox64Preset());
+                    }
+                    refreshCurrentRoute.run();
+                });
+                editDialog.show();
+                styleRuntimeNestedDialog(editDialog);
+            });
+        }
+        View box64EditButton = dialog.findViewById(R.id.BTRuntimeProfileBox64Edit);
+        if (box64EditButton instanceof ImageButton) {
+            box64EditButton.setOnClickListener(v -> {
+                String selectedId = box64PresetSpinner != null ? Box64PresetManager.getSpinnerSelectedId(box64PresetSpinner) : container.getBox64Preset();
+                Box64EditPresetDialog editDialog = new Box64EditPresetDialog(this, "box64", selectedId);
+                editDialog.setOnConfirmCallback(() -> {
+                    if (box64PresetSpinner != null) {
+                        loadRuntimeBox64PresetSpinner(box64PresetSpinner, selectedId);
+                    }
+                    refreshCurrentRoute.run();
+                });
+                editDialog.show();
+                styleRuntimeNestedDialog(editDialog);
+            });
+        }
+
+        View fexAddButton = dialog.findViewById(R.id.BTRuntimeProfileFexAdd);
+        if (fexAddButton instanceof ImageButton) {
+            fexAddButton.setOnClickListener(v -> {
+                FEXCoreEditPresetDialog editDialog = new FEXCoreEditPresetDialog(this, null);
+                editDialog.setOnConfirmCallback(() -> {
+                    if (fexPresetSpinner != null) {
+                        loadRuntimeFexPresetSpinner(fexPresetSpinner, container.getFEXCorePreset());
+                    }
+                    refreshCurrentRoute.run();
+                });
+                editDialog.show();
+                styleRuntimeNestedDialog(editDialog);
+            });
+        }
+        View fexEditButton = dialog.findViewById(R.id.BTRuntimeProfileFexEdit);
+        if (fexEditButton instanceof ImageButton) {
+            fexEditButton.setOnClickListener(v -> {
+                String selectedId = fexPresetSpinner != null ? FEXCorePresetManager.getSpinnerSelectedId(fexPresetSpinner) : container.getFEXCorePreset();
+                FEXCoreEditPresetDialog editDialog = new FEXCoreEditPresetDialog(this, selectedId);
+                editDialog.setOnConfirmCallback(() -> {
+                    if (fexPresetSpinner != null) {
+                        loadRuntimeFexPresetSpinner(fexPresetSpinner, selectedId);
+                    }
+                    refreshCurrentRoute.run();
+                });
+                editDialog.show();
+                styleRuntimeNestedDialog(editDialog);
+            });
+        }
+
+        dialog.setOnConfirmCallback(() -> {
+            String selectedBox64Version = box64VersionSpinner != null && box64VersionSpinner.getSelectedItem() != null
+                    ? box64VersionSpinner.getSelectedItem().toString()
+                    : container.getBox64Version();
+            String selectedBox64Preset = box64PresetSpinner != null
+                    ? Box64PresetManager.getSpinnerSelectedId(box64PresetSpinner)
+                    : container.getBox64Preset();
+            String selectedFexVersion = fexVersionSpinner != null && fexVersionSpinner.getSelectedItem() != null
+                    ? fexVersionSpinner.getSelectedItem().toString()
+                    : container.getFEXCoreVersion();
+            String selectedFexPreset = fexPresetSpinner != null
+                    ? FEXCorePresetManager.getSpinnerSelectedId(fexPresetSpinner)
+                    : container.getFEXCorePreset();
+
+            if (fexPrimary) {
+                container.setEmulator("fexcore");
+                container.setFEXCoreVersion(selectedFexVersion);
+            } else {
+                container.setEmulator("box64");
+                container.setBox64Version(selectedBox64Version);
+            }
+            container.setBox64Preset(selectedBox64Preset);
+            container.setFEXCorePreset(selectedFexPreset);
+            container.saveData();
+
+            emulator = container.getEmulator();
+            if (guestProgramLauncherComponent != null) {
+                guestProgramLauncherComponent.setContainer(container);
+                guestProgramLauncherComponent.setBox64Preset(selectedBox64Preset);
+                guestProgramLauncherComponent.setFEXCorePreset(selectedFexPreset);
+            }
+
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "RUNTIME_PROFILES_UPDATED",
+                    null,
+                    "runtime_ui",
+                    "runtime_profiles_updated",
+                    ForensicLogger.fields(
+                            "runtime_family", fexPrimary ? "fexcore" : "box64",
+                            "emulator", container.getEmulator(),
+                            "box64_version", firstNonEmpty(container.getBox64Version(), ""),
+                            "box64_preset", selectedBox64Preset,
+                            "fexcore_version", firstNonEmpty(container.getFEXCoreVersion(), ""),
+                            "fexcore_preset", selectedFexPreset
+                    )
+            );
+            showToast(this, R.string.runtime_profile_saved);
+            refreshRuntimeDrawerState();
+        });
+
+        dialog.show();
+        styleRuntimeNestedDialog(dialog);
+        if (currentRouteView != null) {
+            currentRouteView.setTextColor(ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text));
+            currentRouteView.setBackgroundResource(R.drawable.surface_runtime_taskmgr_header_background);
+        }
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            dialog.getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.986f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+        ViewGroup.LayoutParams params = dialog.getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            dialog.getContentView().setLayoutParams(params);
+        }
+        dialog.getContentView().setMinimumHeight(0);
+    }
+
     private void refreshRuntimeDrawerState() {
         TextView tvContainer = findViewById(R.id.TVRuntimeDrawerContainerName);
         TextView tvShortcut = findViewById(R.id.TVRuntimeDrawerShortcutName);
         TextView tvRoute = findViewById(R.id.TVRuntimeDrawerRoute);
         TextView tvHint = findViewById(R.id.TVRuntimeDrawerHint);
+        TextView tvGraphicsPrimary = findViewById(R.id.TVRuntimeGraphicsPrimary);
+        TextView tvGraphicsSecondary = findViewById(R.id.TVRuntimeGraphicsSecondary);
+        TextView tvGraphicsTertiary = findViewById(R.id.TVRuntimeGraphicsTertiary);
 
         if (tvContainer != null) {
             String containerName = container != null ? container.getName() : getString(R.string.not_set);
@@ -1973,11 +3524,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         if (tvHint != null) tvHint.setText(R.string.xserver_runtime_drawer_hint);
+        if (tvGraphicsPrimary != null) tvGraphicsPrimary.setText(resolveRuntimeGraphicsPrimaryText());
+        if (tvGraphicsSecondary != null) tvGraphicsSecondary.setText(resolveRuntimeGraphicsSecondaryText());
+        if (tvGraphicsTertiary != null) tvGraphicsTertiary.setText(resolveRuntimeGraphicsTertiaryText());
 
         boolean fullscreenActive = xServerView != null && xServerView.getRenderer() != null && xServerView.getRenderer().isFullscreen();
         boolean logsEnabled = debugDialog != null
                 && (preferences.getBoolean("enable_wine_debug", false) || preferences.getBoolean("enable_box64_logs", false));
         boolean magnifierEnabled = !XrActivity.isEnabled(this);
+        boolean activeWindowsEnabled = xServer != null && xServer.windowManager != null && winHandler != null && winHandler.isReady();
 
         updateRuntimeDrawerAction(
                 R.id.LLRuntimeActionRelativeMouse,
@@ -2010,6 +3565,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 true
         );
         updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionTaskManager,
+                R.id.TVRuntimeActionTaskManagerTitle,
+                R.id.TVRuntimeActionTaskManagerSummary,
+                R.id.IVRuntimeActionTaskManager,
+                R.string.task_manager,
+                R.string.runtime_drawer_task_manager_summary,
+                R.drawable.ae_icon_task_manager,
+                true
+        );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionActiveWindows,
+                R.id.TVRuntimeActionActiveWindowsTitle,
+                R.id.TVRuntimeActionActiveWindowsSummary,
+                R.id.IVRuntimeActionActiveWindows,
+                R.string.active_windows,
+                R.string.runtime_drawer_active_windows_summary,
+                R.drawable.ae_icon_front,
+                activeWindowsEnabled
+        );
+        updateRuntimeDrawerAction(
                 R.id.LLRuntimeActionMagnifier,
                 R.id.TVRuntimeActionMagnifierTitle,
                 R.id.TVRuntimeActionMagnifierSummary,
@@ -2029,12 +3604,48 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.drawable.ae_icon_diagnostics,
                 logsEnabled
         );
+        updateRuntimeDrawerAction(
+                R.id.LLRuntimeActionPrefixPack,
+                R.id.TVRuntimeActionPrefixPackTitle,
+                R.id.TVRuntimeActionPrefixPackSummary,
+                R.id.IVRuntimeActionPrefixPack,
+                R.string.prefix_pack_toolkit,
+                R.string.runtime_drawer_prefix_pack_summary,
+                R.drawable.ae_icon_package,
+                true
+        );
+        updateRuntimeDrawerActionText(
+                R.id.LLRuntimeActionRuntimeProfiles,
+                R.id.TVRuntimeActionRuntimeProfilesTitle,
+                R.id.TVRuntimeActionRuntimeProfilesSummary,
+                R.id.IVRuntimeActionRuntimeProfiles,
+                R.string.runtime_profiles,
+                resolveRuntimeProfilesDrawerSummary(),
+                R.drawable.ae_icon_env_var,
+                shortcut == null
+        );
 
         applyRuntimeThemeAssetPass();
+        applyRuntimeDrawerSurfaceStyle();
+        applyRuntimeGraphicsStatusCardStyle();
     }
 
     private void updateRuntimeDrawerAction(int rowId, int titleId, int summaryId, int iconId,
                                            int titleResId, int summaryResId, int iconResId, boolean enabled) {
+        updateRuntimeDrawerActionText(
+                rowId,
+                titleId,
+                summaryId,
+                iconId,
+                titleResId,
+                getString(summaryResId),
+                iconResId,
+                enabled
+        );
+    }
+
+    private void updateRuntimeDrawerActionText(int rowId, int titleId, int summaryId, int iconId,
+                                               int titleResId, String summaryText, int iconResId, boolean enabled) {
         View row = findViewById(rowId);
         TextView title = findViewById(titleId);
         TextView summary = findViewById(summaryId);
@@ -2042,13 +3653,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (row == null || title == null || summary == null || icon == null) return;
 
         title.setText(titleResId);
-        summary.setText(summaryResId);
+        summary.setText(summaryText);
         if (icon instanceof android.widget.ImageView) {
             ((android.widget.ImageView) icon).setImageResource(iconResId);
         }
         row.setEnabled(enabled);
         row.setClickable(enabled);
-        row.setAlpha(enabled ? 1.0f : 0.56f);
+        row.setAlpha(1.0f);
+        title.setAlpha(enabled ? 1.0f : 0.86f);
+        summary.setAlpha(enabled ? 1.0f : 0.74f);
+        icon.setAlpha(enabled ? 1.0f : 0.82f);
     }
 
     @SuppressLint("SourceLockedOrientationActivity")
@@ -2083,6 +3697,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 break;
             case R.id.main_menu_task_manager:
                 new TaskManagerDialog(this).show();
+                break;
+            case R.id.main_menu_active_windows:
+                ActiveWindowsDialog activeWindowsDialog = new ActiveWindowsDialog(this);
+                activeWindowsDialog.show();
+                styleRuntimeNestedDialog(activeWindowsDialog);
                 break;
             case R.id.main_menu_magnifier:
                 if (magnifierView == null) {
@@ -2125,6 +3744,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 });
                 Log.d("ScreenEffectDialog", "Showing ScreenEffectDialog");
                 screenEffectDialog.show();
+                styleRuntimeNestedDialog(screenEffectDialog);
                 break;
             case R.id.main_menu_logs:
                 if (debugDialog != null) debugDialog.show();
@@ -2166,7 +3786,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (hasFocus) {
             AppUtils.hideSystemUI(this);
-            updateDesktopGestureExclusionRects(touchpadView);
+            refreshDesktopGestureExclusion();
+            maybeRunPendingGuestBootstrap("window_focus");
         }
 
         if (hasFocus && cursorLock && touchpadView != null) {
@@ -2211,7 +3832,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void extractInputDLLs() {
         String inputAsset = resolveInputDllAsset();
-        File wineFolder = new File(imageFs.getWinePath() + "/lib/wine/");
+        File wineFolder = WineUtils.resolveRuntimeWineLibDir(new File(imageFs.getWinePath()));
+        if (wineFolder == null) {
+            Log.d("XServerDisplayActivity", "Skipping input dll extraction: runtime lib/wine path missing");
+            return;
+        }
         Log.d("XServerDisplayActivity", "Extracting input dlls from " + inputAsset + " to " + wineFolder.getPath());
         boolean success = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, inputAsset, wineFolder);
         if (!success)
@@ -2219,10 +3844,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean isTrackedApplicationWindow(Window window) {
-        if (window == null) return false;
-        return window.getWidth() > 1
-                && window.getHeight() > 1
-                && window.getWMHintsValue(Window.WMHints.WINDOW_GROUP) == window.id;
+        return isTrackedVisualWindow(window);
     }
 
     private void noteApplicationWindowMapped(Window window) {
@@ -2232,6 +3854,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (!mappedApplicationWindowIds.add(window.id)) return;
             trackedCount = mappedApplicationWindowIds.size();
         }
+        lastTrackedApplicationWindowMappedAtMs = System.currentTimeMillis();
+        lastTrackedApplicationWindowClassName = window.getClassName() != null
+                ? window.getClassName()
+                : "";
         cancelDeferredGuestTermination("window_mapped");
         ForensicLogger.logEvent(
                 this,
@@ -2248,6 +3874,44 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 )
         );
         maybeRunDebugStartProbe(window, trackedCount);
+        maybeRunDebugAutoOpenTaskManager(window, trackedCount);
+        maybeRunDebugAutoOpenRuntimeDrawer(window, trackedCount);
+        maybeRunDebugAutoOpenLogs(window, trackedCount);
+        maybeRunDebugAutoOpenPrefixPack(window, trackedCount);
+    }
+
+    private void markGuestVisualReady(String reason, @Nullable Window window, @Nullable DesktopShellBootstrapProof proof) {
+        if (guestVisualReady) return;
+        guestVisualReady = true;
+        if (xServerView != null && xServerView.getRenderer() != null) {
+            xServerView.getRenderer().setCursorVisible(true);
+        }
+        if (preloaderDialog != null) {
+            preloaderDialog.closeOnUiThread();
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_GUEST_VISUAL_READY",
+                null,
+                "xserver",
+                "guest_visual_ready",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "class_name", window != null && window.getClassName() != null ? window.getClassName() : "",
+                        "window_id", window != null ? window.id : -1,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "desktop_shell_launch_mode", desktopShellLaunchMode,
+                        "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs),
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "winhandler_ready", winHandler != null && winHandler.isReady(),
+                        "shell_launcher_present", proof != null && proof.shellLauncherPresent,
+                        "shell_process_present", proof != null && proof.explorerProcessPresent,
+                        "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                        "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                        "wineboot_process_present", proof != null && proof.winebootProcessPresent
+                )
+        );
     }
 
     private void maybeRunDebugStartProbe(Window window, int trackedCount) {
@@ -2282,6 +3946,206 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
 
         handler.postDelayed(() -> dispatchDebugStartProbeTaps(probeX, probeY, tapCount, tapIntervalMs), 180L);
+    }
+
+    private void maybeRunDebugAutoOpenTaskManager(Window window, int trackedCount) {
+        if (!debugAutoOpenTaskManagerArmed || debugAutoOpenTaskManagerExecuted) return;
+        if (shortcut != null || !desktopShellBootstrapActive) return;
+        if (window == null || !"explorer.exe".equalsIgnoreCase(window.getClassName())) return;
+        if (trackedCount < 2) return;
+
+        debugAutoOpenTaskManagerExecuted = true;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_TASKMGR_AUTOOPEN_ARMED",
+                null,
+                "xserver",
+                "desktop_debug_task_manager_auto_open_armed",
+                ForensicLogger.fields("tracked_count", trackedCount)
+        );
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_TASKMGR_AUTOOPEN_EXEC",
+                    null,
+                    "xserver",
+                    "desktop_debug_task_manager_auto_open_exec",
+                    ForensicLogger.fields("tracked_count", getTrackedApplicationWindowCount())
+            );
+            new TaskManagerDialog(this).show();
+        }, 320L);
+    }
+
+    private void maybeRunDebugAutoOpenRuntimeDrawer(Window window, int trackedCount) {
+        if (!debugAutoOpenRuntimeDrawerArmed || debugAutoOpenRuntimeDrawerExecuted) return;
+        if (shortcut != null || !desktopShellBootstrapActive) return;
+        if (window == null || !"explorer.exe".equalsIgnoreCase(window.getClassName())) return;
+        if (trackedCount < 2) return;
+
+        debugAutoOpenRuntimeDrawerExecuted = true;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_DRAWER_AUTOOPEN_ARMED",
+                null,
+                "xserver",
+                "desktop_debug_drawer_auto_open_armed",
+                ForensicLogger.fields("tracked_count", trackedCount)
+        );
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_DRAWER_AUTOOPEN_EXEC",
+                    null,
+                    "xserver",
+                    "desktop_debug_drawer_auto_open_exec",
+                    ForensicLogger.fields(
+                            "tracked_count", getTrackedApplicationWindowCount(),
+                            "runtime_drawer_ready", runtimeDrawerView != null
+                    )
+            );
+            showRuntimeDrawer();
+        }, 380L);
+    }
+
+    private void maybeRunDebugAutoOpenLogs(Window window, int trackedCount) {
+        if (!debugAutoOpenLogsArmed || debugAutoOpenLogsExecuted) return;
+        if (shortcut != null || !desktopShellBootstrapActive) return;
+        if (window == null || !"explorer.exe".equalsIgnoreCase(window.getClassName())) return;
+        if (trackedCount < 2) return;
+
+        debugAutoOpenLogsExecuted = true;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_LOGS_AUTOOPEN_ARMED",
+                null,
+                "xserver",
+                "desktop_debug_logs_auto_open_armed",
+                ForensicLogger.fields(
+                        "tracked_count", trackedCount,
+                        "debug_dialog_ready", debugDialog != null
+                )
+        );
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_LOGS_AUTOOPEN_EXEC",
+                    null,
+                    "xserver",
+                    "desktop_debug_logs_auto_open_exec",
+                    ForensicLogger.fields(
+                            "tracked_count", getTrackedApplicationWindowCount(),
+                            "debug_dialog_ready", debugDialog != null
+                    )
+            );
+            if (debugDialog != null) {
+                debugDialog.show();
+            }
+        }, 420L);
+    }
+
+    private void maybeRunDebugAutoOpenPrefixPack(Window window, int trackedCount) {
+        if (!debugAutoOpenPrefixPackArmed || debugAutoOpenPrefixPackExecuted) return;
+        if (shortcut != null || !desktopShellBootstrapActive) return;
+        if (window == null || !"explorer.exe".equalsIgnoreCase(window.getClassName())) return;
+        if (trackedCount < 2) return;
+
+        debugAutoOpenPrefixPackExecuted = true;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_DEBUG_PREFIXPACK_AUTOOPEN_ARMED",
+                null,
+                "xserver",
+                "desktop_debug_prefix_pack_auto_open_armed",
+                ForensicLogger.fields("tracked_count", trackedCount)
+        );
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_PREFIXPACK_AUTOOPEN_EXEC",
+                    null,
+                    "xserver",
+                    "desktop_debug_prefix_pack_auto_open_exec",
+                    ForensicLogger.fields("tracked_count", getTrackedApplicationWindowCount())
+            );
+            showPrefixPackGuide();
+        }, 480L);
+    }
+
+    private void scheduleDebugPrefixPackFallback() {
+        if (!debugAutoOpenPrefixPackArmed || handler == null) return;
+        scheduleDebugPrefixPackFallbackAttempt(0, DEBUG_PREFIXPACK_FALLBACK_INITIAL_DELAY_MS);
+    }
+
+    private void scheduleDebugPrefixPackFallbackAttempt(int attempt, long delayMs) {
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed() || debugAutoOpenPrefixPackExecuted) return;
+            if (!isDesktopShellCommandReady()) {
+                if (attempt + 1 < DEBUG_PREFIXPACK_FALLBACK_MAX_ATTEMPTS) {
+                    ForensicLogger.logEvent(
+                            this,
+                            attempt == 0 ? "info" : "warning",
+                            "DESKTOP_DEBUG_PREFIXPACK_FALLBACK_WAIT",
+                            null,
+                            "xserver",
+                            "desktop_debug_prefix_pack_fallback_wait",
+                            ForensicLogger.fields(
+                                    "attempt", attempt + 1,
+                                    "tracked_count", getTrackedApplicationWindowCount(),
+                                    "desktop_shell_bootstrap_active", desktopShellBootstrapActive,
+                                    "winhandler_ready", winHandler != null && winHandler.isReady()
+                            )
+                    );
+                    scheduleDebugPrefixPackFallbackAttempt(attempt + 1, DEBUG_PREFIXPACK_FALLBACK_RETRY_MS);
+                    return;
+                }
+                String deferredTarget = debugAutoInstallPrefixPackTarget;
+                debugAutoInstallPrefixPackTarget = "";
+                debugAutoOpenPrefixPackExecuted = true;
+                ForensicLogger.logEvent(
+                        this,
+                        "warning",
+                        "DESKTOP_DEBUG_PREFIXPACK_FALLBACK_TIMEOUT",
+                        null,
+                        "xserver",
+                        "desktop_debug_prefix_pack_fallback_timeout",
+                        ForensicLogger.fields(
+                                "attempts", DEBUG_PREFIXPACK_FALLBACK_MAX_ATTEMPTS,
+                                "tracked_count", getTrackedApplicationWindowCount(),
+                                "desktop_shell_bootstrap_active", desktopShellBootstrapActive,
+                                "winhandler_ready", winHandler != null && winHandler.isReady(),
+                                "deferred_install_target", deferredTarget
+                        )
+                );
+                showPrefixPackGuide();
+                return;
+            }
+            debugAutoOpenPrefixPackExecuted = true;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_DEBUG_PREFIXPACK_FALLBACK_EXEC",
+                    null,
+                    "xserver",
+                    "desktop_debug_prefix_pack_fallback_exec",
+                    ForensicLogger.fields(
+                            "tracked_count", getTrackedApplicationWindowCount(),
+                            "desktop_shell_bootstrap_active", desktopShellBootstrapActive
+                    )
+            );
+            showPrefixPackGuide();
+        }, Math.max(120L, delayMs));
     }
 
     private void dispatchDebugStartProbeTaps(int probeX, int probeY, int tapCount, int tapIntervalMs) {
@@ -2359,11 +4223,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private boolean shouldDeferGuestTermination(int status) {
         if (!desktopShellBootstrapActive) return false;
-        synchronized (mappedApplicationWindowIds) {
-            if (!mappedApplicationWindowIds.isEmpty()) return true;
-        }
-        return Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs)
-                < DESKTOP_SHELL_TERMINATION_GRACE_MS;
+        int trackedWindowCount = getTrackedApplicationWindowCount();
+        if (trackedWindowCount > 0) return true;
+        DesktopShellBootstrapProof proof = collectDesktopShellBootstrapProof();
+        return shouldKeepDesktopShellAliveAfterPrimaryTermination(proof, trackedWindowCount);
     }
 
     private int getTrackedApplicationWindowCount() {
@@ -2372,13 +4235,100 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    public boolean isDesktopShellCommandReady() {
+        if (isFinishing() || isDestroyed() || exitInProgress.get()) return false;
+        boolean winHandlerReady = winHandler != null && winHandler.isReady();
+        if (shortcut != null) return true;
+        if (!desktopShellBootstrapActive) return true;
+        boolean requireWinHandler = desktopShellRequiresWinHandler();
+        if (requireWinHandler && !winHandlerReady) return false;
+        if (deferredDesktopPauseScheduled) return false;
+        int trackedWindowCount = getTrackedApplicationWindowCount();
+        if (trackedWindowCount > 0) return true;
+        return collectDesktopShellBootstrapProof().hasProcessProof(winHandlerReady, requireWinHandler);
+    }
+
+    public boolean hasFreshTrackedApplicationWindowMappedSince(long startedAtMs) {
+        long mappedAtMs = lastTrackedApplicationWindowMappedAtMs;
+        if (mappedAtMs <= 0L) return false;
+        long freshnessFloor = Math.max(0L, startedAtMs - 800L);
+        if (mappedAtMs < freshnessFloor) return false;
+        String className = lastTrackedApplicationWindowClassName != null
+                ? lastTrackedApplicationWindowClassName.trim().toLowerCase(Locale.US)
+                : "";
+        if (className.isEmpty()) return true;
+        return !"explorer.exe".equals(className)
+                && !"wfm.exe".equals(className)
+                && !"taskmgr.exe".equals(className);
+    }
+
     private void scheduleDeferredGuestTermination(int status) {
         long elapsedMs = Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs);
-        long delayMs = Math.max(0L, DESKTOP_SHELL_TERMINATION_GRACE_MS - elapsedMs);
+        long remainingMs = Math.max(0L, DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS - elapsedMs);
+        long delayMs = remainingMs > 0L
+                ? Math.min(DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS, remainingMs)
+                : 0L;
         guestLauncherExitStatus = status;
         runtimePauseHandler.removeCallbacks(deferredGuestTerminationRunnable);
         deferredGuestTerminationScheduled = true;
         runtimePauseHandler.postDelayed(deferredGuestTerminationRunnable, delayMs);
+    }
+
+    private boolean shouldKeepDesktopShellAliveAfterPrimaryTermination(@Nullable DesktopShellBootstrapProof proof, int trackedWindowCount) {
+        if (!desktopShellBootstrapActive || guestVisualReady) return false;
+        if (trackedWindowCount > 0) return true;
+        DesktopShellBootstrapProof liveProof = proof != null ? proof : collectDesktopShellBootstrapProof();
+        if (!isDesktopShellBootstrapWithinHorizon(liveProof)) return false;
+        if (desktopShellDetachedFallbackActive) return true;
+        if (desktopShellWinHandlerFallbackAttempted) {
+            return liveProof.winHandlerProcessPresent
+                    || liveProof.wfmProcessPresent
+                    || (winHandler != null && winHandler.isReady())
+                    || liveProof.wineserverPresent;
+        }
+        return liveProof.explorerProcessPresent
+                || liveProof.winebootProcessPresent
+                || liveProof.wineserverPresent;
+    }
+
+    private boolean isDesktopShellBootstrapWithinHorizon(@Nullable DesktopShellBootstrapProof proof) {
+        long elapsedMs = proof != null
+                ? proof.bootstrapElapsedMs
+                : Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs);
+        return elapsedMs < DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS;
+    }
+
+    private boolean maybeLaunchDesktopShellFallbackOnPrimaryTermination(int status) {
+        if (shortcut != null || !desktopShellBootstrapActive || guestVisualReady) return false;
+        if (getTrackedApplicationWindowCount() > 0) return false;
+        if (!DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER.equals(desktopShellLaunchMode)) return false;
+        if (desktopShellWinHandlerFallbackAttempted) return false;
+        if (!hasContainerShellExecutable("wfm.exe")) return false;
+
+        DesktopShellBootstrapProof proof = collectDesktopShellBootstrapProof();
+        if (!isDesktopShellBootstrapWithinHorizon(proof)) return false;
+
+        attemptDesktopShellWinHandlerFallback(proof, -1);
+        ForensicLogger.logEvent(
+                this,
+                desktopShellDetachedFallbackActive ? "warn" : "error",
+                desktopShellDetachedFallbackActive
+                        ? "XSERVER_DESKTOP_SHELL_FALLBACK_ON_TERMINATION"
+                        : "XSERVER_DESKTOP_SHELL_FALLBACK_ON_TERMINATION_FAILED",
+                null,
+                "xserver",
+                desktopShellDetachedFallbackActive
+                        ? "desktop_shell_fallback_started_after_primary_termination"
+                        : "desktop_shell_fallback_failed_after_primary_termination",
+                ForensicLogger.fields(
+                        "status", status,
+                        "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                        "wineserver_present", proof.wineserverPresent,
+                        "wineboot_process_present", proof.winebootProcessPresent,
+                        "explorer_process_present", proof.explorerProcessPresent
+                )
+        );
+        return desktopShellDetachedFallbackActive;
     }
 
     private void cancelDeferredGuestTermination(String reason) {
@@ -2407,15 +4357,464 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void scheduleDeferredDesktopRuntimePause() {
-        if (deferredDesktopPauseScheduled) return;
+        scheduleDeferredDesktopRuntimePause(DESKTOP_RUNTIME_PAUSE_GRACE_MS);
+    }
+
+    private void scheduleDeferredDesktopRuntimePause(long delayMs) {
+        long now = System.currentTimeMillis();
+        long boundedDelayMs = Math.max(0L, delayMs);
+        long requestedDeadlineAtMs = now + boundedDelayMs;
+        if (deferredDesktopPauseScheduled && deferredDesktopPauseDeadlineAtMs >= requestedDeadlineAtMs) {
+            return;
+        }
+        runtimePauseHandler.removeCallbacks(deferredDesktopPauseRunnable);
         deferredDesktopPauseScheduled = true;
-        runtimePauseHandler.postDelayed(deferredDesktopPauseRunnable, DESKTOP_RUNTIME_PAUSE_GRACE_MS);
+        deferredDesktopPauseDeadlineAtMs = requestedDeadlineAtMs;
+        runtimePauseHandler.postDelayed(deferredDesktopPauseRunnable, boundedDelayMs);
+    }
+
+    private boolean shouldKeepDesktopRuntimeActiveAcrossStop(@Nullable DesktopShellBootstrapProof proof, int trackedWindowCount) {
+        if (shortcut != null) return false;
+        if (isFinishing() || exitInProgress.get()) return false;
+        if (!desktopShellBootstrapActive || guestVisualReady) return false;
+        if (trackedWindowCount > 0) return false;
+        if (proof == null) return false;
+        if (proof.winebootProcessPresent) return true;
+        return proof.wineserverPresent && (proof.explorerProcessPresent || proof.shellLauncherPresent);
+    }
+
+    private boolean shouldRenewDeferredDesktopRuntimePause(@Nullable DesktopShellBootstrapProof proof, int trackedWindowCount) {
+        if (!shouldAutoSuspendRuntimeOnLifecycle()) return false;
+        if (!shouldKeepDesktopRuntimeActiveAcrossStop(proof, trackedWindowCount)) return false;
+        return proof != null && proof.bootstrapElapsedMs < DESKTOP_RUNTIME_STOP_BOOTSTRAP_MAX_MS;
+    }
+
+    private String getEffectiveSuspendPolicy() {
+        return container != null ? container.getSuspendPolicy() : Container.SUSPEND_POLICY_AUTO;
+    }
+
+    private boolean shouldAutoSuspendRuntimeOnLifecycle() {
+        return Container.SUSPEND_POLICY_AUTO.equals(getEffectiveSuspendPolicy());
+    }
+
+    private void logDesktopRuntimePauseSkipped(String reason) {
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_RUNTIME_PAUSE_SKIPPED",
+                null,
+                "xserver",
+                "desktop_runtime_pause_skipped",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "runtime_drawer_visible", runtimeDrawerVisible,
+                        "suspend_policy", getEffectiveSuspendPolicy()
+                )
+        );
+    }
+
+    private void scheduleDesktopShellPreloaderFallback() {
+        if (shortcut != null || handler == null) return;
+        scheduleDesktopShellPreloaderFallbackAttempt(0, DESKTOP_SHELL_PRELOADER_FALLBACK_INITIAL_DELAY_MS);
+    }
+
+    private void scheduleDesktopShellPreloaderFallbackAttempt(int attempt, long delayMs) {
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed() || guestVisualReady || preloaderDialog == null) return;
+            if (!desktopShellBootstrapActive) {
+                if (attempt + 1 < DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS) {
+                    scheduleDesktopShellPreloaderFallbackAttempt(attempt + 1, DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS);
+                }
+                return;
+            }
+            DesktopShellBootstrapProof proof = collectDesktopShellBootstrapProof();
+            boolean winHandlerReady = winHandler != null && winHandler.isReady();
+            boolean requireWinHandler = desktopShellRequiresWinHandler();
+            int trackedWindowCount = getTrackedApplicationWindowCount();
+            if (shouldAttemptDesktopShellWinHandlerFallback(proof, trackedWindowCount)) {
+                attemptDesktopShellWinHandlerFallback(proof, attempt);
+                if (attempt + 1 < DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS) {
+                    scheduleDesktopShellPreloaderFallbackAttempt(attempt + 1, DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS);
+                }
+                return;
+            }
+            boolean processProof = proof.hasProcessProof(winHandlerReady, requireWinHandler);
+            boolean visualReady = proof.hasVisualProof(trackedWindowCount);
+            if (visualReady) {
+                ForensicLogger.logEvent(
+                        this,
+                        "info",
+                        "XSERVER_BOOTSTRAP_PRELOADER_FALLBACK_EXEC",
+                        null,
+                        "xserver",
+                        "preloader_closed_on_desktop_shell_visual_proof",
+                        ForensicLogger.fields(
+                                "attempt", attempt + 1,
+                                "shell_launcher_present", proof.shellLauncherPresent,
+                                "shell_process_present", proof.explorerProcessPresent,
+                                "winhandler_process_present", proof.winHandlerProcessPresent,
+                                "wfm_process_present", proof.wfmProcessPresent,
+                                "wineboot_process_present", proof.winebootProcessPresent,
+                                "wineserver_present", proof.wineserverPresent,
+                                "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                                "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                "require_winhandler", requireWinHandler,
+                                "winhandler_ready", winHandlerReady,
+                                "tracked_window_count", trackedWindowCount,
+                                "process_proof", processProof
+                        )
+                );
+                markGuestVisualReady("desktop_shell_visual_proof", null, proof);
+                return;
+            }
+            if (attempt + 1 < DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS) {
+                if (attempt == 0 || attempt + 1 == DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS / 2) {
+                    if (trackedWindowCount == 0) {
+                        logBootstrapWindowSnapshot(
+                                "XSERVER_WINDOW_FRONTIER_SNAPSHOT",
+                                "desktop_shell_window_frontier_snapshot"
+                        );
+                    }
+                    ForensicLogger.logEvent(
+                            this,
+                            "info",
+                            "XSERVER_BOOTSTRAP_PRELOADER_FALLBACK_WAIT",
+                            null,
+                            "xserver",
+                            "desktop_shell_process_proof_pending",
+                            ForensicLogger.fields(
+                                    "attempt", attempt + 1,
+                                    "shell_launcher_present", proof.shellLauncherPresent,
+                                    "shell_process_present", proof.explorerProcessPresent,
+                                    "winhandler_process_present", proof.winHandlerProcessPresent,
+                                    "wfm_process_present", proof.wfmProcessPresent,
+                                    "wineboot_process_present", proof.winebootProcessPresent,
+                                    "wineserver_present", proof.wineserverPresent,
+                                    "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                                    "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                    "require_winhandler", requireWinHandler,
+                                    "winhandler_ready", winHandlerReady,
+                                    "tracked_window_count", trackedWindowCount
+                            )
+                    );
+                    if (processProof) {
+                        ForensicLogger.logEvent(
+                                this,
+                                "warning",
+                                "XSERVER_BOOTSTRAP_NONVISUAL_PROCESS_PROOF",
+                                null,
+                                "xserver",
+                                "desktop_shell_process_proof_without_visual_window",
+                                ForensicLogger.fields(
+                                        "attempt", attempt + 1,
+                                        "shell_launcher_present", proof.shellLauncherPresent,
+                                        "shell_process_present", proof.explorerProcessPresent,
+                                        "winhandler_process_present", proof.winHandlerProcessPresent,
+                                        "wfm_process_present", proof.wfmProcessPresent,
+                                        "wineboot_process_present", proof.winebootProcessPresent,
+                                        "wineserver_present", proof.wineserverPresent,
+                                        "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                                        "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                        "require_winhandler", requireWinHandler,
+                                        "winhandler_ready", winHandlerReady,
+                                        "tracked_window_count", trackedWindowCount
+                                )
+                        );
+                    }
+                }
+                scheduleDesktopShellPreloaderFallbackAttempt(attempt + 1, DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS);
+                return;
+            }
+            if (trackedWindowCount == 0) {
+                logBootstrapWindowSnapshot(
+                        "XSERVER_WINDOW_FRONTIER_STALLED",
+                        "desktop_shell_window_frontier_stalled"
+                );
+            }
+            ForensicLogger.logEvent(
+                    this,
+                    "warning",
+                    "XSERVER_BOOTSTRAP_PRELOADER_STALLED",
+                    null,
+                    "xserver",
+                    "desktop_shell_process_proof_never_materialized",
+                    ForensicLogger.fields(
+                            "attempts", DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS,
+                            "shell_launcher_present", proof.shellLauncherPresent,
+                            "shell_process_present", proof.explorerProcessPresent,
+                            "winhandler_process_present", proof.winHandlerProcessPresent,
+                            "wfm_process_present", proof.wfmProcessPresent,
+                            "wineboot_process_present", proof.winebootProcessPresent,
+                            "wineserver_present", proof.wineserverPresent,
+                            "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                            "desktop_shell_launch_mode", desktopShellLaunchMode,
+                            "require_winhandler", requireWinHandler,
+                            "winhandler_ready", winHandlerReady,
+                            "tracked_window_count", trackedWindowCount,
+                            "process_proof", processProof
+                    )
+            );
+        }, Math.max(200L, delayMs));
+    }
+
+    private boolean shouldAttemptDesktopShellWinHandlerFallback(DesktopShellBootstrapProof proof, int trackedWindowCount) {
+        if (shortcut != null) return false;
+        if (!DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER.equals(desktopShellLaunchMode)) return false;
+        if (desktopShellWinHandlerFallbackAttempted) return false;
+        if (trackedWindowCount > 0) return false;
+        if (proof == null) return false;
+        if (!hasContainerShellExecutable("wfm.exe")) return false;
+        if (!proof.explorerProcessPresent) return false;
+        if (proof.winebootProcessPresent) return false;
+        if (!proof.winebootProcessPresent && !proof.wineserverPresent) return false;
+        return proof.bootstrapElapsedMs >= DESKTOP_SHELL_DIRECT_EXPLORER_FALLBACK_DELAY_MS;
+    }
+
+    private void attemptDesktopShellWinHandlerFallback(DesktopShellBootstrapProof proof, int attempt) {
+        desktopShellWinHandlerFallbackAttempted = true;
+        String fallbackExecutable = buildDesktopShellWinHandlerFallbackExecutable();
+        boolean launched = launchDetachedGuestProgram(fallbackExecutable, "desktop_shell_winhandler_fallback", "");
+        if (launched) {
+            desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
+            desktopShellDetachedFallbackActive = true;
+            cancelDeferredGuestTermination("desktop_shell_winhandler_fallback_started");
+            scheduleDesktopShellWinHandlerInitProbe(attempt);
+        }
+        ForensicLogger.logEvent(
+                this,
+                launched ? "warn" : "error",
+                launched ? "XSERVER_DESKTOP_SHELL_WINHANDLER_FALLBACK_LAUNCHED" : "XSERVER_DESKTOP_SHELL_WINHANDLER_FALLBACK_FAILED",
+                null,
+                "xserver",
+                launched ? "desktop_shell_winhandler_fallback_launched" : "desktop_shell_winhandler_fallback_failed",
+                ForensicLogger.fields(
+                        "attempt", attempt + 1,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                        "shell_process_present", proof != null && proof.explorerProcessPresent,
+                        "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                        "wineserver_present", proof != null && proof.wineserverPresent,
+                        "fallback_guest_executable", fallbackExecutable,
+                        "wfm_present", hasContainerShellExecutable("wfm.exe"),
+                        "desktop_shell_launch_mode", desktopShellLaunchMode
+                )
+        );
+    }
+
+    private void scheduleDesktopShellWinHandlerInitProbe(int attempt) {
+        if (handler == null) return;
+        handler.postDelayed(() -> {
+            if (isFinishing() || isDestroyed() || guestVisualReady) return;
+            if (!desktopShellBootstrapActive || !desktopShellWinHandlerFallbackAttempted) return;
+
+            DesktopShellBootstrapProof proof = collectDesktopShellBootstrapProof();
+            boolean winHandlerReady = winHandler != null && winHandler.isReady();
+            int trackedWindowCount = getTrackedApplicationWindowCount();
+            if (winHandlerReady || trackedWindowCount > 0) return;
+
+            if (trackedWindowCount == 0) {
+                logBootstrapWindowSnapshot(
+                        "XSERVER_WINDOW_FRONTIER_FALLBACK_TIMEOUT",
+                        "desktop_shell_window_frontier_fallback_timeout"
+                );
+            }
+            ForensicLogger.logEvent(
+                    this,
+                    "warning",
+                    "XSERVER_DESKTOP_SHELL_WINHANDLER_INIT_TIMEOUT",
+                    null,
+                    "xserver",
+                    "desktop_shell_winhandler_init_not_received",
+                    ForensicLogger.fields(
+                            "attempt", attempt + 1,
+                            "shell_launcher_present", proof.shellLauncherPresent,
+                            "shell_process_present", proof.explorerProcessPresent,
+                            "winhandler_process_present", proof.winHandlerProcessPresent,
+                            "wfm_process_present", proof.wfmProcessPresent,
+                            "wineboot_process_present", proof.winebootProcessPresent,
+                            "wineserver_present", proof.wineserverPresent,
+                            "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                            "desktop_shell_launch_mode", desktopShellLaunchMode,
+                            "tracked_window_count", trackedWindowCount,
+                            "winhandler_ready", winHandlerReady,
+                            "fallback_active", desktopShellDetachedFallbackActive
+                    )
+            );
+        }, DESKTOP_SHELL_WINHANDLER_INIT_TIMEOUT_MS);
+    }
+
+    private DesktopShellBootstrapProof collectDesktopShellBootstrapProof() {
+        DesktopShellBootstrapProof proof = new DesktopShellBootstrapProof();
+        proof.bootstrapElapsedMs = Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs);
+        if (shortcut != null) return proof;
+
+        String[] entries = new File("/proc").list();
+        if (entries == null) return proof;
+        for (String entry : entries) {
+            if (entry == null || entry.isEmpty()) continue;
+            for (int i = 0; i < entry.length(); i++) {
+                if (!Character.isDigit(entry.charAt(i))) {
+                    entry = null;
+                    break;
+                }
+            }
+            if (entry == null) continue;
+            String commandLine = readProcCmdline(Integer.parseInt(entry)).toLowerCase(Locale.US);
+            if (commandLine.isEmpty()) continue;
+            if (commandLine.contains("explorer /desktop=shell")
+                    || commandLine.contains("explorer.exe /desktop=shell")) {
+                proof.shellLauncherPresent = true;
+            }
+            if (commandLine.contains("explorer.exe")) proof.explorerProcessPresent = true;
+            if (commandLine.contains("winhandler.exe")) proof.winHandlerProcessPresent = true;
+            if (commandLine.contains("wfm.exe") && !commandLine.contains("winhandler.exe")) {
+                proof.wfmProcessPresent = true;
+            }
+            if (commandLine.contains("wineboot.exe")) proof.winebootProcessPresent = true;
+            if (commandLine.contains("wineserver")) proof.wineserverPresent = true;
+        }
+        return proof;
+    }
+
+    private boolean isTrackedVisualWindow(@Nullable Window window) {
+        return window != null
+                && xServer != null
+                && window.isTrackedVisualWindow(xServer.windowManager.rootWindow);
+    }
+
+    private void logBootstrapWindowCandidate(String eventId, String severity, String message, @Nullable Window window) {
+        if (window == null || xServer == null) return;
+        Window rootWindow = xServer.windowManager.rootWindow;
+        String className = window.getClassName() != null ? window.getClassName().trim() : "";
+        String title = window.getName() != null ? window.getName().trim() : "";
+        Window parent = window.getParent();
+        int windowGroup = window.getWMHintsValue(Window.WMHints.WINDOW_GROUP);
+        ForensicLogger.logEvent(
+                this,
+                severity,
+                eventId,
+                null,
+                "xserver",
+                message,
+                ForensicLogger.fields(
+                        "window_id", window.id,
+                        "class_name", className,
+                        "title", title,
+                        "process_id", window.getProcessId(),
+                        "window_handle", String.format(Locale.US, "0x%x", window.getHandle()),
+                        "mapped", window.attributes.isMapped(),
+                        "renderable", window.isRenderable(),
+                        "strict_application_window", window.isApplicationWindow(),
+                        "tracked_visual_window", window.isTrackedVisualWindow(rootWindow),
+                        "identity_hints", window.hasIdentityHints(),
+                        "parent_is_root", parent == rootWindow,
+                        "window_group", String.format(Locale.US, "0x%x", windowGroup),
+                        "geometry", window.getWidth() + "x" + window.getHeight(),
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                )
+        );
+    }
+
+    private void logBootstrapWindowSnapshot(String eventId, String message) {
+        if (xServer == null) return;
+        ArrayList<Window> mappedWindows = new ArrayList<>();
+        int renderableCount = 0;
+        int trackedVisualCount = 0;
+        Window rootWindow = xServer.windowManager.rootWindow;
+        try (XLock lock = xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
+            collectMappedWindows(rootWindow, mappedWindows);
+            for (Window mappedWindow : mappedWindows) {
+                if (mappedWindow.isRenderable()) renderableCount++;
+                if (mappedWindow.isTrackedVisualWindow(rootWindow)) trackedVisualCount++;
+            }
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                eventId,
+                null,
+                "xserver",
+                message,
+                ForensicLogger.fields(
+                        "mapped_window_total", mappedWindows.size(),
+                        "renderable_window_total", renderableCount,
+                        "tracked_visual_window_total", trackedVisualCount,
+                        "tracked_window_count", getTrackedApplicationWindowCount(),
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                )
+        );
+
+        int limit = Math.min(8, mappedWindows.size());
+        for (int i = 0; i < limit; i++) {
+            logBootstrapWindowCandidate(
+                    "XSERVER_WINDOW_FRONTIER_ENTRY",
+                    "info",
+                    "desktop_shell_window_frontier_entry",
+                    mappedWindows.get(i)
+            );
+        }
+    }
+
+    private void collectMappedWindows(@Nullable Window window, ArrayList<Window> out) {
+        if (window == null) return;
+        if (window != xServer.windowManager.rootWindow && window.attributes.isMapped()) {
+            out.add(window);
+        }
+        for (Window child : window.getChildren()) {
+            collectMappedWindows(child, out);
+        }
+    }
+
+    private String readProcCmdline(int pid) {
+        File cmdlineFile = new File(String.format(Locale.US, "/proc/%d/cmdline", pid));
+        if (!cmdlineFile.isFile()) return "";
+        try (FileInputStream inputStream = new FileInputStream(cmdlineFile)) {
+            byte[] buffer = new byte[4096];
+            int count = inputStream.read(buffer);
+            if (count <= 0) return "";
+            StringBuilder builder = new StringBuilder(count);
+            for (int i = 0; i < count; i++) {
+                char ch = (char) buffer[i];
+                builder.append(ch == '\0' ? ' ' : ch);
+            }
+            return builder.toString().trim().replaceAll("\\s+", " ");
+        } catch (IOException ignored) {
+            return "";
+        }
+    }
+
+    private static final class DesktopShellBootstrapProof {
+        boolean shellLauncherPresent;
+        boolean explorerProcessPresent;
+        boolean winHandlerProcessPresent;
+        boolean wfmProcessPresent;
+        boolean winebootProcessPresent;
+        boolean wineserverPresent;
+        long bootstrapElapsedMs;
+
+        boolean hasProcessProof(boolean winHandlerReady, boolean requireWinHandler) {
+            if (!requireWinHandler) {
+                return shellLauncherPresent || explorerProcessPresent || winebootProcessPresent || wineserverPresent;
+            }
+            if (!winHandlerReady) return false;
+            return (shellLauncherPresent || explorerProcessPresent)
+                    && (winHandlerProcessPresent || wfmProcessPresent);
+        }
+
+        boolean hasVisualProof(int trackedWindowCount) {
+            return trackedWindowCount > 0;
+        }
     }
 
     private void cancelDeferredDesktopRuntimePause(String reason) {
         if (!deferredDesktopPauseScheduled) return;
         runtimePauseHandler.removeCallbacks(deferredDesktopPauseRunnable);
         deferredDesktopPauseScheduled = false;
+        deferredDesktopPauseDeadlineAtMs = 0L;
         ForensicLogger.logEvent(
                 this,
                 "info",
@@ -2472,14 +4871,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String dxwrapperSignature = dxwrapperMode;
 
         if (dxwrapperMode.contains("dxvk")) {
-            String dxvkWrapper = "dxvk-" + dxwrapperConfig.get("version");
-            String vkd3dWrapper = "vkd3d-" + dxwrapperConfig.get("vkd3dVersion");
-            dxwrapperSignature = dxvkWrapper + ";" + vkd3dWrapper;
+            String dxvkWrapper = sanitizeConfiguredWrapperVersion(dxwrapperConfig.get("version"), DefaultVersion.DXVK);
+            String vkd3dWrapper = sanitizeConfiguredWrapperVersion(dxwrapperConfig.get("vkd3dVersion"), "None");
+            dxwrapperSignature = "dxvk:" + dxvkWrapper + ":" + vkd3dWrapper;
         } else if (dxwrapperMode.contains("dgvoodoo")) {
             KeyValueSet dgConfig = DgVoodooConfigDialog.parseConfig(dxwrapperConfig);
             String archRequested = DgVoodooConfigDialog.normalizeArch(dgConfig.get("dgvoodooArch"));
             String versionHint = dgConfig.get("dgvoodooVersionHint");
-            dxwrapperSignature = "dgvoodoo:" + archRequested + ":" + versionHint;
+            boolean dgVoodooVulkanBridge = supportsDgVoodooVulkanBridge(graphicsDriver);
+            String dxvkWrapper = DgVoodooConfigDialog.resolveCompanionDxvkVersion(
+                    dgConfig,
+                    archRequested,
+                    dgVoodooVulkanBridge,
+                    contentsManager.getInstalledVersionNames(ContentProfile.ContentType.CONTENT_TYPE_DXVK, true)
+            );
+            String vkd3dWrapper = DgVoodooConfigDialog.resolveCompanionVkd3dVersion(dgConfig, dgVoodooVulkanBridge);
+            String forceD3d11 = DgVoodooConfigDialog.resolveCompanionForceD3d11(dgConfig, dgVoodooVulkanBridge) ? "1" : "0";
+            dxwrapperSignature = "dgvoodoo:" + archRequested + ":" + versionHint + ":" + dxvkWrapper + ":" + vkd3dWrapper + ":" + forceD3d11 + ":" + graphicsDriver;
         }
 
         if (!dxwrapperSignature.equals(container.getExtra("dxwrapper"))) {
@@ -2505,6 +4913,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         WineStartMenuCreator.create(this, container);
         WineUtils.createDosdevicesSymlinks(container);
+        logNoexecDosDriveState(container.getRootDir());
 
         if (shortcut != null)
             startupSelection = shortcut.getExtra("startupSelection", String.valueOf(container.getStartupSelection()));
@@ -2534,9 +4943,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
         synchronized (mappedApplicationWindowIds) {
             mappedApplicationWindowIds.clear();
         }
+        guestVisualReady = false;
         guestLauncherExited = false;
         guestLauncherExitStatus = Integer.MIN_VALUE;
         desktopShellBootstrapActive = false;
+        desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
+        desktopShellWinHandlerFallbackAttempted = false;
+        desktopShellDetachedFallbackActive = false;
         desktopShellBootstrapStartedAtMs = 0L;
         cancelDeferredGuestTermination("setup_xenvironment");
 
@@ -2557,22 +4970,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : effectiveRuntimeModel;
             imageFs.createVariantFile(launchVariant);
             imageFs.createArchFile(container.getWineVersion());
-            imageFs.createRootfsProviderFile(ImageFs.ROOTFS_PROVIDER_GAMENATIVE);
-            imageFs.createRootfsLayoutFile(ImageFs.ROOTFS_LAYOUT_UBUNTUFS);
+            if (!imageFs.getRootfsProviderFile().exists()) {
+                imageFs.createRootfsProviderFile(imageFs.getRootfsProvider());
+            }
+            if (!imageFs.getRootfsLayoutFile().exists()) {
+                imageFs.createRootfsLayoutFile(imageFs.getRootfsLayout());
+            }
             if (Byte.parseByte(startupSelection) == Container.STARTUP_SELECTION_AGGRESSIVE) {
                 winHandler.killProcess("services.exe");
             }
             guestProgramLauncherComponent.setContainer(this.container);
             guestProgramLauncherComponent.setWineInfo(this.wineInfo);
+            ensureBionicGraphicsDriverRegistry();
 
             if (shortcut == null) {
                 configureDesktopShellRegistry();
             }
-            String guestExecutable = "wine explorer /desktop=shell," + xServer.screenInfo + " " + getWineStartCommand();
-            desktopShellBootstrapActive = shortcut == null
-                    && guestExecutable.toLowerCase(java.util.Locale.ROOT).contains("explorer /desktop=shell");
+            String guestExecutable = buildGuestExecutable();
+            boolean desktopShellLaunch = shortcut == null
+                    && guestExecutable.toLowerCase(java.util.Locale.ROOT).contains("/desktop=shell");
+            desktopShellBootstrapActive = desktopShellLaunch;
             if (desktopShellBootstrapActive) {
-                desktopShellBootstrapStartedAtMs = System.currentTimeMillis();
+                if (desktopShellBootstrapStartedAtMs == 0L) {
+                    desktopShellBootstrapStartedAtMs = System.currentTimeMillis();
+                }
+            } else {
+                desktopShellBootstrapStartedAtMs = 0L;
             }
 
             guestProgramLauncherComponent.setGuestExecutable(guestExecutable);
@@ -2613,7 +5036,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 )
         );
         environment.addComponent(new NetworkInfoUpdateComponent());
-        environment.addComponent(new SteamClientComponent());
+        if (shouldAttachSteamClientComponent()) {
+            environment.addComponent(new SteamClientComponent());
+        }
         if (openWithAndroidBrowserEnabled || shareAndroidClipboardEnabled) {
             environment.addComponent(new WineRequestComponent());
         }
@@ -2636,11 +5061,33 @@ public class XServerDisplayActivity extends AppCompatActivity {
             );
         }
 
+        if (GraphicsDrivers.isVortek(graphicsDriver)) {
+            VortekRendererComponent.Options options =
+                    VortekRendererComponent.Options.fromKeyValueSet(this, getGraphicsDriverKeyValueConfig());
+            environment.addComponent(
+                    new VortekRendererComponent(
+                            xServer,
+                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.VORTEK_SERVER_PATH),
+                            options,
+                            this
+                    )
+            );
+        }
+        if (GraphicsDrivers.isVirgl(graphicsDriver)) {
+            environment.addComponent(
+                    new VirGLRendererComponent(
+                            xServer,
+                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.VIRGL_SERVER_PATH)
+                    )
+            );
+        }
+
         // Pass final envVars to the launcher
         guestProgramLauncherComponent.setEnvVars(envVars);
         guestProgramLauncherComponent.setTerminationCallback((status) -> {
             guestLauncherExited = true;
             guestLauncherExitStatus = status;
+            maybeLaunchDesktopShellFallbackOnPrimaryTermination(status);
             ForensicLogger.logEvent(
                     this,
                     "info",
@@ -2670,7 +5117,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                 "tracked_window_count", trackedWindowCount,
                                 "desktop_shell_bootstrap", desktopShellBootstrapActive,
                                 "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs),
-                                "termination_grace_ms", DESKTOP_SHELL_TERMINATION_GRACE_MS
+                                "termination_grace_ms", DESKTOP_SHELL_TERMINATION_GRACE_MS,
+                                "bootstrap_horizon_ms", DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS,
+                                "fallback_active", desktopShellDetachedFallbackActive
                         )
                 );
                 return;
@@ -2697,11 +5146,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 )
         );
 
+        // Start WinHandler before any guest launch so INIT cannot race a late UDP bind.
+        winHandler.start();
+
         // Start all environment components (XServer, Audio, etc.)
         environment.startEnvironmentComponents();
-
-        // Start the WinHandler
-        winHandler.start();
+        scheduleDesktopShellPreloaderFallback();
 
         ForensicLogger.logEvent(
                 this,
@@ -2745,7 +5195,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setFourFingersTapCallback(this::toggleRuntimeDrawer);
+        touchpadView.setLeftEdgeSwipeCallback(this::showRuntimeDrawer);
         rootView.addView(touchpadView);
+        applyDesktopGestureExclusion(rootView);
+        applyDesktopGestureExclusion(xserverRootView);
         applyDesktopGestureExclusion(touchpadView);
 
         inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
@@ -2839,11 +5292,39 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (targetView == null || shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
 
         targetView.post(() -> updateDesktopGestureExclusionRects(targetView));
-        if (!desktopGestureExclusionListenerAttached) {
+        if (desktopGestureExclusionTrackedViews.add(targetView)) {
             targetView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
                     updateDesktopGestureExclusionRects(targetView));
-            desktopGestureExclusionListenerAttached = true;
         }
+    }
+
+    private void armGuestBootstrapAfterFirstDraw(View targetView, String source) {
+        if (targetView == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) return;
+
+        ViewTreeObserver observer = targetView.getViewTreeObserver();
+        if (!observer.isAlive()) return;
+
+        observer.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                ViewTreeObserver currentObserver = targetView.getViewTreeObserver();
+                if (currentObserver.isAlive()) currentObserver.removeOnPreDrawListener(this);
+                if (bootstrapFirstDrawObserved) return true;
+
+                bootstrapFirstDrawObserved = true;
+                logBootstrapCheckpoint(
+                        "XSERVER_BOOTSTRAP_DRAW_GATE_PASSED",
+                        "guest_bootstrap_draw_gate_passed_after_first_activity_draw",
+                        "source", source,
+                        "activity_has_focus", hasWindowFocus(),
+                        "view_width", targetView.getWidth(),
+                        "view_height", targetView.getHeight()
+                );
+                refreshDesktopGestureExclusion();
+                maybeRunPendingGuestBootstrap(source);
+                return true;
+            }
+        });
     }
 
     private void updateDesktopGestureExclusionRects(View targetView) {
@@ -2871,6 +5352,163 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "view_height", height
                 )
         );
+    }
+
+    private void refreshDesktopGestureExclusion() {
+        if (shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        updateDesktopGestureExclusionRects(xserverRootView);
+        View desktopHostView = findViewById(R.id.FLXServerDisplay);
+        updateDesktopGestureExclusionRects(desktopHostView);
+        updateDesktopGestureExclusionRects(touchpadView);
+        if (preloaderDialog != null) {
+            preloaderDialog.refreshWindowState();
+        }
+    }
+
+    public boolean launchDetachedGuestProgram(String guestExecutable, String source, String installTarget) {
+        if (guestProgramLauncherComponent == null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "error",
+                    "DETACHED_GUEST_PROGRAM_MISSING_LAUNCHER",
+                    null,
+                    "xserver",
+                    "detached_guest_program_missing_launcher",
+                    ForensicLogger.fields(
+                            "source", source != null ? source : "",
+                            "install_target", installTarget != null ? installTarget : ""
+                    )
+            );
+            return false;
+        }
+
+        String normalizedExecutable = guestExecutable != null ? guestExecutable.trim() : "";
+        if (normalizedExecutable.isEmpty()) {
+            return false;
+        }
+
+        bindActiveContainerState(container);
+
+        int detachedPid = guestProgramLauncherComponent.launchDetachedGuestProgram(
+                normalizedExecutable,
+                (status) -> {
+                    boolean desktopShellFallback = "desktop_shell_winhandler_fallback".equals(source);
+                    DesktopShellBootstrapProof proof = null;
+                    boolean winHandlerReady = false;
+                    int trackedWindowCount = getTrackedApplicationWindowCount();
+                    if (desktopShellFallback && desktopShellBootstrapActive) {
+                        proof = collectDesktopShellBootstrapProof();
+                        winHandlerReady = winHandler != null && winHandler.isReady();
+                    }
+                    if (desktopShellFallback) {
+                        desktopShellDetachedFallbackActive = false;
+                    }
+                    ForensicLogger.logEvent(
+                            this,
+                            "info",
+                            "DETACHED_GUEST_PROGRAM_TERMINATED",
+                            null,
+                            "xserver",
+                            "detached_guest_program_terminated",
+                            ForensicLogger.fields(
+                                    "source", source != null ? source : "",
+                                    "install_target", installTarget != null ? installTarget : "",
+                                    "status", status,
+                                    "guest_executable", normalizedExecutable,
+                                    "tracked_window_count", trackedWindowCount,
+                                    "winhandler_ready", winHandlerReady,
+                                    "shell_process_present", proof != null && proof.explorerProcessPresent,
+                                    "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                                    "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                                    "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                                    "wineserver_present", proof != null && proof.wineserverPresent
+                            )
+                    );
+                    if (desktopShellFallback) {
+                        ForensicLogger.logEvent(
+                                this,
+                                "warning",
+                                "XSERVER_DESKTOP_SHELL_FALLBACK_TERMINATION_STATE",
+                                null,
+                                "xserver",
+                                "desktop_shell_fallback_termination_state",
+                                ForensicLogger.fields(
+                                        "status", status,
+                                        "tracked_window_count", trackedWindowCount,
+                                        "winhandler_ready", winHandlerReady,
+                                        "shell_process_present", proof != null && proof.explorerProcessPresent,
+                                        "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                                        "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                                        "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                                        "wineserver_present", proof != null && proof.wineserverPresent,
+                                        "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs)
+                                )
+                        );
+                    }
+                    if (desktopShellFallback
+                            && desktopShellBootstrapActive
+                            && guestLauncherExited
+                            && trackedWindowCount == 0
+                            && !guestVisualReady) {
+                        logBootstrapWindowSnapshot(
+                                "XSERVER_WINDOW_FRONTIER_FALLBACK_TERMINATION",
+                                "desktop_shell_window_frontier_fallback_termination"
+                        );
+                        ForensicLogger.logEvent(
+                                this,
+                                "warn",
+                                "XSERVER_DESKTOP_SHELL_FALLBACK_TERMINATED_NO_VISUAL_READY",
+                                null,
+                                "xserver",
+                                "desktop_shell_fallback_terminated_without_visual_ready",
+                                ForensicLogger.fields(
+                                        "status", status,
+                                        "guest_launcher_exit_status", guestLauncherExitStatus,
+                                        "bootstrap_elapsed_ms", Math.max(0L, System.currentTimeMillis() - desktopShellBootstrapStartedAtMs),
+                                        "winhandler_ready", winHandlerReady,
+                                        "shell_process_present", proof != null && proof.explorerProcessPresent,
+                                        "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                                        "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                                        "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                                        "wineserver_present", proof != null && proof.wineserverPresent
+                                )
+                        );
+                        scheduleDeferredGuestTermination(guestLauncherExitStatus);
+                    }
+                }
+        );
+        if (detachedPid == -1) {
+            ForensicLogger.logEvent(
+                    this,
+                    "error",
+                    "DETACHED_GUEST_PROGRAM_START_FAILED",
+                    null,
+                    "xserver",
+                    "detached_guest_program_start_failed",
+                    ForensicLogger.fields(
+                            "source", source != null ? source : "",
+                            "install_target", installTarget != null ? installTarget : "",
+                            "guest_executable", normalizedExecutable
+                    )
+            );
+            return false;
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DETACHED_GUEST_PROGRAM_STARTED",
+                null,
+                "xserver",
+                "detached_guest_program_started",
+                ForensicLogger.fields(
+                        "source", source != null ? source : "",
+                        "install_target", installTarget != null ? installTarget : "",
+                        "pid", detachedPid,
+                        "guest_executable", normalizedExecutable
+                )
+        );
+        return true;
     }
 
     private void handleDesktopBackNavigation() {
@@ -3232,7 +5870,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 + "enableOnLaunch=True";
     }
 
-    private void applyUpscalerEnvVars(boolean dxvkRoute, String socClass) {
+    private void applyUpscalerEnvVars(boolean dxvkBackedRoute, String socClass) {
         String guardReason = "none";
         String normalizedSocClass = socClass == null || socClass.trim().isEmpty() ? "unknown" : socClass.trim();
         boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(upscalerBackend)
@@ -3315,7 +5953,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         modeQuality = Math.max(0.20f, Math.min(1.20f, modeQuality * presetModeQualityMultiplier));
         modeBudgetMs = Math.max(4.0f, Math.min(14.0f, modeBudgetMs * presetModeBudgetMultiplier));
 
-        if (frameGenerationActive && !dxvkRoute) {
+        if (frameGenerationActive && !dxvkBackedRoute) {
             frameGenerationActive = false;
             if ("none".equals(guardReason)) {
                 guardReason = "framegen_requires_dxvk_route";
@@ -3335,32 +5973,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv("AERO_UPSCALER_SCALE_PERCENT", String.valueOf(upscalerScalePercent));
         setOrClearEnv("AERO_UPSCALER_SHARPNESS_PERCENT", String.valueOf(upscalerSharpnessPercent));
         setOrClearEnv("AERO_UPSCALER_DENOISE_PERCENT", String.valueOf(upscalerDenoisePercent));
-        int vulkanSdkProfileCount = safeParseInt(envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"));
-        boolean vulkanSdkAvailable = vulkanSdkProfileCount > 0;
         boolean requestedValidationLayer = upscalerEnabled && upscalerVulkanValidationLayer;
         Set<String> availableVkLayers = resolveAvailableVulkanLayerNames(envVars);
         boolean validationLayerAvailable = availableVkLayers.contains("VK_LAYER_KHRONOS_validation");
-        boolean upscalerValidationLayerActive = requestedValidationLayer && vulkanSdkAvailable && validationLayerAvailable;
-        if (requestedValidationLayer && !vulkanSdkAvailable && "none".equals(guardReason)) {
-            guardReason = "vk_validation_requires_vulkansdk";
-        }
-        if (requestedValidationLayer && vulkanSdkAvailable && !validationLayerAvailable && "none".equals(guardReason)) {
+        boolean upscalerValidationLayerActive = requestedValidationLayer && validationLayerAvailable;
+        if (requestedValidationLayer && !validationLayerAvailable && "none".equals(guardReason)) {
             guardReason = "vk_validation_layer_missing";
         }
         setOrClearEnv("AERO_VK_VALIDATION_REQUESTED", requestedValidationLayer ? "1" : "0");
         setOrClearEnv("AERO_VK_VALIDATION_LAYER", upscalerValidationLayerActive ? "1" : "0");
         setOrClearEnv(
                 "AERO_VK_VALIDATION_GUARD",
-                requestedValidationLayer && !vulkanSdkAvailable
-                        ? "vulkan_sdk_missing"
-                        : requestedValidationLayer && vulkanSdkAvailable && !validationLayerAvailable
+                requestedValidationLayer && !validationLayerAvailable
                         ? "vulkan_validation_layer_missing"
                         : ""
         );
         String vkLayers = removeVkInstanceLayer(envVars.get("VK_INSTANCE_LAYERS"), "VK_LAYER_KHRONOS_validation");
         if (upscalerValidationLayerActive) {
             vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
-        } else if (requestedValidationLayer && vulkanSdkAvailable) {
+        } else if (requestedValidationLayer) {
             logMissingVulkanLayer("upscaler", "VK_LAYER_KHRONOS_validation", availableVkLayers);
         }
         setOrClearEnv("VK_INSTANCE_LAYERS", vkLayers);
@@ -3482,9 +6113,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "denoise_percent", upscalerDenoisePercent,
                         "vk_validation_layer_requested", requestedValidationLayer ? "1" : "0",
                         "vk_validation_layer", upscalerValidationLayerActive ? "1" : "0",
-                        "vk_validation_guard", requestedValidationLayer && !vulkanSdkAvailable ? "vulkan_sdk_missing" : "none",
+                        "vk_validation_guard", requestedValidationLayer && !validationLayerAvailable ? "vulkan_validation_layer_missing" : "none",
                         "vk_validation_source", upscalerValidationSource,
-                        "vulkan_sdk_profile_count", vulkanSdkProfileCount,
+                        "vulkan_runtime_source", envVars.get("AERO_VULKAN_RUNTIME_SOURCE"),
                         "framegen_enabled", frameGenerationActive ? "1" : "0",
                         "framegen_source", upscalerFramegenSource,
                         "generated_frames", upscalerGeneratedFrames,
@@ -3555,8 +6186,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 profileItems.add(profile.getName());
             }
 
-            sProfile.setAdapter(SpinnerAdapters.create(this, isDarkMode, profileItems));
+            sProfile.setAdapter(SpinnerAdapters.createRuntime(this, profileItems));
             sProfile.setSelection(selectedPosition);
+            SpinnerAdapters.applyRuntimeSurface(sProfile);
         };
         loadProfileSpinner.run();
 
@@ -3617,6 +6249,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         dialog.setCanceledOnTouchOutside(false);
         dialog.show();
+        styleRuntimeNestedDialog(dialog);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            dialog.getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.992f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+        ViewGroup.LayoutParams params = dialog.getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            dialog.getContentView().setLayoutParams(params);
+        }
+        dialog.getContentView().setMinimumHeight(0);
     }
 
     private void simulateConfirmInputControlsDialog() {
@@ -3672,7 +6319,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         try {
                             v.requestUnbufferedDispatch(event);
                         }
-                        catch (Throwable ignored) {}
+                        catch (Throwable t) {
+                            Log.d("XServerDisplayActivity", "requestUnbufferedDispatch unavailable", t);
+                        }
                     }
                     // Reset the timeout on any touch event
                     //Log.d("XServerDisplayActivity", "Touch detected, resetting timeout.");
@@ -3725,6 +6374,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private static final Pattern VULKAN_API_MINOR_PATTERN = Pattern.compile("1\\.(\\d+)");
+    private static final int VORTEK_LATEST_VULKAN_API_VERSION = GPUHelper.vkMakeVersion(1, 4, 349);
+    private static final String VORTEK_LATEST_VULKAN_API_LABEL = "1.4";
 
     private String detectSoCClass() {
         SocClassifier.Tier tier = SocClassifier.detect(
@@ -3739,6 +6390,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             case ADRENO_6XX, ADRENO_LEGACY -> "adreno-6xx-and-older";
             case XCLIPSE_RDNA_MOBILE -> "xclipse-rdna-mobile";
             case MALI_G7XX_OR_NEWER -> "mali-g7xx-or-newer";
+            case MALI_LEGACY -> "mali-legacy";
             default -> "unknown";
         };
     }
@@ -3787,7 +6439,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void composeLaunchEnvVars(ForensicConfig.Snapshot forensicSnapshot) {
+        ForensicConfig.Snapshot runtimeForensicSnapshot = resolveRuntimeForensicSnapshot(forensicSnapshot);
         EnvVars mergedEnv = new EnvVars();
+        String bootstrapTraceId;
+        String bootstrapLogPath = "";
         // Preserve graphics/runtime route env prepared before setupXEnvironment().
         mergedEnv.putAll(envVars);
 
@@ -3812,18 +6467,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
             effectiveRuntimeProfile = RuntimeProfileManager.resolveEffectiveProfileId(this, requestedRuntimeProfile);
         }
         mergedEnv.put("AERO_RUNTIME_PROFILE", effectiveRuntimeProfile);
-        applyForensicEnvVars(mergedEnv, forensicSnapshot);
-
-        if (!mergedEnv.has("WINEESYNC")) {
-            mergedEnv.put("WINEESYNC", "1");
-        }
+        applyForensicEnvVars(mergedEnv, runtimeForensicSnapshot);
 
         if (overrideEnvVars != null) {
             mergedEnv.putAll(overrideEnvVars);
             overrideEnvVars.clear();
         }
+        WineSyncPolicy.apply(mergedEnv, selectedRuntimeProfile);
+        setOrClearEnv(mergedEnv, "AERO_FORENSIC_MODE", forensicModeLaunch ? "1" : "");
+        setOrClearEnv(mergedEnv, "AERO_FORENSIC_TRACE_ID", forensicTraceId);
+        setOrClearEnv(mergedEnv, "AERO_FORENSIC_ROUTE_SOURCE", forensicRouteSource);
+        bootstrapTraceId = mergedEnv.get("AERO_FORENSIC_TRACE_ID");
+        if (bootstrapTraceId != null) {
+            bootstrapTraceId = bootstrapTraceId.trim();
+        }
+        if (bootstrapTraceId != null && !bootstrapTraceId.isEmpty()) {
+            bootstrapTraceId = bootstrapTraceId.replaceAll("[^A-Za-z0-9._-]", "_");
+            bootstrapLogPath = imageFs.home_path + "/.freewine-bootstrap-" + bootstrapTraceId + ".log";
+        }
+        setOrClearEnv(mergedEnv, "FREEWINE_BOOTSTRAP_LOG_PATH", bootstrapLogPath);
         mergedEnv.put("AERO_ENV_LAYER_ORDER", "graphics->container->shortcut->runtime->forensic->override");
-        mergedEnv.put("AERO_FORENSIC_RUNTIME_SUMMARY", ForensicConfig.buildRuntimeSummary(forensicSnapshot));
+        mergedEnv.put("AERO_FORENSIC_RUNTIME_SUMMARY", ForensicConfig.buildRuntimeSummary(runtimeForensicSnapshot));
         mergedEnv.put("AERO_FORENSIC_CAPTURE_SUMMARY", ForensicConfig.buildCaptureSummary(this, forensicSnapshot));
 
         ForensicLogger.logEvent(
@@ -3834,17 +6498,52 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "xserver",
                 "forensic_env_applied",
                 ForensicLogger.fields(
-                        "runtime_summary", ForensicConfig.buildRuntimeSummary(forensicSnapshot),
+                        "requested_runtime_summary", ForensicConfig.buildRuntimeSummary(forensicSnapshot),
+                        "runtime_summary", ForensicConfig.buildRuntimeSummary(runtimeForensicSnapshot),
                         "capture_summary", ForensicConfig.buildCaptureSummary(this, forensicSnapshot),
-                        "wine_debug", forensicSnapshot.enableWineDebug ? "1" : "0",
-                        "loader_trace", ForensicConfig.shouldEnableLoaderTrace(forensicSnapshot, false) ? "1" : "0",
-                        "trace_mode", ForensicConfig.buildLoaderTraceMode(forensicSnapshot),
+                        "forensic_mode", forensicModeLaunch,
+                        "forensic_trace_id", mergedEnv.get("AERO_FORENSIC_TRACE_ID"),
+                        "freewine_bootstrap_log_path", mergedEnv.get("FREEWINE_BOOTSTRAP_LOG_PATH"),
+                        "forensic_route_source", mergedEnv.get("AERO_FORENSIC_ROUTE_SOURCE"),
+                        "wine_debug", runtimeForensicSnapshot.enableWineDebug ? "1" : "0",
+                        "loader_trace", runtimeForensicSnapshot.enableLoaderTrace ? "1" : "0",
+                        "trace_mode", ForensicConfig.buildLoaderTraceMode(runtimeForensicSnapshot),
+                        "vulkan_api_dump_requested", mergedEnv.get("AERO_FORENSIC_VULKAN_API_DUMP_REQUESTED"),
+                        "vulkan_api_dump_applied", mergedEnv.get("AERO_FORENSIC_VULKAN_API_DUMP_APPLIED"),
+                        "vulkan_validation_requested", mergedEnv.get("AERO_FORENSIC_VULKAN_VALIDATION_REQUESTED"),
+                        "vulkan_validation_applied", mergedEnv.get("AERO_FORENSIC_VULKAN_VALIDATION_APPLIED"),
+                        "available_vk_layers", mergedEnv.get("AERO_FORENSIC_AVAILABLE_VK_LAYERS"),
+                        "wine_sync_requested", mergedEnv.get("AERO_WINE_SYNC_REQUESTED"),
+                        "wine_sync_effective", mergedEnv.get("AERO_WINE_SYNC_POLICY_EFFECTIVE"),
+                        "wine_sync_userspace_policy", mergedEnv.get("AERO_WINE_SYNC_USERSPACE_POLICY_EFFECTIVE"),
+                        "wine_sync_expected_path", mergedEnv.get("AERO_WINE_SYNC_EXPECTED_PATH"),
+                        "wine_sync_reason", mergedEnv.get("AERO_WINE_SYNC_REASON"),
+                        "wine_sync_runtime_accepts_aesync", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_ACCEPTS_AESYNC"),
+                        "wine_sync_runtime_scope", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_SCOPE"),
+                        "wine_sync_runtime_family", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_FAMILY"),
+                        "wine_sync_runtime_model", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_MODEL"),
+                        "wine_sync_runtime_source_repo", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_SOURCE_REPO"),
+                        "wine_sync_runtime_release_tag", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_RELEASE_TAG"),
+                        "wine_sync_runtime_artifact_name", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_ARTIFACT_NAME"),
+                        "wine_sync_runtime_entry", mergedEnv.get("AERO_WINE_SYNC_RUNTIME_ENTRY"),
+                        "wineaesync", mergedEnv.get("AERO_WINE_SYNC_WINEAESYNC_EFFECTIVE"),
+                        "winefsync", mergedEnv.get("AERO_WINE_SYNC_WINEFSYNC_EFFECTIVE"),
+                        "wineesync", mergedEnv.get("AERO_WINE_SYNC_WINEESYNC_EFFECTIVE"),
+                        "ntsync_device_present", mergedEnv.get("AERO_WINE_SYNC_NTSYNC_DEVICE_PRESENT"),
+                        "ntsync_source_supported", mergedEnv.get("AERO_WINE_SYNC_NTSYNC_SOURCE_SUPPORTED"),
+                        "ntsync_source_tree_present", mergedEnv.get("AERO_WINE_SYNC_NTSYNC_SOURCE_TREE_PRESENT"),
+                        "ntsync_compiled_support", mergedEnv.get("AERO_WINE_SYNC_NTSYNC_COMPILED_SUPPORT"),
+                        "ntsync_env_switchable", mergedEnv.get("AERO_WINE_SYNC_NTSYNC_ENV_SWITCHABLE"),
                         "env_hash", ForensicLogger.hashEnvVars(mergedEnv)
                 )
         );
 
         envVars.clear();
         envVars.putAll(mergedEnv);
+    }
+
+    private ForensicConfig.Snapshot resolveRuntimeForensicSnapshot(ForensicConfig.Snapshot snapshot) {
+        return ForensicConfig.withRuntimeCaptureDefaults(snapshot, forensicModeLaunch);
     }
 
     private void applyForensicEnvVars(ForensicConfig.Snapshot snapshot) {
@@ -3876,29 +6575,41 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv(targetEnv, "VK_LOADER_DEBUG", snapshot.enableVulkanLoaderDebug ? "all" : "");
 
         Set<String> availableVkLayers = resolveAvailableVulkanLayerNames(targetEnv);
+        String availableVkLayersValue = availableVkLayers == null || availableVkLayers.isEmpty()
+                ? ""
+                : String.join(",", availableVkLayers);
         String vkLayers = removeVkInstanceLayer(targetEnv.get("VK_INSTANCE_LAYERS"), "VK_LAYER_LUNARG_api_dump");
         vkLayers = removeVkInstanceLayer(vkLayers, "VK_LAYER_KHRONOS_validation");
+        boolean vulkanApiDumpRequested = snapshot.enableVulkanApiDump;
+        boolean vulkanApiDumpApplied = vulkanApiDumpRequested && availableVkLayers.contains("VK_LAYER_LUNARG_api_dump");
         if (snapshot.enableVulkanApiDump) {
-            if (availableVkLayers.contains("VK_LAYER_LUNARG_api_dump")) {
+            if (vulkanApiDumpApplied) {
                 vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_LUNARG_api_dump");
-            } else {
-                logMissingVulkanLayer("forensic", "VK_LAYER_LUNARG_api_dump", availableVkLayers);
             }
         }
+        boolean vulkanValidationRequested = snapshot.enableVulkanValidation;
+        boolean vulkanValidationApplied = vulkanValidationRequested && availableVkLayers.contains("VK_LAYER_KHRONOS_validation");
         if (snapshot.enableVulkanValidation) {
-            if (availableVkLayers.contains("VK_LAYER_KHRONOS_validation")) {
+            if (vulkanValidationApplied) {
                 vkLayers = appendVkInstanceLayers(vkLayers, "VK_LAYER_KHRONOS_validation");
-            } else {
-                logMissingVulkanLayer("forensic", "VK_LAYER_KHRONOS_validation", availableVkLayers);
             }
         }
         setOrClearEnv(targetEnv, "VK_INSTANCE_LAYERS", vkLayers);
+        setOrClearEnv(targetEnv, "AERO_FORENSIC_AVAILABLE_VK_LAYERS", availableVkLayersValue);
+        setOrClearEnv(targetEnv, "AERO_FORENSIC_VULKAN_API_DUMP_REQUESTED", vulkanApiDumpRequested ? "1" : "0");
+        setOrClearEnv(targetEnv, "AERO_FORENSIC_VULKAN_API_DUMP_APPLIED", vulkanApiDumpApplied ? "1" : "0");
+        setOrClearEnv(targetEnv, "AERO_FORENSIC_VULKAN_VALIDATION_REQUESTED", vulkanValidationRequested ? "1" : "0");
+        setOrClearEnv(targetEnv, "AERO_FORENSIC_VULKAN_VALIDATION_APPLIED", vulkanValidationApplied ? "1" : "0");
     }
 
     private void installForensicRuntimeLogCallbacks(ForensicConfig.Snapshot snapshot) {
         forensicRuntimeCallbacks.clear();
         if (snapshot == null) return;
 
+        addForensicRuntimeFileCallback(forensicModeLaunch,
+                "runtime_omni");
+        addForensicRuntimeFileCallback(forensicModeLaunch,
+                "runtime_bootstrap", "freewine-", "wineboot", "wineserver", "explorer", "services", "winhandler", "wfm", "aesync");
         addForensicRuntimeFileCallback(snapshot.enableWineDebug || snapshot.enableLoaderTrace,
                 "wine_loader", "wine", "loaddll", "module", "ntdll", "kernel32");
         addForensicRuntimeFileCallback(snapshot.enableBox64Logs,
@@ -4078,28 +6789,313 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
     }
 
+    private String forensicTraceIdOrNull() {
+        return forensicTraceId == null || forensicTraceId.trim().isEmpty()
+                ? null
+                : forensicTraceId.trim();
+    }
+
+    private void prearmDesktopShellBootstrapIfNeeded(String source) {
+        if (desktopShellBootstrapActive) return;
+        if (!shouldUseDirectDesktopShellBootstrap()) return;
+        desktopShellBootstrapActive = true;
+        desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER;
+        if (desktopShellBootstrapStartedAtMs == 0L) {
+            desktopShellBootstrapStartedAtMs = System.currentTimeMillis();
+        }
+        logBootstrapCheckpoint(
+                "XSERVER_BOOTSTRAP_PREARMED",
+                "desktop_shell_bootstrap_prearmed_before_guest_submit",
+                "source", source,
+                "launch_mode", desktopShellLaunchMode
+        );
+    }
+
+    private void armGuestBootstrapAfterFocus(Runnable runnable, String source) {
+        if (guestBootstrapSubmitted) return;
+        pendingBootstrapRunnable = runnable;
+        pendingBootstrapSource = source == null ? "" : source;
+        bootstrapWaitingForFocus = false;
+        logBootstrapCheckpoint(
+                "XSERVER_BOOTSTRAP_FOCUS_GATE_ARMED",
+                "guest_bootstrap_armed_waiting_for_window_focus",
+                "source", pendingBootstrapSource,
+                "activity_has_focus", hasWindowFocus(),
+                "activity_finishing", isFinishing(),
+                "activity_destroyed", isDestroyed()
+        );
+        maybeRunPendingGuestBootstrap(source);
+    }
+
+    private void maybeRunPendingGuestBootstrap(String source) {
+        if (guestBootstrapSubmitted) return;
+        Runnable runnable = pendingBootstrapRunnable;
+        if (runnable == null) return;
+
+        boolean hasRealWindowFocus = hasWindowFocus();
+        boolean readyForBootstrap =
+                !isFinishing() && !isDestroyed() && (hasRealWindowFocus || bootstrapFirstDrawObserved);
+        if (!readyForBootstrap) {
+            if (!bootstrapWaitingForFocus) {
+                bootstrapWaitingForFocus = true;
+                logBootstrapCheckpoint(
+                        "XSERVER_BOOTSTRAP_FOCUS_GATE_WAITING",
+                        "guest_bootstrap_waiting_for_real_window_focus_or_first_draw",
+                        "source", source,
+                        "armed_source", pendingBootstrapSource,
+                        "activity_has_focus", hasWindowFocus(),
+                        "first_draw_observed", bootstrapFirstDrawObserved,
+                        "activity_finishing", isFinishing(),
+                        "activity_destroyed", isDestroyed()
+                );
+            }
+            return;
+        }
+
+        pendingBootstrapRunnable = null;
+        guestBootstrapSubmitted = true;
+        bootstrapWaitingForFocus = false;
+        bindActiveContainerState(container);
+        if (hasRealWindowFocus) {
+            logBootstrapCheckpoint(
+                    "XSERVER_BOOTSTRAP_FOCUS_GATE_PASSED",
+                    "guest_bootstrap_released_after_window_focus",
+                    "source", source,
+                    "armed_source", pendingBootstrapSource,
+                    "activity_has_focus", true,
+                    "first_draw_observed", bootstrapFirstDrawObserved
+            );
+        } else {
+            logBootstrapCheckpoint(
+                    "XSERVER_BOOTSTRAP_DRAW_GATE_RELEASED",
+                    "guest_bootstrap_released_after_first_draw_without_window_focus",
+                    "source", source,
+                    "armed_source", pendingBootstrapSource,
+                    "activity_has_focus", false,
+                    "first_draw_observed", bootstrapFirstDrawObserved
+            );
+        }
+        runnable.run();
+    }
+
+    private void logBootstrapCheckpoint(String eventId, String message, Object... fields) {
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                eventId,
+                forensicTraceIdOrNull(),
+                "xserver",
+                message,
+                fields == null || fields.length == 0 ? null : ForensicLogger.fields(fields)
+        );
+    }
+
+    private RuntimeException rethrowBootstrapFailure(String eventId, String message, Throwable error, Object... fields) {
+        ForensicLogger.error(
+                this,
+                eventId,
+                forensicTraceIdOrNull(),
+                "xserver",
+                message,
+                error,
+                fields == null || fields.length == 0 ? null : ForensicLogger.fields(fields)
+        );
+        if (error instanceof RuntimeException) {
+            return (RuntimeException) error;
+        }
+        return new RuntimeException(error);
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private void rememberActiveLaunchTarget(int containerId,
+                                            @Nullable String shortcutPath,
+                                            @Nullable String appId,
+                                            @Nullable String launchRouteToken,
+                                            @Nullable String temporaryOverrideAppId) {
+        activeLaunchContainerId = containerId;
+        activeLaunchShortcutPath = normalizeShortcutPath(shortcutPath);
+        activeLaunchAppId = safeTrim(appId);
+        activeLaunchRouteToken = safeTrim(launchRouteToken);
+        activeTemporaryOverrideAppId = safeTrim(temporaryOverrideAppId);
+        activeTemporaryOverrideRestored = false;
+    }
+
+    private String normalizeShortcutPath(@Nullable String shortcutPath) {
+        return shortcutPath == null ? "" : shortcutPath.trim();
+    }
+
+    private String resolveIntentLaunchAppId(@Nullable Intent intent) {
+        return safeTrim(intent != null ? intent.getStringExtra(LaunchSecurity.EXTRA_APP_ID) : null);
+    }
+
+    private String resolveIntentLaunchRouteToken(@Nullable Intent intent) {
+        return safeTrim(intent != null ? intent.getStringExtra(LaunchSecurity.EXTRA_LAUNCH_ROUTE_TOKEN) : null);
+    }
+
+    private String resolveIntentTemporaryOverrideAppId(@Nullable Intent intent) {
+        return safeTrim(intent != null ? intent.getStringExtra(LaunchSecurity.EXTRA_TEMP_OVERRIDE_APP_ID) : null);
+    }
+
+    private String resolveContainerLaunchAppId(@Nullable Container targetContainer) {
+        return targetContainer == null ? "" : safeTrim(targetContainer.getSessionMetadata("appId", ""));
+    }
+
+    private String resolveEffectiveLaunchAppId(@Nullable Intent intent, @Nullable Container targetContainer) {
+        String appId = resolveIntentLaunchAppId(intent);
+        return appId.isEmpty() ? resolveContainerLaunchAppId(targetContainer) : appId;
+    }
+
+    private boolean isSteamExecutableSurface(@Nullable String value) {
+        String normalized = safeTrim(value).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) return false;
+        return normalized.contains("steam.exe")
+                || normalized.contains("steamwebhelper")
+                || normalized.endsWith("/steam")
+                || normalized.endsWith("\\steam");
+    }
+
+    private boolean shouldAttachSteamClientComponent() {
+        if (container == null) return false;
+        if (container.isLaunchRealSteam()) return true;
+
+        String appId = safeTrim(activeLaunchAppId);
+        if (appId.isEmpty()) appId = resolveIntentLaunchAppId(getIntent());
+        if (appId.isEmpty()) appId = resolveContainerLaunchAppId(container);
+        if (appId.isEmpty() && shortcut != null) {
+            appId = safeTrim(shortcut.getExtra("appId", ""));
+        }
+        if (appId.startsWith("STEAM_")) return true;
+
+        if (shortcut != null && isSteamExecutableSurface(shortcut.path)) return true;
+        return isSteamExecutableSurface(container.getExecutablePath());
+    }
+
+    private int resolveIntentContainerId(@Nullable Intent intent) {
+        if (intent == null) return 0;
+        int containerId = intent.getIntExtra("container_id", 0);
+        if (containerId != 0) return containerId;
+        String shortcutPath = normalizeShortcutPath(intent.getStringExtra("shortcut_path"));
+        if (shortcutPath.isEmpty()) return 0;
+        return parseContainerIdFromDesktopFile(new File(shortcutPath));
+    }
+
+    private boolean hasLaunchTargetChanged(@Nullable Intent intent) {
+        return resolveIntentContainerId(intent) != activeLaunchContainerId
+                || !normalizeShortcutPath(intent != null ? intent.getStringExtra("shortcut_path") : null)
+                .equals(activeLaunchShortcutPath)
+                || !resolveIntentLaunchAppId(intent).equals(activeLaunchAppId)
+                || !resolveIntentLaunchRouteToken(intent).equals(activeLaunchRouteToken);
+    }
+
+    private void restoreTemporaryOverrideIfNeeded(@NonNull String reason) {
+        if (activeTemporaryOverrideRestored) return;
+        String appId = safeTrim(activeTemporaryOverrideAppId);
+        if (appId.isEmpty()) return;
+
+        activeTemporaryOverrideRestored = true;
+        try {
+            IntentLaunchManager.INSTANCE.restoreOriginalConfiguration(this, appId);
+            IntentLaunchManager.INSTANCE.clearTemporaryOverride(appId);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_TEMP_OVERRIDE_RESTORED",
+                    forensicTraceIdOrNull(),
+                    "xserver",
+                    "temporary_override_restored",
+                    ForensicLogger.fields(
+                            "app_id", appId,
+                            "reason", reason
+                    )
+            );
+        } catch (Throwable error) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_TEMP_OVERRIDE_RESTORE_FAILED",
+                    forensicTraceIdOrNull(),
+                    "xserver",
+                    "temporary_override_restore_failed",
+                    ForensicLogger.fields(
+                            "app_id", appId,
+                            "reason", reason,
+                            "error_class", error.getClass().getName(),
+                            "error_detail", String.valueOf(error.getMessage())
+                    )
+            );
+        }
+    }
+
+    private boolean isLaunchBindingCurrent(int generation) {
+        return generation == launchBindingGeneration && !isFinishing() && !isDestroyed();
+    }
+
+    private void recreateForLaunchRelaunch(Intent restartIntent) {
+        if (restartIntent != null) {
+            restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            setIntent(restartIntent);
+        }
+        recreate();
+        overridePendingTransition(0, 0);
+    }
+
+    private void bindActiveContainerState(@Nullable Container targetContainer) {
+        if (targetContainer == null || containerManager == null || imageFs == null) return;
+        containerManager.activateContainer(targetContainer);
+        imageFs.setHomeDir(targetContainer.getRootDir());
+    }
+
     private String normalizeRequestedVulkanApi(String raw) {
-        if (raw == null || raw.trim().isEmpty()) return "1.3";
+        if (raw == null || raw.trim().isEmpty()) return VORTEK_LATEST_VULKAN_API_LABEL;
         Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(raw);
-        if (!matcher.find()) return "1.3";
+        if (!matcher.find()) return VORTEK_LATEST_VULKAN_API_LABEL;
         try {
             int minor = Integer.parseInt(matcher.group(1));
             if (minor < 1) minor = 1;
+            if (minor > 4) minor = 4;
             return "1." + minor;
         } catch (NumberFormatException ignored) {
-            return "1.3";
+            return VORTEK_LATEST_VULKAN_API_LABEL;
         }
     }
 
     private int getVulkanApiMinor(String apiVersion) {
-        if (apiVersion == null || apiVersion.trim().isEmpty()) return 3;
+        if (apiVersion == null || apiVersion.trim().isEmpty()) return 4;
         Matcher matcher = VULKAN_API_MINOR_PATTERN.matcher(apiVersion);
-        if (!matcher.find()) return 3;
+        if (!matcher.find()) return 4;
         try {
             return Integer.parseInt(matcher.group(1));
         } catch (NumberFormatException ignored) {
-            return 3;
+            return 4;
         }
+    }
+
+    private int parseRequestedVulkanApiCeiling(String apiVersion) {
+        String normalized = normalizeRequestedVulkanApi(apiVersion);
+        int requested = GPUHelper.vkMakeVersion(normalized);
+        if (requested == 0) return VORTEK_LATEST_VULKAN_API_VERSION;
+        int minor = GPUHelper.vkVersionMinor(requested);
+        if (minor >= 4) return VORTEK_LATEST_VULKAN_API_VERSION;
+        return GPUHelper.vkMakeVersion(1, minor, 4095);
+    }
+
+    private int queryPhysicalVulkanApiVersion() {
+        try {
+            int version = GPUHelper.vkGetApiVersion();
+            return version == 0 ? GPUHelper.vkGetApiVersionSafe() : version;
+        } catch (Throwable ignored) {
+            return GPUHelper.vkGetApiVersionSafe();
+        }
+    }
+
+    private String resolveVortekManifestApiVersion(String apiVersion) {
+        int requested = parseRequestedVulkanApiCeiling(apiVersion);
+        int physical = queryPhysicalVulkanApiVersion();
+        int effective = GPUHelper.vkMinVersion(requested, physical);
+        return GPUHelper.vkVersionToString(effective);
     }
 
     private int parseMaxVulkanMinor(ContentProfile profile) {
@@ -4160,225 +7156,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return profile == null ? 0L : parsePublishedAtKey(profile.publishedAt);
     }
 
-    private String detectVulkanSdkLaneArch(ContentProfile profile) {
-        return profile == null ? "generic" : profile.getArchitectureTag();
-    }
-
-    private static final class VulkanSdkSelectionGroup {
-        final String key;
-        final HashMap<String, ContentProfile> bestByArch = new HashMap<>();
-        final HashMap<String, Integer> bestScoreByArch = new HashMap<>();
-        final HashMap<String, Integer> bestMaxByArch = new HashMap<>();
-
-        VulkanSdkSelectionGroup(String key) {
-            this.key = key;
-        }
-    }
-
-    private int computeVulkanSdkProfileScore(int requestedMinor, ContentProfile profile) {
-        int minMinor = parseMinVulkanMinor(profile);
-        int maxMinor = parseMaxVulkanMinor(profile);
-        if (minMinor <= 0 || maxMinor <= 0) return Integer.MAX_VALUE;
-        if (requestedMinor < minMinor) {
-            return (minMinor - requestedMinor) + 100;
-        }
-        if (requestedMinor <= maxMinor) {
-            return maxMinor - requestedMinor;
-        }
-        return 1000 + (requestedMinor - maxMinor);
-    }
-
-    private String buildVulkanSdkGroupKey(ContentProfile profile) {
-        if (profile == null) return "";
-        String version = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim().toLowerCase(Locale.US);
-        if (!version.isEmpty()) return version;
-        String value = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
-        return value.replace("-arm64ec", "")
-                .replace("-arm64-ec", "")
-                .replace("-arm64", "")
-                .replace("-x86_64", "")
-                .replace("-x86-64", "")
-                .replace("-amd64", "")
-                .replace("-bundle", "")
-                .replace("-unified", "")
-                .trim();
-    }
-
-    private int resolveVulkanSdkCoverageRank(VulkanSdkSelectionGroup group, boolean preferArm64Ec) {
-        if (group == null) return Integer.MAX_VALUE;
-        boolean hasBundle = group.bestByArch.containsKey("bundle");
-        boolean hasArm64 = group.bestByArch.containsKey("arm64");
-        boolean hasArm64Ec = group.bestByArch.containsKey("arm64ec");
-        boolean hasX64 = group.bestByArch.containsKey("x86_64");
-        boolean hasGeneric = group.bestByArch.containsKey("generic");
-
-        if (preferArm64Ec) {
-            if (hasBundle) return 0;
-            if (hasArm64Ec && hasX64) return 1;
-            if (hasArm64Ec) return 2;
-            if (hasArm64 && hasX64) return 3;
-            if (hasX64) return 4;
-            if (hasArm64) return 5;
-            if (hasGeneric) return 6;
-            return Integer.MAX_VALUE;
-        }
-
-        if (hasBundle) return 0;
-        if (hasArm64 && hasX64) return 1;
-        if (hasArm64) return 2;
-        if (hasX64) return 3;
-        if (hasArm64Ec) return 4;
-        if (hasGeneric) return 5;
-        return Integer.MAX_VALUE;
-    }
-
-    private int resolveVulkanSdkCoverageWidth(VulkanSdkSelectionGroup group) {
-        if (group == null) return 0;
-        if (group.bestByArch.containsKey("bundle")) return 3;
-        int width = 0;
-        if (group.bestByArch.containsKey("arm64")) width++;
-        if (group.bestByArch.containsKey("arm64ec")) width++;
-        if (group.bestByArch.containsKey("x86_64")) width++;
-        if (width == 0 && group.bestByArch.containsKey("generic")) return 1;
-        return width;
-    }
-
-    private int resolveVulkanSdkGroupApiScore(VulkanSdkSelectionGroup group, int requestedMinor) {
-        int bestScore = Integer.MAX_VALUE;
-        for (ContentProfile profile : group.bestByArch.values()) {
-            bestScore = Math.min(bestScore, computeVulkanSdkProfileScore(requestedMinor, profile));
-        }
-        return bestScore;
-    }
-
-    private long resolveVulkanSdkGroupPublishedKey(VulkanSdkSelectionGroup group) {
-        long key = 0L;
-        for (ContentProfile profile : group.bestByArch.values()) {
-            key = Math.max(key, resolveProfilePublishedAtKey(profile));
-        }
-        return key;
-    }
-
-    private int resolveVulkanSdkGroupVersionCode(VulkanSdkSelectionGroup group) {
-        int versionCode = 0;
-        for (ContentProfile profile : group.bestByArch.values()) {
-            versionCode = Math.max(versionCode, profile == null ? 0 : profile.verCode);
-        }
-        return versionCode;
-    }
-
-    @NonNull
-    private List<ContentProfile> collectOrderedVulkanSdkProfiles(VulkanSdkSelectionGroup group, boolean preferArm64Ec) {
-        ArrayList<ContentProfile> selected = new ArrayList<>();
-        if (group == null || group.bestByArch.isEmpty()) return selected;
-        ContentProfile bundle = group.bestByArch.get("bundle");
-        if (bundle != null) {
-            selected.add(bundle);
-            return selected;
-        }
-
-        String[] preferredOrder = preferArm64Ec
-                ? new String[] {"arm64ec", "x86_64", "arm64", "generic"}
-                : new String[] {"arm64", "x86_64", "arm64ec", "generic"};
-        for (String arch : preferredOrder) {
-            ContentProfile profile = group.bestByArch.get(arch);
-            if (profile != null && !selected.contains(profile)) {
-                selected.add(profile);
-            }
-        }
-        return selected;
-    }
-
-    @NonNull
-    private List<ContentProfile> resolveVulkanSdkProfilesForApi(String requestedApiVersion) {
-        int requestedMinor = getVulkanApiMinor(requestedApiVersion);
-        List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
-        if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
-
-        HashMap<String, VulkanSdkSelectionGroup> groups = new HashMap<>();
-        for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
-            int profileScore = computeVulkanSdkProfileScore(requestedMinor, profile);
-            if (profileScore == Integer.MAX_VALUE) continue;
-
-            String groupKey = buildVulkanSdkGroupKey(profile);
-            if (groupKey.isEmpty()) groupKey = ContentsManager.getEntryName(profile);
-            VulkanSdkSelectionGroup group = groups.get(groupKey);
-            if (group == null) {
-                group = new VulkanSdkSelectionGroup(groupKey);
-                groups.put(groupKey, group);
-            }
-
-            String archKey = detectVulkanSdkLaneArch(profile);
-            Integer currentScore = group.bestScoreByArch.get(archKey);
-            Integer currentMax = group.bestMaxByArch.get(archKey);
-            int maxMinor = parseMaxVulkanMinor(profile);
-            if (currentScore == null
-                    || profileScore < currentScore
-                    || (profileScore == currentScore && (currentMax == null || maxMinor > currentMax))) {
-                group.bestScoreByArch.put(archKey, profileScore);
-                group.bestMaxByArch.put(archKey, maxMinor);
-                group.bestByArch.put(archKey, profile);
-            }
-        }
-
-        boolean preferArm64Ec = wineInfo != null && wineInfo.isArm64EC();
-        VulkanSdkSelectionGroup bestGroup = null;
-        for (VulkanSdkSelectionGroup group : groups.values()) {
-            if (group == null || group.bestByArch.isEmpty()) continue;
-            if (bestGroup == null) {
-                bestGroup = group;
-                continue;
-            }
-
-            int coverageCompare = Integer.compare(
-                    resolveVulkanSdkCoverageRank(group, preferArm64Ec),
-                    resolveVulkanSdkCoverageRank(bestGroup, preferArm64Ec)
-            );
-            if (coverageCompare < 0) {
-                bestGroup = group;
-                continue;
-            }
-            if (coverageCompare > 0) continue;
-
-            int apiCompare = Integer.compare(
-                    resolveVulkanSdkGroupApiScore(group, requestedMinor),
-                    resolveVulkanSdkGroupApiScore(bestGroup, requestedMinor)
-            );
-            if (apiCompare < 0) {
-                bestGroup = group;
-                continue;
-            }
-            if (apiCompare > 0) continue;
-
-            int widthCompare = Integer.compare(
-                    resolveVulkanSdkCoverageWidth(group),
-                    resolveVulkanSdkCoverageWidth(bestGroup)
-            );
-            if (widthCompare > 0) {
-                bestGroup = group;
-                continue;
-            }
-            if (widthCompare < 0) continue;
-
-            long publishedCompare = Long.compare(
-                    resolveVulkanSdkGroupPublishedKey(group),
-                    resolveVulkanSdkGroupPublishedKey(bestGroup)
-            );
-            if (publishedCompare > 0) {
-                bestGroup = group;
-                continue;
-            }
-            if (publishedCompare < 0) continue;
-
-            if (resolveVulkanSdkGroupVersionCode(group) > resolveVulkanSdkGroupVersionCode(bestGroup)) {
-                bestGroup = group;
-            }
-        }
-
-        return collectOrderedVulkanSdkProfiles(bestGroup, preferArm64Ec);
-    }
-
     private String joinCsv(List<String> values) {
         if (values == null || values.isEmpty()) return "";
         StringBuilder builder = new StringBuilder();
@@ -4388,6 +7165,437 @@ public class XServerDisplayActivity extends AppCompatActivity {
             builder.append(value.trim());
         }
         return builder.toString();
+    }
+
+    private KeyValueSet getGraphicsDriverKeyValueConfig() {
+        return GraphicsDrivers.toKeyValueSetConfig(graphicsDriver, rawGraphicsDriverConfig);
+    }
+
+    private void ensureGraphicsDriverAssetExtracted(File rootDir, String assetName, String probeRelativePath) {
+        if (rootDir == null || assetName == null || assetName.trim().isEmpty()) return;
+        File probeFile = probeRelativePath == null || probeRelativePath.trim().isEmpty()
+                ? null
+                : new File(rootDir, probeRelativePath);
+        if (probeFile != null && probeFile.isFile()) {
+            if (!GraphicsElfCompatibility.hasForbiddenBionicToken(probeFile)) return;
+            FileUtils.delete(probeFile);
+        }
+        TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, assetName, rootDir);
+    }
+
+    @Nullable
+    private File rewriteVortekIcdFile(File rootDir, @Nullable String libraryRelativePath, @Nullable String apiVersion) {
+        if (rootDir == null) return null;
+        File icdFile = new File(rootDir, "usr/share/vulkan/icd.d/vortek_icd.aarch64.json");
+        if (!icdFile.isFile()) return null;
+
+        String normalizedLibraryPath = trimToEmpty(libraryRelativePath);
+        if (normalizedLibraryPath.startsWith("/")) normalizedLibraryPath = normalizedLibraryPath.substring(1);
+        File libraryFile = normalizedLibraryPath.isEmpty()
+                ? new File(rootDir, "usr/lib/libvulkan_vortek.so")
+                : new File(rootDir, normalizedLibraryPath);
+        if (!GraphicsElfCompatibility.isBionicCompatibleLibrary(libraryFile)) return null;
+        try {
+            JSONObject root = new JSONObject(FileUtils.readString(icdFile));
+            JSONObject icd = root.optJSONObject("ICD");
+            if (icd == null) {
+                icd = new JSONObject();
+                root.put("ICD", icd);
+            }
+            icd.put("library_path", libraryFile.getAbsolutePath());
+            icd.put("api_version", resolveVortekManifestApiVersion(apiVersion));
+            FileUtils.writeString(icdFile, root.toString(2));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to rewrite Vortek ICD manifest", e);
+        }
+        return icdFile;
+    }
+
+    private boolean hasAccessibleRenderNode() {
+        File driDir = new File("/dev/dri");
+        File[] nodes = driDir.listFiles((dir, name) -> name != null && name.startsWith("renderD"));
+        return nodes != null && nodes.length > 0;
+    }
+
+    private String buildVortekRuntimeSource(VortekVulkanDriverPackageManager.PackageInfo driverInfo) {
+        if (driverInfo == null || driverInfo.builtin) return "android-system-hal";
+        String transport = trimToEmpty(driverInfo.transport);
+        if (transport.isEmpty()) return "custom-userspace-wrapper";
+        return "custom-" + transport;
+    }
+
+    private void applyGraphicsDriverMetadataEnv(String prefix,
+                                                String providerLane,
+                                                String driverKind,
+                                                String transport,
+                                                String supportClass,
+                                                String kernelEvidenceClass,
+                                                String transportRequirements,
+                                                String ownerLane,
+                                                String routeId,
+                                                String rankedKernelDonors,
+                                                String diagnosticKeys,
+                                                boolean requiresRenderNode) {
+        setOrClearEnv(prefix + "_PROVIDER_LANE", trimToEmpty(providerLane));
+        setOrClearEnv(prefix + "_DRIVER_KIND", trimToEmpty(driverKind));
+        setOrClearEnv(prefix + "_DRIVER_TRANSPORT", trimToEmpty(transport));
+        setOrClearEnv(prefix + "_SUPPORT_CLASS", trimToEmpty(supportClass));
+        setOrClearEnv(prefix + "_KERNEL_EVIDENCE_CLASS", trimToEmpty(kernelEvidenceClass));
+        setOrClearEnv(prefix + "_TRANSPORT_REQUIREMENTS", trimToEmpty(transportRequirements));
+        setOrClearEnv(prefix + "_OWNER_LANE", trimToEmpty(ownerLane));
+        setOrClearEnv(prefix + "_ROUTE_ID", trimToEmpty(routeId));
+        setOrClearEnv(prefix + "_RANKED_KERNEL_DONORS", trimToEmpty(rankedKernelDonors));
+        setOrClearEnv(prefix + "_DIAGNOSTIC_KEYS", trimToEmpty(diagnosticKeys));
+        setOrClearEnv(prefix + "_REQUIRES_RENDER_NODE", requiresRenderNode ? "1" : "");
+    }
+
+    private boolean isAeMaliVulkanDriver(VortekVulkanDriverPackageManager.PackageInfo driverInfo) {
+        if (driverInfo == null || driverInfo.builtin) return false;
+        String kind = trimToEmpty(driverInfo.driverKind).toLowerCase(Locale.US);
+        String lane = trimToEmpty(driverInfo.providerLane).toLowerCase(Locale.US);
+        String repo = trimToEmpty(driverInfo.sourceRepo).toLowerCase(Locale.US);
+        return kind.contains("aemali")
+                || kind.contains("panvk")
+                || lane.contains("aemali")
+                || lane.contains("mali-panvk")
+                || (repo.contains("mesa") && kind.contains("mali"));
+    }
+
+    private void applyAeMaliPolicyEnv(VortekVulkanDriverPackageManager.PackageInfo driverInfo,
+                                      String extensionProfile,
+                                      String selectedVulkanApi,
+                                      boolean renderNodeAvailable) {
+        boolean aeMaliDriver = isAeMaliVulkanDriver(driverInfo);
+        String selectedApiCeiling = aeMaliDriver
+                ? firstNonEmpty(trimToEmpty(driverInfo.vulkanApiCeiling), selectedVulkanApi)
+                : "";
+        boolean renderNodeRequired = aeMaliDriver && driverInfo.requiresRenderNode;
+        setOrClearEnv("AEMALI_DRIVER", aeMaliDriver ? "1" : "");
+        setOrClearEnv("AERO_MESA_DRIVER", aeMaliDriver ? "aemali" : "");
+        setOrClearEnv("AEMALI_PROFILE", aeMaliDriver ? extensionProfile : "");
+        setOrClearEnv("AEMALI_VK_API_CEILING", selectedApiCeiling);
+        setOrClearEnv("AEMALI_ROUTE", aeMaliDriver ? buildVortekRuntimeSource(driverInfo) : "");
+        setOrClearEnv(
+                "AEMALI_TRANSPORT",
+                aeMaliDriver ? firstNonEmpty(trimToEmpty(driverInfo.transport), "drm-render-node-experimental") : ""
+        );
+        applyGraphicsDriverMetadataEnv(
+                "AEMALI",
+                aeMaliDriver ? driverInfo.providerLane : "",
+                aeMaliDriver ? driverInfo.driverKind : "",
+                aeMaliDriver ? firstNonEmpty(trimToEmpty(driverInfo.transport), "drm-render-node-experimental") : "",
+                aeMaliDriver ? driverInfo.supportClass : "",
+                aeMaliDriver ? driverInfo.kernelEvidenceClass : "",
+                aeMaliDriver ? driverInfo.transportRequirements : "",
+                aeMaliDriver ? driverInfo.ownerLane : "",
+                aeMaliDriver ? driverInfo.routeId : "",
+                aeMaliDriver ? driverInfo.rankedKernelDonors : "",
+                aeMaliDriver ? driverInfo.diagnosticKeys : "",
+                renderNodeRequired
+        );
+        setOrClearEnv("AEMALI_RENDER_NODE_REQUIRED", renderNodeRequired ? "1" : "");
+        setOrClearEnv("AEMALI_RENDER_NODE_PRESENT", aeMaliDriver && renderNodeAvailable ? "1" : "");
+        setOrClearEnv(
+                "AEMALI_TRANSPORT_BLOCK_REASON",
+                renderNodeRequired && !renderNodeAvailable ? "missing_render_node" : ""
+        );
+    }
+
+    private boolean isAeMaliOpenGlProvider(String providerLane, String driverKind, String sourceRepo) {
+        String lane = trimToEmpty(providerLane).toLowerCase(Locale.US);
+        String kind = trimToEmpty(driverKind).toLowerCase(Locale.US);
+        String repo = trimToEmpty(sourceRepo).toLowerCase(Locale.US);
+        return lane.contains("aemali")
+                || kind.contains("aemali")
+                || kind.contains("panfrost")
+                || kind.contains("lima")
+                || (repo.contains("mesa") && kind.contains("gallium"));
+    }
+
+    private void applyAeMaliOpenGlPolicyEnv(String providerLane,
+                                            String driverKind,
+                                            String sourceRepo,
+                                            String transport,
+                                            String supportClass,
+                                            String kernelEvidenceClass,
+                                            String transportRequirements,
+                                            String ownerLane,
+                                            String routeId,
+                                            String rankedKernelDonors,
+                                            String diagnosticKeys,
+                                            boolean requiresRenderNode,
+                                            boolean renderNodeAvailable,
+                                            String galliumDriver,
+                                            String graphicsStackProfile) {
+        boolean aeMaliOpenGl = isAeMaliOpenGlProvider(providerLane, driverKind, sourceRepo);
+        setOrClearEnv("AEMALI_OPENGL", aeMaliOpenGl ? "1" : "");
+        setOrClearEnv("AEMALI_OPENGL_DRIVER", aeMaliOpenGl ? "aemali-gallium" : "");
+        setOrClearEnv("AEMALI_OPENGL_GALLIUM_DRIVER", aeMaliOpenGl ? trimToEmpty(galliumDriver) : "");
+        setOrClearEnv("AEMALI_OPENGL_PROFILE", aeMaliOpenGl ? firstNonEmpty(trimToEmpty(graphicsStackProfile), "aemali-universal") : "");
+        setOrClearEnv("AEMALI_OPENGL_ROUTE", aeMaliOpenGl ? firstNonEmpty(trimToEmpty(routeId), "aemali-gallium") : "");
+        setOrClearEnv(
+                "AEMALI_OPENGL_TRANSPORT",
+                aeMaliOpenGl ? firstNonEmpty(trimToEmpty(transport), "drm-render-node-experimental") : ""
+        );
+        applyGraphicsDriverMetadataEnv(
+                "AEMALI_OPENGL",
+                aeMaliOpenGl ? providerLane : "",
+                aeMaliOpenGl ? driverKind : "",
+                aeMaliOpenGl ? firstNonEmpty(trimToEmpty(transport), "drm-render-node-experimental") : "",
+                aeMaliOpenGl ? supportClass : "",
+                aeMaliOpenGl ? kernelEvidenceClass : "",
+                aeMaliOpenGl ? transportRequirements : "",
+                aeMaliOpenGl ? ownerLane : "",
+                aeMaliOpenGl ? routeId : "",
+                aeMaliOpenGl ? rankedKernelDonors : "",
+                aeMaliOpenGl ? diagnosticKeys : "",
+                aeMaliOpenGl && requiresRenderNode
+        );
+        setOrClearEnv("AEMALI_OPENGL_RENDER_NODE_REQUIRED", aeMaliOpenGl && requiresRenderNode ? "1" : "");
+        setOrClearEnv("AEMALI_OPENGL_RENDER_NODE_PRESENT", aeMaliOpenGl && renderNodeAvailable ? "1" : "");
+        setOrClearEnv(
+                "AEMALI_OPENGL_TRANSPORT_BLOCK_REASON",
+                aeMaliOpenGl && requiresRenderNode && !renderNodeAvailable ? "missing_render_node" : ""
+        );
+    }
+
+    private void applyAeMaliOpenGlMesaCompatEnv(KeyValueSet driverKeyValueConfig,
+                                                boolean aeMaliOpenGl,
+                                                String galliumDriver) {
+        String mesaExtensionOverride = aeMaliOpenGl
+                ? GraphicsDrivers.buildMesaExtensionOverride(
+                        driverKeyValueConfig.getBoolean("disableGLKHRDebug", true),
+                        driverKeyValueConfig.getBoolean("disableVertexArrayBGRA", true),
+                        driverKeyValueConfig.get("extraDisabledExtensions", "")
+                )
+                : "";
+        setOrClearEnv("MESA_EXTENSION_OVERRIDE", mesaExtensionOverride);
+        setOrClearEnv(
+                "MESA_GL_VERSION_OVERRIDE",
+                aeMaliOpenGl
+                        ? firstNonEmpty(trimToEmpty(driverKeyValueConfig.get("glVersion")), "3.1")
+                        : ""
+        );
+        if (aeMaliOpenGl && !trimToEmpty(galliumDriver).isEmpty()) {
+            envVars.put("GALLIUM_DRIVER", trimToEmpty(galliumDriver));
+        }
+    }
+
+    private static final class GladioOverlayState {
+        GraphicsDrivers.BundledDriverAsset bundledAsset;
+        GladioOpenGLDriverPackageManager.PackageInfo customInfo;
+        String requestedEntry = "";
+        String activeEntry = "";
+        String packageLabel = "";
+        String version = "";
+        String sourceRepo = "";
+        String driverKind = "";
+        String transport = "";
+        String providerLane = "";
+        String supportClass = "";
+        String kernelEvidenceClass = "";
+        String transportRequirements = "";
+        String ownerLane = "";
+        String routeId = "";
+        String rankedKernelDonors = "";
+        String diagnosticKeys = "";
+        String graphicsStackProfile = "";
+        String preferredGalliumDriver = "";
+        boolean requiresRenderNode = false;
+        boolean customRequested = false;
+        boolean customOverlayReady = false;
+        boolean degraded = false;
+        String degradedReason = "";
+    }
+
+    private static final class VortekWrapperState {
+        GraphicsDrivers.BundledDriverAsset bundledAsset;
+        VortekWrapperPackageManager.PackageInfo packageInfo;
+        String requestedEntry = "";
+        String activeEntry = "";
+        String packageLabel = "";
+        String version = "";
+        String sourceRepo = "";
+        String rootLibraryPath = "";
+        String driverKind = "";
+        String transport = "";
+        String providerLane = "";
+        String supportClass = "";
+        String kernelEvidenceClass = "";
+        String transportRequirements = "";
+        String ownerLane = "";
+        String routeId = "";
+        String rankedKernelDonors = "";
+        String diagnosticKeys = "";
+        String graphicsStackProfile = "";
+        boolean requiresRenderNode = false;
+    }
+
+    private VortekWrapperState resolveVortekWrapperState(String requestedEntry) {
+        VortekWrapperState state = new VortekWrapperState();
+        state.requestedEntry = trimToEmpty(requestedEntry);
+        VortekWrapperPackageManager packageManager = new VortekWrapperPackageManager(this);
+        state.bundledAsset = GraphicsDrivers.getBundledDriverAsset(
+                this,
+                GraphicsDrivers.VORTEK,
+                state.requestedEntry
+        );
+        state.activeEntry = state.bundledAsset.version;
+        state.packageInfo = packageManager.getPackageInfo(state.bundledAsset.version);
+        state.packageLabel = state.packageInfo == null
+                ? state.bundledAsset.packageLabel
+                : state.packageInfo.getDisplayLabel();
+        state.version = state.packageInfo == null || trimToEmpty(state.packageInfo.version).isEmpty()
+                ? state.bundledAsset.version
+                : trimToEmpty(state.packageInfo.version);
+        state.sourceRepo = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.sourceRepo);
+        state.rootLibraryPath = state.packageInfo == null
+                ? "usr/lib/libvulkan_vortek.so"
+                : firstNonEmpty(trimToEmpty(state.packageInfo.rootLibraryPath), "usr/lib/libvulkan_vortek.so");
+        state.providerLane = state.packageInfo == null
+                ? "vortek-wrapper-vulkan"
+                : firstNonEmpty(trimToEmpty(state.packageInfo.providerLane), "vortek-wrapper-vulkan");
+        state.driverKind = state.packageInfo == null
+                ? "vortek-wrapper"
+                : firstNonEmpty(trimToEmpty(state.packageInfo.driverKind), "vortek-wrapper");
+        state.transport = state.packageInfo == null
+                ? "bundled-root-overlay"
+                : firstNonEmpty(trimToEmpty(state.packageInfo.transport), "bundled-root-overlay");
+        state.supportClass = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.supportClass);
+        state.kernelEvidenceClass = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.kernelEvidenceClass);
+        state.transportRequirements = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.transportRequirements);
+        state.ownerLane = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.ownerLane);
+        state.routeId = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.routeId);
+        state.rankedKernelDonors = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.rankedKernelDonors);
+        state.diagnosticKeys = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.diagnosticKeys);
+        state.graphicsStackProfile = state.packageInfo == null ? "" : trimToEmpty(state.packageInfo.graphicsStackProfile);
+        state.requiresRenderNode = state.packageInfo != null && state.packageInfo.requiresRenderNode;
+        return state;
+    }
+
+    private GladioOverlayState resolveGladioOverlayState(File rootDir, String requestedEntry) {
+        GladioOverlayState state = new GladioOverlayState();
+        state.requestedEntry = trimToEmpty(requestedEntry);
+        GladioOpenGLDriverPackageManager packageManager = new GladioOpenGLDriverPackageManager(this);
+        state.bundledAsset = GraphicsDrivers.getBundledDriverAsset(
+                this,
+                GraphicsDrivers.GLADIO,
+                state.requestedEntry
+        );
+        GladioOpenGLDriverPackageManager.PackageInfo bundledInfo =
+                packageManager.getPackageInfo(state.bundledAsset.version);
+        state.activeEntry = state.bundledAsset.version;
+        state.packageLabel = bundledInfo == null ? state.bundledAsset.packageLabel : bundledInfo.getDisplayLabel();
+        state.version = bundledInfo == null || trimToEmpty(bundledInfo.version).isEmpty()
+                ? state.bundledAsset.version
+                : trimToEmpty(bundledInfo.version);
+        state.sourceRepo = bundledInfo == null
+                ? "https://github.com/Pipetto-crypto/gladiorenderer"
+                : trimToEmpty(bundledInfo.sourceRepo);
+        state.providerLane = bundledInfo == null
+                ? "gladio-opengl"
+                : firstNonEmpty(trimToEmpty(bundledInfo.providerLane), "gladio-opengl");
+        state.driverKind = bundledInfo == null
+                ? "opengl-wrapper"
+                : firstNonEmpty(trimToEmpty(bundledInfo.driverKind), "opengl-wrapper");
+        state.transport = bundledInfo == null
+                ? "bundled-root-overlay"
+                : firstNonEmpty(trimToEmpty(bundledInfo.transport), "bundled-root-overlay");
+        state.supportClass = bundledInfo == null ? "" : trimToEmpty(bundledInfo.supportClass);
+        state.kernelEvidenceClass = bundledInfo == null ? "" : trimToEmpty(bundledInfo.kernelEvidenceClass);
+        state.transportRequirements = bundledInfo == null ? "" : trimToEmpty(bundledInfo.transportRequirements);
+        state.ownerLane = bundledInfo == null ? "" : trimToEmpty(bundledInfo.ownerLane);
+        state.routeId = bundledInfo == null ? "" : trimToEmpty(bundledInfo.routeId);
+        state.rankedKernelDonors = bundledInfo == null ? "" : trimToEmpty(bundledInfo.rankedKernelDonors);
+        state.diagnosticKeys = bundledInfo == null ? "" : trimToEmpty(bundledInfo.diagnosticKeys);
+        state.graphicsStackProfile = bundledInfo == null ? "" : trimToEmpty(bundledInfo.graphicsStackProfile);
+        state.preferredGalliumDriver = bundledInfo == null ? "" : trimToEmpty(bundledInfo.preferredGalliumDriver);
+        state.requiresRenderNode = bundledInfo != null && bundledInfo.requiresRenderNode;
+
+        boolean aeMaliGalliumRequested = GladioOpenGLDriverPackageManager.isAeMaliPackageEntry(state.requestedEntry);
+        state.customRequested = GladioOpenGLDriverPackageManager.isCustomPackageEntry(state.requestedEntry)
+                || aeMaliGalliumRequested;
+        if (!state.customRequested) {
+            ensureGraphicsDriverAssetExtracted(
+                    rootDir,
+                    state.bundledAsset.assetPath,
+                    state.bundledAsset.extractProbePath
+            );
+            return state;
+        }
+
+        state.customInfo = packageManager.getPackageInfo(state.requestedEntry);
+        if (state.customInfo == null) {
+            state.degraded = true;
+            state.degradedReason = aeMaliGalliumRequested
+                    ? "gladio_aemali_gallium_package_missing"
+                    : "gladio_custom_package_missing";
+            ensureGraphicsDriverAssetExtracted(
+                    rootDir,
+                    state.bundledAsset.assetPath,
+                    state.bundledAsset.extractProbePath
+            );
+            return state;
+        }
+
+        state.packageLabel = state.customInfo.getDisplayLabel();
+        state.version = trimToEmpty(state.customInfo.version);
+        if (state.version.isEmpty()) state.version = GladioOpenGLDriverPackageManager.toEntryId(state.requestedEntry);
+        state.sourceRepo = trimToEmpty(state.customInfo.sourceRepo);
+        state.providerLane = trimToEmpty(state.customInfo.providerLane);
+        state.driverKind = firstNonEmpty(trimToEmpty(state.customInfo.driverKind), "opengl-wrapper");
+        state.transport = firstNonEmpty(trimToEmpty(state.customInfo.transport), "root-overlay");
+        state.supportClass = trimToEmpty(state.customInfo.supportClass);
+        state.kernelEvidenceClass = trimToEmpty(state.customInfo.kernelEvidenceClass);
+        state.transportRequirements = trimToEmpty(state.customInfo.transportRequirements);
+        state.ownerLane = trimToEmpty(state.customInfo.ownerLane);
+        state.routeId = trimToEmpty(state.customInfo.routeId);
+        state.rankedKernelDonors = trimToEmpty(state.customInfo.rankedKernelDonors);
+        state.diagnosticKeys = trimToEmpty(state.customInfo.diagnosticKeys);
+        state.graphicsStackProfile = trimToEmpty(state.customInfo.graphicsStackProfile);
+        state.preferredGalliumDriver = trimToEmpty(state.customInfo.preferredGalliumDriver);
+        state.requiresRenderNode = state.customInfo.requiresRenderNode;
+        state.activeEntry = state.requestedEntry;
+        state.customOverlayReady = packageManager.deployPackageToRoot(rootDir, state.requestedEntry);
+        if (!state.customOverlayReady) {
+            state.degraded = true;
+            state.degradedReason = aeMaliGalliumRequested
+                    ? "gladio_aemali_gallium_overlay_deploy_failed"
+                    : "gladio_custom_overlay_deploy_failed";
+            state.activeEntry = state.bundledAsset.version;
+            state.packageLabel = bundledInfo == null ? state.bundledAsset.packageLabel : bundledInfo.getDisplayLabel();
+            state.version = bundledInfo == null || trimToEmpty(bundledInfo.version).isEmpty()
+                    ? state.bundledAsset.version
+                    : trimToEmpty(bundledInfo.version);
+            state.sourceRepo = bundledInfo == null
+                    ? "https://github.com/Pipetto-crypto/gladiorenderer"
+                    : trimToEmpty(bundledInfo.sourceRepo);
+            state.providerLane = bundledInfo == null
+                    ? "gladio-opengl"
+                    : firstNonEmpty(trimToEmpty(bundledInfo.providerLane), "gladio-opengl");
+            state.driverKind = bundledInfo == null
+                    ? "opengl-wrapper"
+                    : firstNonEmpty(trimToEmpty(bundledInfo.driverKind), "opengl-wrapper");
+            state.transport = bundledInfo == null
+                    ? "bundled-root-overlay"
+                    : firstNonEmpty(trimToEmpty(bundledInfo.transport), "bundled-root-overlay");
+            state.supportClass = bundledInfo == null ? "" : trimToEmpty(bundledInfo.supportClass);
+            state.kernelEvidenceClass = bundledInfo == null ? "" : trimToEmpty(bundledInfo.kernelEvidenceClass);
+            state.transportRequirements = bundledInfo == null ? "" : trimToEmpty(bundledInfo.transportRequirements);
+            state.ownerLane = bundledInfo == null ? "" : trimToEmpty(bundledInfo.ownerLane);
+            state.routeId = bundledInfo == null ? "" : trimToEmpty(bundledInfo.routeId);
+            state.rankedKernelDonors = bundledInfo == null ? "" : trimToEmpty(bundledInfo.rankedKernelDonors);
+            state.diagnosticKeys = bundledInfo == null ? "" : trimToEmpty(bundledInfo.diagnosticKeys);
+            state.graphicsStackProfile = bundledInfo == null ? "" : trimToEmpty(bundledInfo.graphicsStackProfile);
+            state.preferredGalliumDriver = bundledInfo == null ? "" : trimToEmpty(bundledInfo.preferredGalliumDriver);
+            state.requiresRenderNode = bundledInfo != null && bundledInfo.requiresRenderNode;
+            ensureGraphicsDriverAssetExtracted(
+                    rootDir,
+                    state.bundledAsset.assetPath,
+                    state.bundledAsset.extractProbePath
+            );
+        }
+        return state;
     }
 
     private String resolveDriverVulkanPatch(String adrenoToolsDriverId) {
@@ -4401,15 +7609,88 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return "0";
     }
 
-    private void purgeLegacyVulkanSdkDirs(File rootDir) {
+    private void purgeLegacyVulkanRuntimeResidue(File rootDir) {
         if (rootDir == null) return;
-        File legacyShare = new File(rootDir, "usr/share/vulkan-sdk");
-        File legacyLib = new File(rootDir, "usr/lib/vulkan-sdk");
+        String legacyPayloadStem = "vulkan" + "-sdk";
+        File legacyShare = new File(rootDir, "usr/share/" + legacyPayloadStem);
+        File legacyLib = new File(rootDir, "usr/lib/" + legacyPayloadStem);
         if (legacyShare.exists()) FileUtils.delete(legacyShare);
         if (legacyLib.exists()) FileUtils.delete(legacyLib);
     }
 
-    private void applyGraphicsRouteDefaults(boolean dxvkRoute, String socClass) {
+    @Nullable
+    private File resolveWrapperIcdFile() {
+        if (imageFs == null) return null;
+        File runtimeShareDir = WineUtils.resolveRuntimeShareDir(new File(imageFs.getWinePath()));
+        if (runtimeShareDir != null) {
+            File runtimeWrapperIcd = new File(runtimeShareDir, "vulkan/icd.d/wrapper_icd.aarch64.json");
+            if (runtimeWrapperIcd.isFile()) return runtimeWrapperIcd;
+        }
+        File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
+        if (imageFsWrapperIcd.isFile()) return imageFsWrapperIcd;
+        return null;
+    }
+
+    private int resolveWrapperIcdApiMinor(@Nullable File wrapperIcdFile) {
+        if (wrapperIcdFile == null || !wrapperIcdFile.isFile()) return 0;
+        try {
+            JSONObject root = new JSONObject(FileUtils.readString(wrapperIcdFile));
+            JSONObject icd = root.optJSONObject("ICD");
+            if (icd == null) return 0;
+            return getVulkanApiMinor(icd.optString("api_version", ""));
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private static boolean isMaliSocClass(String socClass) {
+        String normalized = trimToEmpty(socClass).toLowerCase(Locale.US);
+        return normalized.startsWith("mali-");
+    }
+
+    private String resolveBundledAeMaliPanvkEntry() {
+        GraphicsDrivers.BundledDriverAsset asset = GraphicsDrivers.resolveBundledDriverAsset(
+                this,
+                GraphicsDrivers.AEMALI_PANVK
+        );
+        return asset == null ? "" : VortekVulkanDriverPackageManager.toBundledAeMaliEntry(asset.version);
+    }
+
+    @Nullable
+    private AdrenotoolsManager.DriverPackageInfo resolveOpenGlBridgeTurnipInfo(
+            AdrenotoolsManager adrenotoolsManager,
+            String requestedDriverId
+    ) {
+        String normalizedRequestedDriverId = trimToEmpty(requestedDriverId);
+        AdrenotoolsManager.DriverPackageInfo referenceInfo = normalizedRequestedDriverId.isEmpty()
+                ? null
+                : adrenotoolsManager.getDriverPackageInfo(normalizedRequestedDriverId);
+
+        if (referenceInfo == null || referenceInfo.isSystemSelection()) {
+            String preferredDriverId = trimToEmpty(adrenotoolsManager.getPreferredWrapperDriverId());
+            if (!preferredDriverId.isEmpty() && !DefaultVersion.WRAPPER.equalsIgnoreCase(preferredDriverId)) {
+                AdrenotoolsManager.DriverPackageInfo preferredInfo =
+                        adrenotoolsManager.getDriverPackageInfo(preferredDriverId);
+                if (preferredInfo != null && !preferredInfo.isSystemSelection()) {
+                    referenceInfo = preferredInfo;
+                }
+            }
+        }
+
+        AdrenotoolsManager.DriverPackageInfo resolved =
+                adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", referenceInfo);
+        return resolved != null && !resolved.isSystemSelection() ? resolved : null;
+    }
+
+    private static boolean shouldUseVulkanPrimaryRoute(boolean dxvkRoute, boolean dgVoodooRoute) {
+        return dxvkRoute || dgVoodooRoute;
+    }
+
+    private static boolean shouldUseVortekPrimaryRoute(String routingMode) {
+        return !VortekConfigDialog.ROUTING_OPENGL_FIRST.equals(routingMode);
+    }
+
+    private void applyGraphicsRouteDefaults(boolean vulkanPrimaryRoute, String socClass) {
         envVars.put("AERO_GRAPHICS_STACK_PROFILE", "vulkan-first-with-gl-fallback");
         envVars.put("AERO_GRAPHICS_SOC_CLASS", socClass);
         envVars.put("AERO_GRAPHICS_VULKAN_PROVIDER", "turnip-vulkan");
@@ -4419,20 +7700,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("AERO_DXVK_GL_FALLBACK", "1");
         envVars.put("AERO_VKD3D_GL_FALLBACK", "1");
 
-        if (dxvkRoute) {
+        if (vulkanPrimaryRoute) {
             envVars.put("AERO_GRAPHICS_ACTIVE_ROUTE", "turnip-primary");
             envVars.put("AERO_DXVK_ROUTE_MODE", "turnip-first");
             envVars.put("AERO_VKD3D_ROUTE_MODE", "turnip-first");
             envVars.put("GALLIUM_DRIVER", "zink");
         } else {
-            envVars.put("AERO_GRAPHICS_ACTIVE_ROUTE", "freedreno-primary");
-            envVars.put("AERO_DXVK_ROUTE_MODE", "freedreno-first");
-            envVars.put("AERO_VKD3D_ROUTE_MODE", "freedreno-first");
-            envVars.put("GALLIUM_DRIVER", "freedreno");
+            envVars.put("AERO_GRAPHICS_ACTIVE_ROUTE", "zink-primary");
+            envVars.put("AERO_DXVK_ROUTE_MODE", "zink-first");
+            envVars.put("AERO_VKD3D_ROUTE_MODE", "zink-first");
+            envVars.put("GALLIUM_DRIVER", "zink");
         }
     }
 
-    private void applyGraphicsDriverPackages(String selectedDriverId, boolean dxvkRoute) {
+    private void applyGraphicsDriverPackages(String selectedDriverId, boolean vulkanPrimaryRoute) {
         AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
         AdrenotoolsManager.DriverPackageInfo selectedInfo = adrenotoolsManager.getDriverPackageInfo(selectedDriverId);
         boolean systemSelection = selectedInfo != null && selectedInfo.isSystemSelection();
@@ -4444,8 +7725,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!systemSelection) {
             turnipInfo = adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", selectedInfo);
             openGlInfo = adrenotoolsManager.resolvePreferredDriverForLane("freedreno-opengl", selectedInfo);
-            activeInfo = dxvkRoute ? turnipInfo : openGlInfo;
-            companionInfo = dxvkRoute ? openGlInfo : turnipInfo;
+            if (turnipInfo != null && openGlInfo == null && !safeTrim(turnipInfo.companionProviderLane).isEmpty()) {
+                openGlInfo = ensureGraphicsProviderLaneInstalled(adrenotoolsManager, turnipInfo.companionProviderLane, turnipInfo);
+            }
+            if (openGlInfo != null && turnipInfo == null && !safeTrim(openGlInfo.companionProviderLane).isEmpty()) {
+                turnipInfo = ensureGraphicsProviderLaneInstalled(adrenotoolsManager, openGlInfo.companionProviderLane, openGlInfo);
+            }
+            if (vulkanPrimaryRoute) {
+                activeInfo = turnipInfo != null ? turnipInfo : openGlInfo;
+                companionInfo = turnipInfo != null ? openGlInfo : null;
+            } else {
+                activeInfo = openGlInfo != null ? openGlInfo : turnipInfo;
+                companionInfo = openGlInfo != null ? turnipInfo : null;
+            }
         }
 
         if (activeInfo != null && !activeInfo.isSystemSelection() && !activeInfo.isOpenGlProvider()) {
@@ -4462,8 +7754,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         adrenotoolsManager.restoreManagedOverlay(imageFs);
         boolean openGlOverlayApplied = openGlInfo != null && adrenotoolsManager.applyManagedOverlay(imageFs, openGlInfo);
+        boolean vulkanPrimaryProviderMissing = vulkanPrimaryRoute && turnipInfo == null && openGlInfo != null;
+        String requiredCompanionLane = activeInfo == null ? "" : safeTrim(activeInfo.companionProviderLane);
+        boolean companionMissing = !requiredCompanionLane.isEmpty() && companionInfo == null;
+        boolean legacyRouteDegraded = "route-degraded".equals(safeTrim(legacyGraphicsPolicy));
+        String routeDegradedReason = joinNonEmptyCsv(
+                legacyRouteDegraded ? "legacy_external_renderer_route" : "",
+                vulkanPrimaryProviderMissing ? "vulkan_primary_provider_missing" : "",
+                companionMissing ? "missing_companion_provider" : ""
+        );
 
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", selectedDriverId);
+        setOrClearEnv("AERO_GRAPHICS_LEGACY_REQUESTED_DRIVER", safeTrim(legacyGraphicsRequestedDriver));
+        setOrClearEnv("AERO_GRAPHICS_LEGACY_HINT", safeTrim(legacyGraphicsProviderHint));
+        setOrClearEnv("AERO_GRAPHICS_LEGACY_POLICY", safeTrim(legacyGraphicsPolicy));
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", selectedInfo == null ? "" : selectedInfo.name);
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", selectedInfo == null ? "" : selectedInfo.providerLane);
         setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", activeInfo == null ? "" : activeInfo.providerLane);
@@ -4490,6 +7794,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv("AERO_OPENGL_GALLIUM_DRIVER", openGlInfo == null ? "" : openGlInfo.preferredGalliumDriver);
         setOrClearEnv("AERO_OPENGL_API_FOCUS", openGlInfo == null ? "" : joinCsv(openGlInfo.apiFocus));
         setOrClearEnv("AERO_OPENGL_FORENSIC_LOG_PREFIXES", openGlInfo == null ? "" : joinCsv(openGlInfo.forensicLogPrefixes));
+        setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", requiredCompanionLane);
+        setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", requiredCompanionLane.isEmpty() ? "" : (companionMissing ? "0" : "1"));
+        setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED", routeDegradedReason.isEmpty() ? "" : "1");
+        setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED_REASON", routeDegradedReason);
+
+        if (legacyRouteDegraded || companionMissing) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "GRAPHICS_PROVIDER_CONTRACT_DEGRADED",
+                    null,
+                    "graphics_provider",
+                    "graphics_provider_contract_degraded",
+                    ForensicLogger.fields(
+                            "selected_driver_id", selectedDriverId,
+                            "legacy_requested_driver", legacyGraphicsRequestedDriver,
+                            "legacy_policy", legacyGraphicsPolicy,
+                            "active_provider_lane", activeInfo == null ? "" : activeInfo.providerLane,
+                            "required_companion_lane", requiredCompanionLane,
+                            "selected_provider_lane", selectedInfo == null ? "" : selectedInfo.providerLane,
+                            "degrade_reason", routeDegradedReason
+                    )
+            );
+        }
 
         ForensicLogger.logEvent(
                 this,
@@ -4500,6 +7828,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "graphics_provider_contract_applied",
                 ForensicLogger.fields(
                         "selected_driver_id", selectedDriverId,
+                        "legacy_requested_driver", legacyGraphicsRequestedDriver,
+                        "legacy_policy", legacyGraphicsPolicy,
                         "selected_provider_lane", selectedInfo == null ? "" : selectedInfo.providerLane,
                         "active_provider_lane", activeInfo == null ? "" : activeInfo.providerLane,
                         "active_provider_package", activeInfo == null ? "" : activeInfo.name,
@@ -4642,13 +7972,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void extractGraphicsDriverFiles() {
-        String adrenoToolsDriverId = graphicsDriverConfig.get("version");
+        String normalizedGraphicsDriver = GraphicsDrivers.normalize(graphicsDriver);
+        String adrenoToolsDriverId = trimToEmpty(graphicsDriverConfig.get("version"));
+        if (!GraphicsDrivers.usesKeyValueConfig(normalizedGraphicsDriver) && adrenoToolsDriverId.isEmpty()) {
+            adrenoToolsDriverId = DefaultVersion.WRAPPER;
+        }
+        KeyValueSet driverKeyValueConfig = getGraphicsDriverKeyValueConfig();
+        String forensicDriverId = GraphicsDrivers.isVortek(normalizedGraphicsDriver)
+                ? firstNonEmpty(trimToEmpty(driverKeyValueConfig.get("vortekPackageVersion")), GraphicsDrivers.VORTEK)
+                : adrenoToolsDriverId;
 
-        Log.d("GraphicsDriverExtraction", "Adrenotools DriverID: " + adrenoToolsDriverId);
+        Log.d("GraphicsDriverExtraction", "Graphics driver=" + normalizedGraphicsDriver + " driverId=" + forensicDriverId);
 
         File rootDir = imageFs.getRootDir();
         boolean dxvkRoute = dxwrapper.contains("dxvk");
         boolean dgVoodooRoute = dxwrapper.contains("dgvoodoo");
+        boolean vulkanPrimaryRoute = shouldUseVulkanPrimaryRoute(dxvkRoute, dgVoodooRoute);
         String socClass = detectSoCClass();
 
         if (dxvkRoute) {
@@ -4682,155 +8021,1046 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("MESA_VK_WSI_DEBUG", "sw");
         }
 
-        envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
-        applyGraphicsRouteDefaults(dxvkRoute, socClass);
-        applyWrapperContractsForCurrentRoute(dxvkRoute, socClass);
-
         if (firstTimeBoot) {
             Log.d("XServerDisplayActivity", "First time container boot, re-extracting libs");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst", rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers" + ".tzst", rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst", rootDir);
-            if (wineInfo.isArm64EC() && !GPUInformation.getRenderer(null,null).contains("Mali"))
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/zink_dlls" + ".tzst", new File(rootDir, imageFs.WINEPREFIX + "/drive_c/windows"));
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper.tzst", rootDir);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers.tzst", rootDir);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs.tzst", rootDir);
+            if (wineInfo.isArm64EC() && !GPUInformation.getRenderer(null, null).contains("Mali")) {
+                TarCompressorUtils.extract(
+                        TarCompressorUtils.Type.ZSTD,
+                        this,
+                        "graphics_driver/zink_dlls.tzst",
+                        new File(imageFs.getWinePrefixDir(), "drive_c/windows")
+                );
+            }
         }
 
-        applyGraphicsDriverPackages(adrenoToolsDriverId, dxvkRoute);
+        applyWrapperContractsForCurrentRoute(dxvkRoute, socClass);
 
-        String requestedVulkanApi = normalizeRequestedVulkanApi(graphicsDriverConfig.get("vulkanVersion"));
-        List<ContentProfile> selectedVulkanSdkProfiles = resolveVulkanSdkProfilesForApi(requestedVulkanApi);
-        if (!selectedVulkanSdkProfiles.isEmpty()) {
-            purgeLegacyVulkanSdkDirs(rootDir);
+        AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
+        adrenotoolsManager.restoreManagedOverlay(imageFs);
 
-            int effectiveMinMinor = 0;
-            int effectiveMaxMinor = 0;
-            ArrayList<String> selectedEntries = new ArrayList<>();
-            ArrayList<String> selectedSdkVersions = new ArrayList<>();
-            ArrayList<String> selectedArchCoverage = new ArrayList<>();
-            boolean bundleLayout = false;
+        AdrenotoolsManager.DriverPackageInfo selectedWrapperInfo = null;
+        AdrenotoolsManager.DriverPackageInfo turnipInfo = null;
+        if (!GraphicsDrivers.isVortek(normalizedGraphicsDriver)
+                && !GraphicsDrivers.isGladio(normalizedGraphicsDriver)
+                && !GraphicsDrivers.isAeMaliGallium(normalizedGraphicsDriver)) {
+            selectedWrapperInfo = adrenoToolsDriverId.isEmpty()
+                    ? adrenotoolsManager.getDriverPackageInfo(DefaultVersion.WRAPPER)
+                    : adrenotoolsManager.getDriverPackageInfo(adrenoToolsDriverId);
+            if (selectedWrapperInfo != null) {
+                turnipInfo = selectedWrapperInfo.isSystemSelection()
+                        ? selectedWrapperInfo
+                        : adrenotoolsManager.resolvePreferredDriverForLane("turnip-vulkan", selectedWrapperInfo);
+            }
+        }
 
-            for (ContentProfile profile : selectedVulkanSdkProfiles) {
-                contentsManager.applyContent(profile);
-
-                String entry = ContentsManager.getEntryName(profile);
-                if (!selectedEntries.contains(entry)) selectedEntries.add(entry);
-
-                String archTag = detectVulkanSdkLaneArch(profile);
-                if (!selectedArchCoverage.contains(archTag)) selectedArchCoverage.add(archTag);
-                if ("bundle".equalsIgnoreCase(archTag)) bundleLayout = true;
-
-                String sdkVersion = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim();
-                if (!sdkVersion.isEmpty() && !selectedSdkVersions.contains(sdkVersion)) {
-                    selectedSdkVersions.add(sdkVersion);
-                }
-
-                int profileMinMinor = parseMinVulkanMinor(profile);
-                int profileMaxMinor = parseMaxVulkanMinor(profile);
-                if (profileMaxMinor <= 0) continue;
-
-                if (profileMinMinor > effectiveMinMinor) {
-                    effectiveMinMinor = profileMinMinor;
-                }
-                if (effectiveMaxMinor <= 0 || profileMaxMinor < effectiveMaxMinor) {
-                    effectiveMaxMinor = profileMaxMinor;
-                }
+        if (GraphicsDrivers.isWrapper(normalizedGraphicsDriver)) {
+            File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
+            File selectedWrapperIcd = resolveWrapperIcdFile();
+            String wrapperIcdPath = selectedWrapperIcd != null && selectedWrapperIcd.isFile()
+                    ? selectedWrapperIcd.getAbsolutePath()
+                    : imageFsWrapperIcd.getAbsolutePath();
+            envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
+            envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+            applyGraphicsRouteDefaults(vulkanPrimaryRoute, socClass);
+            applyGraphicsDriverPackages(adrenoToolsDriverId, vulkanPrimaryRoute);
+            applyWrapperGraphicsConfigEnv(rootDir, adrenoToolsDriverId, useDRI3, dri3ForceSwWsi, dri3PresentWait);
+        } else if (GraphicsDrivers.isMesaOpenGlBridge(normalizedGraphicsDriver) || GraphicsDrivers.isVirgl(normalizedGraphicsDriver)) {
+            boolean virglRoute = GraphicsDrivers.isVirgl(normalizedGraphicsDriver);
+            boolean aeMaliGalliumRoute = GraphicsDrivers.isAeMaliGallium(normalizedGraphicsDriver);
+            boolean openGlRouteNeedsVulkanCompanion = (dxvkRoute || dgVoodooRoute) && (virglRoute || aeMaliGalliumRoute);
+            boolean openGlRouteWithoutVulkanCompanion = (virglRoute || aeMaliGalliumRoute) && !openGlRouteNeedsVulkanCompanion;
+            boolean renderNodeAvailable = hasAccessibleRenderNode();
+            boolean maliSoC = isMaliSocClass(socClass);
+            String requestedBridgeVulkanApi = normalizeRequestedVulkanApi(graphicsDriverConfig.get("vulkanVersion"));
+            AdrenotoolsManager.DriverPackageInfo companionTurnipInfo = openGlRouteWithoutVulkanCompanion
+                    ? null
+                    : resolveOpenGlBridgeTurnipInfo(adrenotoolsManager, adrenoToolsDriverId);
+            VortekVulkanDriverPackageManager.PackageInfo companionAeMaliPanvkInfo = null;
+            String openGlBridgeVulkanDegradedReason = "";
+            File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
+            File selectedWrapperIcd = resolveWrapperIcdFile();
+            String wrapperIcdPath = selectedWrapperIcd != null && selectedWrapperIcd.isFile()
+                    ? selectedWrapperIcd.getAbsolutePath()
+                    : imageFsWrapperIcd.getAbsolutePath();
+            int wrapperIcdApiMinor = resolveWrapperIcdApiMinor(selectedWrapperIcd);
+            if (!openGlRouteWithoutVulkanCompanion) {
+                envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
+                envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
             }
 
-            if (effectiveMaxMinor > 0 && effectiveMinMinor > effectiveMaxMinor) {
-                // If profile ranges don't intersect, fallback to broadest upper bound.
-                effectiveMinMinor = 0;
-                effectiveMaxMinor = 0;
-                for (ContentProfile profile : selectedVulkanSdkProfiles) {
-                    int profileMaxMinor = parseMaxVulkanMinor(profile);
-                    if (profileMaxMinor > effectiveMaxMinor) {
-                        effectiveMaxMinor = profileMaxMinor;
+            if (!openGlRouteWithoutVulkanCompanion && !maliSoC && companionTurnipInfo != null) {
+                adrenotoolsManager.setDriverByInfo(envVars, imageFs, companionTurnipInfo);
+            }
+
+            String vulkanProviderLane = "";
+            String vulkanProviderPackage = "";
+            String vulkanProviderVersion = "";
+            if (!openGlRouteWithoutVulkanCompanion && maliSoC) {
+                VortekWrapperState bridgeVortekState = resolveVortekWrapperState("");
+                ensureGraphicsDriverAssetExtracted(
+                        rootDir,
+                        bridgeVortekState.bundledAsset.assetPath,
+                        bridgeVortekState.bundledAsset.extractProbePath
+                );
+                VortekVulkanDriverPackageManager packageManager = new VortekVulkanDriverPackageManager(this);
+                String aeMaliPanvkEntry = resolveBundledAeMaliPanvkEntry();
+                if (aeMaliPanvkEntry.isEmpty()) {
+                    openGlBridgeVulkanDegradedReason = "aemali_panvk_bundle_missing";
+                } else {
+                    companionAeMaliPanvkInfo = packageManager.getPackageInfo(aeMaliPanvkEntry);
+                    String rootLibraryPath = packageManager.resolveRootLibraryPath(aeMaliPanvkEntry);
+                    boolean overlayReady = companionAeMaliPanvkInfo != null
+                            && !trimToEmpty(rootLibraryPath).isEmpty()
+                            && packageManager.deployPackageToRoot(rootDir, aeMaliPanvkEntry)
+                            && new File(rootDir, rootLibraryPath).isFile();
+                    File aeMaliIcdFile = overlayReady
+                            ? rewriteVortekIcdFile(rootDir, rootLibraryPath, requestedBridgeVulkanApi)
+                            : null;
+                    if (aeMaliIcdFile == null) {
+                        openGlBridgeVulkanDegradedReason = overlayReady
+                                ? "aemali_panvk_icd_rewrite_failed"
+                                : "aemali_panvk_overlay_deploy_failed";
+                    } else {
+                        String aeMaliVersion = firstNonEmpty(
+                                trimToEmpty(companionAeMaliPanvkInfo.version),
+                                GraphicsDrivers.getDisplayVersion(this, GraphicsDrivers.AEMALI_PANVK, "")
+                        );
+                        envVars.put("VK_ICD_FILENAMES", aeMaliIcdFile.getAbsolutePath());
+                        envVars.put("VK_DRIVER_FILES", aeMaliIcdFile.getAbsolutePath());
+                        setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", buildVortekRuntimeSource(companionAeMaliPanvkInfo));
+                        setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", aeMaliIcdFile.getAbsolutePath());
+                        setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", requestedBridgeVulkanApi);
+                        setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
+                        setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", requestedBridgeVulkanApi);
+                        setOrClearEnv("AERO_VULKAN_VALIDATION_LAYER_MANIFEST", "");
+                        setOrClearEnv("AERO_VULKAN_API_SELECTED", requestedBridgeVulkanApi);
+                        setOrClearEnv("WRAPPER_VK_VERSION", "");
+                        applyAeMaliPolicyEnv(
+                                companionAeMaliPanvkInfo,
+                                VortekExtensionPolicy.PROFILE_MALI_SYSTEM,
+                                requestedBridgeVulkanApi,
+                                renderNodeAvailable
+                        );
+                        vulkanProviderLane = firstNonEmpty(trimToEmpty(companionAeMaliPanvkInfo.providerLane), "aemali-panvk");
+                        vulkanProviderPackage = companionAeMaliPanvkInfo.getDisplayLabel();
+                        vulkanProviderVersion = aeMaliVersion;
+                    }
+                }
+            } else if (!openGlRouteWithoutVulkanCompanion && companionTurnipInfo != null) {
+                setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", selectedWrapperIcd != null && selectedWrapperIcd.isFile() ? "wrapper-embedded" : "wrapper-missing");
+                setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", selectedWrapperIcd != null && selectedWrapperIcd.isFile() ? selectedWrapperIcd.getAbsolutePath() : "");
+                setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", wrapperIcdApiMinor > 0 ? "1." + wrapperIcdApiMinor : "");
+                setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
+                setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", wrapperIcdApiMinor > 0 ? "1." + wrapperIcdApiMinor : "");
+                setOrClearEnv("AERO_VULKAN_VALIDATION_LAYER_MANIFEST", "");
+                setOrClearEnv("AERO_VULKAN_API_SELECTED", requestedBridgeVulkanApi);
+                setOrClearEnv("WRAPPER_VK_VERSION", requestedBridgeVulkanApi + "." + resolveDriverVulkanPatch(adrenoToolsDriverId));
+                vulkanProviderLane = firstNonEmpty(trimToEmpty(companionTurnipInfo.providerLane), "turnip-vulkan");
+                vulkanProviderPackage = firstNonEmpty(trimToEmpty(companionTurnipInfo.name), trimToEmpty(companionTurnipInfo.entryId));
+                vulkanProviderVersion = trimToEmpty(companionTurnipInfo.driverVersion);
+            }
+
+            String requestedPackageVersion = driverKeyValueConfig.get("packageVersion");
+            VirGLDriverPackageManager virglPackageManager = virglRoute ? new VirGLDriverPackageManager(this) : null;
+            MesaOpenGLDriverPackageManager mesaOpenGlPackageManager = aeMaliGalliumRoute
+                    ? new MesaOpenGLDriverPackageManager(this, normalizedGraphicsDriver)
+                    : null;
+            boolean virglCustomPackage = virglRoute && VirGLDriverPackageManager.isCustomPackageEntry(requestedPackageVersion);
+            boolean aeMaliCustomPackage = aeMaliGalliumRoute && MesaOpenGLDriverPackageManager.isCustomPackageEntry(requestedPackageVersion);
+            boolean virglPackageDegraded = false;
+            String virglPackageDegradedReason = "";
+            boolean aeMaliPackageDegraded = false;
+            String aeMaliPackageDegradedReason = "";
+            GraphicsDrivers.BundledDriverAsset openGlAsset = virglCustomPackage || aeMaliCustomPackage
+                    ? null
+                    : GraphicsDrivers.getBundledDriverAsset(
+                            this,
+                            normalizedGraphicsDriver,
+                            requestedPackageVersion
+                    );
+            VirGLDriverPackageManager.PackageInfo virglPackageInfo = virglRoute && virglPackageManager != null
+                    ? virglPackageManager.getPackageInfo(virglCustomPackage
+                            ? requestedPackageVersion
+                            : (openGlAsset == null ? requestedPackageVersion : openGlAsset.version))
+                    : null;
+            MesaOpenGLDriverPackageManager.PackageInfo mesaPackageInfo = aeMaliGalliumRoute && mesaOpenGlPackageManager != null
+                    ? mesaOpenGlPackageManager.getPackageInfo(aeMaliCustomPackage
+                            ? requestedPackageVersion
+                            : (openGlAsset == null ? requestedPackageVersion : openGlAsset.version))
+                    : null;
+            String packagePreferredGalliumDriver = aeMaliGalliumRoute && mesaPackageInfo != null
+                    ? firstNonEmpty(
+                            trimToEmpty(mesaPackageInfo.preferredGalliumDriver),
+                            trimToEmpty(mesaPackageInfo.fallbackGalliumDriver)
+                    )
+                    : "";
+            String defaultGalliumDriver = virglRoute
+                    ? GraphicsDrivers.getVirglGalliumDriver()
+                    : aeMaliGalliumRoute
+                    ? firstNonEmpty(packagePreferredGalliumDriver, GraphicsDrivers.getMesaGalliumDriver(normalizedGraphicsDriver))
+                    : GraphicsDrivers.getMesaGalliumDriver(normalizedGraphicsDriver);
+            String galliumDriver = virglRoute
+                    ? VirGLConfigDialog.normalizeGalliumDriver(driverKeyValueConfig.get("galliumDriver", defaultGalliumDriver))
+                    : aeMaliGalliumRoute
+                    ? normalizeMaliGalliumDriver(driverKeyValueConfig.get("galliumDriver", defaultGalliumDriver), defaultGalliumDriver)
+                    : normalizeAdrenoGalliumDriver(driverKeyValueConfig.get("galliumDriver", defaultGalliumDriver), defaultGalliumDriver);
+            String openGlLane = normalizedGraphicsDriver;
+            String openGlPackage = virglPackageInfo != null
+                    ? virglPackageInfo.getDisplayLabel()
+                    : mesaPackageInfo != null
+                    ? mesaPackageInfo.getDisplayLabel()
+                    : openGlAsset == null ? GraphicsDrivers.getDisplayLabel(normalizedGraphicsDriver) : openGlAsset.packageLabel;
+            String openGlVersion = virglPackageInfo != null && !trimToEmpty(virglPackageInfo.version).isEmpty()
+                    ? virglPackageInfo.version
+                    : mesaPackageInfo != null && !trimToEmpty(mesaPackageInfo.version).isEmpty()
+                    ? mesaPackageInfo.version
+                    : GraphicsDrivers.getDisplayVersion(this, normalizedGraphicsDriver, rawGraphicsDriverConfig);
+            String openGlActiveEntry = (virglCustomPackage && !virglPackageDegraded)
+                    || (aeMaliCustomPackage && !aeMaliPackageDegraded)
+                    ? requestedPackageVersion
+                    : openGlAsset == null ? requestedPackageVersion : openGlAsset.version;
+            String openGlSourceRepo = virglPackageInfo == null
+                    ? mesaPackageInfo == null
+                    ? "https://gitlab.freedesktop.org/mesa/mesa"
+                    : firstNonEmpty(trimToEmpty(mesaPackageInfo.sourceRepo), "https://gitlab.freedesktop.org/mesa/mesa")
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.sourceRepo), "https://gitlab.freedesktop.org/mesa/mesa");
+            boolean aeMaliOpenGlRequiresRenderNode = mesaPackageInfo != null && mesaPackageInfo.requiresRenderNode;
+            boolean aeMaliOpenGlDegraded = aeMaliGalliumRoute && aeMaliOpenGlRequiresRenderNode && !renderNodeAvailable;
+            String aeMaliOpenGlDegradedReason = aeMaliOpenGlDegraded ? "aemali_gallium_requires_render_node" : "";
+            String virglProviderLane = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-universal"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.providerLane), "virgl-universal");
+            String virglDriverKind = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-mesa-bridge"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.driverKind), "virgl-mesa-bridge");
+            String virglTransport = virglPackageInfo == null || virglPackageDegraded
+                    ? "userspace-virtio-gpu"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.transport), "userspace-virtio-gpu");
+            String virglSupportClass = virglPackageInfo == null || virglPackageDegraded
+                    ? "separate-transport"
+                    : trimToEmpty(virglPackageInfo.supportClass);
+            String virglKernelEvidenceClass = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.kernelEvidenceClass);
+            String virglTransportRequirements = virglPackageInfo == null || virglPackageDegraded
+                    ? "mesa-virpipe-gallium,companion-virglrenderer-host,virtual-gpu-host-surface"
+                    : trimToEmpty(virglPackageInfo.transportRequirements);
+            String virglOwnerLane = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.ownerLane);
+            String virglRouteId = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-universal-virtual-gpu"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.routeId), "virgl-universal-virtual-gpu");
+            String virglRankedKernelDonors = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.rankedKernelDonors);
+            String virglDiagnosticKeys = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.diagnosticKeys);
+            boolean virglRequiresRenderNode = virglPackageInfo != null && !virglPackageDegraded && virglPackageInfo.requiresRenderNode;
+
+            setOrClearEnv("AERO_GRAPHICS_STACK_PROFILE", virglRoute ? "universal-virgl" : aeMaliGalliumRoute ? "aemali-universal" : "builtin-opengl-companion");
+            setOrClearEnv("AERO_GRAPHICS_SOC_CLASS", socClass);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_VULKAN_PROVIDER", vulkanProviderLane);
+            setOrClearEnv("AERO_GRAPHICS_OPENGL_PROVIDER", openGlLane);
+            setOrClearEnv("AERO_GL_FALLBACK_ENGINE", "wined3d");
+            setOrClearEnv("AERO_DXVK_LEGACY_DX89_PATH", "wined3d");
+            setOrClearEnv("AERO_DXVK_GL_FALLBACK", "1");
+            setOrClearEnv("AERO_VKD3D_GL_FALLBACK", "1");
+            setOrClearEnv("AERO_TURNIP_PACKAGE", maliSoC ? "" : vulkanProviderPackage);
+            setOrClearEnv("AERO_TURNIP_VERSION", maliSoC ? "" : vulkanProviderVersion);
+            setOrClearEnv("AERO_TURNIP_SOURCE_REPO", companionTurnipInfo == null || maliSoC ? "" : companionTurnipInfo.sourceRepo);
+            setOrClearEnv("AERO_TURNIP_RELEASE_TAG", companionTurnipInfo == null || maliSoC ? "" : companionTurnipInfo.releaseTag);
+            setOrClearEnv("AERO_TURNIP_GALLIUM_BRIDGE", companionTurnipInfo == null || maliSoC ? "" : companionTurnipInfo.preferredGalliumDriver);
+            setOrClearEnv("AERO_TURNIP_API_FOCUS", companionTurnipInfo == null || maliSoC ? "" : joinCsv(companionTurnipInfo.apiFocus));
+            setOrClearEnv("AERO_TURNIP_FORENSIC_LOG_PREFIXES", companionTurnipInfo == null || maliSoC ? "" : joinCsv(companionTurnipInfo.forensicLogPrefixes));
+
+            if (virglCustomPackage) {
+                boolean deployed = virglPackageManager != null && virglPackageManager.deployPackageToRoot(rootDir, requestedPackageVersion);
+                if (!deployed) {
+                    virglPackageDegraded = true;
+                    virglPackageDegradedReason = "virgl_custom_package_deploy_failed";
+                    openGlAsset = GraphicsDrivers.getBundledDriverAsset(this, normalizedGraphicsDriver);
+                    virglPackageInfo = openGlAsset == null || virglPackageManager == null
+                            ? null
+                            : virglPackageManager.getPackageInfo(openGlAsset.version);
+                    if (openGlAsset != null) {
+                        openGlPackage = virglPackageInfo == null ? openGlAsset.packageLabel : virglPackageInfo.getDisplayLabel();
+                        openGlVersion = virglPackageInfo != null && !trimToEmpty(virglPackageInfo.version).isEmpty()
+                                ? trimToEmpty(virglPackageInfo.version)
+                                : openGlAsset.version;
+                        openGlSourceRepo = virglPackageInfo == null
+                                ? "https://gitlab.freedesktop.org/mesa/mesa"
+                                : trimToEmpty(virglPackageInfo.sourceRepo);
+                        ensureGraphicsDriverAssetExtracted(rootDir, openGlAsset.assetPath, openGlAsset.extractProbePath);
+                    }
+                }
+            } else if (openGlAsset != null) {
+                ensureGraphicsDriverAssetExtracted(rootDir, openGlAsset.assetPath, openGlAsset.extractProbePath);
+            }
+            if (aeMaliCustomPackage) {
+                boolean deployed = mesaOpenGlPackageManager != null
+                        && mesaPackageInfo != null
+                        && mesaOpenGlPackageManager.deployPackageToRoot(rootDir, requestedPackageVersion);
+                if (!deployed) {
+                    aeMaliPackageDegraded = true;
+                    aeMaliPackageDegradedReason = mesaPackageInfo == null
+                            ? "aemali_gallium_custom_package_missing"
+                            : "aemali_gallium_custom_package_deploy_failed";
+                    openGlAsset = GraphicsDrivers.getBundledDriverAsset(this, normalizedGraphicsDriver);
+                    mesaPackageInfo = openGlAsset == null || mesaOpenGlPackageManager == null
+                            ? null
+                            : mesaOpenGlPackageManager.getPackageInfo(openGlAsset.version);
+                    if (openGlAsset != null) {
+                        openGlPackage = mesaPackageInfo == null ? openGlAsset.packageLabel : mesaPackageInfo.getDisplayLabel();
+                        openGlVersion = mesaPackageInfo != null && !trimToEmpty(mesaPackageInfo.version).isEmpty()
+                                ? trimToEmpty(mesaPackageInfo.version)
+                                : openGlAsset.version;
+                        openGlSourceRepo = mesaPackageInfo == null
+                                ? "https://gitlab.freedesktop.org/mesa/mesa"
+                                : trimToEmpty(mesaPackageInfo.sourceRepo);
+                        ensureGraphicsDriverAssetExtracted(rootDir, openGlAsset.assetPath, openGlAsset.extractProbePath);
                     }
                 }
             }
-
-            int requestedMinor = getVulkanApiMinor(requestedVulkanApi);
-            if (effectiveMinMinor > 0 && requestedMinor < effectiveMinMinor) {
-                requestedMinor = effectiveMinMinor;
+            if (aeMaliGalliumRoute) {
+                String resolvedDefaultGalliumDriver = firstNonEmpty(
+                        mesaPackageInfo == null ? "" : trimToEmpty(mesaPackageInfo.preferredGalliumDriver),
+                        mesaPackageInfo == null ? "" : trimToEmpty(mesaPackageInfo.fallbackGalliumDriver),
+                        GraphicsDrivers.getMesaGalliumDriver(normalizedGraphicsDriver)
+                );
+                galliumDriver = normalizeMaliGalliumDriver(
+                        driverKeyValueConfig.get("galliumDriver", resolvedDefaultGalliumDriver),
+                        resolvedDefaultGalliumDriver
+                );
             }
-            if (effectiveMaxMinor > 0 && requestedMinor > effectiveMaxMinor) {
-                requestedMinor = effectiveMaxMinor;
+            openGlActiveEntry = (virglCustomPackage && !virglPackageDegraded)
+                    || (aeMaliCustomPackage && !aeMaliPackageDegraded)
+                    ? requestedPackageVersion
+                    : openGlAsset == null ? requestedPackageVersion : openGlAsset.version;
+            virglProviderLane = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-universal"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.providerLane), "virgl-universal");
+            virglDriverKind = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-mesa-bridge"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.driverKind), "virgl-mesa-bridge");
+            virglTransport = virglPackageInfo == null || virglPackageDegraded
+                    ? "userspace-virtio-gpu"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.transport), "userspace-virtio-gpu");
+            virglSupportClass = virglPackageInfo == null || virglPackageDegraded
+                    ? "separate-transport"
+                    : trimToEmpty(virglPackageInfo.supportClass);
+            virglKernelEvidenceClass = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.kernelEvidenceClass);
+            virglTransportRequirements = virglPackageInfo == null || virglPackageDegraded
+                    ? "mesa-virpipe-gallium,companion-virglrenderer-host,virtual-gpu-host-surface"
+                    : trimToEmpty(virglPackageInfo.transportRequirements);
+            virglOwnerLane = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.ownerLane);
+            virglRouteId = virglPackageInfo == null || virglPackageDegraded
+                    ? "virgl-universal-virtual-gpu"
+                    : firstNonEmpty(trimToEmpty(virglPackageInfo.routeId), "virgl-universal-virtual-gpu");
+            virglRankedKernelDonors = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.rankedKernelDonors);
+            virglDiagnosticKeys = virglPackageInfo == null || virglPackageDegraded
+                    ? ""
+                    : trimToEmpty(virglPackageInfo.diagnosticKeys);
+            virglRequiresRenderNode = virglPackageInfo != null && !virglPackageDegraded && virglPackageInfo.requiresRenderNode;
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", openGlPackage);
+            setOrClearEnv("AERO_OPENGL_PACKAGE", openGlPackage);
+            setOrClearEnv("AERO_OPENGL_VERSION", openGlVersion);
+            setOrClearEnv("AERO_OPENGL_SOURCE_REPO", virglRoute || aeMaliGalliumRoute ? openGlSourceRepo : "");
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY_REQUESTED", virglRoute || aeMaliGalliumRoute ? requestedPackageVersion : "");
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY", virglRoute || aeMaliGalliumRoute ? openGlActiveEntry : "");
+            setOrClearEnv("AERO_OPENGL_CONTAINER_SOURCE", virglRoute
+                    ? (virglCustomPackage && !virglPackageDegraded ? "custom-overlay" : "bundled-virgl")
+                    : aeMaliGalliumRoute
+                    ? (aeMaliCustomPackage && !aeMaliPackageDegraded ? "custom-aemali-gallium" : "bundled-aemali-gallium")
+                    : "");
+            if (virglRoute) {
+                applyGraphicsDriverMetadataEnv(
+                        "AERO_OPENGL",
+                        virglProviderLane,
+                        virglDriverKind,
+                        virglTransport,
+                        virglSupportClass,
+                        virglKernelEvidenceClass,
+                        virglTransportRequirements,
+                        virglOwnerLane,
+                        virglRouteId,
+                        virglRankedKernelDonors,
+                        virglDiagnosticKeys,
+                        virglRequiresRenderNode
+                );
+            } else if (aeMaliGalliumRoute && mesaPackageInfo != null) {
+                applyGraphicsDriverMetadataEnv(
+                        "AERO_OPENGL",
+                        mesaPackageInfo.providerLane,
+                        mesaPackageInfo.driverKind,
+                        mesaPackageInfo.transport,
+                        mesaPackageInfo.supportClass,
+                        mesaPackageInfo.kernelEvidenceClass,
+                        mesaPackageInfo.transportRequirements,
+                        mesaPackageInfo.ownerLane,
+                        mesaPackageInfo.routeId,
+                        mesaPackageInfo.rankedKernelDonors,
+                        mesaPackageInfo.diagnosticKeys,
+                        mesaPackageInfo.requiresRenderNode
+                );
+                applyAeMaliOpenGlPolicyEnv(
+                        mesaPackageInfo.providerLane,
+                        mesaPackageInfo.driverKind,
+                        mesaPackageInfo.sourceRepo,
+                        mesaPackageInfo.transport,
+                        mesaPackageInfo.supportClass,
+                        mesaPackageInfo.kernelEvidenceClass,
+                        mesaPackageInfo.transportRequirements,
+                        mesaPackageInfo.ownerLane,
+                        mesaPackageInfo.routeId,
+                        mesaPackageInfo.rankedKernelDonors,
+                        mesaPackageInfo.diagnosticKeys,
+                        mesaPackageInfo.requiresRenderNode,
+                        renderNodeAvailable,
+                        galliumDriver,
+                        mesaPackageInfo.graphicsStackProfile
+                );
             }
-            requestedVulkanApi = "1." + requestedMinor;
+            if (!galliumDriver.isEmpty()) envVars.put("GALLIUM_DRIVER", galliumDriver);
+            if (virglRoute) {
+                envVars.put("VIRGL_SERVER_PATH", rootDir.getAbsolutePath() + UnixSocketConfig.VIRGL_SERVER_PATH);
+                setOrClearEnv("AERO_VIRGL_PACKAGE", openGlPackage);
+                setOrClearEnv("AERO_VIRGL_PACKAGE_VERSION", openGlVersion);
+                setOrClearEnv("AERO_VIRGL_PACKAGE_SOURCE", virglCustomPackage && !virglPackageDegraded ? "custom" : "bundled");
+                setOrClearEnv("AERO_VIRGL_PACKAGE_ENTRY_REQUESTED", requestedPackageVersion);
+                setOrClearEnv("AERO_VIRGL_PACKAGE_ENTRY", openGlActiveEntry);
+                setOrClearEnv("AERO_VIRGL_ROUTE_DEGRADED_REASON", virglPackageDegradedReason);
+                setOrClearEnv("AERO_VIRGL_GALLIUM_DRIVER", galliumDriver);
+                applyGraphicsDriverMetadataEnv(
+                        "AERO_VIRGL",
+                        virglProviderLane,
+                        virglDriverKind,
+                        virglTransport,
+                        virglSupportClass,
+                        virglKernelEvidenceClass,
+                        virglTransportRequirements,
+                        virglOwnerLane,
+                        virglRouteId,
+                        virglRankedKernelDonors,
+                        virglDiagnosticKeys,
+                        virglRequiresRenderNode
+                );
+                setOrClearEnv("AERO_VIRGL_RENDERER_SOURCE_REPO", "https://gitlab.freedesktop.org/virgl/virglrenderer");
+                setOrClearEnv("AERO_VIRGL_RENDERER_SOURCE_REV", "ca50e008863837e094747a69974dde3ae148aeaa+mr1613:6bfe93b5c4d6aaf0f50888f80d751ba3bfbae854");
+                setOrClearEnv("AERO_VIRGL_RENDERER_SOURCE_BASE_REV", "ca50e008863837e094747a69974dde3ae148aeaa");
+                setOrClearEnv("AERO_VIRGL_RENDERER_SOURCE_OVERLAY_REV", "6bfe93b5c4d6aaf0f50888f80d751ba3bfbae854");
+                VirGLConfigDialog.setEnvVars(driverKeyValueConfig, envVars);
+            } else {
+                MesaOpenGLConfigDialog.setEnvVars(driverKeyValueConfig, envVars, normalizedGraphicsDriver);
+            }
 
-            envVars.put("AERO_VULKAN_SDK_PROFILE", joinCsv(selectedEntries));
-            envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", String.valueOf(selectedEntries.size()));
-            setOrClearEnv("AERO_VULKAN_SDK_VERSION", joinCsv(selectedSdkVersions));
-            setOrClearEnv("AERO_VULKAN_SDK_ARCH_COVERAGE", joinCsv(selectedArchCoverage));
-            setOrClearEnv("AERO_VULKAN_SDK_LAYOUT", bundleLayout ? "bundle" : (selectedEntries.size() > 1 ? "split" : "single"));
-            setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", effectiveMinMinor > 0 ? "1." + effectiveMinMinor : "");
-            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", effectiveMaxMinor > 0 ? "1." + effectiveMaxMinor : "");
-        } else {
-            envVars.put("AERO_VULKAN_SDK_PROFILE", "none");
-            envVars.put("AERO_VULKAN_SDK_PROFILE_COUNT", "0");
-            setOrClearEnv("AERO_VULKAN_SDK_VERSION", "");
-            setOrClearEnv("AERO_VULKAN_SDK_ARCH_COVERAGE", "");
-            setOrClearEnv("AERO_VULKAN_SDK_LAYOUT", "");
+            boolean openGlBridgeUsesVulkanPrimary = openGlRouteNeedsVulkanCompanion && !vulkanProviderLane.isEmpty();
+            boolean vulkanPrimaryProviderMissing = openGlRouteNeedsVulkanCompanion && vulkanProviderLane.isEmpty();
+            if (openGlBridgeUsesVulkanPrimary) {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", vulkanProviderLane + "-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", vulkanProviderLane + "-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", vulkanProviderLane + "-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", vulkanProviderLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", vulkanProviderPackage);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", vulkanProviderVersion);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", openGlLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", openGlPackage);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", openGlVersion);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", openGlLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", "1");
+            } else {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", openGlLane + "-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", openGlLane + "-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", openGlLane + "-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", openGlLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", openGlPackage);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", openGlVersion);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", vulkanProviderLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", vulkanProviderPackage);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", vulkanProviderVersion);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", vulkanProviderLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", vulkanProviderLane.isEmpty() ? "" : "1");
+            }
+
+            String openGlBridgeRouteDegradedReason = joinNonEmptyCsv(
+                    virglPackageDegraded ? virglPackageDegradedReason : "",
+                    aeMaliPackageDegraded ? aeMaliPackageDegradedReason : "",
+                    aeMaliOpenGlDegraded ? aeMaliOpenGlDegradedReason : "",
+                    openGlBridgeVulkanDegradedReason,
+                    vulkanPrimaryProviderMissing ? "vulkan_primary_provider_missing" : ""
+            );
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED", openGlBridgeRouteDegradedReason.isEmpty() ? "" : "1");
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED_REASON", openGlBridgeRouteDegradedReason);
+            if (!virglRoute && !aeMaliGalliumRoute) {
+                applyWrapperGraphicsConfigEnv(rootDir, adrenoToolsDriverId, useDRI3, dri3ForceSwWsi, dri3PresentWait);
+            }
+        } else if (GraphicsDrivers.isGladio(normalizedGraphicsDriver)) {
+            VortekWrapperState vortekState = resolveVortekWrapperState(driverKeyValueConfig.get("vortekPackageVersion"));
+            ensureGraphicsDriverAssetExtracted(rootDir, vortekState.bundledAsset.assetPath, vortekState.bundledAsset.extractProbePath);
+            GladioOverlayState gladioState = resolveGladioOverlayState(
+                    rootDir,
+                    driverKeyValueConfig.get("gladioPackageVersion")
+            );
+
+            String selectedVulkanApi = firstNonEmpty(
+                    trimToEmpty(driverKeyValueConfig.get("vkMaxVersion")),
+                    VortekConfigDialog.DEFAULT_VK_MAX_VERSION
+            );
+            VortekVulkanDriverPackageManager vortekVulkanDriverPackageManager = new VortekVulkanDriverPackageManager(this);
+            String requestedVulkanDriverEntry = VortekVulkanDriverPackageManager.normalizeEntry(
+                    driverKeyValueConfig.get("vulkanDriverEntry", VortekVulkanDriverPackageManager.SYSTEM_ENTRY)
+            );
+            boolean nonSystemVulkanDriverRequested = !VortekVulkanDriverPackageManager.isSystemEntry(requestedVulkanDriverEntry);
+            boolean renderNodeAvailable = hasAccessibleRenderNode();
+            boolean vortekRouteDegraded = false;
+            String vortekRouteDegradedReason = "";
+            boolean customVulkanOverlayReady = false;
+            String activeVulkanDriverEntry = requestedVulkanDriverEntry;
+            VortekVulkanDriverPackageManager.PackageInfo activeVulkanDriverInfo =
+                    vortekVulkanDriverPackageManager.getPackageInfo(requestedVulkanDriverEntry);
+            String hostVulkanLibraryPath = vortekVulkanDriverPackageManager.resolveLibraryPath(requestedVulkanDriverEntry);
+            String rootVulkanLibraryPath = vortekVulkanDriverPackageManager.resolveRootLibraryPath(requestedVulkanDriverEntry);
+            if (nonSystemVulkanDriverRequested) {
+                if (activeVulkanDriverInfo == null || trimToEmpty(hostVulkanLibraryPath).isEmpty()) {
+                    vortekRouteDegraded = true;
+                    vortekRouteDegradedReason = "vortek_vulkan_package_host_library_missing";
+                    activeVulkanDriverEntry = VortekVulkanDriverPackageManager.SYSTEM_ENTRY;
+                    activeVulkanDriverInfo = vortekVulkanDriverPackageManager.getPackageInfo(activeVulkanDriverEntry);
+                    hostVulkanLibraryPath = null;
+                    rootVulkanLibraryPath = "";
+                } else if (activeVulkanDriverInfo.requiresRenderNode && !renderNodeAvailable) {
+                    vortekRouteDegraded = true;
+                    vortekRouteDegradedReason = "vortek_vulkan_package_requires_render_node";
+                    activeVulkanDriverEntry = VortekVulkanDriverPackageManager.SYSTEM_ENTRY;
+                    activeVulkanDriverInfo = vortekVulkanDriverPackageManager.getPackageInfo(activeVulkanDriverEntry);
+                    hostVulkanLibraryPath = null;
+                    rootVulkanLibraryPath = "";
+                } else if (!trimToEmpty(rootVulkanLibraryPath).isEmpty()) {
+                    customVulkanOverlayReady = vortekVulkanDriverPackageManager.deployPackageToRoot(rootDir, requestedVulkanDriverEntry)
+                            && new File(rootDir, rootVulkanLibraryPath).isFile();
+                    if (!customVulkanOverlayReady) {
+                        vortekRouteDegraded = true;
+                        vortekRouteDegradedReason = "vortek_vulkan_package_overlay_deploy_failed";
+                        rootVulkanLibraryPath = "";
+                    }
+                }
+            }
+            File vortekIcdFile = rewriteVortekIcdFile(
+                    rootDir,
+                    customVulkanOverlayReady ? rootVulkanLibraryPath : "",
+                    selectedVulkanApi
+            );
+            if (vortekIcdFile == null && !vortekRouteDegraded) {
+                vortekRouteDegraded = true;
+                vortekRouteDegradedReason = "vortek_wrapper_icd_bionic_incompatible";
+            }
+            File validationLayerManifest = new File(imageFs.getShareDir(), "vulkan/explicit_layer.d/VkLayer_khronos_validation.json");
+            String routingMode = VortekConfigDialog.normalizeRoutingMode(driverKeyValueConfig.get("routingMode", VortekConfigDialog.ROUTING_AUTO));
+            String extensionProfile = VortekExtensionPolicy.normalizeProfile(driverKeyValueConfig.get("extensionProfile", VortekExtensionPolicy.PROFILE_MALI_SYSTEM));
+            String exposedExtensions = driverKeyValueConfig.get("exposedDeviceExtensions");
+            if (exposedExtensions.isEmpty()) {
+                exposedExtensions = VortekExtensionPolicy.joinExtensions(
+                        VortekExtensionPolicy.getSelectedExtensionsForProfile(
+                                extensionProfile,
+                                VortekExtensionPolicy.buildCandidateExtensions(GPUHelper.vkGetDeviceExtensions())
+                        )
+                );
+            }
+            String disabledExtensions = driverKeyValueConfig.get("disabledDeviceExtensions", "");
+            if (disabledExtensions.isEmpty()) {
+                disabledExtensions = VortekExtensionPolicy.joinExtensions(VortekExtensionPolicy.getDisabledExtensionsForProfile(extensionProfile));
+            }
+            boolean useVortekPrimary = shouldUseVortekPrimaryRoute(routingMode);
+            String gladioTransportBlockReason = gladioState.requiresRenderNode
+                    && isAeMaliOpenGlProvider(gladioState.providerLane, gladioState.driverKind, gladioState.sourceRepo)
+                    && !renderNodeAvailable
+                    ? "gladio_aemali_gallium_requires_render_node"
+                    : "";
+            String routeDegradedReason = joinNonEmptyCsv(
+                    vortekRouteDegraded ? vortekRouteDegradedReason : "",
+                    gladioState.degraded ? gladioState.degradedReason : "",
+                    gladioTransportBlockReason
+            );
+
+            if (vortekIcdFile != null) {
+                envVars.put("VK_ICD_FILENAMES", vortekIcdFile.getAbsolutePath());
+                envVars.put("VK_DRIVER_FILES", vortekIcdFile.getAbsolutePath());
+            }
+            envVars.put("VORTEK_SERVER_PATH", rootDir.getAbsolutePath() + UnixSocketConfig.VORTEK_SERVER_PATH);
+            envVars.put("WINEVKUSEPLACEDADDR", "1");
+            if (driverKeyValueConfig.getBoolean("gladioNoError", true)) envVars.put("GLADIO_NO_ERROR", "1");
+
+            String graphicsStackProfile = firstNonEmpty(
+                    trimToEmpty(gladioState.graphicsStackProfile),
+                    trimToEmpty(vortekState.graphicsStackProfile),
+                    "mediatek-gladio-vortek"
+            );
+            String openGlGalliumDriver = trimToEmpty(gladioState.preferredGalliumDriver);
+            boolean aeMaliOpenGlOverlay = isAeMaliOpenGlProvider(
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.sourceRepo
+            );
+            if (aeMaliOpenGlOverlay) {
+                String defaultOpenGlGalliumDriver = firstNonEmpty(openGlGalliumDriver, "panfrost");
+                openGlGalliumDriver = normalizeMaliGalliumDriver(
+                        driverKeyValueConfig.get("galliumDriver", defaultOpenGlGalliumDriver),
+                        defaultOpenGlGalliumDriver
+                );
+            }
+            if (!openGlGalliumDriver.isEmpty()) envVars.put("GALLIUM_DRIVER", openGlGalliumDriver);
+            applyAeMaliOpenGlMesaCompatEnv(driverKeyValueConfig, aeMaliOpenGlOverlay, openGlGalliumDriver);
+            setOrClearEnv("AERO_GRAPHICS_STACK_PROFILE", graphicsStackProfile);
+            setOrClearEnv("AERO_GRAPHICS_SOC_CLASS", socClass);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", gladioState.packageLabel);
+            setOrClearEnv("AERO_GRAPHICS_VULKAN_PROVIDER", vortekState.providerLane);
+            setOrClearEnv("AERO_GRAPHICS_OPENGL_PROVIDER", gladioState.providerLane);
+            setOrClearEnv("AERO_VORTEK_PACKAGE", vortekState.packageLabel);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_VERSION", vortekState.version);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_ENTRY", vortekState.activeEntry);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_SOURCE_REPO", vortekState.sourceRepo);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_VORTEK_PACKAGE",
+                    vortekState.providerLane,
+                    vortekState.driverKind,
+                    vortekState.transport,
+                    vortekState.supportClass,
+                    vortekState.kernelEvidenceClass,
+                    vortekState.transportRequirements,
+                    vortekState.ownerLane,
+                    vortekState.routeId,
+                    vortekState.rankedKernelDonors,
+                    vortekState.diagnosticKeys,
+                    vortekState.requiresRenderNode
+            );
+            setOrClearEnv("AERO_OPENGL_PACKAGE", gladioState.packageLabel);
+            setOrClearEnv("AERO_OPENGL_VERSION", gladioState.version);
+            setOrClearEnv("AERO_OPENGL_SOURCE_REPO", gladioState.sourceRepo);
+            setOrClearEnv("AERO_OPENGL_GALLIUM_DRIVER", openGlGalliumDriver);
+            setOrClearEnv("AERO_OPENGL_OVERLAY_ACTIVE", gladioState.customOverlayReady ? "1" : "0");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_PACKAGE", gladioState.customOverlayReady ? gladioState.packageLabel : "");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_ENTRY", gladioState.customOverlayReady ? gladioState.activeEntry : "");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_VERSION", gladioState.customOverlayReady ? gladioState.version : "");
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY_REQUESTED", gladioState.requestedEntry);
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY", gladioState.activeEntry);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_OPENGL",
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.transport,
+                    gladioState.supportClass,
+                    gladioState.kernelEvidenceClass,
+                    gladioState.transportRequirements,
+                    gladioState.ownerLane,
+                    gladioState.routeId,
+                    gladioState.rankedKernelDonors,
+                    gladioState.diagnosticKeys,
+                    gladioState.requiresRenderNode
+            );
+            applyAeMaliOpenGlPolicyEnv(
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.sourceRepo,
+                    gladioState.transport,
+                    gladioState.supportClass,
+                    gladioState.kernelEvidenceClass,
+                    gladioState.transportRequirements,
+                    gladioState.ownerLane,
+                    gladioState.routeId,
+                    gladioState.rankedKernelDonors,
+                    gladioState.diagnosticKeys,
+                    gladioState.requiresRenderNode,
+                    renderNodeAvailable,
+                    openGlGalliumDriver,
+                    gladioState.graphicsStackProfile
+            );
+            setOrClearEnv("AERO_OPENGL_CONTAINER_SOURCE", gladioState.customOverlayReady
+                    ? (aeMaliOpenGlOverlay ? "aemali-gallium-overlay" : "custom-overlay")
+                    : "bundled-gladio");
+            setOrClearEnv("AERO_TURNIP_PACKAGE", "");
+            setOrClearEnv("AERO_TURNIP_VERSION", "");
+            setOrClearEnv("AERO_TURNIP_SOURCE_REPO", "");
+            setOrClearEnv("AERO_TURNIP_RELEASE_TAG", "");
+            setOrClearEnv("AERO_TURNIP_GALLIUM_BRIDGE", "");
+            setOrClearEnv("AERO_TURNIP_API_FOCUS", "");
+            setOrClearEnv("AERO_TURNIP_FORENSIC_LOG_PREFIXES", "");
+            setOrClearEnv("AERO_GL_FALLBACK_ENGINE", "wined3d");
+            setOrClearEnv("AERO_DXVK_LEGACY_DX89_PATH", "wined3d");
+            setOrClearEnv("AERO_DXVK_GL_FALLBACK", "1");
+            setOrClearEnv("AERO_VKD3D_GL_FALLBACK", "1");
+            boolean activeAeMaliPanvkOverlay = VortekVulkanDriverPackageManager.isBundledAeMaliPackageEntry(activeVulkanDriverEntry);
+            String vortekRuntimeSource = activeVulkanDriverInfo == null || activeVulkanDriverInfo.builtin
+                    ? "vortek-builtin"
+                    : activeAeMaliPanvkOverlay
+                    ? (customVulkanOverlayReady ? "aemali-panvk-full" : "aemali-panvk-host")
+                    : (customVulkanOverlayReady ? "vortek-custom-full" : "vortek-custom-host");
+            setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", vortekRuntimeSource);
+            setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", vortekIcdFile == null ? "" : vortekIcdFile.getAbsolutePath());
+            setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", selectedVulkanApi);
             setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
-            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", "");
-        }
-        envVars.put("AERO_VULKAN_API_SELECTED", requestedVulkanApi);
-        envVars.put("WRAPPER_VK_VERSION", requestedVulkanApi + "." + resolveDriverVulkanPatch(adrenoToolsDriverId));
+            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", selectedVulkanApi);
+            setOrClearEnv("AERO_VULKAN_VALIDATION_LAYER_MANIFEST", validationLayerManifest.isFile() ? validationLayerManifest.getAbsolutePath() : "");
+            setOrClearEnv("AERO_VULKAN_API_SELECTED", selectedVulkanApi);
+            setOrClearEnv("WRAPPER_VK_VERSION", "");
+            setOrClearEnv("AERO_MEDIATEK_WRAPPER_MODE", routingMode);
+            setOrClearEnv("AERO_VORTEK_VULKAN_SOURCE", buildVortekRuntimeSource(activeVulkanDriverInfo));
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_ENTRY_REQUESTED", requestedVulkanDriverEntry);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_ENTRY", activeVulkanDriverEntry);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_NAME", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.name);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_VERSION", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.version);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_VORTEK_VULKAN",
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.providerLane,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.driverKind,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.transport,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.supportClass,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.kernelEvidenceClass,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.transportRequirements,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.ownerLane,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.routeId,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.rankedKernelDonors,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.diagnosticKeys,
+                    activeVulkanDriverInfo != null && activeVulkanDriverInfo.requiresRenderNode
+            );
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_SOURCE_REPO", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.sourceRepo);
+            setOrClearEnv("AERO_VORTEK_VULKAN_LIBRARY_PATH", hostVulkanLibraryPath);
+            setOrClearEnv("AERO_VORTEK_VULKAN_CONTAINER_SOURCE", customVulkanOverlayReady
+                    ? (activeAeMaliPanvkOverlay ? "aemali-panvk-overlay" : "custom-overlay")
+                    : "bundled-vortek");
+            setOrClearEnv(
+                    "AERO_VORTEK_VULKAN_CONTAINER_LIBRARY",
+                    customVulkanOverlayReady && !trimToEmpty(rootVulkanLibraryPath).isEmpty()
+                            ? new File(rootDir, rootVulkanLibraryPath).getAbsolutePath()
+                            : new File(rootDir, firstNonEmpty(trimToEmpty(vortekState.rootLibraryPath), "usr/lib/libvulkan_vortek.so")).getAbsolutePath()
+            );
+            setOrClearEnv("AERO_VORTEK_VULKAN_RENDER_NODE_AVAILABLE", renderNodeAvailable ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_EXPERIMENTAL", activeVulkanDriverInfo != null && activeVulkanDriverInfo.experimental ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_MALI_NATIVE_VULKAN", VortekExtensionPolicy.isMaliProfile(extensionProfile) ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_EXTENSION_PROFILE", extensionProfile);
+            setOrClearEnv("AERO_VORTEK_EXPOSED_EXTENSIONS", exposedExtensions);
+            setOrClearEnv("AERO_VORTEK_DISABLED_EXTENSIONS", disabledExtensions);
+            applyAeMaliPolicyEnv(activeVulkanDriverInfo, extensionProfile, selectedVulkanApi, renderNodeAvailable);
 
-        String blacklistedExtensions = graphicsDriverConfig.get("blacklistedExtensions");
-        envVars.put("WRAPPER_EXTENSION_BLACKLIST", blacklistedExtensions);
-
-        String gpuName = graphicsDriverConfig.get("gpuName");
-        if (!gpuName.equals("Device")) {
-            envVars.put("WRAPPER_DEVICE_NAME", gpuName);
-            envVars.put("WRAPPER_DEVICE_ID", WineD3DConfigDialog.getDeviceIdFromGPUName(this, gpuName));
-            envVars.put("WRAPPER_VENDOR_ID", WineD3DConfigDialog.getVendorIdFromGPUName(this, gpuName));
-        }
-
-        String maxDeviceMemory = graphicsDriverConfig.get("maxDeviceMemory");
-        if (maxDeviceMemory != null && Integer.parseInt(maxDeviceMemory) > 0)
-            envVars.put("WRAPPER_VMEM_MAX_SIZE", maxDeviceMemory);
-
-        String presentMode = graphicsDriverConfig.get("presentMode");
-        if (presentMode.contains("immediate")) {
-            envVars.put("WRAPPER_MAX_IMAGE_COUNT", "1");
-        }
-        envVars.put("MESA_VK_WSI_PRESENT_MODE", presentMode);
-
-        String resourceType = graphicsDriverConfig.get("resourceType");
-        envVars.put("WRAPPER_RESOURCE_TYPE", resourceType);
-
-        String syncFrame = graphicsDriverConfig.get("syncFrame");
-        if (syncFrame.equals("1") && !dri3ForceSwWsi && useDRI3)
-            envVars.put("MESA_VK_WSI_DEBUG", "forcesync");
-
-        String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
-        if (!dri3PresentWait) disablePresentWait = "1";
-        envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
-
-        String bcnEmulation = graphicsDriverConfig.get("bcnEmulation");
-        String bcnEmulationType = graphicsDriverConfig.get("bcnEmulationType");
-
-        switch (bcnEmulation) {
-            case "auto" -> {
-                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
-                    envVars.put("ENABLE_BCN_COMPUTE", "1");
-                    envVars.put("BCN_COMPUTE_AUTO", "1");
-                }
-                envVars.put("WRAPPER_EMULATE_BCN", "3");
+            if (useVortekPrimary) {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", "vortek-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", "vortek-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", "vortek-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", vortekState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", vortekState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", gladioState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", gladioState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", "1");
+            } else {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", "gladio-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", "gladio-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", "gladio-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", gladioState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", gladioState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", vortekState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", vortekState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", "1");
             }
-            case "full" -> {
-                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
-                    envVars.put("ENABLE_BCN_COMPUTE", "1");
-                    envVars.put("BCN_COMPUTE_AUTO", "0");
-                }
-                envVars.put("WRAPPER_EMULATE_BCN", "2");
-            }
-            case "none" -> envVars.put("WRAPPER_EMULATE_BCN", "0");
-            default -> envVars.put("WRAPPER_EMULATE_BCN", "1");
-        }
 
-        String bcnEmulationCache = graphicsDriverConfig.get("bcnEmulationCache");
-        envVars.put("WRAPPER_USE_BCN_CACHE", bcnEmulationCache);
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED", routeDegradedReason.isEmpty() ? "" : "1");
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED_REASON", routeDegradedReason);
+        } else if (GraphicsDrivers.isVortek(normalizedGraphicsDriver)) {
+            VortekWrapperState vortekState = resolveVortekWrapperState(driverKeyValueConfig.get("vortekPackageVersion"));
+            ensureGraphicsDriverAssetExtracted(rootDir, vortekState.bundledAsset.assetPath, vortekState.bundledAsset.extractProbePath);
+            GladioOverlayState gladioState = resolveGladioOverlayState(
+                    rootDir,
+                    driverKeyValueConfig.get("gladioPackageVersion")
+            );
+
+            String selectedVulkanApi = firstNonEmpty(
+                    trimToEmpty(driverKeyValueConfig.get("vkMaxVersion")),
+                    VortekConfigDialog.DEFAULT_VK_MAX_VERSION
+            );
+            VortekVulkanDriverPackageManager vortekVulkanDriverPackageManager = new VortekVulkanDriverPackageManager(this);
+            String requestedVulkanDriverEntry = VortekVulkanDriverPackageManager.normalizeEntry(
+                    driverKeyValueConfig.get("vulkanDriverEntry", VortekVulkanDriverPackageManager.SYSTEM_ENTRY)
+            );
+            boolean nonSystemVulkanDriverRequested = !VortekVulkanDriverPackageManager.isSystemEntry(requestedVulkanDriverEntry);
+            boolean renderNodeAvailable = hasAccessibleRenderNode();
+            boolean vortekRouteDegraded = false;
+            String vortekRouteDegradedReason = "";
+            boolean customVulkanOverlayReady = false;
+            String activeVulkanDriverEntry = requestedVulkanDriverEntry;
+            VortekVulkanDriverPackageManager.PackageInfo activeVulkanDriverInfo =
+                    vortekVulkanDriverPackageManager.getPackageInfo(requestedVulkanDriverEntry);
+            String hostVulkanLibraryPath = vortekVulkanDriverPackageManager.resolveLibraryPath(requestedVulkanDriverEntry);
+            String rootVulkanLibraryPath = vortekVulkanDriverPackageManager.resolveRootLibraryPath(requestedVulkanDriverEntry);
+            if (nonSystemVulkanDriverRequested) {
+                if (activeVulkanDriverInfo == null || trimToEmpty(hostVulkanLibraryPath).isEmpty()) {
+                    vortekRouteDegraded = true;
+                    vortekRouteDegradedReason = "vortek_vulkan_package_host_library_missing";
+                    activeVulkanDriverEntry = VortekVulkanDriverPackageManager.SYSTEM_ENTRY;
+                    activeVulkanDriverInfo = vortekVulkanDriverPackageManager.getPackageInfo(activeVulkanDriverEntry);
+                    hostVulkanLibraryPath = null;
+                    rootVulkanLibraryPath = "";
+                } else if (activeVulkanDriverInfo.requiresRenderNode && !renderNodeAvailable) {
+                    vortekRouteDegraded = true;
+                    vortekRouteDegradedReason = "vortek_vulkan_package_requires_render_node";
+                    activeVulkanDriverEntry = VortekVulkanDriverPackageManager.SYSTEM_ENTRY;
+                    activeVulkanDriverInfo = vortekVulkanDriverPackageManager.getPackageInfo(activeVulkanDriverEntry);
+                    hostVulkanLibraryPath = null;
+                    rootVulkanLibraryPath = "";
+                } else if (!trimToEmpty(rootVulkanLibraryPath).isEmpty()) {
+                    customVulkanOverlayReady = vortekVulkanDriverPackageManager.deployPackageToRoot(rootDir, requestedVulkanDriverEntry)
+                            && new File(rootDir, rootVulkanLibraryPath).isFile();
+                    if (!customVulkanOverlayReady) {
+                        vortekRouteDegraded = true;
+                        vortekRouteDegradedReason = "vortek_vulkan_package_overlay_deploy_failed";
+                        rootVulkanLibraryPath = "";
+                    }
+                }
+            }
+            File vortekIcdFile = rewriteVortekIcdFile(
+                    rootDir,
+                    customVulkanOverlayReady ? rootVulkanLibraryPath : "",
+                    selectedVulkanApi
+            );
+            if (vortekIcdFile == null && !vortekRouteDegraded) {
+                vortekRouteDegraded = true;
+                vortekRouteDegradedReason = "vortek_wrapper_icd_bionic_incompatible";
+            }
+            File validationLayerManifest = new File(imageFs.getShareDir(), "vulkan/explicit_layer.d/VkLayer_khronos_validation.json");
+            String routingMode = VortekConfigDialog.normalizeRoutingMode(driverKeyValueConfig.get("routingMode", VortekConfigDialog.ROUTING_AUTO));
+            String extensionProfile = VortekExtensionPolicy.normalizeProfile(driverKeyValueConfig.get("extensionProfile", VortekExtensionPolicy.PROFILE_MALI_SYSTEM));
+            String exposedExtensions = driverKeyValueConfig.get("exposedDeviceExtensions");
+            if (exposedExtensions.isEmpty()) {
+                exposedExtensions = VortekExtensionPolicy.joinExtensions(
+                        VortekExtensionPolicy.getSelectedExtensionsForProfile(
+                                extensionProfile,
+                                VortekExtensionPolicy.buildCandidateExtensions(GPUHelper.vkGetDeviceExtensions())
+                        )
+                );
+            }
+            String disabledExtensions = driverKeyValueConfig.get("disabledDeviceExtensions", "");
+            if (disabledExtensions.isEmpty()) {
+                disabledExtensions = VortekExtensionPolicy.joinExtensions(VortekExtensionPolicy.getDisabledExtensionsForProfile(extensionProfile));
+            }
+            boolean useVortekPrimary = shouldUseVortekPrimaryRoute(routingMode);
+            String gladioTransportBlockReason = gladioState.requiresRenderNode
+                    && isAeMaliOpenGlProvider(gladioState.providerLane, gladioState.driverKind, gladioState.sourceRepo)
+                    && !renderNodeAvailable
+                    ? "gladio_aemali_gallium_requires_render_node"
+                    : "";
+            String routeDegradedReason = joinNonEmptyCsv(
+                    vortekRouteDegraded ? vortekRouteDegradedReason : "",
+                    gladioState.degraded ? gladioState.degradedReason : "",
+                    gladioTransportBlockReason
+            );
+
+            if (vortekIcdFile != null) {
+                envVars.put("VK_ICD_FILENAMES", vortekIcdFile.getAbsolutePath());
+                envVars.put("VK_DRIVER_FILES", vortekIcdFile.getAbsolutePath());
+            }
+
+            envVars.put("VORTEK_SERVER_PATH", rootDir.getAbsolutePath() + UnixSocketConfig.VORTEK_SERVER_PATH);
+            envVars.put("WINEVKUSEPLACEDADDR", "1");
+            if (driverKeyValueConfig.getBoolean("gladioNoError", true)) envVars.put("GLADIO_NO_ERROR", "1");
+            String graphicsStackProfile = firstNonEmpty(
+                    trimToEmpty(gladioState.graphicsStackProfile),
+                    trimToEmpty(vortekState.graphicsStackProfile),
+                    "vortek-gladio"
+            );
+            String openGlGalliumDriver = trimToEmpty(gladioState.preferredGalliumDriver);
+            boolean aeMaliOpenGlOverlay = isAeMaliOpenGlProvider(
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.sourceRepo
+            );
+            if (aeMaliOpenGlOverlay) {
+                String defaultOpenGlGalliumDriver = firstNonEmpty(openGlGalliumDriver, "panfrost");
+                openGlGalliumDriver = normalizeMaliGalliumDriver(
+                        driverKeyValueConfig.get("galliumDriver", defaultOpenGlGalliumDriver),
+                        defaultOpenGlGalliumDriver
+                );
+            }
+            if (!openGlGalliumDriver.isEmpty()) envVars.put("GALLIUM_DRIVER", openGlGalliumDriver);
+            applyAeMaliOpenGlMesaCompatEnv(driverKeyValueConfig, aeMaliOpenGlOverlay, openGlGalliumDriver);
+            setOrClearEnv("AERO_GRAPHICS_STACK_PROFILE", graphicsStackProfile);
+            setOrClearEnv("AERO_GRAPHICS_SOC_CLASS", socClass);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", normalizedGraphicsDriver);
+            setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", vortekState.packageLabel);
+            setOrClearEnv("AERO_GRAPHICS_VULKAN_PROVIDER", vortekState.providerLane);
+            setOrClearEnv("AERO_GRAPHICS_OPENGL_PROVIDER", gladioState.providerLane);
+            setOrClearEnv("AERO_VORTEK_PACKAGE", vortekState.packageLabel);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_VERSION", vortekState.version);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_ENTRY", vortekState.activeEntry);
+            setOrClearEnv("AERO_VORTEK_PACKAGE_SOURCE_REPO", vortekState.sourceRepo);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_VORTEK_PACKAGE",
+                    vortekState.providerLane,
+                    vortekState.driverKind,
+                    vortekState.transport,
+                    vortekState.supportClass,
+                    vortekState.kernelEvidenceClass,
+                    vortekState.transportRequirements,
+                    vortekState.ownerLane,
+                    vortekState.routeId,
+                    vortekState.rankedKernelDonors,
+                    vortekState.diagnosticKeys,
+                    vortekState.requiresRenderNode
+            );
+            setOrClearEnv("AERO_OPENGL_PACKAGE", gladioState.packageLabel);
+            setOrClearEnv("AERO_OPENGL_VERSION", gladioState.version);
+            setOrClearEnv("AERO_OPENGL_SOURCE_REPO", gladioState.sourceRepo);
+            setOrClearEnv("AERO_OPENGL_GALLIUM_DRIVER", openGlGalliumDriver);
+            setOrClearEnv("AERO_OPENGL_OVERLAY_ACTIVE", gladioState.customOverlayReady ? "1" : "0");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_PACKAGE", gladioState.customOverlayReady ? gladioState.packageLabel : "");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_ENTRY", gladioState.customOverlayReady ? gladioState.activeEntry : "");
+            setOrClearEnv("AERO_OPENGL_OVERLAY_VERSION", gladioState.customOverlayReady ? gladioState.version : "");
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY_REQUESTED", gladioState.requestedEntry);
+            setOrClearEnv("AERO_OPENGL_PACKAGE_ENTRY", gladioState.activeEntry);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_OPENGL",
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.transport,
+                    gladioState.supportClass,
+                    gladioState.kernelEvidenceClass,
+                    gladioState.transportRequirements,
+                    gladioState.ownerLane,
+                    gladioState.routeId,
+                    gladioState.rankedKernelDonors,
+                    gladioState.diagnosticKeys,
+                    gladioState.requiresRenderNode
+            );
+            applyAeMaliOpenGlPolicyEnv(
+                    gladioState.providerLane,
+                    gladioState.driverKind,
+                    gladioState.sourceRepo,
+                    gladioState.transport,
+                    gladioState.supportClass,
+                    gladioState.kernelEvidenceClass,
+                    gladioState.transportRequirements,
+                    gladioState.ownerLane,
+                    gladioState.routeId,
+                    gladioState.rankedKernelDonors,
+                    gladioState.diagnosticKeys,
+                    gladioState.requiresRenderNode,
+                    renderNodeAvailable,
+                    openGlGalliumDriver,
+                    gladioState.graphicsStackProfile
+            );
+            setOrClearEnv("AERO_OPENGL_CONTAINER_SOURCE", gladioState.customOverlayReady
+                    ? (aeMaliOpenGlOverlay ? "aemali-gallium-overlay" : "custom-overlay")
+                    : "bundled-gladio");
+            setOrClearEnv("AERO_TURNIP_PACKAGE", "");
+            setOrClearEnv("AERO_TURNIP_VERSION", "");
+            setOrClearEnv("AERO_TURNIP_SOURCE_REPO", "");
+            setOrClearEnv("AERO_TURNIP_RELEASE_TAG", "");
+            setOrClearEnv("AERO_TURNIP_GALLIUM_BRIDGE", "");
+            setOrClearEnv("AERO_TURNIP_API_FOCUS", "");
+            setOrClearEnv("AERO_TURNIP_FORENSIC_LOG_PREFIXES", "");
+            setOrClearEnv("AERO_GL_FALLBACK_ENGINE", "wined3d");
+            setOrClearEnv("AERO_DXVK_LEGACY_DX89_PATH", "wined3d");
+            setOrClearEnv("AERO_DXVK_GL_FALLBACK", "1");
+            setOrClearEnv("AERO_VKD3D_GL_FALLBACK", "1");
+            boolean activeAeMaliPanvkOverlay = VortekVulkanDriverPackageManager.isBundledAeMaliPackageEntry(activeVulkanDriverEntry);
+            String vortekRuntimeSource = activeVulkanDriverInfo == null || activeVulkanDriverInfo.builtin
+                    ? "vortek-builtin"
+                    : activeAeMaliPanvkOverlay
+                    ? (customVulkanOverlayReady ? "aemali-panvk-full" : "aemali-panvk-host")
+                    : (customVulkanOverlayReady ? "vortek-custom-full" : "vortek-custom-host");
+            setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", vortekRuntimeSource);
+            setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", vortekIcdFile == null ? "" : vortekIcdFile.getAbsolutePath());
+            setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", selectedVulkanApi);
+            setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
+            setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", selectedVulkanApi);
+            setOrClearEnv("AERO_VULKAN_VALIDATION_LAYER_MANIFEST", validationLayerManifest.isFile() ? validationLayerManifest.getAbsolutePath() : "");
+            setOrClearEnv("AERO_VULKAN_API_SELECTED", selectedVulkanApi);
+            setOrClearEnv("WRAPPER_VK_VERSION", "");
+            setOrClearEnv("AERO_MEDIATEK_WRAPPER_MODE", routingMode);
+            setOrClearEnv("AERO_VORTEK_VULKAN_SOURCE", buildVortekRuntimeSource(activeVulkanDriverInfo));
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_ENTRY_REQUESTED", requestedVulkanDriverEntry);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_ENTRY", activeVulkanDriverEntry);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_NAME", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.name);
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_VERSION", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.version);
+            applyGraphicsDriverMetadataEnv(
+                    "AERO_VORTEK_VULKAN",
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.providerLane,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.driverKind,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.transport,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.supportClass,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.kernelEvidenceClass,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.transportRequirements,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.ownerLane,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.routeId,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.rankedKernelDonors,
+                    activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.diagnosticKeys,
+                    activeVulkanDriverInfo != null && activeVulkanDriverInfo.requiresRenderNode
+            );
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_SOURCE_REPO", activeVulkanDriverInfo == null ? "" : activeVulkanDriverInfo.sourceRepo);
+            setOrClearEnv("AERO_VORTEK_VULKAN_LIBRARY_PATH", hostVulkanLibraryPath);
+            setOrClearEnv("AERO_VORTEK_VULKAN_CONTAINER_SOURCE", customVulkanOverlayReady
+                    ? (activeAeMaliPanvkOverlay ? "aemali-panvk-overlay" : "custom-overlay")
+                    : "bundled-vortek");
+            setOrClearEnv(
+                    "AERO_VORTEK_VULKAN_CONTAINER_LIBRARY",
+                    customVulkanOverlayReady && !trimToEmpty(rootVulkanLibraryPath).isEmpty()
+                            ? new File(rootDir, rootVulkanLibraryPath).getAbsolutePath()
+                            : new File(rootDir, firstNonEmpty(trimToEmpty(vortekState.rootLibraryPath), "usr/lib/libvulkan_vortek.so")).getAbsolutePath()
+            );
+            setOrClearEnv("AERO_VORTEK_VULKAN_RENDER_NODE_AVAILABLE", renderNodeAvailable ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_VULKAN_DRIVER_EXPERIMENTAL", activeVulkanDriverInfo != null && activeVulkanDriverInfo.experimental ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_MALI_NATIVE_VULKAN", VortekExtensionPolicy.isMaliProfile(extensionProfile) ? "1" : "");
+            setOrClearEnv("AERO_VORTEK_EXTENSION_PROFILE", extensionProfile);
+            setOrClearEnv("AERO_VORTEK_EXPOSED_EXTENSIONS", exposedExtensions);
+            setOrClearEnv("AERO_VORTEK_DISABLED_EXTENSIONS", disabledExtensions);
+            applyAeMaliPolicyEnv(activeVulkanDriverInfo, extensionProfile, selectedVulkanApi, renderNodeAvailable);
+
+            if (useVortekPrimary) {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", "vortek-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", "vortek-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", "vortek-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", vortekState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", vortekState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", gladioState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", gladioState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", "1");
+            } else {
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_ROUTE", "gladio-primary");
+                setOrClearEnv("AERO_DXVK_ROUTE_MODE", "gladio-first");
+                setOrClearEnv("AERO_VKD3D_ROUTE_MODE", "gladio-first");
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", gladioState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", gladioState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", gladioState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", vortekState.packageLabel);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", vortekState.version);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_REQUIRED_LANE", vortekState.providerLane);
+                setOrClearEnv("AERO_GRAPHICS_COMPANION_READY", "1");
+            }
+
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED", routeDegradedReason.isEmpty() ? "" : "1");
+            setOrClearEnv("AERO_GRAPHICS_ROUTE_DEGRADED_REASON", routeDegradedReason);
+        }
 
         ForensicLogger.logEvent(
                 this,
@@ -4841,7 +9071,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "graphics_route_applied",
                 ForensicLogger.fields(
                         "graphics_driver", graphicsDriver,
-                        "driver_id", adrenoToolsDriverId,
+                        "legacy_requested_driver", envVars.get("AERO_GRAPHICS_LEGACY_REQUESTED_DRIVER"),
+                        "legacy_policy", envVars.get("AERO_GRAPHICS_LEGACY_POLICY"),
+                        "route_degraded_reason", envVars.get("AERO_GRAPHICS_ROUTE_DEGRADED_REASON"),
+                        "driver_id", forensicDriverId,
                         "dxwrapper_active", envVars.get("AERO_DXWRAPPER_ACTIVE"),
                         "dri3_mode", envVars.get("AERO_DRI3_MODE"),
                         "dri3_enabled", envVars.get("AERO_DRI3_ENABLED"),
@@ -4854,15 +9087,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "companion_provider_lane", envVars.get("AERO_GRAPHICS_COMPANION_PROVIDER_LANE"),
                         "opengl_overlay_active", envVars.get("AERO_OPENGL_OVERLAY_ACTIVE"),
                         "vulkan_api_selected", envVars.get("AERO_VULKAN_API_SELECTED"),
-                        "vulkan_sdk_profiles", envVars.get("AERO_VULKAN_SDK_PROFILE"),
-                        "vulkan_sdk_profile_count", envVars.get("AERO_VULKAN_SDK_PROFILE_COUNT"),
-                        "vulkan_sdk_arch_coverage", envVars.get("AERO_VULKAN_SDK_ARCH_COVERAGE"),
-                        "vulkan_sdk_layout", envVars.get("AERO_VULKAN_SDK_LAYOUT"),
+                        "vulkan_runtime_source", envVars.get("AERO_VULKAN_RUNTIME_SOURCE"),
+                        "vulkan_wrapper_icd", envVars.get("AERO_VULKAN_WRAPPER_ICD"),
+                        "vulkan_wrapper_api_max", envVars.get("AERO_VULKAN_WRAPPER_API_MAX"),
                         "wrapper_vk_version", envVars.get("WRAPPER_VK_VERSION")
                 )
         );
 
-        applyUpscalerEnvVars(dxvkRoute, socClass);
+        applyUpscalerEnvVars(vulkanPrimaryRoute, socClass);
     }
 
     @Override
@@ -4928,45 +9160,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final String[] dlls = {"d3d10.dll", "d3d10_1.dll", "d3d10core.dll", "d3d11.dll", "d3d12.dll", "d3d12core.dll", "d3d8.dll", "d3d9.dll", "dxgi.dll", "ddraw.dll", "d3dimm.dll"};
 
         File rootDir = imageFs.getRootDir();
-        File windowsDir = new File(rootDir, ImageFs.WINEPREFIX + "/drive_c/windows");
+        File windowsDir = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "drive_c/windows");
         cleanupDgVoodooRuntimeStage(rootDir);
 
         if (dxwrapper.contains("dxvk")) {
             Log.d(TAG, "Extracting DXVK wrapper files, version: " + dxwrapper);
+            String dxvkWrapper = resolveConfiguredDxvkWrapper(dxwrapperConfig);
+            String vkd3dWrapper = resolveConfiguredVkd3dWrapper(dxwrapperConfig);
+            boolean dxvkReady = stageDxvkCompanionPayload(dxvkWrapper, windowsDir);
+            boolean vkd3dReady = !"None".equalsIgnoreCase(vkd3dWrapper)
+                    && stageVkd3dCompanionPayload(vkd3dWrapper, windowsDir);
 
-            String[] wrapperParts = dxwrapper.split(";");
-            String dxvkWrapper = wrapperParts.length > 0 ? wrapperParts[0] : "";
-            String vkd3dWrapper = wrapperParts.length > 1 ? wrapperParts[1] : "vkd3d-None";
-            ContentProfile dxvkProfile = contentsManager.getProfileByEntryName(dxvkWrapper);
-            if (dxvkProfile != null) {
-                Log.d(TAG, "Applying user-defined DXVK content profile: " + dxvkWrapper);
-                contentsManager.applyContent(dxvkProfile);
-            } else {
-                Log.d(TAG, "Extracting fallback DXVK .tzst archive: " + dxvkWrapper);
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/" + dxvkWrapper + ".tzst", windowsDir, onExtractFileListener);
-
-                if (compareVersion(dxvkWrapper, "2.4") < 0) {
-                    Log.d(TAG, "Extracting d8vk as part of DXVK version " + dxvkWrapper);
-                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/d8vk-" + DefaultVersion.D8VK + ".tzst", windowsDir, onExtractFileListener);
-                }
-            }
-
-            if (vkd3dWrapper.contains("None")) {
+            if ("None".equalsIgnoreCase(vkd3dWrapper) || !vkd3dReady) {
                 Log.d(TAG, "No VKD3D has been selected, restoring original d3d12");
                 restoreOriginalDllFiles(new String[]{"d3d12.dll", "d3d12core.dll"});
             }
-            else {
-                ContentProfile vkd3dProfile = contentsManager.getProfileByEntryName(vkd3dWrapper);
-                if (vkd3dProfile != null) {
-                    Log.d(TAG, "Applying user-defined VKD3D content profile: " + vkd3dWrapper);
-                    contentsManager.applyContent(vkd3dProfile);
-                } else {
-                    Log.d(TAG, "Extracting fallback VKD3D .tzst archive: " + vkd3dWrapper);
-                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/" + vkd3dWrapper + ".tzst", windowsDir, onExtractFileListener);
-                }
-            }
 
-            // Legacy DDraw wrapper payloads are deprecated in DXVK lane.
+            // Older DDraw wrapper payloads are superseded in the DXVK lane.
             // DDraw/D3D1-7/Glide routing is handled by dedicated dgVoodoo lanes when selected.
             restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
 
@@ -4981,41 +9191,110 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     ForensicLogger.fields(
                             "dxwrapper", dxwrapper,
                             "dxvk_wrapper", dxvkWrapper,
-                            "vkd3d_wrapper", vkd3dWrapper
+                            "dxvk_ready", dxvkReady ? "1" : "0",
+                            "vkd3d_wrapper", vkd3dWrapper,
+                            "vkd3d_ready", vkd3dReady ? "1" : "0"
                     )
             );
         } else if (dxwrapper.contains("dgvoodoo")) {
-            Log.d(TAG, "Staging dgVoodoo runtime for legacy API route.");
+            Log.d(TAG, "Staging dgVoodoo runtime for older API route.");
             restoreOriginalDllFiles(dlls);
 
             DgVoodooManager manager = new DgVoodooManager(this);
             String shortcutPath = shortcut != null ? shortcut.path : "";
             KeyValueSet config = DgVoodooConfigDialog.parseConfig(dxwrapperConfig);
-            File stageTarget = manager.resolveShortcutTargetDir(rootDir, shortcutPath);
+            WineUtils.WindowsLaunchTarget shortcutLaunchTarget = resolveEffectiveShortcutLaunchTarget();
+            if (shortcutLaunchTarget == null) {
+                shortcutLaunchTarget = resolveShortcutLaunchTarget(rootDir);
+            }
+            File stageTarget = manager.resolveShortcutTargetDir(shortcutLaunchTarget);
             if (stageTarget == null || !stageTarget.isDirectory()) {
                 stageTarget = new File(windowsDir, "system32");
             }
 
-            String activeArch = manager.resolvePreferredArch(shortcutPath, config.get("dgvoodooArch"));
+            String activeArch = manager.resolvePreferredArch(shortcutLaunchTarget, config.get("dgvoodooArch"), wineInfo);
+            String packageLane = DgVoodooManager.resolvePackageLaneForRuntimeArch(activeArch);
             boolean staged = manager.stageRuntime(stageTarget, activeArch);
+            boolean dgVoodooVulkanBridge = supportsDgVoodooVulkanBridge(graphicsDriver);
+            String dxvkWrapper = DgVoodooConfigDialog.resolveCompanionDxvkVersion(
+                    config,
+                    activeArch,
+                    dgVoodooVulkanBridge,
+                    contentsManager.getInstalledVersionNames(ContentProfile.ContentType.CONTENT_TYPE_DXVK, true)
+            );
+            String vkd3dWrapper = DgVoodooConfigDialog.resolveCompanionVkd3dVersion(config, dgVoodooVulkanBridge);
+            boolean forceD3d11 = DgVoodooConfigDialog.resolveCompanionForceD3d11(config, dgVoodooVulkanBridge);
+            boolean dxvkReady = false;
+            boolean vkd3dReady = false;
+            String routeState = staged ? "dgvoodoo" : "wined3d-fallback";
+            String degradeReason = staged ? "" : "missing_package_lane:" + packageLane;
+            String outputApi = "";
+
+            if (staged && dgVoodooVulkanBridge) {
+                dxvkReady = stageDxvkCompanionPayload(dxvkWrapper, windowsDir);
+                if (!dxvkReady) {
+                    routeState = "wined3d-fallback";
+                    degradeReason = "missing_dxvk:" + dxvkWrapper;
+                } else {
+                    if (!forceD3d11 && !"None".equalsIgnoreCase(vkd3dWrapper)) {
+                        vkd3dReady = stageVkd3dCompanionPayload(vkd3dWrapper, windowsDir);
+                        if (!vkd3dReady) {
+                            routeState = "wined3d-fallback";
+                            degradeReason = "missing_vkd3d:" + vkd3dWrapper;
+                        }
+                    }
+
+                    if (degradeReason.isEmpty()) {
+                        outputApi = resolveDgVoodooOutputApi(forceD3d11, dxvkReady, vkd3dReady);
+                        if (outputApi.isEmpty() || !writeDgVoodooRuntimeConfig(stageTarget, outputApi)) {
+                            routeState = "wined3d-fallback";
+                            degradeReason = "dgvoodoo_config_write_failed";
+                        } else {
+                            routeState = vkd3dReady && !forceD3d11 ? "dgvoodoo+dxvk+vkd3d" : "dgvoodoo+dxvk";
+                            envVars.put("AERO_DXWRAPPER_ACTIVE", routeState);
+                        }
+                    }
+                }
+            } else if (staged && !dgVoodooVulkanBridge) {
+                routeState = "wined3d-fallback";
+                degradeReason = "graphics_driver_no_vulkan_bridge:" + Container.normalizeGraphicsDriver(graphicsDriver);
+            }
+
             envVars.put("AERO_DGVOODOO_STAGE_TARGET", stageTarget.getAbsolutePath());
             envVars.put("AERO_DGVOODOO_ARCH_ACTIVE", activeArch);
+            envVars.put("AERO_DGVOODOO_PACKAGE_LANE", packageLane);
             envVars.put("AERO_DGVOODOO_STAGE_READY", staged ? "1" : "0");
-            if (!staged) {
-                Log.w(TAG, "dgVoodoo runtime stage failed for target " + stageTarget.getAbsolutePath());
+            envVars.put("AERO_DGVOODOO_DXVK_WRAPPER", dxvkWrapper);
+            envVars.put("AERO_DGVOODOO_VKD3D_WRAPPER", vkd3dWrapper);
+            envVars.put("AERO_DGVOODOO_ROUTE_STATE", routeState);
+            envVars.put("AERO_DGVOODOO_OUTPUT_API", outputApi);
+            envVars.put("AERO_DGVOODOO_DEGRADE_REASON", degradeReason);
+            if (!staged || !degradeReason.isEmpty()) {
+                WineD3DConfigDialog.setEnvVars(this, config, envVars);
+                envVars.put("AERO_DXWRAPPER_ACTIVE", "wined3d");
+                Log.w(TAG, "dgVoodoo runtime stage failed for target " + stageTarget.getAbsolutePath()
+                        + " (required lane: " + packageLane + ", arch: " + activeArch + ", degradeReason=" + degradeReason + ")");
             }
             ForensicLogger.logEvent(
                     this,
-                    staged ? "info" : "warn",
+                    staged && degradeReason.isEmpty() ? "info" : "warn",
                     "DXWRAPPER_RUNTIME_STAGE_READY",
                     null,
                     "dxwrapper",
-                    staged ? "dgvoodoo_runtime_stage_ready" : "dgvoodoo_runtime_stage_failed",
+                    staged && degradeReason.isEmpty() ? "dgvoodoo_runtime_stage_ready" : "dgvoodoo_runtime_stage_failed",
                     ForensicLogger.fields(
                             "dxwrapper", dxwrapper,
                             "stage_target", stageTarget.getAbsolutePath(),
+                            "package_lane", packageLane,
                             "arch_active", activeArch,
-                            "stage_ready", staged ? "1" : "0"
+                            "stage_ready", staged ? "1" : "0",
+                            "route_state", routeState,
+                            "dxvk_wrapper", dxvkWrapper,
+                            "dxvk_ready", dxvkReady ? "1" : "0",
+                            "vkd3d_wrapper", vkd3dWrapper,
+                            "vkd3d_ready", vkd3dReady ? "1" : "0",
+                            "output_api", outputApi,
+                            "degrade_reason", degradeReason
                     )
             );
         } else if (dxwrapper.contains("wined3d")) {
@@ -5033,11 +9312,296 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private String resolveConfiguredDxvkWrapper(KeyValueSet config) {
+        return sanitizeConfiguredWrapperVersion(config.get("version"), DefaultVersion.DXVK);
+    }
+
+    private String resolveConfiguredDxvkWrapper(String config) {
+        return resolveConfiguredDxvkWrapper(DXVKConfigDialog.parseConfig(config));
+    }
+
+    private String resolveConfiguredVkd3dWrapper(KeyValueSet config) {
+        return sanitizeConfiguredWrapperVersion(config.get("vkd3dVersion"), "None");
+    }
+
+    private String resolveConfiguredVkd3dWrapper(String config) {
+        return resolveConfiguredVkd3dWrapper(DXVKConfigDialog.parseConfig(config));
+    }
+
+    private String sanitizeConfiguredWrapperVersion(String value, String fallback) {
+        if (AppUtils.isMissingComponentValue(value)) return fallback;
+        if (value == null || value.trim().isEmpty()) return fallback;
+        return value.trim();
+    }
+
+    private boolean stageDxvkCompanionPayload(String dxvkWrapper, File windowsDir) {
+        if (dxvkWrapper == null || dxvkWrapper.trim().isEmpty()) return false;
+        ContentProfile dxvkProfile = contentsManager.findInstalledProfileByVersion(
+                ContentProfile.ContentType.CONTENT_TYPE_DXVK,
+                dxvkWrapper,
+                true
+        );
+        if (dxvkProfile != null) {
+            Log.d(TAG, "Applying user-defined DXVK content profile: " + dxvkWrapper);
+            contentsManager.applyContent(dxvkProfile);
+            return true;
+        }
+
+        Log.d(TAG, "Extracting secondary DXVK .tzst archive: " + dxvkWrapper);
+        boolean extracted = TarCompressorUtils.extract(
+                TarCompressorUtils.Type.ZSTD,
+                this,
+                "dxwrapper/dxvk-" + dxvkWrapper + ".tzst",
+                windowsDir,
+                onExtractFileListener
+        );
+        if (!extracted) return false;
+
+        if (compareVersion(dxvkWrapper, "2.4") < 0) {
+            Log.d(TAG, "Extracting d8vk as part of DXVK version " + dxvkWrapper);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/d8vk-" + DefaultVersion.D8VK + ".tzst", windowsDir, onExtractFileListener);
+        }
+        return true;
+    }
+
+    private boolean stageVkd3dCompanionPayload(String vkd3dWrapper, File windowsDir) {
+        if (vkd3dWrapper == null || vkd3dWrapper.trim().isEmpty() || "None".equalsIgnoreCase(vkd3dWrapper)) {
+            return false;
+        }
+        ContentProfile vkd3dProfile = contentsManager.findInstalledProfileByVersion(
+                ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
+                vkd3dWrapper,
+                true
+        );
+        if (vkd3dProfile != null) {
+            Log.d(TAG, "Applying user-defined VKD3D content profile: " + vkd3dWrapper);
+            contentsManager.applyContent(vkd3dProfile);
+            return true;
+        }
+
+        Log.d(TAG, "Extracting secondary VKD3D .tzst archive: " + vkd3dWrapper);
+        return TarCompressorUtils.extract(
+                TarCompressorUtils.Type.ZSTD,
+                this,
+                "dxwrapper/vkd3d-" + vkd3dWrapper + ".tzst",
+                windowsDir,
+                onExtractFileListener
+        );
+    }
+
+    private String resolveDgVoodooOutputApi(boolean forceD3d11, boolean dxvkReady, boolean vkd3dReady) {
+        if (!dxvkReady) return "";
+        if (forceD3d11 || !vkd3dReady) return "d3d11_fl11_0";
+        return "bestavailable";
+    }
+
+    private boolean writeDgVoodooRuntimeConfig(File targetDir, String outputApi) {
+        if (targetDir == null || !targetDir.isDirectory() || outputApi == null || outputApi.trim().isEmpty()) {
+            return false;
+        }
+        File configFile = new File(targetDir, "dgVoodoo.conf");
+        String current = configFile.isFile() ? FileUtils.readString(configFile) : "";
+        String updated = upsertIniKey(current == null ? "" : current, "General", "OutputAPI", outputApi);
+        return FileUtils.writeString(configFile, updated);
+    }
+
+    private String upsertIniKey(String source, String section, String key, String value) {
+        String[] lines = source.isEmpty() ? new String[0] : source.split("\\r?\\n", -1);
+        StringBuilder builder = new StringBuilder();
+        boolean inSection = false;
+        boolean sectionFound = false;
+        boolean keyWritten = false;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            boolean sectionLine = trimmed.startsWith("[") && trimmed.endsWith("]");
+            if (sectionLine) {
+                if (inSection && !keyWritten) {
+                    builder.append(key).append(" = ").append(value).append('\n');
+                    keyWritten = true;
+                }
+                inSection = trimmed.equalsIgnoreCase("[" + section + "]");
+                if (inSection) sectionFound = true;
+                builder.append(line).append('\n');
+                continue;
+            }
+
+            if (inSection && isIniKeyLine(trimmed, key)) {
+                builder.append(key).append(" = ").append(value).append('\n');
+                keyWritten = true;
+                continue;
+            }
+
+            builder.append(line).append('\n');
+        }
+
+        if (!sectionFound) {
+            if (builder.length() > 0 && builder.charAt(builder.length() - 1) != '\n') builder.append('\n');
+            builder.append("[")
+                    .append(section)
+                    .append("]")
+                    .append('\n')
+                    .append(key)
+                    .append(" = ")
+                    .append(value)
+                    .append('\n');
+        } else if (!keyWritten) {
+            builder.append(key).append(" = ").append(value).append('\n');
+        }
+
+        return builder.toString();
+    }
+
+    private boolean isIniKeyLine(String trimmed, String key) {
+        if (trimmed.isEmpty() || trimmed.startsWith(";") || trimmed.startsWith("#")) return false;
+        int delimiter = trimmed.indexOf('=');
+        if (delimiter < 0) delimiter = trimmed.indexOf(':');
+        if (delimiter < 0) return false;
+        String currentKey = trimmed.substring(0, delimiter).trim();
+        return currentKey.equalsIgnoreCase(key);
+    }
+
+    private void applyWrapperGraphicsConfigEnv(
+            File rootDir,
+            String adrenoToolsDriverId,
+            boolean useDRI3,
+            boolean dri3ForceSwWsi,
+            boolean dri3PresentWait
+    ) {
+        String requestedVulkanApi = normalizeRequestedVulkanApi(graphicsDriverConfig.get("vulkanVersion"));
+        purgeLegacyVulkanRuntimeResidue(rootDir);
+        File wrapperIcdFile = resolveWrapperIcdFile();
+        int wrapperApiMinor = resolveWrapperIcdApiMinor(wrapperIcdFile);
+        boolean wrapperIcdAvailable = wrapperIcdFile != null && wrapperIcdFile.isFile();
+        File validationLayerManifest = new File(imageFs.getShareDir(), "vulkan/explicit_layer.d/VkLayer_khronos_validation.json");
+        setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", wrapperIcdAvailable ? "wrapper-embedded" : "wrapper-missing");
+        setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", wrapperIcdAvailable ? wrapperIcdFile.getAbsolutePath() : "");
+        setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", wrapperApiMinor > 0 ? "1." + wrapperApiMinor : "");
+        setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
+        setOrClearEnv("AERO_VULKAN_API_MAX_AVAILABLE", wrapperApiMinor > 0 ? "1." + wrapperApiMinor : "");
+        setOrClearEnv("AERO_VULKAN_VALIDATION_LAYER_MANIFEST", validationLayerManifest.isFile() ? validationLayerManifest.getAbsolutePath() : "");
+        envVars.put("AERO_VULKAN_API_SELECTED", requestedVulkanApi);
+        envVars.put("WRAPPER_VK_VERSION", requestedVulkanApi + "." + resolveDriverVulkanPatch(adrenoToolsDriverId));
+
+        String blacklistedExtensions = graphicsDriverConfig.get("blacklistedExtensions");
+        envVars.put("WRAPPER_EXTENSION_BLACKLIST", blacklistedExtensions);
+
+        String gpuName = graphicsDriverConfig.get("gpuName");
+        if (!gpuName.equals("Device")) {
+            envVars.put("WRAPPER_DEVICE_NAME", gpuName);
+            envVars.put("WRAPPER_DEVICE_ID", WineD3DConfigDialog.getDeviceIdFromGPUName(this, gpuName));
+            envVars.put("WRAPPER_VENDOR_ID", WineD3DConfigDialog.getVendorIdFromGPUName(this, gpuName));
+        }
+
+        String maxDeviceMemory = graphicsDriverConfig.get("maxDeviceMemory");
+        if (maxDeviceMemory != null && Integer.parseInt(maxDeviceMemory) > 0) {
+            envVars.put("WRAPPER_VMEM_MAX_SIZE", maxDeviceMemory);
+        }
+
+        String presentMode = graphicsDriverConfig.get("presentMode");
+        if (presentMode.contains("immediate")) {
+            envVars.put("WRAPPER_MAX_IMAGE_COUNT", "1");
+        }
+        envVars.put("MESA_VK_WSI_PRESENT_MODE", presentMode);
+
+        String resourceType = graphicsDriverConfig.get("resourceType");
+        envVars.put("WRAPPER_RESOURCE_TYPE", resourceType);
+
+        String syncFrame = graphicsDriverConfig.get("syncFrame");
+        if (syncFrame.equals("1") && !dri3ForceSwWsi && useDRI3) {
+            envVars.put("MESA_VK_WSI_DEBUG", "forcesync");
+        }
+
+        String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
+        if (!dri3PresentWait) disablePresentWait = "1";
+        envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
+
+        String bcnEmulation = graphicsDriverConfig.get("bcnEmulation");
+        String bcnEmulationType = graphicsDriverConfig.get("bcnEmulationType");
+
+        switch (bcnEmulation) {
+            case "auto" -> {
+                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
+                    envVars.put("ENABLE_BCN_COMPUTE", "1");
+                    envVars.put("BCN_COMPUTE_AUTO", "1");
+                }
+                envVars.put("WRAPPER_EMULATE_BCN", "3");
+            }
+            case "full" -> {
+                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
+                    envVars.put("ENABLE_BCN_COMPUTE", "1");
+                    envVars.put("BCN_COMPUTE_AUTO", "0");
+                }
+                envVars.put("WRAPPER_EMULATE_BCN", "2");
+            }
+            case "none" -> envVars.put("WRAPPER_EMULATE_BCN", "0");
+            default -> envVars.put("WRAPPER_EMULATE_BCN", "1");
+        }
+
+        String bcnEmulationCache = graphicsDriverConfig.get("bcnEmulationCache");
+        envVars.put("WRAPPER_USE_BCN_CACHE", bcnEmulationCache);
+
+        String wrapperGalliumDriver = GraphicsDrivers.getWrapperGalliumDriver(graphicsDriverConfig.get("galliumDriver"));
+        envVars.put("GALLIUM_DRIVER", wrapperGalliumDriver);
+        setOrClearEnv("AERO_OPENGL_GALLIUM_DRIVER", wrapperGalliumDriver);
+        setOrClearEnv("AERO_WRAPPER_OPENGL_DRIVER", wrapperGalliumDriver);
+
+        boolean zinkOpenGlRoute = GraphicsDrivers.isWrapperZinkOpenGlDriver(wrapperGalliumDriver);
+        String mesaExtensionOverride = "";
+        if (zinkOpenGlRoute) {
+            ArrayList<String> disabledExtensions = new ArrayList<>();
+            if (isEnabledConfigValue(graphicsDriverConfig.get("disableGLKHRDebug"), true)) {
+                disabledExtensions.add("GL_KHR_debug");
+            }
+            if (isEnabledConfigValue(graphicsDriverConfig.get("disableVertexArrayBGRA"), true)) {
+                disabledExtensions.add("GL_EXT_vertex_array_bgra");
+            }
+            for (String disabledExtension : disabledExtensions) {
+                mesaExtensionOverride += (mesaExtensionOverride.isEmpty() ? "" : " ") + "-" + disabledExtension;
+            }
+        }
+        setOrClearEnv("MESA_EXTENSION_OVERRIDE", mesaExtensionOverride);
+        setOrClearEnv(
+                "MESA_GL_VERSION_OVERRIDE",
+                zinkOpenGlRoute
+                        ? GraphicsDrivers.normalizeWrapperGlVersion(graphicsDriverConfig.get("glVersion"), wrapperGalliumDriver)
+                        : ""
+        );
+    }
+
+    private boolean isEnabledConfigValue(@Nullable String value, boolean fallback) {
+        String normalized = trimToEmpty(value).toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return fallback;
+        if ("1".equals(normalized) || "true".equals(normalized) || "t".equals(normalized)) return true;
+        if ("0".equals(normalized) || "false".equals(normalized) || "f".equals(normalized)) return false;
+        return fallback;
+    }
+
     private void cleanupDgVoodooRuntimeStage(File rootDir) {
         if (rootDir == null || shortcut == null) return;
         DgVoodooManager manager = new DgVoodooManager(this);
-        File stageTarget = manager.resolveShortcutTargetDir(rootDir, shortcut.path);
+        WineUtils.WindowsLaunchTarget launchTarget = resolveEffectiveShortcutLaunchTarget();
+        if (launchTarget == null) launchTarget = resolveShortcutLaunchTarget(rootDir);
+        File stageTarget = manager.resolveShortcutTargetDir(launchTarget);
         if (stageTarget != null) manager.cleanupStagedRuntime(stageTarget);
+    }
+
+    private String normalizeAdrenoGalliumDriver(String requestedDriver, String fallbackDriver) {
+        String normalized = trimToEmpty(requestedDriver).toLowerCase(Locale.US);
+        if ("freedreno".equals(normalized) || "zink".equals(normalized)) return normalized;
+        return trimToEmpty(fallbackDriver).isEmpty() ? "zink" : fallbackDriver;
+    }
+
+    private String normalizeMaliGalliumDriver(String requestedDriver, String fallbackDriver) {
+        String normalized = trimToEmpty(requestedDriver).toLowerCase(Locale.US);
+        if ("panfrost".equals(normalized)
+                || "lima".equals(normalized)
+                || "zink".equals(normalized)
+                || "softpipe".equals(normalized)) {
+            return normalized;
+        }
+        String fallback = trimToEmpty(fallbackDriver).toLowerCase(Locale.US);
+        return fallback.isEmpty() ? "panfrost" : fallback;
     }
 
     private static int compareVersion(String varA, String varB) {
@@ -5086,8 +9650,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void extractWinComponentFiles() {
         Log.d("XServerDisplayActivity", "Extracting WinComponents");
         File rootDir = imageFs.getRootDir();
-        File windowsDir = new File(rootDir, ImageFs.WINEPREFIX+"/drive_c/windows");
-        File systemRegFile = new File(rootDir, ImageFs.WINEPREFIX+"/system.reg");
+        File prefixDir = WineUtils.resolveHostWinePrefixDir(rootDir);
+        File windowsDir = new File(prefixDir, "drive_c/windows");
+        File systemRegFile = new File(prefixDir, "system.reg");
 
         try {
             JSONObject wincomponentsJSONObject = new JSONObject(FileUtils.readString(this, "wincomponents/wincomponents.json"));
@@ -5118,21 +9683,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             if (!dlls.isEmpty()) restoreOriginalDllFiles(dlls.toArray(new String[0]));
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.w("XServerDisplayActivity", "Failed to restore original DLL files from wincomponent config", e);
+        }
     }
 
     private void restoreOriginalDllFiles(final String... dlls) {
         File rootDir = imageFs.getRootDir();
-        File windowsDir = new File(rootDir, ImageFs.WINEPREFIX+"/drive_c/windows");
-        File system32dlls = null;
-        File syswow64dlls = null;
-
-        if (wineInfo.isArm64EC())
-            system32dlls = new File(imageFs.getWinePath() + "/lib/wine/aarch64-windows");
-        else
-            system32dlls = new File(imageFs.getWinePath() + "/lib/wine/x86_64-windows");
-
-        syswow64dlls = new File(imageFs.getWinePath() + "/lib/wine/i386-windows");
+        File windowsDir = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "drive_c/windows");
+        File runtimeWineLibDir = WineUtils.resolveRuntimeWineLibDir(new File(imageFs.getWinePath()));
+        if (runtimeWineLibDir == null) return;
+        File system32dlls = wineInfo.isArm64EC()
+                ? new File(runtimeWineLibDir, "aarch64-windows")
+                : new File(runtimeWineLibDir, "x86_64-windows");
+        File syswow64dlls = new File(runtimeWineLibDir, "i386-windows");
 
 
         for (String dll : dlls) {
@@ -5145,6 +9709,298 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
    }
 
+    @Nullable
+    private WineUtils.WindowsLaunchTarget resolveEffectiveShortcutLaunchTarget() {
+        if (shortcut == null) return null;
+
+        File rootDir = imageFs != null ? imageFs.getRootDir() : null;
+        if (rootDir == null) return resolveShortcutLaunchTarget(null);
+        if (effectiveShortcutLaunchTarget != null) return effectiveShortcutLaunchTarget;
+
+        WineUtils.WindowsLaunchTarget launchTarget = resolveShortcutLaunchTarget(rootDir);
+        effectiveShortcutLaunchTarget = resolveNoexecMirroredLaunchTarget(rootDir, launchTarget);
+        return effectiveShortcutLaunchTarget;
+    }
+
+    @NonNull
+    private WineUtils.WindowsLaunchTarget resolveShortcutLaunchTarget(@Nullable File rootDir) {
+        return WineUtils.resolveWindowsLaunchTarget(rootDir, resolveShortcutCommandSpec());
+    }
+
+    @NonNull
+    private String resolveShortcutCommandSpec() {
+        if (shortcut == null) return "";
+        if (shortcut.file != null && shortcut.file.isFile()) {
+            for (String line : FileUtils.readLines(shortcut.file)) {
+                if (line == null) continue;
+                String trimmed = line.trim();
+                if (!trimmed.startsWith("Exec=")) continue;
+                String execPayload = WineUtils.extractWineExecPayload(trimmed.substring(5));
+                if (!execPayload.isEmpty()) return execPayload;
+            }
+        }
+        return shortcut.path == null ? "" : shortcut.path;
+    }
+
+    @NonNull
+    private WineUtils.WindowsLaunchTarget resolveNoexecMirroredLaunchTarget(
+            @Nullable File rootDir,
+            @NonNull WineUtils.WindowsLaunchTarget launchTarget
+    ) {
+        if (rootDir == null
+                || !launchTarget.hasCommandPath()
+                || launchTarget.isShortcutLink()
+                || launchTarget.hostTargetDir == null
+                || launchTarget.hostTargetFile == null) {
+            return launchTarget;
+        }
+        if (!shouldMirrorNoexecLaunchTarget(rootDir, launchTarget.hostTargetDir)) return launchTarget;
+
+        File mirrorDir = materializeNoexecLaunchMirror(rootDir, launchTarget.hostTargetDir, launchTarget.hostTargetFile);
+        if (mirrorDir == null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "NOEXEC_LAUNCH_MIRROR_FAILED",
+                    null,
+                    "xserver",
+                    "noexec_launch_mirror_failed",
+                    ForensicLogger.fields(
+                            "source_host_dir", launchTarget.hostTargetDir.getAbsolutePath(),
+                            "source_host_file", launchTarget.hostTargetFile.getAbsolutePath()
+                    )
+            );
+            return launchTarget;
+        }
+
+        File mirroredTargetFile = new File(mirrorDir, launchTarget.hostTargetFile.getName());
+        if (!mirroredTargetFile.isFile()) return launchTarget;
+
+        WineUtils.WindowsLaunchTarget mirroredTarget =
+                WineUtils.remapWindowsLaunchTarget(rootDir, launchTarget, mirroredTargetFile);
+        if (mirroredTarget == null || !mirroredTarget.hasCommandPath()) return launchTarget;
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "NOEXEC_LAUNCH_MIRROR_APPLIED",
+                null,
+                "xserver",
+                "noexec_launch_mirror_applied",
+                ForensicLogger.fields(
+                        "source_host_dir", launchTarget.hostTargetDir.getAbsolutePath(),
+                        "mirror_host_dir", mirrorDir.getAbsolutePath(),
+                        "source_command_path", launchTarget.commandPath,
+                        "mirror_command_path", mirroredTarget.commandPath
+                )
+        );
+        return mirroredTarget;
+    }
+
+    private boolean shouldMirrorNoexecLaunchTarget(@Nullable File rootDir, @Nullable File hostTargetDir) {
+        String canonicalPath = canonicalPath(hostTargetDir);
+        if (canonicalPath.isEmpty()) return false;
+        if (isPathInside(canonicalPath, canonicalPath(rootDir))) return false;
+        if (isPathInside(canonicalPath, canonicalPath(getFilesDir()))) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                && isPathInside(canonicalPath, canonicalPath(getDataDir()))) {
+            return false;
+        }
+
+        MountInfo mountInfo = findBestMountInfo(canonicalPath);
+        if (mountInfo != null && mountInfo.hasOption("noexec")) return true;
+        return isKnownAndroidSharedStoragePath(canonicalPath);
+    }
+
+    @Nullable
+    private File materializeNoexecLaunchMirror(File rootDir, File sourceDir, File sourceFile) {
+        File driveCRoot = WineUtils.resolveHostWineDriveCRoot(rootDir);
+        File mirrorBaseDir = new File(driveCRoot, NOEXEC_LAUNCH_MIRROR_DIR);
+        if (!mirrorBaseDir.isDirectory() && !mirrorBaseDir.mkdirs()) return null;
+
+        File mirrorDir = new File(
+                mirrorBaseDir,
+                buildNoexecLaunchMirrorId(sourceDir) + "-" + sanitizeLaunchMirrorLeaf(sourceDir.getName())
+        );
+        if (isFreshNoexecLaunchMirror(mirrorDir, sourceDir, sourceFile)) return mirrorDir;
+
+        if (mirrorDir.exists() && !FileUtils.delete(mirrorDir)) return null;
+        if (!FileUtils.copy(sourceDir, mirrorDir)) return null;
+
+        File mirroredTargetFile = new File(mirrorDir, sourceFile.getName());
+        if (!mirroredTargetFile.isFile()) return null;
+
+        writeNoexecLaunchMirrorStamp(mirrorDir, sourceDir, sourceFile);
+        return mirrorDir;
+    }
+
+    private boolean isFreshNoexecLaunchMirror(File mirrorDir, File sourceDir, File sourceFile) {
+        if (!mirrorDir.isDirectory()) return false;
+        File mirroredTargetFile = new File(mirrorDir, sourceFile.getName());
+        if (!mirroredTargetFile.isFile()) return false;
+
+        File stampFile = new File(mirrorDir, NOEXEC_LAUNCH_MIRROR_STAMP);
+        if (!stampFile.isFile()) return false;
+
+        try {
+            String stampString = FileUtils.readString(stampFile);
+            if (stampString == null || stampString.trim().isEmpty()) return false;
+            JSONObject stamp = new JSONObject(stampString);
+            return canonicalPath(sourceDir).equals(stamp.optString("source_dir"))
+                    && sourceFile.getName().equals(stamp.optString("source_file"))
+                    && sourceFile.length() == stamp.optLong("source_file_size", -1L)
+                    && sourceFile.lastModified() == stamp.optLong("source_file_mtime", -1L);
+        } catch (JSONException e) {
+            return false;
+        }
+    }
+
+    private void writeNoexecLaunchMirrorStamp(File mirrorDir, File sourceDir, File sourceFile) {
+        try {
+            JSONObject stamp = new JSONObject();
+            stamp.put("source_dir", canonicalPath(sourceDir));
+            stamp.put("source_file", sourceFile.getName());
+            stamp.put("source_file_size", sourceFile.length());
+            stamp.put("source_file_mtime", sourceFile.lastModified());
+            FileUtils.writeString(new File(mirrorDir, NOEXEC_LAUNCH_MIRROR_STAMP), stamp.toString());
+        } catch (JSONException ignored) {
+        }
+    }
+
+    private String buildNoexecLaunchMirrorId(File sourceDir) {
+        String canonicalPath = canonicalPath(sourceDir);
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(canonicalPath.getBytes(StandardCharsets.UTF_8));
+            return hexPrefix(hash, 8);
+        } catch (NoSuchAlgorithmException e) {
+            return Integer.toHexString(canonicalPath.hashCode());
+        }
+    }
+
+    private String sanitizeLaunchMirrorLeaf(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) return "shortcut";
+        return normalized.replaceAll("[^A-Za-z0-9._-]+", "_");
+    }
+
+    private String hexPrefix(byte[] bytes, int byteCount) {
+        if (bytes == null || bytes.length == 0 || byteCount <= 0) return "mirror";
+        StringBuilder builder = new StringBuilder(byteCount * 2);
+        int limit = Math.min(bytes.length, byteCount);
+        for (int i = 0; i < limit; i++) {
+            builder.append(String.format(Locale.US, "%02x", bytes[i] & 0xff));
+        }
+        return builder.toString();
+    }
+
+    private String canonicalPath(@Nullable File file) {
+        if (file == null) return "";
+        try {
+            return file.getCanonicalPath();
+        } catch (IOException e) {
+            return file.getAbsolutePath();
+        }
+    }
+
+    private String canonicalLowerPath(@Nullable File file) {
+        return canonicalPath(file).toLowerCase(Locale.US);
+    }
+
+    private boolean isKnownAndroidSharedStoragePath(String path) {
+        String normalized = path == null ? "" : path.toLowerCase(Locale.US);
+        return isPathInside(normalized, "/storage/emulated")
+                || isPathInside(normalized, "/storage/self/primary")
+                || isPathInside(normalized, "/sdcard")
+                || isPathInside(normalized, "/mnt/sdcard")
+                || isPathInside(normalized, "/mnt/runtime/default/emulated")
+                || isPathInside(normalized, "/mnt/runtime/read/emulated")
+                || isPathInside(normalized, "/mnt/runtime/write/emulated")
+                || isPathInside(normalized, "/mnt/user/0/primary")
+                || isPathInside(normalized, "/mnt/media_rw");
+    }
+
+    private boolean isPathInside(String path, String root) {
+        if (path == null || root == null || path.isEmpty() || root.isEmpty()) return false;
+        String normalizedPath = stripTrailingSlashes(path);
+        String normalizedRoot = stripTrailingSlashes(root);
+        return normalizedPath.equals(normalizedRoot) || normalizedPath.startsWith(normalizedRoot + "/");
+    }
+
+    private String stripTrailingSlashes(String value) {
+        if (value == null) return "";
+        String normalized = value.trim();
+        while (normalized.length() > 1 && normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    @Nullable
+    private MountInfo findBestMountInfo(String path) {
+        if (path == null || path.isEmpty()) return null;
+        MountInfo best = null;
+        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/mounts"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] fields = line.split("\\s+");
+                if (fields.length < 4) continue;
+                String mountPoint = decodeMountToken(fields[1]);
+                if (mountPoint.isEmpty() || !isPathInside(path, mountPoint)) continue;
+                if (best == null || mountPoint.length() > best.mountPoint.length()) {
+                    best = new MountInfo(mountPoint, fields[3]);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return best;
+    }
+
+    private String decodeMountToken(String token) {
+        if (token == null || token.isEmpty()) return "";
+        return token
+                .replace("\\040", " ")
+                .replace("\\011", "\t")
+                .replace("\\012", "\n")
+                .replace("\\134", "\\");
+    }
+
+    private static final class MountInfo {
+        final String mountPoint;
+        final String options;
+
+        MountInfo(String mountPoint, String options) {
+            this.mountPoint = mountPoint == null ? "" : mountPoint;
+            this.options = options == null ? "" : options;
+        }
+
+        boolean hasOption(String option) {
+            if (option == null || option.isEmpty()) return false;
+            String[] parts = options.split(",");
+            for (String part : parts) {
+                if (option.equals(part)) return true;
+            }
+            return false;
+        }
+    }
+
+    private String buildGuestExecutable() {
+        if (shortcut == null && shouldUseDirectDesktopShellBootstrap()) {
+            desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER;
+            return buildDirectDesktopShellGuestExecutable(getOverrideEnvVars());
+        }
+        return "wine explorer /desktop=shell," + xServer.screenInfo + " " + getWineStartCommand();
+    }
+
+    private String buildDirectDesktopShellGuestExecutable(EnvVars envVars) {
+        String shellExecutable = buildDesktopShellStartArgs(envVars);
+        return "wine explorer /desktop=shell," + xServer.screenInfo + " " + shellExecutable;
+    }
+
+    private String buildDesktopShellWinHandlerFallbackExecutable() {
+        return "wine explorer /desktop=shell," + xServer.screenInfo + " winhandler.exe \"wfm.exe\"";
+    }
+
     private String getWineStartCommand() {
         // Initialize overrideEnvVars if not already done
         EnvVars envVars = getOverrideEnvVars();
@@ -5153,40 +10009,82 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String args = "";
 
         if (shortcut != null) {
-            String execArgs = shortcut.getExtra("execArgs");
-            execArgs = !execArgs.isEmpty() ? " " + execArgs : "";
+            WineUtils.WindowsLaunchTarget launchTarget = resolveEffectiveShortcutLaunchTarget();
+            if (launchTarget == null) launchTarget = resolveShortcutLaunchTarget(null);
+            String shortcutCommandPath = launchTarget.commandPath;
+            if (shortcutCommandPath.isEmpty()) shortcutCommandPath = shortcut.path;
+            String shortcutInlineArgs = launchTarget.commandArgs;
+            String combinedExecArgs = container != null ? container.getExecArgs() : "";
+            if (!shortcutInlineArgs.isEmpty()) {
+                combinedExecArgs = combinedExecArgs.isEmpty() ? shortcutInlineArgs : shortcutInlineArgs + " " + combinedExecArgs;
+            }
+            String shortcutExecArgs = shortcut.getExtra("execArgs");
+            if (!shortcutExecArgs.isEmpty()) {
+                combinedExecArgs = combinedExecArgs.isEmpty() ? shortcutExecArgs : combinedExecArgs + " " + shortcutExecArgs;
+            }
+            String execArgs = !combinedExecArgs.trim().isEmpty() ? " " + combinedExecArgs.trim() : "";
 
-            if (shortcut.path.endsWith(".lnk")) {
-                args += "\"" + shortcut.path + "\"" + execArgs;
+            if (launchTarget.isShortcutLink()) {
+                args += "\"" + shortcutCommandPath + "\"" + execArgs;
             } else {
-                String exeDir = FileUtils.getDirname(shortcut.path);
-                String filename = FileUtils.getName(shortcut.path);
-
-                int dotIndex = filename.lastIndexOf(".");
-                int spaceIndex = (dotIndex != -1) ? filename.indexOf(" ", dotIndex) : -1;
-
-                if (spaceIndex != -1) {
-                    execArgs = filename.substring(spaceIndex + 1) + execArgs;
-                    filename = filename.substring(0, spaceIndex);
-                }
+                String exeDir = launchTarget.workingDir;
+                String filename = launchTarget.getExecutableName();
+                if (filename.isEmpty()) filename = FileUtils.getName(shortcutCommandPath);
 
                 args += "/dir " + StringUtils.escapeDOSPath(exeDir) + " \"" + filename + "\"" + execArgs;
             }
         } else {
-            // Append EXTRA_EXEC_ARGS from overrideEnvVars if it exists
-            if (envVars.has("EXTRA_EXEC_ARGS")) {
-                args += " " + envVars.get("EXTRA_EXEC_ARGS");
-                envVars.remove("EXTRA_EXEC_ARGS"); // Remove the key after use
-            } else {
-                args += "\"" + resolveDesktopShellExecutable() + "\"";
+            args += buildDesktopShellStartArgs(envVars);
+            if (!desktopShellRequiresWinHandler()) {
+                return args;
             }
         }
         return "winhandler.exe " + args;
     }
 
+    private String buildDesktopShellStartArgs(EnvVars envVars) {
+        String shellExecutable = resolveDesktopShellExecutable();
+        desktopShellLaunchMode = shortcut == null && shouldUseDirectDesktopShellBootstrap()
+                ? DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER
+                : DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
+        if (envVars != null && envVars.has("EXTRA_EXEC_ARGS")) {
+            String staleExtraExecArgs = envVars.get("EXTRA_EXEC_ARGS");
+            envVars.remove("EXTRA_EXEC_ARGS");
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "DESKTOP_SHELL_EXTRA_EXEC_IGNORED",
+                    null,
+                    "xserver",
+                    "desktop_shell_extra_exec_ignored",
+                    ForensicLogger.fields(
+                            "requested_shell", staleExtraExecArgs == null ? "" : staleExtraExecArgs,
+                            "resolved_shell", shellExecutable
+                    )
+            );
+        }
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_SHELL_ROUTE_SELECTED",
+                null,
+                "xserver",
+                "desktop_shell_route_selected",
+                ForensicLogger.fields(
+                        "shell_executable", shellExecutable,
+                        "desktop_shell_launch_mode", desktopShellLaunchMode,
+                        "wfm_present", hasContainerShellExecutable("wfm.exe"),
+                        "explorer_present", hasContainerShellExecutable("explorer.exe"),
+                        "container_variant", container != null ? container.getContainerVariant() : "",
+                        "wine_version", container != null ? container.getWineVersion() : ""
+                )
+        );
+        return "\"" + shellExecutable + "\"";
+    }
+
     private void configureDesktopShellRegistry() {
         if (container == null || xServer == null) return;
-        File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
+        File userRegFile = new File(WineUtils.resolveHostWinePrefixDir(container.getRootDir()), "user.reg");
         String desktopName = "shell";
         String desktopGeometry = String.valueOf(xServer.screenInfo);
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
@@ -5225,23 +10123,92 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private void ensureBionicGraphicsDriverRegistry() {
+        if (container == null) return;
+        if (!Container.BIONIC.equalsIgnoreCase(container.getContainerVariant())) return;
+
+        try {
+            File runtimeRootDir = wineInfo != null && wineInfo.path != null ? new File(wineInfo.path) : null;
+            String preferredGraphicsDriver = WineUtils.resolvePreferredGraphicsDriver(runtimeRootDir, wineInfo);
+            if (preferredGraphicsDriver.isEmpty()) {
+                ForensicLogger.logEvent(
+                        this,
+                        "info",
+                        "BIONIC_GRAPHICS_DRIVER_REGISTRY_SKIPPED",
+                        null,
+                        "xserver",
+                        "bionic_graphics_driver_registry_skipped",
+                        ForensicLogger.fields(
+                                "container_id", container.id,
+                                "runtime_root", runtimeRootDir == null ? "" : runtimeRootDir.getPath(),
+                                "runtime_profile", selectedRuntimeProfile == null ? "" : ContentsManager.getEntryName(selectedRuntimeProfile),
+                                "reason", "no_runtime_driver_surface"
+                        )
+                );
+                return;
+            }
+
+            WineUtils.ensureGraphicsDriverRegistry(container.getRootDir(), preferredGraphicsDriver);
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "BIONIC_GRAPHICS_DRIVER_REGISTRY_APPLIED",
+                    null,
+                    "xserver",
+                    "bionic_graphics_driver_registry_applied",
+                    ForensicLogger.fields(
+                            "container_id", container.id,
+                            "graphics_driver", preferredGraphicsDriver,
+                            "runtime_root", runtimeRootDir == null ? "" : runtimeRootDir.getPath(),
+                            "runtime_profile", selectedRuntimeProfile == null ? "" : ContentsManager.getEntryName(selectedRuntimeProfile)
+                    )
+            );
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to apply bionic graphics driver registry baseline", e);
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "BIONIC_GRAPHICS_DRIVER_REGISTRY_FAILED",
+                    null,
+                    "xserver",
+                    "bionic_graphics_driver_registry_failed",
+                    ForensicLogger.fields(
+                            "container_id", container.id,
+                            "runtime_root", (wineInfo == null || wineInfo.path == null) ? "" : wineInfo.path,
+                            "error", e.getMessage() == null ? "" : e.getMessage()
+                    )
+            );
+        }
+    }
+
     private String getExecutable() {
         String filename = "";
         if (shortcut != null) {
-            filename = FileUtils.getName(shortcut.path);
+            WineUtils.WindowsLaunchTarget launchTarget = resolveEffectiveShortcutLaunchTarget();
+            if (launchTarget == null) launchTarget = resolveShortcutLaunchTarget(null);
+            filename = launchTarget.getExecutableName();
+            if (filename.isEmpty()) filename = FileUtils.getName(shortcut.path);
         }
         else {
-            boolean directDesktopShellBootstrap = wineInfo != null
-                    && wineInfo.isArm64EC()
-                    && !getOverrideEnvVars().has("EXTRA_EXEC_ARGS");
-            filename = directDesktopShellBootstrap ? "explorer.exe" : resolveDesktopShellExecutable();
+            filename = resolveDesktopShellExecutable();
         }
         return filename;
     }
 
     private String resolveDesktopShellExecutable() {
-        if (hasContainerShellExecutable("wfm.exe")) return "wfm.exe";
+        if (!shouldUseDirectDesktopShellBootstrap() && hasContainerShellExecutable("wfm.exe")) return "wfm.exe";
         return "explorer.exe";
+    }
+
+    private boolean shouldUseDirectDesktopShellBootstrap() {
+        if (shortcut != null) return false;
+        if (container == null || wineInfo == null) return false;
+        if (!wineInfo.isArm64EC()) return false;
+        return Container.BIONIC.equalsIgnoreCase(container.getContainerVariant());
+    }
+
+    private boolean desktopShellRequiresWinHandler() {
+        return !DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER.equals(desktopShellLaunchMode);
     }
 
     private boolean hasContainerShellExecutable(String executableName) {
@@ -5290,8 +10257,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void changeWineAudioDriver() {
         if (!audioDriver.equals(container.getExtra("audioDriver"))) {
-            File rootDir = imageFs.getRootDir();
-            File userRegFile = new File(rootDir, ImageFs.WINEPREFIX+"/user.reg");
+            File userRegFile = new File(WineUtils.resolveHostWinePrefixDir(imageFs.getRootDir()), "user.reg");
             try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
                 if (audioDriver.equals("alsa")) {
                     registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "alsa");
@@ -5309,9 +10275,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File rootDir = imageFs.getRootDir();
         boolean glibcVariant = container != null && Container.GLIBC.equalsIgnoreCase(container.getContainerVariant());
         if (glibcVariant) {
-            FileUtils.delete(new File(rootDir, "/opt/apps"));
             if (!ImageFsInstaller.extractSupportArchive(this, "imagefs_patches_gamenative.tzst", TarCompressorUtils.Type.ZSTD, rootDir)) {
                 Log.w("XServerDisplayActivity", "Missing glibc runtime patch archive: imagefs_patches_gamenative.tzst");
+            }
+            if (!ImageFsInstaller.extractSupportArchive(this, "extras.tzst", TarCompressorUtils.Type.ZSTD, rootDir)) {
+                Log.w("XServerDisplayActivity", "Missing extras overlay archive: extras.tzst");
             }
             if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio-gamenative.tzst", new File(getFilesDir(), "pulseaudio"))) {
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "pulseaudio.tzst", new File(getFilesDir(), "pulseaudio"));

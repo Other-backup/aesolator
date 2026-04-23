@@ -10,6 +10,8 @@ public class GPUImage extends Texture {
     private long imageKHRPtr;
     private ByteBuffer virtualData;
     private short stride;
+    private boolean locked;
+    private int nativeHandle;
     private static boolean supported = false;
 
     static {
@@ -17,16 +19,18 @@ public class GPUImage extends Texture {
     }
 
     public GPUImage(short width, short height) {
-        hardwareBufferPtr = createHardwareBuffer(width, height);
-        if (hardwareBufferPtr != 0) {
+        this(width, height, true, true);
+    }
+
+    public GPUImage(short width, short height, boolean cpuAccess) {
+        this(width, height, cpuAccess, true);
+    }
+
+    public GPUImage(short width, short height, boolean cpuAccess, boolean useHALPixelFormatBGRA8888) {
+        hardwareBufferPtr = createHardwareBuffer(width, height, cpuAccess, useHALPixelFormatBGRA8888);
+        if (cpuAccess && hardwareBufferPtr != 0) {
             virtualData = lockHardwareBuffer(hardwareBufferPtr);
-            if (virtualData == null) {
-                System.err.println("Error: Failed to lock hardware buffer");
-                destroyHardwareBuffer(hardwareBufferPtr);
-                hardwareBufferPtr = 0;
-            }
-        } else {
-            System.err.println("Error: Failed to create hardware buffer");
+            locked = true;
         }
     }
 
@@ -34,13 +38,7 @@ public class GPUImage extends Texture {
         hardwareBufferPtr = hardwareBufferFromSocket(socketFd);
         if (hardwareBufferPtr != 0) {
             virtualData = lockHardwareBuffer(hardwareBufferPtr);
-            if (virtualData == null) {
-                System.err.println("Error: Failed to lock hardware buffer");
-                destroyHardwareBuffer(hardwareBufferPtr);
-                hardwareBufferPtr = 0;
-            }
-        } else {
-            System.err.println("Error: Failed to create hardware buffer");
+            locked = virtualData != null;
         }
     }
 
@@ -52,7 +50,7 @@ public class GPUImage extends Texture {
             imageKHRPtr = createImageKHR(hardwareBufferPtr, textureId);
             if (imageKHRPtr == 0) {
                 System.err.println("Error: Failed to create EGL image");
-                destroyHardwareBuffer(hardwareBufferPtr);
+                destroyHardwareBuffer(hardwareBufferPtr, locked);
                 hardwareBufferPtr = 0;
             }
         }
@@ -73,6 +71,15 @@ public class GPUImage extends Texture {
         this.stride = stride;
     }
 
+    public int getNativeHandle() {
+        return nativeHandle;
+    }
+
+    @Keep
+    private void setNativeHandle(int nativeHandle) {
+        this.nativeHandle = nativeHandle;
+    }
+
     public ByteBuffer getVirtualData() {
         return virtualData;
     }
@@ -88,9 +95,10 @@ public class GPUImage extends Texture {
             imageKHRPtr = 0;
         }
         if (hardwareBufferPtr != 0) {
-            destroyHardwareBuffer(hardwareBufferPtr);
+            destroyHardwareBuffer(hardwareBufferPtr, locked);
             hardwareBufferPtr = 0;
         }
+        locked = false;
         virtualData = null;
         super.destroy();
     }
@@ -109,9 +117,9 @@ public class GPUImage extends Texture {
 
     private native long hardwareBufferFromSocket(int fd);
 
-    private native long createHardwareBuffer(short width, short height);
+    private native long createHardwareBuffer(short width, short height, boolean cpuAccess, boolean useHALPixelFormatBGRA8888);
 
-    private native void destroyHardwareBuffer(long hardwareBufferPtr);
+    private native void destroyHardwareBuffer(long hardwareBufferPtr, boolean locked);
 
     private native ByteBuffer lockHardwareBuffer(long hardwareBufferPtr);
 

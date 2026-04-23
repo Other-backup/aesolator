@@ -1,7 +1,6 @@
 package com.winlator.cmod.core;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 
 import java.util.Arrays;
 
@@ -30,10 +29,7 @@ public abstract class ArrayUtils {
     public static String[] toStringArray(JSONArray data) {
         String[] stringArray = new String[data.length()];
         for (int i = 0; i < data.length(); i++) {
-            try {
-                stringArray[i] = data.getString(i);
-            }
-            catch (JSONException e) {}
+            stringArray[i] = data.optString(i, null);
         }
         return stringArray;
     }

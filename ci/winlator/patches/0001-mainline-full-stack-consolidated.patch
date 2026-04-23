@@ -16,7 +16,7 @@ index 1760433..4bf057a 100644
 -        versionName "7.1.4x-cmod"
 +        def aerosoVersionCodeEnv = System.getenv("AEROSO_APP_VERSION_CODE")
 +        def aerosoVersionCode = (aerosoVersionCodeEnv != null && aerosoVersionCodeEnv.isInteger()) ? aerosoVersionCodeEnv.toInteger() : 21
-+        def aerosoVersionName = System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9c+"
++        def aerosoVersionName = System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9q+"
 +        versionCode aerosoVersionCode
 +        versionName aerosoVersionName
  

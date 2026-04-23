@@ -24,7 +24,7 @@ public class VirGLRendererComponent extends EnvironmentComponent implements Conn
     private long sharedEGLContextPtr;
 
     static {
-        System.loadLibrary("virglrenderer");
+        System.loadLibrary("virglbridge");
     }
 
     public VirGLRendererComponent(XServer xServer, UnixSocketConfig socketConfig) {
@@ -138,6 +138,4 @@ public class VirGLRendererComponent extends EnvironmentComponent implements Conn
     private native long getCurrentEGLContextPtr();
 
     private native void destroyClient(long clientPtr);
-
-    private native void destroyRenderer(long clientPtr);
 }

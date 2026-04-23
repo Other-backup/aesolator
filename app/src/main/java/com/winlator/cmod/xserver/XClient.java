@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import androidx.collection.ArrayMap;
 
+import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xserver.events.Event;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 
 public class XClient implements XResourceManager.OnResourceLifecycleListener {
     public final XServer xServer;
+    public final int fd;
     private boolean authenticated = false;
     public final Integer resourceIDBase;
     private short sequenceNumber = 0;
@@ -21,11 +23,13 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
     private final XOutputStream outputStream;
     private final ArrayMap<Window, EventListener> eventListeners = new ArrayMap<>();
     private final ArrayList<XResource> resources = new ArrayList<>();
+    private final ArrayList<Callback<XClient>> onDestroyListeners = new ArrayList<>();
 
     public XClient(XServer xServer, XInputStream inputStream, XOutputStream outputStream) {
         this.xServer = xServer;
         this.inputStream = inputStream;
         this.outputStream = outputStream;
+        this.fd = inputStream.clientSocket != null ? inputStream.clientSocket.fd : -1;
 
         try (XLock lock = xServer.lockAll()) {
             resourceIDBase = xServer.resourceIDs.get();
@@ -58,6 +62,14 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
         }
     }
 
+    public void addOnDestroyListener(Callback<XClient> listener) {
+        if (listener != null && !onDestroyListeners.contains(listener)) onDestroyListeners.add(listener);
+    }
+
+    public void removeOnDestroyListener(Callback<XClient> listener) {
+        onDestroyListeners.remove(listener);
+    }
+
     public boolean isInterestedIn(int eventId, Window window) {
         EventListener eventListener = eventListeners.get(window);
         return eventListener != null && eventListener.isInterestedIn(eventId);
@@ -73,6 +85,11 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
 
     public void freeResources() {
         try (XLock lock = xServer.lockAll()) {
+            for (int i = onDestroyListeners.size() - 1; i >= 0; i--) {
+                onDestroyListeners.get(i).call(this);
+            }
+            onDestroyListeners.clear();
+
             while (!resources.isEmpty()) {
                 XResource resource = resources.remove(resources.size()-1);
                 if (resource instanceof Window) {

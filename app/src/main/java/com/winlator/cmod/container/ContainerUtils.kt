@@ -293,15 +293,24 @@ object ContainerUtils {
     fun applyBestConfigMapToContainerData(
         containerData: ContainerData,
         bestConfigMap: Map<String, Any?>,
+        storeMatch: Boolean = true,
     ): ContainerData {
         if (bestConfigMap.isEmpty()) return containerData
-        val merged = containerData.toMap().toMutableMap()
+        return ContainerData.fromMap(applyBestConfigMapToMap(containerData.toMap(), bestConfigMap, storeMatch))
+    }
+
+    fun applyBestConfigMapToMap(
+        baseMap: Map<String, Any?>,
+        bestConfigMap: Map<String, Any?>,
+        storeMatch: Boolean = true,
+    ): Map<String, Any?> {
+        if (bestConfigMap.isEmpty()) return baseMap
+        val merged = baseMap.toMutableMap()
         for ((key, value) in bestConfigMap) {
-            if (value != null) {
-                merged[key] = value
-            }
+            if (!storeMatch && key == "executablePath") continue
+            if (value != null) merged[key] = value
         }
-        return ContainerData.fromMap(merged)
+        return merged
     }
 
     fun applyToContainer(context: Context, container: Container, containerData: ContainerData) {

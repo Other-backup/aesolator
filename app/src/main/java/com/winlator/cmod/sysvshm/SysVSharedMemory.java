@@ -3,6 +3,7 @@ package com.winlator.cmod.sysvshm;
 import android.os.SharedMemory;
 import android.system.ErrnoException;
 import android.util.SparseArray;
+import android.util.Log;
 
 import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.xconnector.XConnectorEpoll;
@@ -101,10 +102,14 @@ public class SysVSharedMemory {
                     Object ret = method.invoke(sharedMemory);
                     if (ret != null) return (int)ret;
                 }
-                catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {}
+                catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                    Log.w("SysVSharedMemory", "SharedMemory.getFd reflection failed", e);
+                }
             }
         }
-        catch (ErrnoException e) {}
+        catch (ErrnoException e) {
+            Log.w("SysVSharedMemory", "SharedMemory.create failed", e);
+        }
         return -1;
     }
 

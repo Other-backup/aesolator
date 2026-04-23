@@ -5,6 +5,8 @@ import android.content.res.AssetManager;
 import android.net.Uri;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
@@ -27,6 +29,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,11 +37,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AdrenotoolsManager {
     private static final String TAG = "AdrenotoolsManager";
     private static final String OVERLAY_BACKUP_DIR = "_overlay_backup";
     private static final String OVERLAY_MANIFEST = "overlay-manifest.txt";
+    private static final Pattern BUNDLED_DRIVER_ASSET_PATTERN =
+            Pattern.compile("^adrenotools-(.+)\\.tzst$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NUMERIC_TOKEN_PATTERN = Pattern.compile("(\\d+)");
 
     public static final class DriverFileMapping {
         public final String source;
@@ -215,6 +223,80 @@ public class AdrenotoolsManager {
         return drivers;
     }
 
+    public ArrayList<String> enumerateBundledDriverEntryIds() {
+        ArrayList<String> entryIds = new ArrayList<>();
+        AssetManager assetManager = mContext.getAssets();
+        try {
+            String[] assetEntries = assetManager.list("graphics_driver");
+            if (assetEntries == null) return entryIds;
+            for (String assetEntry : assetEntries) {
+                if (assetEntry == null) continue;
+                Matcher matcher = BUNDLED_DRIVER_ASSET_PATTERN.matcher(assetEntry.trim());
+                if (!matcher.matches()) continue;
+                String entryId = matcher.group(1).trim();
+                if (entryId.isEmpty() || entryIds.contains(entryId)) continue;
+                entryIds.add(entryId);
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to enumerate bundled graphics drivers", e);
+        }
+        sortWrapperDriverEntryIds(entryIds);
+        return entryIds;
+    }
+
+    public ArrayList<String> enumerateAvailableWrapperVersionEntries() {
+        ArrayList<String> versionEntries = new ArrayList<>();
+        versionEntries.add(DefaultVersion.WRAPPER);
+
+        for (String entryId : enumerateBundledDriverEntryIds()) {
+            if (!versionEntries.contains(entryId)) versionEntries.add(entryId);
+        }
+
+        for (DriverPackageInfo info : enumerateInstalledDriverPackages()) {
+            if (info == null || info.fromResources) continue;
+            if (!versionEntries.contains(info.entryId)) versionEntries.add(info.entryId);
+        }
+
+        return versionEntries;
+    }
+
+    public String getPreferredWrapperDriverId() {
+        if (!GPUInformation.isAdrenoGPU(mContext)) return DefaultVersion.WRAPPER;
+
+        for (String entryId : enumerateBundledDriverEntryIds()) {
+            if (GPUInformation.isDriverSupported(entryId, mContext)) return entryId;
+        }
+
+        return DefaultVersion.WRAPPER;
+    }
+
+    public void extractBundledDriverResources() {
+        for (String entryId : enumerateBundledDriverEntryIds()) {
+            extractDriverFromResources(entryId);
+        }
+    }
+
+    public int countInstalledDriverPackages(ContentProfile.ContentType type) {
+        if (type != ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                && type != ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) {
+            return 0;
+        }
+
+        int count = 0;
+        for (DriverPackageInfo info : enumerateInstalledDriverPackages()) {
+            if (matchesInstalledDriverProfile(type, info)) count++;
+        }
+        return count;
+    }
+
+    public boolean isInstalledDriverProfile(ContentProfile remoteProfile) {
+        if (remoteProfile == null) return false;
+        for (DriverPackageInfo info : enumerateInstalledDriverPackages()) {
+            if (matchesInstalledDriverProfile(remoteProfile, info)) return true;
+        }
+        return false;
+    }
+
     public DriverPackageInfo resolvePreferredDriverForLane(String providerLane, DriverPackageInfo requestedInfo) {
         if (providerLane == null || providerLane.trim().isEmpty()) return requestedInfo;
         String normalizedLane = providerLane.trim().toLowerCase(Locale.US);
@@ -251,6 +333,48 @@ public class AdrenotoolsManager {
             score += 12;
         }
         return score;
+    }
+
+    private void sortWrapperDriverEntryIds(List<String> entryIds) {
+        if (entryIds == null || entryIds.size() < 2) return;
+        Collections.sort(entryIds, this::compareWrapperDriverEntryIds);
+    }
+
+    private int compareWrapperDriverEntryIds(String left, String right) {
+        int leftRank = getWrapperDriverLaneRank(left);
+        int rightRank = getWrapperDriverLaneRank(right);
+        if (leftRank != rightRank) return Integer.compare(rightRank, leftRank);
+
+        ArrayList<Integer> leftTokens = extractNumericTokens(left);
+        ArrayList<Integer> rightTokens = extractNumericTokens(right);
+        int tokenCount = Math.max(leftTokens.size(), rightTokens.size());
+        for (int i = 0; i < tokenCount; i++) {
+            int leftValue = i < leftTokens.size() ? leftTokens.get(i) : -1;
+            int rightValue = i < rightTokens.size() ? rightTokens.get(i) : -1;
+            if (leftValue != rightValue) return Integer.compare(rightValue, leftValue);
+        }
+
+        return right.compareToIgnoreCase(left);
+    }
+
+    private int getWrapperDriverLaneRank(String entryId) {
+        String normalized = entryId == null ? "" : entryId.trim().toLowerCase(Locale.US);
+        if (normalized.startsWith("turnip")) return 3;
+        if (normalized.startsWith("v")) return 2;
+        return 1;
+    }
+
+    private ArrayList<Integer> extractNumericTokens(String entryId) {
+        ArrayList<Integer> numericTokens = new ArrayList<>();
+        if (entryId == null) return numericTokens;
+        Matcher matcher = NUMERIC_TOKEN_PATTERN.matcher(entryId.toLowerCase(Locale.US));
+        while (matcher.find()) {
+            try {
+                numericTokens.add(Integer.parseInt(matcher.group(1)));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return numericTokens;
     }
 
     private DriverPackageInfo parseDriverPackageInfo(String entryId, File driverPath, boolean fromResources) {
@@ -311,7 +435,7 @@ public class AdrenotoolsManager {
                 JSONObject routePolicy = contractJson.optJSONObject("providerRoutePolicy");
                 if (routePolicy != null && info.companionProviderLane.isEmpty()) {
                     String companion = optTrim(routePolicy, "companion");
-                    if (companion.isEmpty()) companion = optTrim(routePolicy, "fallback");
+                    if (companion.isEmpty()) companion = optTrim(routePolicy, "secondary path");
                     info.companionProviderLane = companion;
                 }
 
@@ -368,7 +492,7 @@ public class AdrenotoolsManager {
             if (info.isOpenGlProvider()) info.providerLane = "freedreno-opengl";
             else if (info.isTurnipProvider()) info.providerLane = "turnip-vulkan";
         }
-        if (info.graphicsStackProfile.isEmpty()) info.graphicsStackProfile = "vulkan-first-with-gl-fallback";
+        if (info.graphicsStackProfile.isEmpty()) info.graphicsStackProfile = "vulkan-first-with-gl-secondary path";
         if (info.archiveFormat.isEmpty()) info.archiveFormat = "adrenotools";
         if (info.installSurface.isEmpty()) info.installSurface = "graphics-center";
         return info;
@@ -424,14 +548,13 @@ public class AdrenotoolsManager {
         DriverPackageInfo info = getDriverPackageInfo(adrenoToolsDriverId);
         String driverName = info == null ? "" : info.name;
         String driverEntry = info == null ? adrenoToolsDriverId : info.entryId;
+        String preferredWrapperDriver = getPreferredWrapperDriverId();
         ContainerManager containerManager = new ContainerManager(mContext);
         for (Container container : containerManager.getContainers()) {
             HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(container.getGraphicsDriverConfig());
             String configuredVersion = config.get("version");
             if (matchesDriverReference(configuredVersion, driverEntry, driverName)) {
-                config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext)
-                        ? DefaultVersion.WRAPPER_ADRENO
-                        : DefaultVersion.WRAPPER);
+                config.put("version", preferredWrapperDriver);
                 container.setGraphicsDriverConfig(GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 container.saveData();
             }
@@ -442,9 +565,7 @@ public class AdrenotoolsManager {
             );
             String configuredVersion = config.get("version");
             if (matchesDriverReference(configuredVersion, driverEntry, driverName)) {
-                config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext)
-                        ? DefaultVersion.WRAPPER_ADRENO
-                        : DefaultVersion.WRAPPER);
+                config.put("version", preferredWrapperDriver);
                 shortcut.putExtra("graphicsDriverConfig", GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 shortcut.saveData();
             }
@@ -479,6 +600,11 @@ public class AdrenotoolsManager {
         return driversList;
     }
 
+    public boolean matchesDriverReference(String configuredVersion, DriverPackageInfo info) {
+        if (info == null) return false;
+        return matchesDriverReference(configuredVersion, info.entryId, info.name);
+    }
+
     public boolean isFromResources(String adrenotoolsDriverId) {
         if (adrenotoolsDriverId == null || adrenotoolsDriverId.trim().isEmpty()) return false;
         String driver = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
@@ -502,12 +628,88 @@ public class AdrenotoolsManager {
         return hasExtracted;
     }
 
+    private boolean matchesInstalledDriverProfile(ContentProfile remoteProfile, DriverPackageInfo info) {
+        return remoteProfile != null && matchesInstalledDriverProfile(remoteProfile.type, remoteProfile, info);
+    }
+
+    private boolean matchesInstalledDriverProfile(ContentProfile.ContentType type, DriverPackageInfo info) {
+        return matchesInstalledDriverProfile(type, null, info);
+    }
+
+    private boolean matchesInstalledDriverProfile(ContentProfile.ContentType type,
+                                                 @Nullable ContentProfile remoteProfile,
+                                                 DriverPackageInfo info) {
+        if (type != ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                && type != ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) {
+            return false;
+        }
+        if (info == null) return false;
+
+        String expectedLane = type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
+                ? "freedreno-opengl"
+                : "turnip-vulkan";
+        if (!info.providerLane.isEmpty() && !expectedLane.equalsIgnoreCase(info.providerLane)) return false;
+        if (remoteProfile == null) return true;
+
+        String remoteNameToken = normalizeDriverToken(remoteProfile.verName);
+        String remoteTagToken = normalizeDriverToken(remoteProfile.releaseTag);
+        String remoteDescToken = normalizeDriverToken(remoteProfile.desc);
+
+        ArrayList<String> localTokens = new ArrayList<>();
+        localTokens.add(normalizeDriverToken(info.entryId));
+        localTokens.add(normalizeDriverToken(info.name));
+        localTokens.add(normalizeDriverToken(stripZipSuffix(info.artifactName)));
+        localTokens.add(normalizeDriverToken(info.releaseTag));
+        localTokens.add(normalizeDriverToken(info.driverVersion));
+
+        for (String localToken : localTokens) {
+            if (localToken.isEmpty()) continue;
+            if (!remoteNameToken.isEmpty() && localToken.equals(remoteNameToken)) return true;
+            if (!remoteTagToken.isEmpty() && localToken.equals(remoteTagToken)) return true;
+        }
+
+        boolean sameSource = info.sourceRepo != null
+                && remoteProfile.sourceRepo != null
+                && !info.sourceRepo.trim().isEmpty()
+                && info.sourceRepo.equalsIgnoreCase(remoteProfile.sourceRepo);
+
+        for (String localToken : localTokens) {
+            if (localToken.isEmpty()) continue;
+            if (remoteNameToken.length() >= 8 && (localToken.contains(remoteNameToken) || remoteNameToken.contains(localToken))) {
+                return true;
+            }
+            if (sameSource && remoteDescToken.length() >= 10
+                    && (localToken.contains(remoteDescToken) || remoteDescToken.contains(localToken))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeDriverToken(String value) {
+        if (value == null) return "";
+        return value.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "");
+    }
+
+    private String stripZipSuffix(String value) {
+        if (value == null) return "";
+        String out = value.trim();
+        if (out.toLowerCase(Locale.US).endsWith(".zip")) {
+            out = out.substring(0, out.length() - 4);
+        }
+        return out;
+    }
+
     public String installDriver(Uri driverUri) {
+        return installDriver(driverUri, null);
+    }
+
+    public String installDriver(Uri driverUri, ContentProfile remoteHint) {
         File tmpDir = new File(adrenotoolsContentDir, "tmp");
         if (tmpDir.exists()) FileUtils.delete(tmpDir);
         if (!tmpDir.mkdirs()) return "";
 
-        String name = "";
+        String installEntryId = "";
         try (InputStream is = mContext.getContentResolver().openInputStream(driverUri)) {
             if (is == null) {
                 FileUtils.delete(tmpDir);
@@ -526,26 +728,41 @@ public class AdrenotoolsManager {
                 return "";
             }
 
-            name = readDriverName(packageRoot);
-            if (name.isEmpty()) {
+            String driverName = readDriverName(packageRoot);
+            if (driverName.isEmpty()) {
                 Log.d(TAG, "Failed to install driver, package meta has empty name");
                 FileUtils.delete(tmpDir);
                 return "";
             }
 
-            File dst = new File(adrenotoolsContentDir, name);
+            installEntryId = resolveInstallEntryId(driverName, remoteHint);
+            if (installEntryId.isEmpty()) {
+                Log.d(TAG, "Failed to install driver, unable to resolve install entry id");
+                FileUtils.delete(tmpDir);
+                return "";
+            }
+
+            File dst = new File(adrenotoolsContentDir, installEntryId);
             if (dst.exists()) FileUtils.delete(dst);
             if (!FileUtils.copy(packageRoot, dst)) {
                 Log.d(TAG, "Failed to install driver, unable to copy payload");
-                name = "";
+                installEntryId = "";
             }
         } catch (IOException e) {
             Log.d(TAG, "Failed to install driver, invalid payload");
-            name = "";
+            installEntryId = "";
         }
 
         FileUtils.delete(tmpDir);
-        return name;
+        return installEntryId;
+    }
+
+    private String resolveInstallEntryId(String driverName, ContentProfile remoteHint) {
+        if (remoteHint != null) {
+            String remoteEntry = ContentsManager.getEntryName(remoteHint);
+            if (remoteEntry != null && !remoteEntry.trim().isEmpty()) return remoteEntry.trim();
+        }
+        return driverName == null ? "" : driverName.trim();
     }
 
     private boolean extractZipSafely(InputStream inputStream, File outputDir) {
@@ -570,11 +787,7 @@ public class AdrenotoolsManager {
     }
 
     private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
-        File dstFile = new File(rootDir, entry.getName());
-        String rootPath = rootDir.getCanonicalPath() + File.separator;
-        String dstPath = dstFile.getCanonicalPath();
-        if (!dstPath.startsWith(rootPath)) return null;
-        return dstFile;
+        return FileUtils.resolveSafeArchiveEntry(rootDir, entry.getName());
     }
 
     private File findDriverPackageRoot(File rootDir) {

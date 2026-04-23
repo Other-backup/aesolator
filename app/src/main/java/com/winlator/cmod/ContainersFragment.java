@@ -122,15 +122,19 @@ public class ContainersFragment extends Fragment {
         public void onBindViewHolder(final ViewHolder holder, int position) {
             final Container item = data.get(position); // Use 'item' instead of undefined 'container'
             boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(holder.itemView.getContext()).getBoolean("dark_mode", false);
+            Context context = holder.itemView.getContext();
             int accent = androidx.core.content.ContextCompat.getColor(
-                    holder.itemView.getContext(),
+                    context,
                     isDarkMode ? R.color.colorAccentDark : R.color.colorAccent
             );
             holder.imageView.setImageResource(R.drawable.ae_icon_package);
             holder.imageView.setColorFilter(accent);
             holder.title.setText(item.getName());
-            holder.title.setTextColor(accent);
-            holder.itemView.setBackground(buildRowBackground(accent, isDarkMode));
+            holder.title.setTextColor(androidx.core.content.ContextCompat.getColor(
+                    context,
+                    isDarkMode ? R.color.surface_body_text_dark : R.color.surface_body_text
+            ));
+            holder.itemView.setBackground(buildRowBackground(context, isDarkMode));
 
             holder.runButton.setOnClickListener(view -> runContainer(item)); // Correct item reference
 
@@ -147,6 +151,10 @@ public class ContainersFragment extends Fragment {
             if (!XrActivity.isEnabled(getContext())) {
                 Intent intent = new Intent(context, XServerDisplayActivity.class);
                 intent.putExtra("container_id", container.id);
+                String appId = container.getSessionMetadata("appId", "");
+                if (!appId.isEmpty()) {
+                    intent.putExtra(LaunchSecurity.EXTRA_APP_ID, appId);
+                }
                 LaunchSecurity.signXServerLaunchIntent(context, intent);
                 requireActivity().startActivity(intent);
             } else {
@@ -203,17 +211,21 @@ public class ContainersFragment extends Fragment {
     }
 
 
-    private GradientDrawable buildRowBackground(int accent, boolean isDarkMode) {
+    private GradientDrawable buildRowBackground(Context context, boolean isDarkMode) {
         GradientDrawable background = new GradientDrawable();
         background.setShape(GradientDrawable.RECTANGLE);
         background.setCornerRadius(UnitUtils.dpToPx(16));
-        background.setColor(withAlpha(accent, isDarkMode ? 50 : 20));
-        background.setStroke(Math.round(UnitUtils.dpToPx(1)), withAlpha(accent, isDarkMode ? 220 : 130));
+        background.setColor(androidx.core.content.ContextCompat.getColor(
+                context,
+                isDarkMode ? R.color.surface_card_bg_dark : R.color.surface_card_bg
+        ));
+        background.setStroke(
+                Math.round(UnitUtils.dpToPx(1)),
+                androidx.core.content.ContextCompat.getColor(
+                        context,
+                        isDarkMode ? R.color.surface_card_border_dark : R.color.surface_card_border
+                )
+        );
         return background;
-    }
-
-    private int withAlpha(int color, int alpha) {
-        int clamped = Math.max(0, Math.min(255, alpha));
-        return (color & 0x00ffffff) | (clamped << 24);
     }
 }

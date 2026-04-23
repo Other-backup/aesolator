@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVVortekGladioSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:tag="theme_hint"
+                    android:text="@string/vortek_gladio_summary" />
+
+                <TextView
+                    android:id="@+id/TVVortekVulkanDriverLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/vortek_vulkan_driver_source"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SVortekVulkanDriver"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTVortekInstallVulkanDriver"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="@string/vortek_install_custom_vulkan_driver" />
+
+                    <Button
+                        android:id="@+id/BTVortekDeleteVulkanDriver"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/vortek_delete_custom_vulkan_driver" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVVortekVulkanDriverSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:tag="theme_hint"
+                    android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                <View
+                    style="@style/FieldSeparator"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp" />
+
+                <TextView
+                    android:id="@+id/TVVortekPackageLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/vortek_driver_package"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SVortekPackage"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/TVVortekPackageSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:tag="theme_hint"
+                    android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                <View
+                    style="@style/FieldSeparator"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp" />
+
+                <TextView
+                    android:id="@+id/TVGladioPackageLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/gladio_driver_package"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SGladioPackage"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/BTGladioInstallPackage"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="@string/gladio_install_custom_driver" />
+
+                    <Button
+                        android:id="@+id/BTGladioDeletePackage"
+                        style="@style/ButtonNeutral"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/gladio_delete_custom_driver" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVGladioPackageSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:tag="theme_hint"
+                    android:textAppearance="?android:attr/textAppearanceSmall" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_driver_section_package_surface" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/FLOpenGlPolicySection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVGladioGalliumDriverLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesa_bridge_gallium_driver"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SGladioGalliumDriver"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/aemali_gallium_driver_entries" />
+
+                <TextView
+                    android:id="@+id/TVGladioOpenGlVersionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/opengl_version"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SGladioOpenGlVersion"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/opengl_version_entries" />
+
+                <CheckBox
+                    android:id="@+id/CBGladioDisableVertexArrayBGRA"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/disable_vertex_array_bgra" />
+
+                <CheckBox
+                    android:id="@+id/CBGladioDisableGLKHRDebug"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/mesa_bridge_disable_debug" />
+
+                <TextView
+                    android:id="@+id/TVGladioExtraDisabledExtensionsLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/mesa_extra_disabled_extensions"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <EditText
+                    android:id="@+id/ETGladioExtraDisabledExtensions"
+                    style="@style/EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/mesa_extra_disabled_extensions_hint" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_driver_section_opengl_policy" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVMediaTekWrapperModeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mediatek_wrapper_mode"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SMediaTekWrapperMode"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/mediatek_wrapper_mode_entries" />
+
+                <TextView
+                    android:id="@+id/TVVortekExtensionProfileLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/vortek_extension_profile"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SVortekExtensionProfile"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/vortek_extension_profile_entries" />
+
+                <TextView
+                    android:id="@+id/TVVortekExtensionProfileSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:tag="theme_hint"
+                    android:textAppearance="?android:attr/textAppearanceSmall" />
+
+                <TextView
+                    android:id="@+id/TVVkMaxVersionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/graphics_driver_vulkan_version"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SVkMaxVersion"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/vk_version_entries" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_driver_section_vulkan_policy" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVExposedExtensionsLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/exposed_extensions"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <TextView
+                    android:id="@+id/TVExposedExtensionsHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:tag="theme_hint"
+                    android:text="@string/vortek_exposed_extensions_hint" />
+
+                <com.winlator.cmod.widget.MultiSelectionComboBox
+                    android:id="@+id/MSCBExposedExtensions"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_driver_section_extension_surface" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                style="@style/FieldSet"
+                android:tag="theme_card">
+
+                <TextView
+                    android:id="@+id/TVMaxDeviceMemoryLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/max_device_memory"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SMaxDeviceMemory"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/max_device_memory_entries" />
+
+                <TextView
+                    android:id="@+id/TVResourceMemoryTypeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/resource_memory_type"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SResourceMemoryType"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/resource_memory_type_entries" />
+
+                <TextView
+                    android:id="@+id/TVImageCacheSizeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/image_cache_size"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SImageCacheSize"
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:entries="@array/image_cache_size_entries" />
+
+                <CheckBox
+                    android:id="@+id/CBGladioNoError"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/vortek_gladio_companion_no_error" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/FieldSetLabel"
+                android:tag="theme_badge"
+                android:text="@string/graphics_driver_section_runtime_limits" />
+        </FrameLayout>
+    </LinearLayout>
+</ScrollView>

@@ -1,6 +1,7 @@
 package com.winlator.cmod.core;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -45,7 +46,24 @@ public abstract class AppUtils {
     private static WeakReference<Toast> globalToastReference = null;
 
     public static void keepScreenOn(Activity activity) {
-        activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Window window = activity.getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            activity.setTurnScreenOn(true);
+            activity.setShowWhenLocked(true);
+        } else {
+            window.addFlags(
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                            | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                            | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            );
+        }
+
+        KeyguardManager keyguardManager = (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE);
+        if (keyguardManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && keyguardManager.isKeyguardLocked()) {
+            keyguardManager.requestDismissKeyguard(activity, null);
+        }
     }
 
     public static String getArchName() {
@@ -317,6 +335,10 @@ public abstract class AppUtils {
             }
         }
         return false;
+    }
+
+    public static boolean setSpinnerSelectionFromMemorySize(Spinner spinner, String memorySize) {
+        return setSpinnerSelectionFromNumber(spinner, StringUtils.parseMemorySize(memorySize));
     }
 
     public static void setupTabLayout(final View view, int tabLayoutResId, final int... tabResIds) {

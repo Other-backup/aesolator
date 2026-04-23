@@ -105,7 +105,7 @@ Status:
 - installer/overlay foundation imported into the local tree
 - explicit rootfs layer ownership is now written down
 - per-library base/overlay adoption is now written down
-- archive diff/extraction pass still open
+- remaining open work is proof/cleanup, not missing archive/layout ownership
 
 Why it matters:
 
@@ -202,9 +202,9 @@ Primary donor files:
 Status:
 
 - foundation imported into the local tree
-- still not wired through the whole runtime stack yet
-- high-value lane remains active because execution policy and payload/runtime
-  placement still need the next donor passes
+- major launcher/runtime stack wiring is now in place
+- high-value lane remains active because auth/storefront branches and
+  payload/runtime placement still need the next donor passes
 
 Why it matters:
 
@@ -225,6 +225,10 @@ Current imported status:
   Steam type, graphics-driver version, exec args, executable path, session
   metadata, install path, box86 state, SDL/controller flags, gesture config,
   external-display state, suspend policy, DRM flags, and portrait mode
+- shortcut-driven install path, working directory, and executable-name
+  resolution now collapse through one `WineUtils.WindowsLaunchTarget` owner
+  instead of separate parsers in `Shortcut`, `XServerDisplayActivity`,
+  `GameFixesRegistry`, and `DgVoodooManager`
 - `ImageFs` now exposes donor-style runtime markers:
   `.variant`, `.arch`, glibc/bin/lib accessors, storage/files roots, and
   `getRuntimeLibcModel()`
@@ -242,8 +246,10 @@ Current imported status:
 - local `WineRequestComponent` now replaces the old standalone request handler
   and lives inside `XEnvironment`; request routing keeps donor socket/lifecycle
   structure while preserving the local Android clipboard bridge
-- donor `SteamPipeServer` / `SteamClientComponent` foundation is now staged in
-  the local tree for later runtime/storefront wiring
+- donor `SteamPipeServer` / `SteamClientComponent` foundation is now wired by
+  explicit Steam ownership instead of ambient startup: the component mounts
+  only for launches with real Steam evidence (`launchRealSteam`, `STEAM_*`
+  appId, or a Steam executable surface), not for every container
 - donor `ControllerManager`, `TouchMouse`, and Kotlin `XKeycode` are now also
   staged locally, so the next closure step for input is behavior/compile
   validation instead of filename parity
@@ -254,9 +260,6 @@ Current imported status:
 
 Still open inside this lane:
 
-- decide where and when local runtime should actually mount
-  `SteamClientComponent`, since `Ae.solator` does not yet have a donor-style
-  Steam source lane driving it
 - decide whether any donor auth-specific request branches need a local
   `Ae.solator` equivalent beyond plain browser/clipboard routing
 - wire launcher/runtime placement deeper into payload install and rootfs
@@ -304,7 +307,29 @@ Current imported status:
   `AdrenotoolsManager` install bridges
 - `ManifestComponentHelper` adapted for installed-package availability,
   manifest-version option building, and DXVK context shaping
-- UI wiring is still open; manifest layer is now foundation, not yet surfaced
+- manifest version matching now survives donor build/tag suffix drift such as
+  `2.7.1 -> 2.7.1-0` and `0.3.6 -> 0.3.6-0`, with variant-aware lookup
+- launch dependency lane now uses donor manifest as an actual recovery surface
+  for supported missing payloads (`dxvk`, `vkd3d`, `wowbox64`, `fexcore`,
+  donor `proton`) instead of a read-only reference
+- installed/runtime package truth now lives in `ContentsManager` as
+  `present -> usable -> broken`, so manifest/UI/dependency code no longer
+  forks on raw `locallyInstalled`
+- `ContentProfile.locallyInstalled` is now owner-private and only mutated
+  through `ContentsManager`, so install-state drift no longer leaks as a
+  public mutable field into UI/launch surfaces
+- local `Contents` UI now consumes that same state truth:
+  installed+remote entries keep their management menu, broken installs stay
+  visible as repairable local state, and `Content Info` exposes detailed
+  broken-reason labels instead of collapsing everything into `remote` vs
+  `installed`
+- graphics-driver donor parity is now closer too:
+  `AdrenotoolsManager` owns installed-driver profile matching/counting
+  centrally, so graphics feed sorting/status and wrapper-version fallback stop
+  reimplementing that logic in the fragment/dialog layer
+- for this lane, static app-side closure is complete;
+  remaining tail is proof only: compile/runtime validation and any defects that
+  appear under that proof
 
 ### Lane 4: Container Routing / Launch Requests
 

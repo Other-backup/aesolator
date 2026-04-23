@@ -131,7 +131,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
             FileUtils.writeString(file, data.toString());
         }
-        catch (JSONException e) {}
+        catch (JSONException e) { /* best-effort path; keep surrounding flow intact. */ }
     }
 
     public static File getProfileFile(Context context, int id) {

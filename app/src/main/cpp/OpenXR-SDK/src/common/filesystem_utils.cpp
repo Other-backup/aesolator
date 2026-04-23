@@ -30,11 +30,11 @@
 #include <experimental/filesystem>
 #define FS_PREFIX std::experimental::filesystem
 #elif defined(XR_USE_PLATFORM_WIN32)
-// Windows fallback includes
+// Windows degrade includes
 #include <stdint.h>
 #include <direct.h>
 #else
-// Linux/Apple fallback includes
+// Linux/Apple degrade includes
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
@@ -227,7 +227,7 @@ bool FileSysUtilsFindFilesInPath(const std::string& path, std::vector<std::strin
     return false;
 }
 
-#else  // XR_OS_LINUX/XR_OS_APPLE fallback
+#else  // XR_OS_LINUX/XR_OS_APPLE degrade
 
 // simple POSIX-compatible implementation of the <filesystem> pieces used by OpenXR
 

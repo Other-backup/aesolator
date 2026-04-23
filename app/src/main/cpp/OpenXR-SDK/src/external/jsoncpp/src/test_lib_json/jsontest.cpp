@@ -350,7 +350,7 @@ static int msvcrtSilentReportHook(int reportType, char* message,
   if (reportType == _CRT_ERROR || reportType == _CRT_ASSERT) {
     // calling abort() cause the ReportHook to be called
     // The following is used to detect this case and let's the
-    // error handler fallback on its default behaviour (
+    // error handler degrade on its default behaviour (
     // display a warning message)
     static volatile bool isAborting = false;
     if (isAborting) {

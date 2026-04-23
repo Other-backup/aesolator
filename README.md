@@ -28,7 +28,7 @@ Android application repository for Ae.solator (`com.winlator.cmod`).
 
 - `kosoymiki/aesolator`: app source-of-truth.
 - `kosoymiki/freewine11`: native FreeWine source tree.
-- `kosoymiki/wcp-runtime-lanes` (WCP Archive): Aesolator APK lane + FreeWine + VulkanSDK + DXVK + VKD3D + dgVoodoo WCP lanes.
+- `kosoymiki/wcp-runtime-lanes` (WCP Archive): Aesolator APK lane + FreeWine + wrapper-backed Vulkan runtime + DXVK + VKD3D + dgVoodoo WCP lanes.
 - `kosoymiki/wcp-graphics-lanes`: Turnip/OpenGL provider lanes + build owner for dgVoodoo archive lane.
 - `kosoymiki/winlator-wine-proton-arm64ec-wcp`: legacy archived history only.
 
@@ -48,6 +48,10 @@ Legacy CI patch-overlay stack has been removed; this repository stays native sou
 - Repo-local agent rules live in `AGENTS.md`.
 - Approval-gated review mode, documentation sync rules, and process gates live
   in `docs/CODEX_OPERATING_CONTRACT.md`.
+- The hard master engineering directive lives in
+  `docs/MASTER_ENGINEERING_DIRECTIVE.md`.
+- If remediation is possible locally, the expected result is an applied
+  systemic fix, not advisory-only instructions.
 
 ## Local Build
 
@@ -59,6 +63,15 @@ sh tools/bootstrap-termux-host.sh
 ./gradlew --no-daemon assembleDebug
 ```
 
+Rules for the authoritative local lane:
+
+- run Gradle from the repo root only
+- treat the root wrapper as the source of truth
+- do not rely on `app/gradlew` as a separate build lane
+- `preBuild` is now deterministic:
+  it verifies bundled assets and runtime JNI state,
+  but it does not download donor rootfs archives or mutate `src/main/assets`
+
 Legacy CI/helper wrapper:
 
 ```bash
@@ -67,6 +80,13 @@ bash ci/winlator/ci-build-winlator-ludashi.sh
 
 For verified on-device Termux ARM64 local build and Wi-Fi ADB install notes,
 see `docs/TERMUX_LOCAL_BUILD.md`.
+
+For the audited extra-runtime cache lane (`VC++ AIO + VC6 legacy`, `Wine Mono`,
+`Wine Gecko`, `DirectX June 2010`) and the rootfs-visible prefix toolkit, see
+`docs/PREFIX_PACK_TOOLKIT.md`. Repo-side helpers now cover source-bound catalog
+inspection, cache fetch, offline-overlay packing, and direct ADB staging into a
+live `imagefs`, while the rootfs and Windows loaders keep the same manifest and
+Ajay-style `save_data` / log roots.
 
 ## Runtime/Graphics Matrix
 
@@ -82,6 +102,8 @@ see `docs/TERMUX_LOCAL_BUILD.md`.
 - `docs/ADB_HARVARD_DEVICE_FORENSICS.md`
 - `docs/AEOLATOR_FORENSIC_SYNC_CONTRACT.md`
 - `docs/TERMUX_LOCAL_BUILD.md`
+- `docs/PREFIX_PACK_TOOLKIT.md`
+- `docs/AJAY_PREFIX_COMPONENT_AUDIT.md`
 - `docs/README.md`
 - `docs/DONOR_REFLECTIVE_ROADMAP.md`
 - `docs/GAMENATIVE_X11_RENDERER_DRIVER_AUDIT.md`

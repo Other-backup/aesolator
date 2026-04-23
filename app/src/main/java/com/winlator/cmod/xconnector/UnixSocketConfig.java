@@ -43,6 +43,7 @@ public class UnixSocketConfig {
 
     private static void ensureCompatSocketLink(File rootedDir, File rootedSocketFile, String originalPath) {
         if (rootedDir == null || rootedSocketFile == null || originalPath == null || originalPath.isEmpty()) return;
+        if (originalPath.startsWith("/tmp/")) return;
 
         File compatDir = new File(FileUtils.getDirname(originalPath));
         if (compatDir.getAbsolutePath().equals(rootedDir.getAbsolutePath())) return;

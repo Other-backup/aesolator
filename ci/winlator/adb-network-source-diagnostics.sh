@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_OUT_DIR:=/tmp/winlator-network-diag-$(date +%Y%m%d_%H%M%S)}"
 : "${WLT_SOURCE_MAP:=${ROOT_DIR}/ci/winlator/artifact-source-map.json}"
 : "${WLT_URL_TIMEOUT:=20}"
@@ -72,7 +72,7 @@ PY
   adb_s shell getprop > "${WLT_OUT_DIR}/getprop.txt" 2>/dev/null || true
   adb_s shell dumpsys connectivity > "${WLT_OUT_DIR}/dumpsys-connectivity.txt" 2>/dev/null || true
   adb_s shell ip route > "${WLT_OUT_DIR}/ip-route.txt" 2>/dev/null || true
-  adb_s shell "run-as ${WLT_PACKAGE} sh -c 'cat ./shared_prefs/by.aero.so.benchmark_preferences.xml 2>/dev/null'" > "${WLT_OUT_DIR}/prefs.xml" 2>/dev/null || true
+  adb_s shell "run-as ${WLT_PACKAGE} sh -c 'cat ./shared_prefs/${WLT_PACKAGE}_preferences.xml 2>/dev/null'" > "${WLT_OUT_DIR}/prefs.xml" 2>/dev/null || true
 
   out_json="${WLT_OUT_DIR}/endpoint-probes.tsv"
   printf 'url\thttp_code\ttime_dns\ttime_connect\ttime_tls\ttime_total\tcurl_status\n' > "${out_json}"

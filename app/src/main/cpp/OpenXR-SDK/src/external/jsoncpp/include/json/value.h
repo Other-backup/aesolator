@@ -248,7 +248,7 @@ public:
   // converting Value::maxUInt64 to a double correctly (AIX/xlC).
   // Assumes that UInt64 is a 64 bits integer.
   static constexpr double maxUInt64AsDouble = 18446744073709551615.0;
-// Workaround for bug in the NVIDIAs CUDA 9.1 nvcc compiler
+// workaround for bug in the NVIDIAs CUDA 9.1 nvcc compiler
 // when using gcc and clang backend compilers.  CZString
 // cannot be defined as private.  See issue #486
 #ifdef __NVCC__

@@ -29,7 +29,9 @@ import com.winlator.cmod.ShortcutsFragment;
 import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
+import com.winlator.cmod.container.GraphicsDrivers;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
@@ -54,6 +56,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -150,16 +153,17 @@ public class ShortcutSettingsDialog extends ContentDialog {
         contentsManager.syncContents();
 
         final View vGraphicsDriverConfig = findViewById(R.id.BTGraphicsDriverConfig);
-        String initialGraphicsDriverConfig = shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig());
-        if (initialGraphicsDriverConfig == null || initialGraphicsDriverConfig.trim().isEmpty()) {
-            initialGraphicsDriverConfig = Container.DEFAULT_GRAPHICSDRIVERCONFIG;
+        String resolvedInitialGraphicsDriverConfig = shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig());
+        if (resolvedInitialGraphicsDriverConfig == null || resolvedInitialGraphicsDriverConfig.trim().isEmpty()) {
+            resolvedInitialGraphicsDriverConfig = Container.DEFAULT_GRAPHICSDRIVERCONFIG;
         }
+        final String initialGraphicsDriverConfig = resolvedInitialGraphicsDriverConfig;
         vGraphicsDriverConfig.setTag(initialGraphicsDriverConfig);
 
         final View vDXWrapperConfig = findViewById(R.id.BTDXWrapperConfig);
         vDXWrapperConfig.setTag(shortcut.getExtra("dxwrapperConfig", shortcut.container.getDXWrapperConfig()));
 
-        loadGraphicsDriverSpinner(sGraphicsDriver, sDXWrapper, vGraphicsDriverConfig, shortcut.getExtra("graphicsDriver", shortcut.container.getGraphicsDriver()),
+        loadGraphicsDriverSpinner(sGraphicsDriver, sDXWrapper, vGraphicsDriverConfig, Container.normalizeGraphicsDriver(shortcut.getExtra("graphicsDriver", shortcut.container.getGraphicsDriver())),
             shortcut.getExtra("dxwrapper", shortcut.container.getDXWrapper()));
 
         findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
@@ -387,8 +391,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         });
 
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
-        List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(SpinnerAdapters.create(context, isDarkMode, sGraphicsItemsList));
         sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background);
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
@@ -637,11 +639,22 @@ public class ShortcutSettingsDialog extends ContentDialog {
             boolean renamingSuccess = !nameChanged || new File(shortcut.file.getParent(), name + ".desktop").exists();
 
             if (renamingSuccess) {
-                String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
+                String selectedGraphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
+                String graphicsDriver = Container.normalizeGraphicsDriver(selectedGraphicsDriver);
                 Object graphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
                 String graphicsDriverConfig = graphicsDriverConfigTag instanceof String
                         ? (String) graphicsDriverConfigTag
-                        : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
+                        : GraphicsDrivers.defaultConfig(selectedGraphicsDriver);
+                graphicsDriverConfig = GraphicsDrivers.sanitizeConfigShape(selectedGraphicsDriver, graphicsDriverConfig);
+                if (!GraphicsDrivers.usesKeyValueConfig(selectedGraphicsDriver)) {
+                    graphicsDriverConfig = Container.reconcileLegacyGraphicsConfig(selectedGraphicsDriver, graphicsDriverConfig);
+                    HashMap<String, String> config = GraphicsDrivers.parseConfig(selectedGraphicsDriver, graphicsDriverConfig);
+                    String graphicsDriverVersion = config.get("version");
+                    if (graphicsDriverVersion == null || graphicsDriverVersion.trim().isEmpty()) {
+                        config.put("version", new AdrenotoolsManager(context).getPreferredWrapperDriverId());
+                        graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
+                    }
+                }
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
                 String dxwrapperConfig = vDXWrapperConfig.getTag().toString();
                 String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
@@ -790,6 +803,15 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
                 // Save all changes to the shortcut
                 shortcut.saveData();
+                boolean requireRestart = GraphicsDrivers.isMediaTekWrapperFamily(graphicsDriver)
+                        && VortekConfigDialog.isRequireRestart(initialGraphicsDriverConfig, graphicsDriverConfig);
+                if (requireRestart) {
+                    ContentDialog.confirm(
+                            context,
+                            R.string.the_settings_have_been_changed_do_you_want_to_restart_the_app,
+                            () -> AppUtils.restartApplication(context)
+                    );
+                }
                 ForensicLogger.logEvent(
                         context,
                         "info",
@@ -1233,23 +1255,43 @@ public class ShortcutSettingsDialog extends ContentDialog {
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
         final boolean isDarkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
+        final String initialGraphicsDriver = GraphicsDrivers.getTopLevelSelectableDriver(selectedGraphicsDriver);
+        Object initialGraphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
+        String initialGraphicsDriverConfig = initialGraphicsDriverConfigTag instanceof String
+                ? (String) initialGraphicsDriverConfigTag
+                : GraphicsDrivers.defaultConfig(selectedGraphicsDriver);
+        vGraphicsDriverConfig.setTag(
+                GraphicsDrivers.migrateToUnifiedTopLevelConfig(selectedGraphicsDriver, initialGraphicsDriverConfig)
+        );
 
         ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver);
 
         final String[] dxwrapperEntries = context.getResources().getStringArray(R.array.dxwrapper_entries);
 
         Runnable update = () -> {
-            String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
+            String graphicsDriver = Container.normalizeGraphicsDriver(StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem()));
             Object graphicsDriverConfigTag = vGraphicsDriverConfig.getTag();
             String graphicsDriverConfig = graphicsDriverConfigTag instanceof String
                     ? (String) graphicsDriverConfigTag
-                    : Container.DEFAULT_GRAPHICSDRIVERCONFIG;
+                    : GraphicsDrivers.defaultConfig(graphicsDriver);
+            graphicsDriverConfig = GraphicsDrivers.sanitizeConfigShape(graphicsDriver, graphicsDriverConfig);
+            vGraphicsDriverConfig.setTag(graphicsDriverConfig);
 
-            tvGraphicsDriverVersion.setText(GraphicsDriverConfigDialog.getVersion(graphicsDriverConfig));
+            tvGraphicsDriverVersion.setText(GraphicsDrivers.getDisplayVersion(context, graphicsDriver, graphicsDriverConfig));
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
                 try {
-                    new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, tvGraphicsDriverVersion).show();
+                    if (GraphicsDrivers.isVortek(graphicsDriver)) {
+                        new VortekConfigDialog(vGraphicsDriverConfig).show();
+                    } else if (GraphicsDrivers.isVirgl(graphicsDriver)) {
+                        new VirGLConfigDialog(vGraphicsDriverConfig).show();
+                    } else if (GraphicsDrivers.isMesaOpenGlBridge(graphicsDriver)) {
+                        new MesaOpenGLConfigDialog(vGraphicsDriverConfig, graphicsDriver).show();
+                    } else if (GraphicsDrivers.isGladio(graphicsDriver)) {
+                        new VortekConfigDialog(vGraphicsDriverConfig, graphicsDriver).show();
+                    } else {
+                        new GraphicsDriverConfigDialog(vGraphicsDriverConfig, graphicsDriver, tvGraphicsDriverVersion).show();
+                    }
                 } catch (Throwable t) {
                     Log.e("ShortcutSettingsDialog", "Failed to open graphics driver config dialog", t);
                     ForensicLogger.error(
@@ -1288,7 +1330,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, selectedGraphicsDriver);
+        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, initialGraphicsDriver);
         update.run();
     }
 }

@@ -4,20 +4,30 @@ import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -34,6 +44,13 @@ public class DgVoodooManager {
     private static final String ARCH_X64 = "x64";
     private static final String ARCH_ARM64 = "arm64";
     private static final String ARCH_ARM64EC = "arm64ec";
+    private static final String PACKAGE_X86_64 = "x86_64";
+    private static final String PACKAGE_ARM64EC = "arm64ec";
+    private static final int PE_MACHINE_I386 = 0x014c;
+    private static final int PE_MACHINE_AMD64 = 0x8664;
+    private static final int PE_MACHINE_ARM64 = 0xaa64;
+    private static final int PE_MACHINE_ARM64EC = 0xa641;
+    private static final Pattern VERSION_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     private final Context context;
     private final File rootDir;
@@ -53,6 +70,13 @@ public class DgVoodooManager {
 
     public boolean isArchInstalled(String arch) {
         return resolveBestPackageRootForArch(arch) != null;
+    }
+
+    public boolean isPackageLaneInstalled(String packageLane) {
+        for (File packageRoot : getPackageRootsSorted()) {
+            if (hasPackageLane(packageRoot, packageLane)) return true;
+        }
+        return false;
     }
 
     public String getVersionHint() {
@@ -75,10 +99,26 @@ public class DgVoodooManager {
         return architectures;
     }
 
+    public ArrayList<String> getInstalledPackageLanes() {
+        ArrayList<String> lanes = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
+        for (File packageRoot : getPackageRootsSorted()) {
+            appendInstalledPackageLane(packageRoot, PACKAGE_X86_64, lanes, seen);
+            appendInstalledPackageLane(packageRoot, PACKAGE_ARM64EC, lanes, seen);
+        }
+        return lanes;
+    }
+
     public String getInstalledArchitectureSummary() {
         ArrayList<String> architectures = getInstalledArchitectures();
         if (architectures.isEmpty()) return "-";
         return String.join(", ", architectures);
+    }
+
+    public String getInstalledPackageLaneSummary() {
+        ArrayList<String> packageLanes = getInstalledPackageLanes();
+        if (packageLanes.isEmpty()) return "-";
+        return String.join(", ", packageLanes);
     }
 
     public String installPackage(Uri packageUri) {
@@ -126,37 +166,41 @@ public class DgVoodooManager {
 
     public boolean matchesProfile(ContentProfile profile) {
         if (profile == null || profile.type != ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return false;
-        if (!isInstalled()) return false;
-        String archTag = profile.getArchitectureTag();
-        if ("generic".equalsIgnoreCase(archTag)) return true;
-        if ("bundle".equalsIgnoreCase(archTag)) {
-            return isArchInstalled(ARCH_X64) && (isArchInstalled(ARCH_ARM64EC) || isArchInstalled(ARCH_ARM64));
+        String requestedLane = resolvePackageLaneForProfile(profile);
+        for (File packageRoot : getPackageRootsSorted()) {
+            if (!requestedLane.isEmpty() && !hasPackageLane(packageRoot, requestedLane)) continue;
+            if (matchesRequestedVersion(profile, packageRoot)) return true;
         }
-        if ("x86_64".equalsIgnoreCase(archTag)) return isArchInstalled(ARCH_X64);
-        return isArchInstalled(archTag);
+        return false;
     }
 
     public File resolveShortcutTargetDir(File imageFsRoot, String shortcutPath) {
-        if (shortcutPath == null || shortcutPath.trim().isEmpty()) return null;
-        if (shortcutPath.toLowerCase(Locale.ROOT).endsWith(".lnk")) return null;
-        File targetFile = resolveDosPath(imageFsRoot, shortcutPath);
-        return targetFile != null ? targetFile.getParentFile() : null;
+        return resolveShortcutTargetDir(WineUtils.resolveWindowsLaunchTarget(imageFsRoot, shortcutPath));
+    }
+
+    public File resolveShortcutTargetDir(WineUtils.WindowsLaunchTarget launchTarget) {
+        if (!launchTarget.hasCommandPath() || launchTarget.isShortcutLink()) return null;
+        return launchTarget.hostTargetDir;
     }
 
     public String resolvePreferredArch(String shortcutPath, String configuredArch) {
-        String configured = configuredArch == null ? "" : configuredArch.trim().toLowerCase(Locale.ROOT);
-        if (ARCH_X86.equals(configured)
-                || ARCH_X64.equals(configured)
-                || ARCH_ARM64.equals(configured)
-                || ARCH_ARM64EC.equals(configured)) {
-            return configured;
-        }
+        return resolvePreferredArch(WineUtils.resolveWindowsLaunchTarget(null, shortcutPath), configuredArch, null);
+    }
 
-        String value = shortcutPath == null ? "" : shortcutPath.toLowerCase(Locale.ROOT);
-        if (value.contains("program files (x86)") || value.contains("syswow64")) {
-            if (hasInstalledRuntimeArch(ARCH_X86)) return ARCH_X86;
-        }
+    public String resolvePreferredArch(WineUtils.WindowsLaunchTarget launchTarget, String configuredArch) {
+        return resolvePreferredArch(launchTarget, configuredArch, null);
+    }
 
+    public String resolvePreferredArch(
+            @Nullable WineUtils.WindowsLaunchTarget launchTarget,
+            String configuredArch,
+            @Nullable WineInfo wineInfo
+    ) {
+        String configured = normalizeConfiguredArch(configuredArch);
+        if (!configured.isEmpty()) return configured;
+
+        String autoArch = resolveAutoRuntimeArch(launchTarget, wineInfo);
+        if (!autoArch.isEmpty()) return autoArch;
         if (hasInstalledRuntimeArch(ARCH_ARM64EC)) return ARCH_ARM64EC;
         if (hasInstalledRuntimeArch(ARCH_X64)) return ARCH_X64;
         if (hasInstalledRuntimeArch(ARCH_ARM64)) return ARCH_ARM64;
@@ -172,21 +216,6 @@ public class DgVoodooManager {
         String normalizedArch = normalizeRuntimeArch(arch);
         File packageRoot = resolveBestPackageRootForArch(normalizedArch);
         File sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, normalizedArch);
-        if (!sourceDir.isDirectory() && ARCH_ARM64EC.equals(normalizedArch)) {
-            packageRoot = resolveBestPackageRootForArch(ARCH_X64);
-            sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_X64);
-            if (!sourceDir.isDirectory()) {
-                packageRoot = resolveBestPackageRootForArch(ARCH_ARM64);
-                sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_ARM64);
-            }
-        } else if (!sourceDir.isDirectory() && ARCH_ARM64.equals(normalizedArch)) {
-            packageRoot = resolveBestPackageRootForArch(ARCH_ARM64EC);
-            sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_ARM64EC);
-            if (!sourceDir.isDirectory()) {
-                packageRoot = resolveBestPackageRootForArch(ARCH_X64);
-                sourceDir = packageRoot == null ? new File("/nonexistent") : resolveRuntimeDir(packageRoot, ARCH_X64);
-            }
-        }
         if (!sourceDir.isDirectory() || packageRoot == null) return false;
 
         ArrayList<String> stagedFiles = new ArrayList<>();
@@ -275,7 +304,7 @@ public class DgVoodooManager {
                 return "";
             }
 
-            String versionHint = resolveVersionHint(packageRoot, displayName);
+            String versionHint = resolveVersionHint(profile, packageRoot, displayName);
             FileUtils.writeString(new File(destination, META_FILE), versionHint);
             FileUtils.delete(tempDir);
             return versionHint;
@@ -377,6 +406,8 @@ public class DgVoodooManager {
         }
 
         roots.sort((left, right) -> {
+            int semanticCompare = compareVersionNames(resolvePackageVersionName(right), resolvePackageVersionName(left));
+            if (semanticCompare != 0) return semanticCompare;
             int versionCompare = Integer.compare(resolvePackageVersionCode(right), resolvePackageVersionCode(left));
             if (versionCompare != 0) return versionCompare;
             int modifiedCompare = Long.compare(right.lastModified(), left.lastModified());
@@ -384,6 +415,14 @@ public class DgVoodooManager {
             return left.getAbsolutePath().compareToIgnoreCase(right.getAbsolutePath());
         });
         return roots;
+    }
+
+    private String resolvePackageVersionName(File packageRoot) {
+        ContentProfile profile = readProfile(packageRoot);
+        if (profile != null && profile.verName != null && !profile.verName.trim().isEmpty()) {
+            return profile.verName.trim();
+        }
+        return readVersionHint(packageRoot);
     }
 
     private int resolvePackageVersionCode(File packageRoot) {
@@ -404,6 +443,11 @@ public class DgVoodooManager {
 
     private String readVersionHint(File packageRoot) {
         if (packageRoot == null) return "";
+        ContentProfile profile = readProfile(packageRoot);
+        if (profile != null && profile.verName != null && !profile.verName.trim().isEmpty()) {
+            return profile.verName.trim();
+        }
+
         File metaFile = new File(packageRoot, META_FILE);
         if (metaFile.isFile()) {
             ArrayList<String> lines = FileUtils.readLines(metaFile);
@@ -413,16 +457,17 @@ public class DgVoodooManager {
             }
         }
 
-        ContentProfile profile = readProfile(packageRoot);
-        if (profile != null && profile.verName != null && !profile.verName.trim().isEmpty()) {
-            return profile.verName.trim();
-        }
         return "";
     }
 
     private void appendInstalledArch(File packageRoot, String arch, ArrayList<String> architectures, HashSet<String> seen) {
         if (!hasRuntimeArch(packageRoot, arch)) return;
         if (seen.add(arch)) architectures.add(arch);
+    }
+
+    private void appendInstalledPackageLane(File packageRoot, String packageLane, ArrayList<String> lanes, HashSet<String> seen) {
+        if (!hasPackageLane(packageRoot, packageLane)) return;
+        if (seen.add(packageLane)) lanes.add(packageLane);
     }
 
     private boolean hasInstalledRuntimeArch(String arch) {
@@ -456,15 +501,85 @@ public class DgVoodooManager {
         return hasAnyRuntimeArch(payloadRuntime);
     }
 
-    private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
-        File target = new File(rootDir, entry.getName());
-        String rootPath = rootDir.getCanonicalPath() + File.separator;
-        String targetPath = target.getCanonicalPath();
-        if (!targetPath.startsWith(rootPath)) return null;
-        return target;
+    private boolean hasPackageLane(File root, String packageLane) {
+        if (root == null) return false;
+        String normalized = resolvePackageLaneForRuntimeArch(packageLane);
+        String declaredPackageLane = resolveDeclaredPackageLane(root);
+        if ("bundle".equalsIgnoreCase(declaredPackageLane)) return true;
+        if (!declaredPackageLane.isEmpty()) return normalized.equalsIgnoreCase(declaredPackageLane);
+        if (PACKAGE_X86_64.equals(normalized)) {
+            return hasRuntimeArch(root, ARCH_X86);
+        }
+        if (PACKAGE_ARM64EC.equals(normalized)) {
+            return hasRuntimeArch(root, ARCH_ARM64EC) || hasRuntimeArch(root, ARCH_ARM64);
+        }
+        return false;
     }
 
-    private String resolveVersionHint(File packageRoot, String displayName) {
+    private String resolveDeclaredPackageLane(File packageRoot) {
+        String contractLane = readDeclaredPackageLaneFromContract(packageRoot);
+        if (!contractLane.isEmpty()) return contractLane;
+        ContentProfile profile = readProfile(packageRoot);
+        if (profile == null) return "";
+        String archTag = profile.getArchitectureTag();
+        if ("bundle".equalsIgnoreCase(archTag)) return "bundle";
+        return normalizePackageLaneValue(archTag);
+    }
+
+    private String readDeclaredPackageLaneFromContract(File packageRoot) {
+        if (packageRoot == null) return "";
+        File contractFile = new File(packageRoot, "ae-runtime-contract.json");
+        if (!contractFile.isFile()) return "";
+        return resolvePackageLaneFromContractText(FileUtils.readString(contractFile));
+    }
+
+    static String resolvePackageLaneFromContractText(String contractText) {
+        String text = contractText == null ? "" : contractText.trim();
+        if (text.isEmpty()) return "";
+        try {
+            JSONObject jsonObject = new JSONObject(text);
+            String packageArch = normalizePackageLaneValue(jsonObject.optString("packageArch", ""));
+            if (!packageArch.isEmpty()) return packageArch;
+            return normalizePackageLaneValue(jsonObject.optString("lane", ""));
+        } catch (JSONException e) {
+            return "";
+        }
+    }
+
+    static String normalizePackageLaneValue(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) return "";
+        if ("bundle".equals(normalized) || "universal".equals(normalized) || "all-arch".equals(normalized)) {
+            return "bundle";
+        }
+        if (PACKAGE_X86_64.equals(normalized)
+                || "x64".equals(normalized)
+                || "x86-64".equals(normalized)
+                || "x86_x64".equals(normalized)
+                || "x86-x64".equals(normalized)
+                || "dgvoodoo-x86_64".equals(normalized)
+                || "dgvoodoo-x86-64".equals(normalized)
+                || "dgvoodoo-x86-x64".equals(normalized)) {
+            return PACKAGE_X86_64;
+        }
+        if (PACKAGE_ARM64EC.equals(normalized)
+                || ARCH_ARM64.equals(normalized)
+                || "aarch64".equals(normalized)
+                || "dgvoodoo-arm64ec".equals(normalized)
+                || "dgvoodoo-arm64".equals(normalized)) {
+            return PACKAGE_ARM64EC;
+        }
+        return "";
+    }
+
+    private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
+        return FileUtils.resolveSafeArchiveEntry(rootDir, entry.getName());
+    }
+
+    private String resolveVersionHint(ContentProfile profile, File packageRoot, String displayName) {
+        if (profile != null && profile.verName != null && !profile.verName.trim().isEmpty()) {
+            return profile.verName.trim();
+        }
         String directoryHint = packageRoot != null ? normalizeVersionHint(packageRoot.getName()) : "local";
         if (!"local".equals(directoryHint)) return directoryHint;
         return normalizeVersionHint(displayName);
@@ -544,40 +659,161 @@ public class DgVoodooManager {
         return new File(targetDir, BACKUP_PREFIX + fileName);
     }
 
-    private File resolveDosPath(File imageFsRoot, String shortcutPath) {
-        if (shortcutPath == null || shortcutPath.length() < 2 || shortcutPath.charAt(1) != ':') {
-            return null;
-        }
-
-        char driveLetter = Character.toLowerCase(shortcutPath.charAt(0));
-        String relativePath = shortcutPath.substring(2).replace('\\', '/');
-        while (relativePath.startsWith("/")) {
-            relativePath = relativePath.substring(1);
-        }
-
-        File baseDir;
-        if (driveLetter == 'c') {
-            baseDir = new File(imageFsRoot, ImageFs.WINEPREFIX + "/drive_c");
-        } else {
-            baseDir = new File(imageFsRoot, ImageFs.WINEPREFIX + "/dosdevices/" + driveLetter + ":");
-            try {
-                if (!baseDir.exists()) return null;
-                baseDir = baseDir.getCanonicalFile();
-            } catch (IOException e) {
-                return null;
-            }
-        }
-
-        return relativePath.isEmpty() ? baseDir : new File(baseDir, relativePath);
+    private static String normalizeConfiguredArch(String arch) {
+        String trimmed = arch == null ? "" : arch.trim();
+        if (trimmed.isEmpty() || "auto".equalsIgnoreCase(trimmed)) return "";
+        String normalized = trimmed.toLowerCase(Locale.ROOT);
+        if (ARCH_X86.equals(normalized)) return ARCH_X86;
+        if (ARCH_X64.equals(normalized)) return ARCH_X64;
+        if (ARCH_ARM64.equals(normalized) || "aarch64".equals(normalized)) return ARCH_ARM64;
+        if (ARCH_ARM64EC.equals(normalized) || "arm64-ec".equals(normalized)) return ARCH_ARM64EC;
+        return "";
     }
 
-    private String normalizeRuntimeArch(String arch) {
+    private static String normalizeRuntimeArch(String arch) {
         String normalized = arch == null ? "" : arch.trim().toLowerCase(Locale.ROOT);
         if (ARCH_X86.equals(normalized)) return ARCH_X86;
         if (ARCH_X64.equals(normalized)) return ARCH_X64;
         if (ARCH_ARM64.equals(normalized) || "aarch64".equals(normalized)) return ARCH_ARM64;
         if (ARCH_ARM64EC.equals(normalized) || "arm64-ec".equals(normalized)) return ARCH_ARM64EC;
-        return ARCH_X86;
+        return ARCH_X64;
+    }
+
+    public static String resolvePackageLaneForRuntimeArch(String runtimeArch) {
+        String normalized = normalizeRuntimeArch(runtimeArch);
+        if (ARCH_ARM64.equals(normalized) || ARCH_ARM64EC.equals(normalized)) return PACKAGE_ARM64EC;
+        return PACKAGE_X86_64;
+    }
+
+    static String resolvePackageLaneForProfile(ContentProfile profile) {
+        if (profile == null || profile.type != ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return "";
+        String archTag = normalizePackageLaneValue(profile.getArchitectureTag());
+        if (!archTag.isEmpty() && !"bundle".equalsIgnoreCase(archTag)) return archTag;
+
+        String combined = (
+                (profile.verName == null ? "" : profile.verName) + " "
+                        + (profile.desc == null ? "" : profile.desc) + " "
+                        + (profile.releaseTag == null ? "" : profile.releaseTag) + " "
+                        + (profile.artifactName == null ? "" : profile.artifactName) + " "
+                        + (profile.remoteUrl == null ? "" : profile.remoteUrl)
+        ).toLowerCase(Locale.ROOT);
+        if (combined.contains("dgvoodoo-arm64ec") || combined.contains("arm64ec") || combined.contains("arm64-ec")) {
+            return PACKAGE_ARM64EC;
+        }
+        if (combined.contains("dgvoodoo-x86_64")
+                || combined.contains("dgvoodoo-x86-64")
+                || combined.contains("x86_64")
+                || combined.contains("x86-64")
+                || combined.contains("x86_x64")
+                || combined.contains("amd64")) {
+            return PACKAGE_X86_64;
+        }
+        return "";
+    }
+
+    private boolean matchesRequestedVersion(ContentProfile requestedProfile, File packageRoot) {
+        String requestedVersion = requestedProfile.verName == null ? "" : requestedProfile.verName.trim();
+        if (requestedVersion.isEmpty()) return true;
+        String installedVersion = resolvePackageVersionName(packageRoot);
+        return requestedVersion.equalsIgnoreCase(installedVersion);
+    }
+
+    static int compareVersionNames(String left, String right) {
+        int[] leftParts = parseVersionParts(left);
+        int[] rightParts = parseVersionParts(right);
+        for (int i = 0; i < leftParts.length; i++) {
+            if (leftParts[i] != rightParts[i]) {
+                return leftParts[i] - rightParts[i];
+            }
+        }
+        return 0;
+    }
+
+    private static int[] parseVersionParts(String value) {
+        int[] parts = new int[]{0, 0, 0, 0};
+        if (value == null) return parts;
+        Matcher matcher = VERSION_PATTERN.matcher(value);
+        if (!matcher.find()) return parts;
+        for (int i = 0; i < parts.length; i++) {
+            String group = matcher.group(i + 1);
+            if (group == null || group.trim().isEmpty()) continue;
+            try {
+                parts[i] = Integer.parseInt(group);
+            } catch (NumberFormatException ignored) {
+                parts[i] = 0;
+            }
+        }
+        return parts;
+    }
+
+    public static String detectExecutableArch(@Nullable File executableFile) {
+        if (executableFile == null || !executableFile.isFile()) return "";
+        try (RandomAccessFile file = new RandomAccessFile(executableFile, "r")) {
+            if (file.length() < 0x40) return "";
+            file.seek(0);
+            if (file.readUnsignedByte() != 'M' || file.readUnsignedByte() != 'Z') return "";
+
+            file.seek(0x3c);
+            long peOffset = readUnsignedIntLE(file);
+            if (peOffset <= 0 || peOffset + 6 > file.length()) return "";
+
+            file.seek(peOffset);
+            if (file.readUnsignedByte() != 'P'
+                    || file.readUnsignedByte() != 'E'
+                    || file.readUnsignedByte() != 0
+                    || file.readUnsignedByte() != 0) {
+                return "";
+            }
+
+            int machine = readUnsignedShortLE(file);
+            return switch (machine) {
+                case PE_MACHINE_I386 -> ARCH_X86;
+                case PE_MACHINE_AMD64 -> ARCH_X64;
+                case PE_MACHINE_ARM64 -> ARCH_ARM64;
+                case PE_MACHINE_ARM64EC -> ARCH_ARM64EC;
+                default -> "";
+            };
+        } catch (IOException ignored) {
+            return "";
+        }
+    }
+
+    public static String resolveAutoRuntimeArch(
+            @Nullable WineUtils.WindowsLaunchTarget launchTarget,
+            @Nullable WineInfo wineInfo
+    ) {
+        if (launchTarget != null) {
+            String detectedArch = detectExecutableArch(launchTarget.hostTargetFile);
+            if (ARCH_X64.equals(detectedArch) && wineInfo != null && wineInfo.isArm64EC()) {
+                return ARCH_ARM64EC;
+            }
+            if (!detectedArch.isEmpty()) return detectedArch;
+
+            String commandPath = launchTarget.commandPath == null ? "" : launchTarget.commandPath.toLowerCase(Locale.ROOT);
+            if (commandPath.contains("program files (x86)") || commandPath.contains("syswow64")) {
+                return ARCH_X86;
+            }
+        }
+
+        if (wineInfo != null) {
+            if (wineInfo.isArm64EC()) return ARCH_ARM64EC;
+            if (wineInfo.isWin64()) return ARCH_X64;
+        }
+        return "";
+    }
+
+    private static int readUnsignedShortLE(RandomAccessFile file) throws IOException {
+        int b0 = file.readUnsignedByte();
+        int b1 = file.readUnsignedByte();
+        return b0 | (b1 << 8);
+    }
+
+    private static long readUnsignedIntLE(RandomAccessFile file) throws IOException {
+        long b0 = file.readUnsignedByte();
+        long b1 = file.readUnsignedByte();
+        long b2 = file.readUnsignedByte();
+        long b3 = file.readUnsignedByte();
+        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
     }
 
     private boolean hasAnyRuntimeArch(File root) {

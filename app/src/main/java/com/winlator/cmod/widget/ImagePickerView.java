@@ -2,6 +2,7 @@ package com.winlator.cmod.widget;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -16,12 +17,16 @@ import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.core.WineThemeManager;
 
 import java.io.File;
 
 public class ImagePickerView extends AppCompatButton implements View.OnClickListener {
+    @Nullable
+    private File targetFile;
+
     public ImagePickerView(Context context) {
         this(context, null);
     }
@@ -50,7 +55,7 @@ public class ImagePickerView extends AppCompatButton implements View.OnClickList
     @Override
     public void onClick(View anchor) {
         final Context context = getContext();
-        final File userWallpaperFile = WineThemeManager.getUserWallpaperFile(context);
+        final File userWallpaperFile = targetFile != null ? targetFile : WineThemeManager.getUserWallpaperFile(context);
 
         View view = LayoutInflater.from(context).inflate(R.layout.image_picker_view, null);
         ImageView imageView = view.findViewById(R.id.ImageView);
@@ -64,6 +69,11 @@ public class ImagePickerView extends AppCompatButton implements View.OnClickList
         View browseButton = view.findViewById(R.id.BTBrowse);
         browseButton.setOnClickListener((v) -> {
             MainActivity activity = (MainActivity)context;
+            MainActivity.setImagePickerCallback((Bitmap bitmap) -> {
+                File parent = userWallpaperFile.getParentFile();
+                if (parent != null && !parent.isDirectory()) parent.mkdirs();
+                ImageUtils.save(bitmap, userWallpaperFile, Bitmap.CompressFormat.PNG, 100);
+            });
             Intent intent = new Intent(Intent.ACTION_PICK);
             intent.setType("image/*");
             popupWindow[0].dismiss();
@@ -80,5 +90,9 @@ public class ImagePickerView extends AppCompatButton implements View.OnClickList
         }
 
         popupWindow[0] = AppUtils.showPopupWindow(anchor, view, 200, 240);
+    }
+
+    public void setTargetFile(@Nullable File targetFile) {
+        this.targetFile = targetFile;
     }
 }

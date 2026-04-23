@@ -7,6 +7,7 @@ android {
     namespace 'app.ubuntufs'
     compileSdk 34
     buildToolsVersion "35.0.0"
+    ndkVersion '29.0.14206865'
 
     defaultConfig {
         minSdkVersion 26

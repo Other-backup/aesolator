@@ -309,7 +309,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
         Window ownerWindow = resolveCursorOwnerWindow(pointWindow);
         if (ownerWindow == null || ownerWindow == xServer.windowManager.rootWindow) return true;
-        if (!ownerWindow.isApplicationWindow()) return true;
+        if (!ownerWindow.isTrackedVisualWindow(xServer.windowManager.rootWindow)) return true;
         // Keep the compositor cursor on the desktop shell. The shell path is
         // driven by xServer pointer state and remains the most stable cursor
         // owner for trackpad/desktop sessions.
@@ -321,7 +321,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         Window current = pointWindow;
         while (current != null) {
             if (current == xServer.windowManager.rootWindow) return current;
-            if (current.isApplicationWindow()) return current;
+            if (current.isTrackedVisualWindow(xServer.windowManager.rootWindow)) return current;
             current = current.getParent();
         }
         return null;
@@ -383,6 +383,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             if (viewable)
                 renderableWindows.add(new RenderableWindow(window.getContent(), x, y));
         }
+
+        if (!window.attributes.isRenderSubwindows()) return;
 
         for (Window child : window.getChildren()) {
             collectRenderableWindows(child, child.getX() + x, child.getY() + y);

@@ -819,7 +819,9 @@ public class InputControlsView extends View {
             try (InputStream is = context.getAssets().open("inputcontrols/icons/"+id+".png")) {
                 icons[id] = BitmapFactory.decodeStream(is);
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                Log.w("InputControlsView", "Failed to load input control icon " + id, e);
+            }
         }
         return icons[id];
     }

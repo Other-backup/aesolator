@@ -16,6 +16,7 @@ import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.GraphicsDrivers;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -33,6 +34,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,6 +49,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private static final Pattern VULKAN_API_PATTERN = Pattern.compile("1\\.(\\d+)");
     private Spinner sVersion;
     private Spinner sVulkanVersion;
+    private Spinner sWrapperOpenGLDriver;
+    private TextView tvWrapperOpenGLVersionLabel;
+    private Spinner sWrapperOpenGLVersion;
     private MultiSelectionComboBox mscAvailableExtensions;
     private Spinner sGPUName;
     private Spinner sMaxDeviceMemory;
@@ -57,9 +62,13 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private Spinner sBCnEmulationCache;
     private CheckBox cbSyncFrame;
     private CheckBox cbDisablePresentWait;
+    private CheckBox cbWrapperDisableVertexArrayBGRA;
+    private CheckBox cbWrapperDisableGLKHRDebug;
 
     private static String selectedVulkanVersion;
     private static String selectedVersion;
+    private static String selectedWrapperOpenGLDriver;
+    private static String selectedWrapperOpenGLVersion;
     private static String blacklistedExtensions = "";
     private static String selectedGPUName;
     private static String selectedDeviceMemory;
@@ -71,6 +80,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private static String selectedBCnEmulation;
     private static String selectedBCnEmulationType;
     private static String isBCnCacheEnabled;
+    private static String isWrapperDisableVertexArrayBGRA;
+    private static String isWrapperDisableGLKHRDebug;
 
     private void loadGPUNameSpinner(Context context, Spinner spinner)  {
         String gpuNameList = FileUtils.readString(context, "gpu_cards.json");
@@ -135,6 +146,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     public static String writeGraphicsDriverConfig() {
         String graphicsDriverConfig = "vulkanVersion=" + selectedVulkanVersion + ";" +
                 "version=" + selectedVersion + ";" +
+                "galliumDriver=" + selectedWrapperOpenGLDriver + ";" +
+                "glVersion=" + selectedWrapperOpenGLVersion + ";" +
+                "disableVertexArrayBGRA=" + isWrapperDisableVertexArrayBGRA + ";" +
+                "disableGLKHRDebug=" + isWrapperDisableGLKHRDebug + ";" +
                 "blacklistedExtensions=" + blacklistedExtensions + ";" +
                 "maxDeviceMemory=" + StringUtils.parseNumber(selectedDeviceMemory) + ";" +
                 "presentMode=" + selectedPresentMode + ";" +
@@ -206,6 +221,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
 
         sVersion = findViewById(R.id.SGraphicsDriverVersion);
         sVulkanVersion = findViewById(R.id.SGraphicsDriverVulkanVersion);
+        sWrapperOpenGLDriver = findViewById(R.id.SWrapperOpenGLDriver);
+        tvWrapperOpenGLVersionLabel = findViewById(R.id.TVWrapperOpenGLVersionLabel);
+        sWrapperOpenGLVersion = findViewById(R.id.SWrapperOpenGLVersion);
         mscAvailableExtensions = findViewById(R.id.MSCAvailableExtensions);
         sPresentMode = findViewById(R.id.SGraphicsDriverPresentMode);
         sGPUName = findViewById(R.id.SGraphicsDriverGPUName);
@@ -216,12 +234,22 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sBCnEmulationCache = findViewById(R.id.SGraphicsDriverBCnEmulationCache);
         cbSyncFrame = findViewById(R.id.CBSyncFrame);
         cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
+        cbWrapperDisableVertexArrayBGRA = findViewById(R.id.CBWrapperDisableVertexArrayBGRA);
+        cbWrapperDisableGLKHRDebug = findViewById(R.id.CBWrapperDisableGLKHRDebug);
         applyPopupTheme(anchor.getContext());
 
         HashMap<String, String> config = parseGraphicsDriverConfigWithDefaults(graphicsDriverConfig);
+        AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(anchor.getContext());
+        String defaultWrapperVersion = adrenotoolsManager.getPreferredWrapperDriverId();
 
         String vulkanVersion = getConfigValue(config, "vulkanVersion", "1.4");
-        String initialVersion = getConfigValue(config, "version", DefaultVersion.WRAPPER);
+        String initialVersion = getConfigValue(
+                config,
+                "version",
+                GraphicsDrivers.isWrapper(graphicsDriver) ? defaultWrapperVersion : DefaultVersion.WRAPPER
+        );
+        String wrapperOpenGlDriver = GraphicsDrivers.getWrapperGalliumDriver(getConfigValue(config, "galliumDriver", "zink"));
+        String wrapperOpenGlVersion = GraphicsDrivers.normalizeWrapperGlVersion(getConfigValue(config, "glVersion", ""), wrapperOpenGlDriver);
         String blExtensions = getConfigValue(config, "blacklistedExtensions", "");
         String gpuName = getConfigValue(config, "gpuName", "Device");
         String maxDeviceMemory = getConfigValue(config, "maxDeviceMemory", "0");
@@ -232,8 +260,12 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         String bcnEmulation = getConfigValue(config, "bcnEmulation", "auto");
         String bcnEmulationType = getConfigValue(config, "bcnEmulationType", "compute");
         String bcnEmulationCache = getConfigValue(config, "bcnEmulationCache", "0");
+        String disableVertexArrayBGRA = getConfigValue(config, "disableVertexArrayBGRA", "1");
+        String disableGLKHRDebug = getConfigValue(config, "disableGLKHRDebug", "1");
         selectedVersion = initialVersion;
         selectedVulkanVersion = vulkanVersion;
+        selectedWrapperOpenGLDriver = wrapperOpenGlDriver;
+        selectedWrapperOpenGLVersion = wrapperOpenGlVersion;
         selectedGPUName = gpuName;
         selectedDeviceMemory = maxDeviceMemory;
         selectedPresentMode = presentMode;
@@ -243,6 +275,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         isBCnCacheEnabled = bcnEmulationCache;
         isSyncFrame = syncFrame;
         isDisablePresentWait = disablePresentWait;
+        isWrapperDisableVertexArrayBGRA = disableVertexArrayBGRA;
+        isWrapperDisableGLKHRDebug = disableGLKHRDebug;
 
         ForensicLogger.logEvent(
                 anchor.getContext(),
@@ -311,6 +345,41 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
 
+            }
+        });
+
+        sWrapperOpenGLDriver.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedWrapperOpenGLDriver = GraphicsDrivers.getWrapperGalliumDriver(
+                        StringUtils.parseIdentifier(sWrapperOpenGLDriver.getSelectedItem())
+                );
+                selectedWrapperOpenGLVersion = GraphicsDrivers.normalizeWrapperGlVersion(
+                        StringUtils.parseNumber(sWrapperOpenGLVersion.getSelectedItem()),
+                        selectedWrapperOpenGLDriver
+                );
+                if (GraphicsDrivers.isWrapperZinkOpenGlDriver(selectedWrapperOpenGLDriver)) {
+                    AppUtils.setSpinnerSelectionFromIdentifier(sWrapperOpenGLVersion, selectedWrapperOpenGLVersion);
+                }
+                updateWrapperMesaCompatControls();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        sWrapperOpenGLVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedWrapperOpenGLVersion = GraphicsDrivers.normalizeWrapperGlVersion(
+                        StringUtils.parseNumber(sWrapperOpenGLVersion.getSelectedItem()),
+                        selectedWrapperOpenGLDriver
+                );
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
             }
         });
 
@@ -408,12 +477,27 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             isDisablePresentWait = isChecked ? "1" : "0";
         });
 
+        cbWrapperDisableVertexArrayBGRA.setChecked("1".equals(isWrapperDisableVertexArrayBGRA));
+        cbWrapperDisableVertexArrayBGRA.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isWrapperDisableVertexArrayBGRA = isChecked ? "1" : "0";
+        });
+
+        cbWrapperDisableGLKHRDebug.setChecked("1".equals(isWrapperDisableGLKHRDebug));
+        cbWrapperDisableGLKHRDebug.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isWrapperDisableGLKHRDebug = isChecked ? "1" : "0";
+        });
+
         // Ensure ContentsManager syncContents is called
         ContentsManager contentsManager = new ContentsManager(anchor.getContext());
         contentsManager.syncContents();
 
         // Populate the spinner with available versions from ContentsManager and pre-select the initial version
-        populateGraphicsDriverVersions(anchor.getContext(), contentsManager, vulkanVersion, initialVersion, blExtensions, gpuName, maxDeviceMemory, presentMode, resourceType, bcnEmulation, bcnEmulationType, bcnEmulationCache, graphicsDriver);
+        populateGraphicsDriverVersions(anchor.getContext(), contentsManager, vulkanVersion, initialVersion, blExtensions, gpuName, maxDeviceMemory, presentMode, resourceType, bcnEmulation, bcnEmulationType, bcnEmulationCache, graphicsDriver, adrenotoolsManager);
+        AppUtils.setSpinnerSelectionFromIdentifier(
+                sWrapperOpenGLVersion,
+                GraphicsDrivers.normalizeWrapperGlVersion(selectedWrapperOpenGLVersion, selectedWrapperOpenGLDriver)
+        );
+        updateWrapperMesaCompatControls();
 
         setOnConfirmCallback(() -> {
             if (AppUtils.isMissingComponentValue(selectedVersion)) {
@@ -450,17 +534,14 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         });
     }
 
-    private void populateGraphicsDriverVersions(Context context, ContentsManager contentsManager, String vulkanVersion, @Nullable String initialVersion, @Nullable String blExtensions, String gpuName, String maxDeviceMemory, String presentMode, String selectedResourceType, String bcnEmulation, String bcnEmulationType, String bcnEmulationCache, String graphicsDriver) {
-        List<String> wrapperVersions = new ArrayList<>();
-        String[] wrapperDefaultVersions = context.getResources().getStringArray(R.array.wrapper_graphics_driver_version_entries);
+    private void populateGraphicsDriverVersions(Context context, ContentsManager contentsManager, String vulkanVersion, @Nullable String initialVersion, @Nullable String blExtensions, String gpuName, String maxDeviceMemory, String presentMode, String selectedResourceType, String bcnEmulation, String bcnEmulationType, String bcnEmulationCache, String graphicsDriver, AdrenotoolsManager adrenotoolsManager) {
+        List<String> wrapperVersions = new ArrayList<>(adrenotoolsManager.enumerateAvailableWrapperVersionEntries());
 
-        for (String version : wrapperDefaultVersions) {
-            wrapperVersions.add(version);
+        ArrayList<AdrenotoolsManager.DriverPackageInfo> installedPackages = adrenotoolsManager.enumerateInstalledDriverPackages();
+        for (AdrenotoolsManager.DriverPackageInfo info : installedPackages) {
+            if (info == null || info.fromResources) continue;
+            if (!wrapperVersions.contains(info.entryId)) wrapperVersions.add(info.entryId);
         }
-
-        // Add installed versions from AdrenotoolsManager
-        AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(context);
-        wrapperVersions.addAll(adrenotoolsManager.enumarateInstalledDrivers());
 
         // Set the adapter and select the initial version
         boolean hasVersions = !wrapperVersions.isEmpty();
@@ -470,6 +551,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), wrapperVersions));
         sVersion.setEnabled(hasVersions);
         mscAvailableExtensions.setEnabled(hasVersions);
+        AppUtils.setSpinnerSelectionFromIdentifier(sWrapperOpenGLDriver, GraphicsDrivers.getWrapperGalliumDriver(selectedWrapperOpenGLDriver));
 
         // We can start logging selected graphics driver and initial version
         Log.d(TAG, "Graphics driver: " + graphicsDriver);
@@ -480,7 +562,12 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
 
         // Use the custom selection logic
         if (hasVersions) {
-            setSpinnerSelectionWithFallback(sVersion, initialVersion, graphicsDriver);
+            setSpinnerSelectionWithFallback(
+                    sVersion,
+                    initialVersion,
+                    installedPackages,
+                    adrenotoolsManager.getPreferredWrapperDriverId()
+            );
         } else {
             selectedVersion = AppUtils.MISSING_COMPONENT_PLACEHOLDER;
             sVersion.setSelection(0, false);
@@ -499,88 +586,21 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     private void populateVulkanVersionSpinner(Context context, ContentsManager contentsManager, String selectedValue) {
-        ArrayList<String> sdkApiVersions = collectInstalledVulkanSdkApiVersions(contentsManager);
-        if (sdkApiVersions.isEmpty()) {
-            // No installed Vulkan SDK lane: keep previous config value and disable selector.
-            sdkApiVersions.add("—");
-            sVulkanVersion.setEnabled(false);
-            selectedVulkanVersion = selectedValue != null && !selectedValue.trim().isEmpty() ? selectedValue : "1.3";
-            sVulkanVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), sdkApiVersions));
-            sVulkanVersion.setSelection(0);
-            return;
-        }
-
+        ArrayList<String> sdkApiVersions = new ArrayList<>(Arrays.asList(
+                context.getResources().getStringArray(R.array.vulkan_version_entries)
+        ));
         sVulkanVersion.setEnabled(true);
         sVulkanVersion.setAdapter(SpinnerAdapters.create(context, isDarkMode(context), sdkApiVersions));
         if (!AppUtils.setSpinnerSelectionFromValue(sVulkanVersion, selectedValue)) {
-            // Default to highest API exposed by installed SDK lanes.
             sVulkanVersion.setSelection(sdkApiVersions.size() - 1);
         }
         selectedVulkanVersion = sVulkanVersion.getSelectedItem().toString();
     }
 
-    private ArrayList<String> collectInstalledVulkanSdkApiVersions(ContentsManager contentsManager) {
-        TreeSet<Integer> apiMinors = new TreeSet<>();
-        List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
-        if (profiles == null) return new ArrayList<>();
-
-        for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
-            int[] range = resolveVulkanApiRangeFromProfile(profile);
-            int minMinor = range[0];
-            int maxMinor = range[1];
-            if (maxMinor < 1) continue;
-            for (int minor = minMinor; minor <= maxMinor; minor++) {
-                apiMinors.add(minor);
-            }
-        }
-
-        ArrayList<String> versions = new ArrayList<>();
-        for (Integer minor : apiMinors) {
-            versions.add(String.format(Locale.US, "1.%d", minor));
-        }
-        return versions;
-    }
-
-    private int parseMaxVulkanMinorFromProfile(ContentProfile profile) {
-        return resolveVulkanApiRangeFromProfile(profile)[1];
-    }
-
-    private int[] resolveVulkanApiRangeFromProfile(ContentProfile profile) {
-        int min = profile != null ? profile.vulkanApiMin : 0;
-        int max = profile != null ? profile.vulkanApiMax : 0;
-        if (min > 0 && max > 0) {
-            if (min > max) {
-                int tmp = min;
-                min = max;
-                max = tmp;
-            }
-            return new int[]{min, max};
-        }
-
-        int inferredMax = 0;
-        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.verName : null));
-        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.desc : null));
-        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.releaseTag : null));
-        inferredMax = Math.max(inferredMax, parseMaxVulkanMinorFromString(profile != null ? profile.vulkanSdkVersion : null));
-        if (inferredMax > 0) return new int[]{1, inferredMax};
-        return new int[]{0, 0};
-    }
-
-    private int parseMaxVulkanMinorFromString(String raw) {
-        if (raw == null || raw.trim().isEmpty()) return 0;
-        int maxMinor = 0;
-        Matcher matcher = VULKAN_API_PATTERN.matcher(raw);
-        while (matcher.find()) {
-            try {
-                maxMinor = Math.max(maxMinor, Integer.parseInt(matcher.group(1)));
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return maxMinor;
-    }
-
-    private void setSpinnerSelectionWithFallback(Spinner spinner, String version, String graphicsDriver) {
+    private void setSpinnerSelectionWithFallback(Spinner spinner,
+                                                 @Nullable String version,
+                                                 List<AdrenotoolsManager.DriverPackageInfo> installedPackages,
+                                                 String fallbackVersion) {
         if (spinner.getCount() == 0) return;
         String firstItem = spinner.getItemAtPosition(0).toString();
         if (AppUtils.isMissingComponentValue(firstItem)) {
@@ -598,7 +618,19 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         }
 
-        AppUtils.setSpinnerSelectionFromValue(spinner, DefaultVersion.WRAPPER);
+        if (version != null && installedPackages != null) {
+            AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(spinner.getContext());
+            for (AdrenotoolsManager.DriverPackageInfo info : installedPackages) {
+                if (!adrenotoolsManager.matchesDriverReference(version, info)) continue;
+                if (AppUtils.setSpinnerSelectionFromValue(spinner, info.entryId)) {
+                    return;
+                }
+            }
+        }
+
+        if (!AppUtils.setSpinnerSelectionFromValue(spinner, fallbackVersion)) {
+            AppUtils.setSpinnerSelectionFromValue(spinner, DefaultVersion.WRAPPER);
+        }
     }
 
     private void applyPopupTheme(Context context) {
@@ -607,6 +639,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         int popupBg = isDarkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
         SpinnerAdapters.applySurface(sVersion, isDarkMode);
         SpinnerAdapters.applySurface(sVulkanVersion, isDarkMode);
+        SpinnerAdapters.applySurface(sWrapperOpenGLDriver, isDarkMode);
+        SpinnerAdapters.applySurface(sWrapperOpenGLVersion, isDarkMode);
         SpinnerAdapters.applySurface(sPresentMode, isDarkMode);
         SpinnerAdapters.applySurface(sGPUName, isDarkMode);
         SpinnerAdapters.applySurface(sMaxDeviceMemory, isDarkMode);
@@ -617,6 +651,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         SpinnerAdapters.applySurface(mscAvailableExtensions, isDarkMode);
         sVersion.setPopupBackgroundResource(popupBg);
         sVulkanVersion.setPopupBackgroundResource(popupBg);
+        sWrapperOpenGLDriver.setPopupBackgroundResource(popupBg);
+        sWrapperOpenGLVersion.setPopupBackgroundResource(popupBg);
         sPresentMode.setPopupBackgroundResource(popupBg);
         sGPUName.setPopupBackgroundResource(popupBg);
         sMaxDeviceMemory.setPopupBackgroundResource(popupBg);
@@ -650,6 +686,15 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         if (value == null) return fallback;
         String normalized = value.trim();
         return normalized.isEmpty() ? fallback : normalized;
+    }
+
+    private void updateWrapperMesaCompatControls() {
+        boolean zinkOpenGlRoute = GraphicsDrivers.isWrapperZinkOpenGlDriver(selectedWrapperOpenGLDriver);
+        int visibility = zinkOpenGlRoute ? View.VISIBLE : View.GONE;
+        tvWrapperOpenGLVersionLabel.setVisibility(visibility);
+        sWrapperOpenGLVersion.setVisibility(visibility);
+        cbWrapperDisableVertexArrayBGRA.setVisibility(visibility);
+        cbWrapperDisableGLKHRDebug.setVisibility(visibility);
     }
 
 }

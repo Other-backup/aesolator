@@ -46,6 +46,33 @@ If the device is already paired and only needs reconnect:
 sh tools/adb-wifi-debug.sh connect 192.168.0.10:42363
 ```
 
+## Same-Device Loopback Fallback
+
+When `Termux` runs on the same Android device, the most stable practical
+fallback is to switch `adbd` into classic TCP mode and then reconnect through
+loopback instead of the ephemeral Wireless Debugging port.
+
+Bootstrap from a working wireless-debug endpoint:
+
+```sh
+sh tools/adb-wifi-debug.sh tcpip-loopback 192.168.0.10:42363
+```
+
+After that, reuse the local same-device endpoint:
+
+```sh
+sh tools/adb-wifi-debug.sh connect-loopback
+```
+
+This yields `127.0.0.1:5555` on the same phone.
+
+Important:
+
+- this is a practical fallback, not a permanent no-root system hack
+- after reboot or `adbd` restart, `tcpip 5555` may need to be re-enabled once
+- for same-device `Termux`, `127.0.0.1:5555` is preferable to chasing a fresh
+  Wireless Debugging port every session
+
 ## Status / Disconnect
 
 ```sh

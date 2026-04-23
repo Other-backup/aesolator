@@ -30,32 +30,43 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
     }
 
     @Override
-    public boolean isSatisfied(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
-        return collectMissingParts(context, container, shortcut).isEmpty();
+    public boolean isSatisfied(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+        return collectMissingRequirements(dependencyContext, container, shortcut).isEmpty();
     }
 
     @Override
-    public String getLoadingMessage(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
-        List<String> missing = collectMissingParts(context, container, shortcut);
+    public String getLoadingMessage(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId) {
+        List<ManifestDependencyInstaller.RequiredContent> missing = collectMissingRequirements(dependencyContext, container, shortcut);
         if (missing.isEmpty()) return "Validating emulator runtime payloads";
-        return "Missing emulator runtime payloads: " + String.join(", ", missing);
+        return "Missing emulator runtime payloads: " + ManifestDependencyInstaller.formatMissing(missing);
     }
 
     @Override
-    public void install(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
-        List<String> missing = collectMissingParts(context, container, shortcut);
-        String detail = missing.isEmpty()
-                ? "Emulator runtime validation failed"
-                : "Missing emulator runtime payloads: " + String.join(", ", missing);
+    public void install(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId, LaunchDependencyCallbacks callbacks) {
+        List<ManifestDependencyInstaller.RequiredContent> missing = collectMissingRequirements(dependencyContext, container, shortcut);
+        if (!missing.isEmpty()) {
+            ManifestDependencyInstaller.installAvailable(
+                    dependencyContext,
+                    container == null ? "" : container.getContainerVariant(),
+                    missing,
+                    callbacks
+            );
+        }
+        List<ManifestDependencyInstaller.RequiredContent> unresolved = collectMissingRequirements(dependencyContext, container, shortcut);
+        if (unresolved.isEmpty()) {
+            callbacks.setLoadingProgress(1f);
+            return;
+        }
+        String detail = "Missing emulator runtime payloads: " + ManifestDependencyInstaller.formatMissing(unresolved);
         callbacks.setLoadingMessage(detail);
         callbacks.setLoadingProgress(0f);
         throw new IllegalStateException(detail);
     }
 
-    private List<String> collectMissingParts(Context context, Container container, @Nullable Shortcut shortcut) {
-        ArrayList<String> missing = new ArrayList<>();
-        ContentsManager manager = new ContentsManager(context);
-        manager.syncContents();
+    private List<ManifestDependencyInstaller.RequiredContent> collectMissingRequirements(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut) {
+        ArrayList<ManifestDependencyInstaller.RequiredContent> missing = new ArrayList<>();
+        Context context = dependencyContext.getContext();
+        ContentsManager manager = dependencyContext.getContentsManager();
 
         String selectedWine = resolveWineIdentifier(container, shortcut);
         if (selectedWine.isEmpty()) return missing;
@@ -66,47 +77,53 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
             requestedRuntimeModel = inferredRuntimeModel;
         }
         WineInfo wineInfo = WineInfo.fromIdentifier(context, manager, selectedWine, requestedRuntimeModel);
-        File imageFsRoot = ImageFs.find(context).getRootDir();
+        ImageFs imageFs = ImageFs.find(context);
+        File imageFsRoot = imageFs.getRootDir();
+        File winePrefixDir = container != null && container.getRootDir() != null
+                ? new File(container.getRootDir(), ".wine")
+                : imageFs.getWinePrefixDir();
 
         if (wineInfo.isArm64EC()) {
             String wowbox64Version = resolveBox64Version(container, shortcut, true);
             String fexcoreVersion = resolveFexcoreVersion(container, shortcut);
 
-            boolean wowbox64Ready = hasInstalledVersion(manager, ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64, wowbox64Version)
+            boolean wowbox64Ready = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64, wowbox64Version, true)
                     || hasEmbeddedArchive(context, "wowbox64/wowbox64-" + wowbox64Version + ".tzst")
-                    || new File(imageFsRoot, "home/xuser/.wine/drive_c/windows/system32/wowbox64.dll").isFile();
+                    || new File(winePrefixDir, "drive_c/windows/system32/wowbox64.dll").isFile();
             if (!wowbox64Ready) {
-                missing.add("wowbox64-" + wowbox64Version);
+                missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
+                        wowbox64Version,
+                        "wowbox64-" + wowbox64Version
+                ));
             }
 
-            boolean fexcoreReady = hasInstalledVersion(manager, ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, fexcoreVersion)
+            boolean fexcoreReady = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, fexcoreVersion, true)
                     || hasEmbeddedArchive(context, "fexcore/fexcore-" + fexcoreVersion + ".tzst")
-                    || new File(imageFsRoot, "home/xuser/.wine/drive_c/windows/system32/libwow64fex.dll").isFile()
-                    || new File(imageFsRoot, "home/xuser/.wine/drive_c/windows/system32/libarm64ecfex.dll").isFile();
+                    || new File(winePrefixDir, "drive_c/windows/system32/libwow64fex.dll").isFile()
+                    || new File(winePrefixDir, "drive_c/windows/system32/libarm64ecfex.dll").isFile();
             if (!fexcoreReady) {
-                missing.add("fexcore-" + fexcoreVersion);
+                missing.add(new ManifestDependencyInstaller.RequiredContent(
+                        ContentProfile.ContentType.CONTENT_TYPE_FEXCORE,
+                        fexcoreVersion,
+                        "fexcore-" + fexcoreVersion
+                ));
             }
             return missing;
         }
 
         String box64Version = resolveBox64Version(container, shortcut, false);
-        boolean box64Ready = hasInstalledVersion(manager, ContentProfile.ContentType.CONTENT_TYPE_BOX64, box64Version)
+        boolean box64Ready = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_BOX64, box64Version, true)
                 || hasEmbeddedArchive(context, "box64/box64-" + box64Version + ".tzst")
                 || new File(imageFsRoot, "usr/bin/box64").isFile();
         if (!box64Ready) {
-            missing.add("box64-" + box64Version);
+            missing.add(new ManifestDependencyInstaller.RequiredContent(
+                    ContentProfile.ContentType.CONTENT_TYPE_BOX64,
+                    box64Version,
+                    "box64-" + box64Version
+            ));
         }
         return missing;
-    }
-
-    private boolean hasInstalledVersion(ContentsManager manager, ContentProfile.ContentType type, String version) {
-        List<ContentProfile> profiles = manager.getProfiles(type);
-        if (profiles == null || version == null || version.trim().isEmpty()) return false;
-        for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
-            if (version.equalsIgnoreCase(profile.verName)) return true;
-        }
-        return false;
     }
 
     private boolean hasEmbeddedArchive(Context context, String assetPath) {

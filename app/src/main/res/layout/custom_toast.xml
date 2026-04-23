@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="horizontal"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="10dp"
+    android:layout_width="340dp"
+    android:layout_height="wrap_content"
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp"
     android:gravity="center_vertical"
     android:background="@drawable/custom_toast_background">
 
-    <ImageView
-        android:src="@drawable/ae_icon_info"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:tint="@color/colorAccent"
-        android:layout_marginEnd="10dp" />
+    <FrameLayout
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_marginEnd="10dp"
+        android:gravity="center"
+        android:translationX="-4dp">
+
+        <ImageView
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ae_icon_info"
+            android:tint="@color/surface_runtime_taskmgr_border" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/TextView"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
+        android:layout_weight="1"
+        android:textSize="15sp"
         android:textColor="@color/white" />
 </LinearLayout>

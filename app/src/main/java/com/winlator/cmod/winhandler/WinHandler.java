@@ -10,6 +10,7 @@ import android.view.MotionEvent;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.XServerDisplayActivity;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class WinHandler {
+    private static final String TAG = "WinHandler";
     private static final short SERVER_PORT = 7947;
     private static final short CLIENT_PORT = 7946;
     private static final int SEND_PACKET_SIZE = 64;
@@ -178,12 +180,22 @@ public class WinHandler {
         preferences = PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
     }
     private boolean sendPacket(int port) {
+        return sendPacket(port, sendData);
+    }
+
+    private boolean sendPacket(int port, ByteBuffer buffer) {
         try {
-            int size = sendData.position();
+            int size = buffer.position();
             if (size == 0) return false;
-            sendPacket.setAddress(localhost);
-            sendPacket.setPort(port);
-            socket.send(sendPacket);
+            if (buffer == sendData) {
+                sendPacket.setData(sendData.array(), 0, size);
+                sendPacket.setAddress(localhost);
+                sendPacket.setPort(port);
+                socket.send(sendPacket);
+            } else {
+                DatagramPacket packet = new DatagramPacket(buffer.array(), size, localhost, port);
+                socket.send(packet);
+            }
             return true;
         }
         catch (IOException e) {
@@ -195,47 +207,62 @@ public class WinHandler {
         command = command.trim();
         if (command.isEmpty()) return;
 
-        // The `split` function here should be sensitive to paths with spaces.
-        // Instead of splitting, let's assume that command is directly provided in two parts: filename and parameters.
-        // Adjust command splitting based on whether it contains quotes.
+        String[] parsed = splitCommand(command);
+        String filename = parsed[0];
+        String parameters = parsed[1];
 
-        String filename;
-        String parameters;
+        addAction(() -> {
+            byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
+            byte[] parametersBytes = parameters.getBytes(StandardCharsets.UTF_8);
+            int packetSize = 1 + (Integer.BYTES * 3) + filenameBytes.length + parametersBytes.length;
+            ByteBuffer packetBuffer = packetSize <= SEND_PACKET_SIZE
+                    ? sendData
+                    : ByteBuffer.allocate(packetSize).order(ByteOrder.LITTLE_ENDIAN);
 
-        if (command.contains("\"")) {
-            // If the command is quoted, extract the quoted part as the filename
-            int firstQuote = command.indexOf("\"");
-            int lastQuote = command.lastIndexOf("\"");
-            filename = command.substring(firstQuote + 1, lastQuote);
-            if (lastQuote + 1 < command.length()) {
-                parameters = command.substring(lastQuote + 1).trim();
-            } else {
-                parameters = "";
-            }
-        } else {
-            // Standard split when no quotes
-            String[] cmdList = command.split(" ", 2);
-            filename = cmdList[0];
-            if (cmdList.length > 1) {
-                parameters = cmdList[1];
-            } else {
-                parameters = "";
+            packetBuffer.clear();
+            packetBuffer.put(RequestCodes.EXEC);
+            packetBuffer.putInt(filenameBytes.length + parametersBytes.length + 8);
+            packetBuffer.putInt(filenameBytes.length);
+            packetBuffer.putInt(parametersBytes.length);
+            packetBuffer.put(filenameBytes);
+            packetBuffer.put(parametersBytes);
+            sendPacket(CLIENT_PORT, packetBuffer);
+        });
+    }
+
+    static String[] splitCommand(String command) {
+        String trimmed = command != null ? command.trim() : "";
+        if (trimmed.isEmpty()) return new String[] {"", ""};
+
+        if (trimmed.charAt(0) == '"') {
+            int closingQuote = findClosingQuote(trimmed, 1);
+            if (closingQuote > 1) {
+                String filename = trimmed.substring(1, closingQuote);
+                String parameters = closingQuote + 1 < trimmed.length()
+                        ? trimmed.substring(closingQuote + 1).trim()
+                        : "";
+                return new String[] {filename, parameters};
             }
         }
 
-        addAction(() -> {
-            byte[] filenameBytes = filename.getBytes();
-            byte[] parametersBytes = parameters.getBytes();
+        int firstSpace = trimmed.indexOf(' ');
+        if (firstSpace == -1) return new String[] {trimmed, ""};
+        return new String[] {
+                trimmed.substring(0, firstSpace),
+                trimmed.substring(firstSpace + 1).trim()
+        };
+    }
 
-            sendData.rewind();
-            sendData.put(RequestCodes.EXEC);
-            sendData.putInt(filenameBytes.length + parametersBytes.length + 8);
-            sendData.putInt(filenameBytes.length);
-            sendData.putInt(parametersBytes.length);
-            sendData.put(filenameBytes);
-            sendData.put(parametersBytes);
-            sendPacket(CLIENT_PORT);
-        });
+    private static int findClosingQuote(String value, int start) {
+        for (int index = start; index < value.length(); index++) {
+            if (value.charAt(index) != '"') continue;
+            int backslashCount = 0;
+            for (int cursor = index - 1; cursor >= 0 && value.charAt(cursor) == '\\'; cursor--) {
+                backslashCount++;
+            }
+            if ((backslashCount & 1) == 0) return index;
+        }
+        return -1;
     }
 
 
@@ -346,8 +373,12 @@ public class WinHandler {
     private void addAction(Runnable action) {
         synchronized (actions) {
             actions.add(action);
-            actions.notify();
+            actions.notifyAll();
         }
+    }
+
+    public boolean isReady() {
+        return initReceived;
     }
 
     public OnGetProcessInfoListener getOnGetProcessInfoListener() {
@@ -364,18 +395,26 @@ public class WinHandler {
         Executors.newSingleThreadExecutor().execute(() -> {
             while (running) {
                 synchronized (actions) {
-                    while (initReceived && !actions.isEmpty()) actions.poll().run();
+                    while (running && initReceived && !actions.isEmpty()) actions.poll().run();
                     try {
-                        actions.wait();
+                        while (running && (!initReceived || actions.isEmpty())) {
+                            actions.wait();
+                        }
                     }
-                    catch (InterruptedException e) {}
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "WinHandler send thread interrupted", e);
+                        return;
+                    }
                 }
             }
         });
     }
 
     public void stop() {
+        boolean wasRunning = running;
         running = false;
+        initReceived = false;
 
         if (socket != null) {
             socket.close();
@@ -383,7 +422,22 @@ public class WinHandler {
         }
 
         synchronized (actions) {
-            actions.notify();
+            actions.notifyAll();
+        }
+
+        if (wasRunning) {
+            ForensicLogger.logEvent(
+                    activity,
+                    "info",
+                    "WINHANDLER_SOCKET_STOPPED",
+                    null,
+                    "winhandler",
+                    "winhandler_socket_stopped",
+                    ForensicLogger.fields(
+                            "server_port", (int) SERVER_PORT,
+                            "client_port", (int) CLIENT_PORT
+                    )
+            );
         }
     }
 
@@ -391,6 +445,22 @@ public class WinHandler {
         switch (requestCode) {
             case RequestCodes.INIT: {
                 initReceived = true;
+                ForensicLogger.logEvent(
+                        activity,
+                        "info",
+                        "WINHANDLER_INIT_RECEIVED",
+                        null,
+                        "winhandler",
+                        "winhandler_init_received",
+                        ForensicLogger.fields(
+                                "server_port", (int) SERVER_PORT,
+                                "client_port", (int) CLIENT_PORT,
+                                "remote_port", port
+                        )
+                );
+                synchronized (actions) {
+                    actions.notifyAll();
+                }
 
 
 
@@ -552,23 +622,50 @@ public class WinHandler {
 
 
     public void start() {
+        stop();
+
         try {
             localhost = InetAddress.getLocalHost();
         }
         catch (UnknownHostException e) {
-            try {
-                localhost = InetAddress.getByName("127.0.0.1");
-            }
-            catch (UnknownHostException ex) {}
+            Log.w(TAG, "Falling back to loopback address for WinHandler transport", e);
+            localhost = InetAddress.getLoopbackAddress();
         }
 
+        initReceived = false;
         running = true;
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "WINHANDLER_SOCKET_STARTING",
+                null,
+                "winhandler",
+                "winhandler_socket_starting",
+                ForensicLogger.fields(
+                        "server_port", (int) SERVER_PORT,
+                        "client_port", (int) CLIENT_PORT,
+                        "localhost", localhost == null ? "" : localhost.getHostAddress()
+                )
+        );
         startSendThread();
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 socket = new DatagramSocket(null);
                 socket.setReuseAddress(true);
                 socket.bind(new InetSocketAddress((InetAddress)null, SERVER_PORT));
+                ForensicLogger.logEvent(
+                        activity,
+                        "info",
+                        "WINHANDLER_SOCKET_BOUND",
+                        null,
+                        "winhandler",
+                        "winhandler_socket_bound",
+                        ForensicLogger.fields(
+                                "server_port", (int) SERVER_PORT,
+                                "client_port", (int) CLIENT_PORT,
+                                "localhost", localhost == null ? "" : localhost.getHostAddress()
+                        )
+                );
 
                 while (running) {
                     receivePacket.setLength(receiveData.capacity());
@@ -582,7 +679,35 @@ public class WinHandler {
                     }
                 }
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                if (running) {
+                    Log.e(TAG, "WinHandler socket loop failed", e);
+                    ForensicLogger.error(
+                            activity,
+                            "WINHANDLER_SOCKET_FAILED",
+                            null,
+                            "winhandler",
+                            "winhandler_socket_failed",
+                            e,
+                            ForensicLogger.fields(
+                                    "server_port", (int) SERVER_PORT,
+                                    "client_port", (int) CLIENT_PORT,
+                                    "localhost", localhost == null ? "" : localhost.getHostAddress()
+                            )
+                    );
+                }
+            }
+            finally {
+                if (socket != null) {
+                    socket.close();
+                    socket = null;
+                }
+                running = false;
+                initReceived = false;
+                synchronized (actions) {
+                    actions.notifyAll();
+                }
+            }
         });
     }
 

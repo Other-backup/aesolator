@@ -1,0 +1,437 @@
+diff --git a/src/gallium/drivers/lima/lima_aemali_policy.c b/src/gallium/drivers/lima/lima_aemali_policy.c
+new file mode 100644
+index 0000000..6f8e1cd
+--- /dev/null
++++ b/src/gallium/drivers/lima/lima_aemali_policy.c
+@@ -0,0 +1,140 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#include "lima_aemali_policy.h"
++
++#include "drm-uapi/lima_drm.h"
++#include "util/log.h"
++#include "util/os_misc.h"
++
++#include <stdbool.h>
++#include <stdio.h>
++#include <string.h>
++
++static const char *
++aemali_first_option(const char *primary, const char *secondary,
++                    const char *tertiary)
++{
++   const char *value = os_get_option(primary);
++   if (value && value[0])
++      return value;
++
++   value = os_get_option(secondary);
++   if (value && value[0])
++      return value;
++
++   value = os_get_option(tertiary);
++   return value && value[0] ? value : NULL;
++}
++
++static bool
++aemali_matches_driver_name(const char *value)
++{
++   return value && value[0] && strstr(value, "aemali");
++}
++
++static bool
++aemali_is_truthy(const char *value)
++{
++   if (!value || !value[0])
++      return false;
++
++   return !strcmp(value, "1") ||
++          !strcmp(value, "true") ||
++          !strcmp(value, "on") ||
++          !strcmp(value, "yes") ||
++          !strcmp(value, "enabled") ||
++          !strcmp(value, "aemali");
++}
++
++static bool
++lima_aemali_policy_enabled(void)
++{
++   const char *flag = os_get_option("AEMALI_OPENGL");
++   const char *driver = aemali_first_option("AEMALI_OPENGL_DRIVER",
++                                            "AERO_MESA_OPENGL_DRIVER",
++                                            "AERO_MESA_DRIVER");
++
++   return aemali_is_truthy(flag) || aemali_matches_driver_name(driver);
++}
++
++static const char *
++lima_gpu_name(int gpu_type)
++{
++   switch (gpu_type) {
++   case DRM_LIMA_PARAM_GPU_ID_MALI400:
++      return "Mali400";
++   case DRM_LIMA_PARAM_GPU_ID_MALI450:
++      return "Mali450";
++   default:
++      return "MaliUtgard";
++   }
++}
++
++const char *
++lima_aemali_vendor_string(void)
++{
++   return lima_aemali_policy_enabled() ? "Ae.solator Mesa" : "Mesa";
++}
++
++void
++lima_aemali_build_renderer_string(char *dst, size_t dst_size,
++                                  int gpu_type, int num_pp)
++{
++   const char *name = lima_gpu_name(gpu_type);
++
++   if (!dst || !dst_size)
++      return;
++
++   if (!lima_aemali_policy_enabled()) {
++      snprintf(dst, dst_size, "%s", name);
++      return;
++   }
++
++   snprintf(dst, dst_size, "AeMali Gallium/Lima %s PP%u", name,
++            num_pp > 0 ? (unsigned)num_pp : 1u);
++}
++
++void
++lima_aemali_log_startup(const char *renderer, int gpu_type, int num_pp)
++{
++   const char *profile;
++   const char *route;
++   const char *transport;
++   const char *gallium_driver;
++   const char *render_node_required;
++   const char *render_node_present;
++
++   if (!lima_aemali_policy_enabled())
++      return;
++
++   profile = aemali_first_option("AEMALI_OPENGL_PROFILE", "AEMALI_PROFILE",
++                                 "AERO_GRAPHICS_STACK_PROFILE");
++   route = aemali_first_option("AEMALI_OPENGL_ROUTE", "AEMALI_ROUTE",
++                               "AERO_OPENGL_ROUTE_ID");
++   transport = aemali_first_option("AEMALI_OPENGL_TRANSPORT",
++                                   "AEMALI_TRANSPORT",
++                                   "AERO_OPENGL_DRIVER_TRANSPORT");
++   gallium_driver = aemali_first_option("AEMALI_OPENGL_GALLIUM_DRIVER",
++                                        "AERO_OPENGL_GALLIUM_DRIVER",
++                                        "GALLIUM_DRIVER");
++   render_node_required = aemali_first_option("AEMALI_OPENGL_RENDER_NODE_REQUIRED",
++                                              "AERO_OPENGL_REQUIRES_RENDER_NODE",
++                                              "AEMALI_RENDER_NODE_REQUIRED");
++   render_node_present = aemali_first_option("AEMALI_OPENGL_RENDER_NODE_PRESENT",
++                                             "AERO_OPENGL_RENDER_NODE_PRESENT",
++                                             "AEMALI_RENDER_NODE_PRESENT");
++
++   mesa_logi("AeMali Gallium policy: renderer=%s gpu=%s pp=%u profile=%s route=%s transport=%s gallium=%s render_node_required=%s render_node_present=%s",
++             renderer ? renderer : "AeMali Gallium/Lima",
++             lima_gpu_name(gpu_type),
++             num_pp > 0 ? (unsigned)num_pp : 1u,
++             profile ? profile : "aemali-universal",
++             route ? route : "aemali-gallium",
++             transport ? transport : "drm-render-node-experimental",
++             gallium_driver ? gallium_driver : "lima",
++             render_node_required ? render_node_required : "0",
++             render_node_present ? render_node_present : "0");
++}
+diff --git a/src/gallium/drivers/lima/lima_aemali_policy.h b/src/gallium/drivers/lima/lima_aemali_policy.h
+new file mode 100644
+index 0000000..29d7d63
+--- /dev/null
++++ b/src/gallium/drivers/lima/lima_aemali_policy.h
+@@ -0,0 +1,16 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#ifndef LIMA_AEMALI_POLICY_H
++#define LIMA_AEMALI_POLICY_H
++
++#include <stddef.h>
++
++const char *lima_aemali_vendor_string(void);
++void lima_aemali_build_renderer_string(char *dst, size_t dst_size,
++                                       int gpu_type, int num_pp);
++void lima_aemali_log_startup(const char *renderer, int gpu_type, int num_pp);
++
++#endif
+diff --git a/src/gallium/drivers/lima/lima_screen.c b/src/gallium/drivers/lima/lima_screen.c
+index 18ce19b..6b79020 100644
+--- a/src/gallium/drivers/lima/lima_screen.c
++++ b/src/gallium/drivers/lima/lima_screen.c
+@@ -33,6 +33,7 @@
+ #include "drm-uapi/drm_fourcc.h"
+ #include "drm-uapi/lima_drm.h"
+ 
++#include "lima_aemali_policy.h"
+ #include "lima_screen.h"
+ #include "lima_context.h"
+ #include "lima_resource.h"
+@@ -75,6 +76,9 @@ lima_screen_get_name(struct pipe_screen *pscreen)
+ {
+    struct lima_screen *screen = lima_screen(pscreen);
+ 
++   if (screen->renderer_string[0])
++      return screen->renderer_string;
++
+    switch (screen->gpu_type) {
+    case DRM_LIMA_PARAM_GPU_ID_MALI400:
+      return "Mali400";
+@@ -88,7 +92,7 @@ lima_screen_get_name(struct pipe_screen *pscreen)
+ static const char *
+ lima_screen_get_vendor(struct pipe_screen *pscreen)
+ {
+-   return "Mesa";
++   return lima_aemali_vendor_string();
+ }
+ 
+ static const char *
+@@ -587,6 +591,12 @@ lima_screen_create(int fd, const struct pipe_screen_config *config,
+    if (!lima_screen_query_info(screen))
+       goto err_out0;
+ 
++   lima_aemali_build_renderer_string(screen->renderer_string,
++                                     sizeof(screen->renderer_string),
++                                     screen->gpu_type, screen->num_pp);
++   lima_aemali_log_startup(screen->renderer_string, screen->gpu_type,
++                           screen->num_pp);
++
+    if (!lima_bo_cache_init(screen))
+       goto err_out0;
+ 
+diff --git a/src/gallium/drivers/lima/lima_screen.h b/src/gallium/drivers/lima/lima_screen.h
+index 5f76edd..bdd1d97 100644
+--- a/src/gallium/drivers/lima/lima_screen.h
++++ b/src/gallium/drivers/lima/lima_screen.h
+@@ -72,6 +72,7 @@ struct lima_screen {
+    int fd;
+    int gpu_type;
+    int num_pp;
++   char renderer_string[64];
+    uint32_t plb_max_blk;
+ 
+    /* bo table */
+diff --git a/src/gallium/drivers/lima/meson.build b/src/gallium/drivers/lima/meson.build
+index ebd62c4..ace9b4d 100644
+--- a/src/gallium/drivers/lima/meson.build
++++ b/src/gallium/drivers/lima/meson.build
+@@ -39,6 +39,7 @@ files_lima = files(
+ 
+   'ir/lima_ir.h',
+ 
++  'lima_aemali_policy.c',
+   'lima_screen.c',
+   'lima_screen.h',
+   'lima_context.c',
+diff --git a/src/gallium/drivers/panfrost/meson.build b/src/gallium/drivers/panfrost/meson.build
+index 5b3e5e4..e896aa6 100644
+--- a/src/gallium/drivers/panfrost/meson.build
++++ b/src/gallium/drivers/panfrost/meson.build
+@@ -4,6 +4,7 @@
+ 
+ files_panfrost = files(
+   'driinfo_panfrost.h',
++  'pan_aemali_policy.c',
+   'pan_mod_conv_cso.c',
+   'pan_bo.c',
+   'pan_device.c',
+diff --git a/src/gallium/drivers/panfrost/pan_aemali_policy.c b/src/gallium/drivers/panfrost/pan_aemali_policy.c
+new file mode 100644
+index 0000000..d7d3bdc
+--- /dev/null
++++ b/src/gallium/drivers/panfrost/pan_aemali_policy.c
+@@ -0,0 +1,124 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#include "pan_aemali_policy.h"
++
++#include "util/log.h"
++#include "util/os_misc.h"
++
++#include <stdio.h>
++#include <string.h>
++
++static const char *
++aemali_first_option(const char *primary, const char *secondary,
++                    const char *tertiary)
++{
++   const char *value = os_get_option(primary);
++   if (value && value[0])
++      return value;
++
++   value = os_get_option(secondary);
++   if (value && value[0])
++      return value;
++
++   value = os_get_option(tertiary);
++   return value && value[0] ? value : NULL;
++}
++
++static bool
++aemali_matches_driver_name(const char *value)
++{
++   return value && value[0] && strstr(value, "aemali");
++}
++
++static bool
++aemali_is_truthy(const char *value)
++{
++   if (!value || !value[0])
++      return false;
++
++   return !strcmp(value, "1") ||
++          !strcmp(value, "true") ||
++          !strcmp(value, "on") ||
++          !strcmp(value, "yes") ||
++          !strcmp(value, "enabled") ||
++          !strcmp(value, "aemali");
++}
++
++bool
++pan_aemali_policy_enabled(void)
++{
++   const char *flag = os_get_option("AEMALI_OPENGL");
++   const char *driver = aemali_first_option("AEMALI_OPENGL_DRIVER",
++                                            "AERO_MESA_OPENGL_DRIVER",
++                                            "AERO_MESA_DRIVER");
++
++   return aemali_is_truthy(flag) || aemali_matches_driver_name(driver);
++}
++
++const char *
++pan_aemali_vendor_string(void)
++{
++   return pan_aemali_policy_enabled() ? "Ae.solator Mesa" : "Mesa";
++}
++
++void
++pan_aemali_build_renderer_string(char *dst, size_t dst_size,
++                                 const char *gpu_name,
++                                 unsigned core_count)
++{
++   const char *name = gpu_name && gpu_name[0] ? gpu_name : "Mali";
++
++   if (!dst || !dst_size)
++      return;
++
++   if (!pan_aemali_policy_enabled()) {
++      snprintf(dst, dst_size, "%s MC%u (Panfrost)", name, core_count);
++      return;
++   }
++
++   snprintf(dst, dst_size, "AeMali Gallium/Panfrost %s MC%u", name, core_count);
++}
++
++void
++pan_aemali_log_startup(const char *renderer, unsigned arch)
++{
++   const char *profile;
++   const char *route;
++   const char *transport;
++   const char *gallium_driver;
++   const char *render_node_required;
++   const char *render_node_present;
++
++   if (!pan_aemali_policy_enabled())
++      return;
++
++   profile = aemali_first_option("AEMALI_OPENGL_PROFILE", "AEMALI_PROFILE",
++                                 "AERO_GRAPHICS_STACK_PROFILE");
++   route = aemali_first_option("AEMALI_OPENGL_ROUTE", "AEMALI_ROUTE",
++                               "AERO_OPENGL_ROUTE_ID");
++   transport = aemali_first_option("AEMALI_OPENGL_TRANSPORT",
++                                   "AEMALI_TRANSPORT",
++                                   "AERO_OPENGL_DRIVER_TRANSPORT");
++   gallium_driver = aemali_first_option("AEMALI_OPENGL_GALLIUM_DRIVER",
++                                        "AERO_OPENGL_GALLIUM_DRIVER",
++                                        "GALLIUM_DRIVER");
++   render_node_required = aemali_first_option("AEMALI_OPENGL_RENDER_NODE_REQUIRED",
++                                              "AERO_OPENGL_REQUIRES_RENDER_NODE",
++                                              "AEMALI_RENDER_NODE_REQUIRED");
++   render_node_present = aemali_first_option("AEMALI_OPENGL_RENDER_NODE_PRESENT",
++                                             "AERO_OPENGL_RENDER_NODE_PRESENT",
++                                             "AEMALI_RENDER_NODE_PRESENT");
++
++   mesa_logi("AeMali Gallium policy: renderer=%s arch=v%u profile=%s route=%s transport=%s gallium=%s render_node_required=%s render_node_present=%s",
++             renderer ? renderer : "AeMali Gallium/Panfrost",
++             arch,
++             profile ? profile : "aemali-universal",
++             route ? route : "aemali-gallium",
++             transport ? transport : "drm-render-node-experimental",
++             gallium_driver ? gallium_driver : "panfrost",
++             render_node_required ? render_node_required : "0",
++             render_node_present ? render_node_present : "0");
++}
+diff --git a/src/gallium/drivers/panfrost/pan_aemali_policy.h b/src/gallium/drivers/panfrost/pan_aemali_policy.h
+new file mode 100644
+index 0000000..cee5ffb
+--- /dev/null
++++ b/src/gallium/drivers/panfrost/pan_aemali_policy.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2026 Ae.solator contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#ifndef PAN_AEMALI_POLICY_H
++#define PAN_AEMALI_POLICY_H
++
++#include <stdbool.h>
++#include <stddef.h>
++
++bool pan_aemali_policy_enabled(void);
++const char *pan_aemali_vendor_string(void);
++void pan_aemali_build_renderer_string(char *dst, size_t dst_size,
++                                      const char *gpu_name,
++                                      unsigned core_count);
++void pan_aemali_log_startup(const char *renderer, unsigned arch);
++
++#endif
+diff --git a/src/gallium/drivers/panfrost/pan_screen.c b/src/gallium/drivers/panfrost/pan_screen.c
+index 86d28d2..9f07bbe 100644
+--- a/src/gallium/drivers/panfrost/pan_screen.c
++++ b/src/gallium/drivers/panfrost/pan_screen.c
+@@ -32,6 +32,7 @@
+ #include "pan_fence.h"
+ #include "pan_public.h"
+ #include "pan_resource.h"
++#include "pan_aemali_policy.h"
+ #include "pan_screen.h"
+ #include "pan_compiler.h"
+ #include "pan_util.h"
+@@ -74,7 +75,7 @@ panfrost_get_name(struct pipe_screen *screen)
+ static const char *
+ panfrost_get_vendor(struct pipe_screen *screen)
+ {
+-   return "Mesa";
++   return pan_aemali_vendor_string();
+ }
+ 
+ static const char *
+@@ -1060,8 +1061,10 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
+    unsigned core_count =
+       pan_query_core_count(&dev->kmod.dev->props, &core_id_range);
+ 
+-   snprintf(screen->renderer_string, sizeof(screen->renderer_string),
+-            "%s MC%u (Panfrost)", dev->model->name, core_count);
++   pan_aemali_build_renderer_string(screen->renderer_string,
++                                    sizeof(screen->renderer_string),
++                                    dev->model->name, core_count);
++   pan_aemali_log_startup(screen->renderer_string, dev->arch);
+ 
+    screen->afbc_tiled = driQueryOptionb(config->options, "pan_afbc_tiled");
+ 

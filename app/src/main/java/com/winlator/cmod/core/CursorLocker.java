@@ -1,5 +1,7 @@
 package com.winlator.cmod.core;
 
+import android.util.Log;
+
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.xserver.XServer;
 
@@ -57,7 +59,11 @@ public class CursorLocker extends TimerTask {
                 try {
                     pauseLock.wait();
                 }
-                catch (InterruptedException e) {}
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.w("CursorLocker", "Cursor lock wait interrupted", e);
+                    return;
+                }
             }
         }
 

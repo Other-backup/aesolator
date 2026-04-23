@@ -130,13 +130,17 @@ object IntentLaunchManager {
         }
 
         val json = JSONObject(jsonString)
+        val rawGraphicsDriver = json.optString("graphicsDriver", Container.DEFAULT_GRAPHICS_DRIVER)
         val config = ContainerData(
             name = json.optString("name", ""),
             screenSize = json.optString("screenSize", Container.DEFAULT_SCREEN_SIZE),
             envVars = json.optString("envVars", Container.DEFAULT_ENV_VARS),
-            graphicsDriver = json.optString("graphicsDriver", Container.DEFAULT_GRAPHICS_DRIVER),
+            graphicsDriver = Container.normalizeGraphicsDriver(rawGraphicsDriver),
             graphicsDriverVersion = json.optString("graphicsDriverVersion", ""),
-            graphicsDriverConfig = json.optString("graphicsDriverConfig", Container.DEFAULT_GRAPHICSDRIVERCONFIG),
+            graphicsDriverConfig = Container.reconcileLegacyGraphicsConfig(
+                rawGraphicsDriver,
+                json.optString("graphicsDriverConfig", Container.DEFAULT_GRAPHICSDRIVERCONFIG)
+            ),
             dxwrapper = json.optString("dxwrapper", Container.DEFAULT_DXWRAPPER),
             dxwrapperConfig = if (json.has("dxwrapperConfig")) {
                 "version=" + json.optString("dxwrapperConfig", "")
@@ -196,7 +200,11 @@ object IntentLaunchManager {
             name = override.name.ifEmpty { base.name },
             screenSize = if (override.screenSize != Container.DEFAULT_SCREEN_SIZE) override.screenSize else base.screenSize,
             envVars = if (override.envVars != Container.DEFAULT_ENV_VARS) override.envVars else base.envVars,
-            graphicsDriver = if (override.graphicsDriver != Container.DEFAULT_GRAPHICS_DRIVER) override.graphicsDriver else base.graphicsDriver,
+            graphicsDriver = if (Container.normalizeGraphicsDriver(override.graphicsDriver) != Container.DEFAULT_GRAPHICS_DRIVER) {
+                Container.normalizeGraphicsDriver(override.graphicsDriver)
+            } else {
+                Container.normalizeGraphicsDriver(base.graphicsDriver)
+            },
             graphicsDriverVersion = override.graphicsDriverVersion.ifEmpty { base.graphicsDriverVersion },
             graphicsDriverConfig = override.graphicsDriverConfig.ifEmpty { base.graphicsDriverConfig },
             dxwrapper = if (override.dxwrapper != Container.DEFAULT_DXWRAPPER) override.dxwrapper else base.dxwrapper,

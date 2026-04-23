@@ -30,17 +30,17 @@ public class FrameRating extends FrameLayout implements Runnable {
     private final TextView tvRenderer;
     private final TextView tvGPU;
     private final TextView tvRAM;
-    private HashMap graphicsDriverConfig;
+    private HashMap<String, String> graphicsDriverConfig;
 
-    public FrameRating(Context context, HashMap graphicsDriverConfig) {
+    public FrameRating(Context context, HashMap<String, String> graphicsDriverConfig) {
         this(context, graphicsDriverConfig ,null);
     }
 
-    public FrameRating(Context context, HashMap graphicsDriverConfig, AttributeSet attrs) {
+    public FrameRating(Context context, HashMap<String, String> graphicsDriverConfig, AttributeSet attrs) {
         this(context, graphicsDriverConfig, attrs, 0);
     }
 
-    public FrameRating(Context context, HashMap graphicsDriverConfig, AttributeSet attrs, int defStyleAttr) {
+    public FrameRating(Context context, HashMap<String, String> graphicsDriverConfig, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         this.context = context;
         View view = LayoutInflater.from(context).inflate(R.layout.frame_rating, this, false);
@@ -48,11 +48,18 @@ public class FrameRating extends FrameLayout implements Runnable {
         tvRenderer = view.findViewById(R.id.TVRenderer);
         tvRenderer.setText(R.string.frame_rating_renderer_default);
         tvGPU = view.findViewById(R.id.TVGPU);
-        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        tvGPU.setText(GPUInformation.getRenderer(getRendererDriverName(graphicsDriverConfig), context));
         tvRAM = view.findViewById(R.id.TVRAM);
         totalRAM = getTotalRAM();
         this.graphicsDriverConfig = graphicsDriverConfig;
         addView(view);
+    }
+
+    static String getRendererDriverName(HashMap<String, String> graphicsDriverConfig) {
+        if (graphicsDriverConfig == null) return null;
+        String configuredVersion = graphicsDriverConfig.get("version");
+        if (configuredVersion == null || configuredVersion.trim().isEmpty()) return null;
+        return configuredVersion.trim();
     }
 
     private String getTotalRAM() {
@@ -84,7 +91,7 @@ public class FrameRating extends FrameLayout implements Runnable {
 
     public void reset() {
         tvRenderer.setText(R.string.frame_rating_renderer_default);
-        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        tvGPU.setText(GPUInformation.getRenderer(getRendererDriverName(graphicsDriverConfig), context));
     }
 
     public void update() {

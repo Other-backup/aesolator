@@ -36,7 +36,7 @@ public final class ForensicUi {
             try {
                 jsonArray = new JSONArray(FileUtils.readString(context, "wine_debug_channels.json"));
             }
-            catch (Exception ignored) {}
+            catch (Exception ignored) { /* best-effort path; keep surrounding flow intact. */ }
 
             final String[] items = ArrayUtils.toStringArray(jsonArray);
             ContentDialog.showMultipleChoiceList(context, R.string.wine_debug_channel, items, selectedPositions -> {

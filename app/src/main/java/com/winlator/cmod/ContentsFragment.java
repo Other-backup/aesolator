@@ -37,18 +37,18 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.ContentInfoDialog;
 import com.winlator.cmod.contentdialog.ContentUntrustedDialog;
 import com.winlator.cmod.contents.ContentProfile;
+import com.winlator.cmod.contents.ContentStateUi;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
 import com.winlator.cmod.contents.Downloader;
-import com.winlator.cmod.contents.GamehubFeedNormalizer;
+import com.winlator.cmod.contents.RemoteFeedPayloadLoader;
+import com.winlator.cmod.contents.RemoteProfileFeedMerger;
+import com.winlator.cmod.contents.RuntimeFeedRegistry;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.File;
 import java.net.URI;
@@ -67,9 +67,9 @@ public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_ARCHIVE = "archive";
     private static final String SOURCE_MODE_GAMEHUB = "gamehub";
     private static final String SOURCE_MODE_NIGHTLIES = "nightlies";
+    private static final String SOURCE_MODE_COMMUNITY = RuntimeFeedRegistry.SOURCE_MODE_COMMUNITY;
     private static final int MAX_GAMEHUB_RELEASE_PAGES = 16;
     private static final int MAX_NIGHTLIES_RELEASE_PAGES = 16;
-    private static final int MAX_NIGHTLIES_ATOM_RELEASES = 12;
 
     private enum ImportArchHint {
         UNKNOWN,
@@ -86,7 +86,6 @@ public class ContentsFragment extends Fragment {
             ContentProfile.ContentType.CONTENT_TYPE_PROTON,
             ContentProfile.ContentType.CONTENT_TYPE_DXVK,
             ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
-            ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK,
             ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO,
             ContentProfile.ContentType.CONTENT_TYPE_BOX64,
             ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
@@ -191,8 +190,7 @@ public class ContentsFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 currentContentType = SUPPORTED_CONTENT_TYPES.get(position);
-                if (currentContentType != ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                        && preselectedDisplayCategory != null
+                if (preselectedDisplayCategory != null
                         && !preselectedDisplayCategory.trim().isEmpty()) {
                     preselectedDisplayCategory = "";
                 }
@@ -340,7 +338,6 @@ public class ContentsFragment extends Fragment {
 
     private String getTypeLabel(ContentProfile.ContentType type) {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) return "Proton";
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
         return type.toString();
     }
@@ -364,14 +361,11 @@ public class ContentsFragment extends Fragment {
             if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON && !isProtonLike(profile)) {
                 continue;
             }
-            boolean locallyInstalled = profile != null && profile.locallyInstalled;
+            boolean availableLocally = isProfileInstalled(profile);
             if (!matchesSelectedSourceMode(profile) && !shouldBypassSourceFilter(profile)) {
                 continue;
             }
-            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && profile.isBetaLike()) {
-                continue;
-            }
-            if (!locallyInstalled && supportsChannelFilter(currentContentType)) {
+            if (!availableLocally && supportsChannelFilter(currentContentType)) {
                 if ("stable".equalsIgnoreCase(channelMode) && profile.isBetaLike()) {
                     continue;
                 }
@@ -384,14 +378,33 @@ public class ContentsFragment extends Fragment {
                     && !"all".equalsIgnoreCase(archMode)) {
                 if (!profile.matchesArchitectureFilter(archMode)) continue;
             }
-            if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                    && !matchesPreselectedDisplayCategory(profile)) {
-                continue;
-            }
             filtered.add(profile);
         }
         sortVisibleProfiles(filtered);
-        return filtered;
+        return dedupeVisibleProfiles(filtered);
+    }
+
+    private List<ContentProfile> dedupeVisibleProfiles(List<ContentProfile> profiles) {
+        if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
+        LinkedHashMap<String, ContentProfile> bestByIdentity = new LinkedHashMap<>();
+        ArrayList<ContentProfile> ordered = new ArrayList<>();
+        for (ContentProfile profile : profiles) {
+            String identity = buildVisibleProfileIdentity(profile);
+            if (bestByIdentity.containsKey(identity)) continue;
+            bestByIdentity.put(identity, profile);
+            ordered.add(profile);
+        }
+        return ordered;
+    }
+
+    private String buildVisibleProfileIdentity(ContentProfile profile) {
+        if (profile == null) return "";
+        String versionName = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
+        return (profile.type == null ? "" : profile.type.toString().toLowerCase(Locale.US))
+                + "|" + ContentProfile.normalizeRuntimeModel(profile.getRuntimeModel())
+                + "|" + resolveProfileArchTag(profile).trim().toLowerCase(Locale.US)
+                + "|" + profile.getChannel().trim().toLowerCase(Locale.US)
+                + "|" + versionName;
     }
 
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
@@ -402,7 +415,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean shouldBypassSourceFilter(ContentProfile profile) {
-        if (profile == null || !profile.locallyInstalled) return false;
+        if (!isProfileInstalled(profile)) return false;
         if (getAvailableSourceModesForType(currentContentType).size() > 1) return false;
         String resolvedSource = resolveProfileSourceMode(profile);
         return "remote".equalsIgnoreCase(resolvedSource)
@@ -412,10 +425,10 @@ public class ContentsFragment extends Fragment {
 
     private void sortVisibleProfiles(List<ContentProfile> profiles) {
         Collections.sort(profiles, (left, right) -> {
-            boolean leftInstalled = isRuntimeInstalled(left);
-            boolean rightInstalled = isRuntimeInstalled(right);
-            if (leftInstalled != rightInstalled) {
-                return leftInstalled ? -1 : 1;
+            int leftRank = resolveProfileLocalRank(left);
+            int rightRank = resolveProfileLocalRank(right);
+            if (leftRank != rightRank) {
+                return Integer.compare(rightRank, leftRank);
             }
 
             int sourceCompare = Integer.compare(resolveProfileSourcePriority(right), resolveProfileSourcePriority(left));
@@ -450,6 +463,7 @@ public class ContentsFragment extends Fragment {
             if (sourceRepo.contains("raw")) return 245;
             return 250;
         }
+        if (SOURCE_MODE_COMMUNITY.equals(profileMode)) return 225;
         if (SOURCE_MODE_WCPHUB.equals(profileMode)) return 200;
         return 50;
     }
@@ -464,13 +478,6 @@ public class ContentsFragment extends Fragment {
 
     private int resolveProfileArchPriority(ContentProfile profile) {
         String archTag = resolveProfileArchTag(profile);
-        if (profile != null && profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            if ("arm64".equalsIgnoreCase(archTag)) return 40;
-            if ("x86_64".equalsIgnoreCase(archTag)) return 30;
-            if ("arm64ec".equalsIgnoreCase(archTag)) return 20;
-            if ("generic".equalsIgnoreCase(archTag)) return 10;
-            return 0;
-        }
         if ("x86_64".equalsIgnoreCase(archTag)) return 40;
         if ("arm64ec".equalsIgnoreCase(archTag)) return 30;
         if ("arm64".equalsIgnoreCase(archTag)) return 20;
@@ -497,10 +504,11 @@ public class ContentsFragment extends Fragment {
                 profile.remoteUrl
         );
         if (!resolved.isEmpty()) return resolved;
-        if (profile.locallyInstalled) {
+        if (isProfileInstalled(profile)) {
             ArrayList<String> availableSourceModes = getAvailableSourceModesForType(profile.type);
             if (availableSourceModes.size() == 1) return availableSourceModes.get(0);
             if (availableSourceModes.contains(SOURCE_MODE_ARCHIVE)) return SOURCE_MODE_ARCHIVE;
+            if (availableSourceModes.contains(SOURCE_MODE_COMMUNITY)) return SOURCE_MODE_COMMUNITY;
             if (availableSourceModes.contains(SOURCE_MODE_NIGHTLIES)) return SOURCE_MODE_NIGHTLIES;
             if (availableSourceModes.contains(SOURCE_MODE_GAMEHUB)) return SOURCE_MODE_GAMEHUB;
             if (availableSourceModes.contains(SOURCE_MODE_WCPHUB)) return SOURCE_MODE_WCPHUB;
@@ -509,34 +517,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private String classifySourceMode(String sourceFeed, String sourceRepo, String sourceLabel, String remoteUrl) {
-        String joined = (
-                (sourceFeed == null ? "" : sourceFeed) + " " +
-                        (sourceRepo == null ? "" : sourceRepo) + " " +
-                        (sourceLabel == null ? "" : sourceLabel) + " " +
-                        (remoteUrl == null ? "" : remoteUrl)
-        ).toLowerCase(Locale.US);
-
-        if (joined.contains("wcp-graphics-lanes") || joined.contains("wcp graphics lanes")
-                || joined.contains("wcp-runtime-lanes") || joined.contains("wcp runtime lanes")
-                || joined.contains("ae.solator") || joined.contains("aesolator")) {
-            return SOURCE_MODE_ARCHIVE;
-        }
-        if (joined.contains("the412banner/nightlies")
-                || joined.contains("nightlies releases")
-                || joined.contains("nightlies by the412banner")) {
-            return SOURCE_MODE_NIGHTLIES;
-        }
-        if (joined.contains("gamehub-components")
-                || joined.contains("gamehub")) {
-            return SOURCE_MODE_GAMEHUB;
-        }
-        if (joined.contains("open-wine-components")
-                || joined.contains("wcphub")
-                || joined.contains("arihany")
-                || joined.contains("winlatorwcphub")) {
-            return SOURCE_MODE_WCPHUB;
-        }
-        return "";
+        return RemoteProfileFeedMerger.classifySourceMode(sourceFeed, sourceRepo, sourceLabel, remoteUrl);
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -571,6 +552,8 @@ public class ContentsFragment extends Fragment {
         String sourceScope;
         if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceMode)) {
             sourceScope = getString(R.string.contents_lane_scope_archive);
+        } else if (SOURCE_MODE_COMMUNITY.equalsIgnoreCase(sourceMode)) {
+            sourceScope = getString(R.string.contents_lane_scope_community);
         } else if (SOURCE_MODE_NIGHTLIES.equalsIgnoreCase(sourceMode)) {
             sourceScope = getString(R.string.contents_lane_scope_nightlies);
         } else if (SOURCE_MODE_GAMEHUB.equalsIgnoreCase(sourceMode)) {
@@ -578,12 +561,7 @@ public class ContentsFragment extends Fragment {
         } else {
             sourceScope = getString(R.string.contents_lane_scope_wcphub);
         }
-        if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK && !lane.isEmpty()) {
-            tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope + " • " + getString(R.string.contents_lane_scope_format, lane));
-        }
-        else {
-            tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope);
-        }
+        tvContentsLaneScope.setText(sourceLabel + " • " + sourceScope);
         tvContentsLaneScope.setVisibility(View.VISIBLE);
     }
 
@@ -600,16 +578,12 @@ public class ContentsFragment extends Fragment {
         if ("opengl".equals(lane)) {
             return combined.contains("opengl") || combined.contains("zink") || combined.contains("gallium");
         }
-        if ("vulkansdk".equals(lane) || "vulkan sdk".equals(lane) || "sdk".equals(lane)) {
-            return combined.contains("vulkan") || combined.contains("sdk");
-        }
         return combined.contains(lane);
     }
 
     private boolean supportsArchitectureFilters(ContentProfile.ContentType type) {
         return type == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
-                || type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D
                 || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
@@ -742,17 +716,6 @@ public class ContentsFragment extends Fragment {
         if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
             return new String[]{getString(R.string.contents_arch_all_lanes)};
         }
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            if (!currentSourceHasBundleCandidates(type)) {
-                String[] entries = getResources().getStringArray(R.array.contents_arch_entries_vulkan_sdk);
-                return new String[]{
-                        entries[0],
-                        entries[2],
-                        entries[3]
-                };
-            }
-            return getResources().getStringArray(R.array.contents_arch_entries_vulkan_sdk);
-        }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
             return getResources().getStringArray(R.array.contents_arch_entries_dxvk_vkd3d);
@@ -788,8 +751,7 @@ public class ContentsFragment extends Fragment {
             return ordered;
         }
 
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK
-                || type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
             ordered.add(SOURCE_MODE_ARCHIVE);
             return ordered;
         }
@@ -797,6 +759,7 @@ public class ContentsFragment extends Fragment {
         if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             ordered.add(SOURCE_MODE_ARCHIVE);
+            ordered.add(SOURCE_MODE_COMMUNITY);
             if (type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
                 ordered.add(SOURCE_MODE_NIGHTLIES);
             }
@@ -819,6 +782,7 @@ public class ContentsFragment extends Fragment {
 
     private String getSourceEntryLabel(String sourceValue) {
         if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
+        if (SOURCE_MODE_COMMUNITY.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_community_feed);
         if (SOURCE_MODE_NIGHTLIES.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_nightlies_feed);
         if (SOURCE_MODE_GAMEHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_gamehub_feed);
         if (SOURCE_MODE_WCPHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_wcphub_feed);
@@ -828,12 +792,6 @@ public class ContentsFragment extends Fragment {
     private String[] getArchValuesForType(ContentProfile.ContentType type) {
         if (!supportsArchitectureFilters(type) || !currentSourceHasMultipleArchitectureCandidates()) {
             return new String[]{"all"};
-        }
-        if (type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            if (!currentSourceHasBundleCandidates(type)) {
-                return new String[]{"all", "arm64", "x86_64"};
-            }
-            return getResources().getStringArray(R.array.contents_arch_values_vulkan_sdk);
         }
         if (type == ContentProfile.ContentType.CONTENT_TYPE_DXVK
                 || type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D) {
@@ -903,7 +861,7 @@ public class ContentsFragment extends Fragment {
         if (profiles == null) return false;
         HashSet<String> archTags = new HashSet<>();
         for (ContentProfile profile : profiles) {
-            if (profile == null || profile.locallyInstalled) continue;
+            if (profile == null || isProfileInstalled(profile)) continue;
             if (!matchesSelectedSourceMode(profile)) continue;
             String archTag = resolveProfileArchTag(profile);
             if ("generic".equalsIgnoreCase(archTag)) continue;
@@ -913,22 +871,11 @@ public class ContentsFragment extends Fragment {
         return false;
     }
 
-    private boolean currentSourceHasBundleCandidates(ContentProfile.ContentType type) {
-        List<ContentProfile> profiles = manager.getProfiles(type);
-        if (profiles == null) return false;
-        for (ContentProfile profile : profiles) {
-            if (profile == null || profile.locallyInstalled) continue;
-            if (!matchesSelectedSourceMode(profile)) continue;
-            if ("bundle".equalsIgnoreCase(resolveProfileArchTag(profile))) return true;
-        }
-        return false;
-    }
-
     private boolean currentSourceHasNightlyCandidates() {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return false;
         for (ContentProfile profile : profiles) {
-            if (profile == null || profile.locallyInstalled) continue;
+            if (profile == null || isProfileInstalled(profile)) continue;
             if (!matchesSelectedSourceMode(profile)) continue;
             if (profile.isBetaLike()) return true;
         }
@@ -939,67 +886,34 @@ public class ContentsFragment extends Fragment {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return false;
         for (ContentProfile profile : profiles) {
-            if (profile == null || profile.locallyInstalled) continue;
+            if (profile == null || isProfileInstalled(profile)) continue;
             if (!matchesSelectedSourceMode(profile)) continue;
             if (!profile.isBetaLike()) return true;
         }
         return false;
     }
 
-    private boolean isRuntimeInstalled(ContentProfile profile) {
+    private boolean isProfileAvailableLocally(ContentProfile profile) {
+        return ContentStateUi.isProfileUsableLocally(requireContext(), manager, profile);
+    }
+
+    private boolean isProfilePresentLocally(ContentProfile profile) {
+        return ContentStateUi.isProfilePresentLocally(requireContext(), manager, profile);
+    }
+
+    private boolean isProfileBrokenLocally(ContentProfile profile) {
+        return ContentStateUi.isProfileBrokenLocally(requireContext(), manager, profile);
+    }
+
+    private int resolveProfileLocalRank(ContentProfile profile) {
+        if (isProfileAvailableLocally(profile)) return 2;
+        if (isProfilePresentLocally(profile)) return 1;
+        return 0;
+    }
+
+    private boolean isProfileInstalled(ContentProfile profile) {
         if (profile == null) return false;
-        if (profile.isInstalledLocally()) return true;
-        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
-            DgVoodooManager dgVoodooManager = new DgVoodooManager(requireContext());
-            return dgVoodooManager.matchesProfile(profile);
-        }
-        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK) {
-            return hasInstalledVulkanSdkCoverage(profile);
-        }
-        return false;
-    }
-
-    private boolean hasInstalledVulkanSdkCoverage(ContentProfile targetProfile) {
-        if (targetProfile == null) return false;
-        List<ContentProfile> profiles = manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VULKAN_SDK);
-        if (profiles == null || profiles.isEmpty()) return false;
-
-        String requestedArch = resolveProfileArchTag(targetProfile);
-        String requestedKey = normalizeVulkanSdkVersionKey(targetProfile);
-        HashSet<String> installedArchs = new HashSet<>();
-        for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
-            if (!requestedKey.equals(normalizeVulkanSdkVersionKey(profile))) continue;
-            installedArchs.add(resolveProfileArchTag(profile));
-        }
-        if (installedArchs.isEmpty()) return false;
-        if (installedArchs.contains("bundle")) return true;
-        if ("bundle".equalsIgnoreCase(requestedArch)) {
-            return installedArchs.contains("x86_64")
-                    && (installedArchs.contains("arm64") || installedArchs.contains("arm64ec"));
-        }
-        if ("arm64ec".equalsIgnoreCase(requestedArch)) {
-            return installedArchs.contains("arm64ec")
-                    || (installedArchs.contains("arm64") && installedArchs.contains("x86_64"));
-        }
-        return installedArchs.contains(requestedArch);
-    }
-
-    private String normalizeVulkanSdkVersionKey(ContentProfile profile) {
-        if (profile == null) return "";
-        String version = profile.vulkanSdkVersion == null ? "" : profile.vulkanSdkVersion.trim().toLowerCase(Locale.US);
-        if (!version.isEmpty()) return version;
-        String value = profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US);
-        value = value.replace("-arm64ec", "")
-                .replace("-arm64-ec", "")
-                .replace("-arm64", "")
-                .replace("-x86_64", "")
-                .replace("-x86-64", "")
-                .replace("-amd64", "")
-                .replace("-bundle", "")
-                .replace("-unified", "")
-                .trim();
-        return value;
+        return isProfilePresentLocally(profile);
     }
 
     private void reloadRemoteContents() {
@@ -1062,7 +976,7 @@ public class ContentsFragment extends Fragment {
                     return;
                 }
 
-                String merged = mergeJsonArrays(payloads);
+                String merged = RemoteProfileFeedMerger.mergePayloads(payloads);
                 final boolean finalUsedBundledArchiveFallback = usedBundledArchiveFallback;
                 getActivity().runOnUiThread(() -> {
                     sharedPreferences.edit()
@@ -1148,8 +1062,8 @@ public class ContentsFragment extends Fragment {
     private void appendGamehubReleaseFeeds(List<String> payloads, HashSet<String> seenSources) {
         int emptyPages = 0;
         for (int page = 1; page <= MAX_GAMEHUB_RELEASE_PAGES && emptyPages < 2; page++) {
-            String payload = addRemoteFeed(payloads, seenSources, buildGamehubReleasePageUrl(page));
-            if (isEmptyRemotePayload(payload)) {
+            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(payloads, seenSources, buildGamehubReleasePageUrl(page));
+            if (result == null || !result.hasPayload()) {
                 emptyPages++;
             } else {
                 emptyPages = 0;
@@ -1160,8 +1074,8 @@ public class ContentsFragment extends Fragment {
     private void appendNightliesReleaseFeeds(List<String> payloads, HashSet<String> seenSources) {
         int emptyPages = 0;
         for (int page = 1; page <= MAX_NIGHTLIES_RELEASE_PAGES && emptyPages < 2; page++) {
-            String payload = addRemoteFeed(payloads, seenSources, buildNightliesReleasePageUrl(page));
-            if (isEmptyRemotePayload(payload)) {
+            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(payloads, seenSources, buildNightliesReleasePageUrl(page));
+            if (result == null || !result.hasPayload()) {
                 emptyPages++;
             } else {
                 emptyPages = 0;
@@ -1182,55 +1096,22 @@ public class ContentsFragment extends Fragment {
     }
 
     private void appendNightliesAtomFallbackFeeds(List<String> payloads, HashSet<String> seenSources) {
-        String atom = Downloader.downloadString(ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM);
-        List<GamehubFeedNormalizer.ReleaseFeedEntry> entries =
-                GamehubFeedNormalizer.parseGitHubReleaseAtom(atom, "The412Banner/Nightlies");
-        if (entries.isEmpty()) return;
-
-        int consumed = 0;
-        for (GamehubFeedNormalizer.ReleaseFeedEntry entry : entries) {
-            if (entry == null || !entry.isValid()) continue;
-            if (consumed >= MAX_NIGHTLIES_ATOM_RELEASES) break;
-            String expandedAssetsUrl = buildNightliesExpandedAssetsUrl(entry.tag);
-            if (seenSources.contains(expandedAssetsUrl) || !isAllowedFeedUrl(expandedAssetsUrl)) continue;
-            seenSources.add(expandedAssetsUrl);
-
-            String html = Downloader.downloadString(expandedAssetsUrl);
-            if (html == null || html.trim().isEmpty()) continue;
-            String payload = GamehubFeedNormalizer.normalizeExpandedAssetsHtml(
-                    html,
-                    entry,
-                    GamehubFeedNormalizer.NIGHTLIES_FEED_ID,
-                    GamehubFeedNormalizer.NIGHTLIES_LABEL,
-                    GamehubFeedNormalizer.NIGHTLIES_REPO_RELEASES,
-                    "The412Banner nightly package"
-            );
-            if (isEmptyRemotePayload(payload)) continue;
-            payloads.add(payload);
-            consumed++;
-        }
-    }
-
-    private String buildNightliesExpandedAssetsUrl(String releaseTag) {
-        String normalizedTag = releaseTag == null ? "" : releaseTag.trim();
-        return "https://github.com/The412Banner/Nightlies/releases/expanded_assets/" + normalizedTag;
-    }
-
-    private boolean isEmptyRemotePayload(@Nullable String payload) {
-        if (payload == null) return true;
-        String normalized = payload.trim();
-        if (normalized.isEmpty() || "[]".equals(normalized)) return true;
-        try {
-            return new JSONArray(normalized).length() == 0;
-        } catch (Exception ignored) {
-            return false;
-        }
+        RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNightliesAtomFallbackPayload();
+        if (!result.hasPayload() || !isAllowedFeedUrl(result.requestedUrl) || seenSources.contains(result.requestedUrl)) return;
+        seenSources.add(result.requestedUrl);
+        payloads.add(result.payload);
     }
 
     private List<String> resolveSelectedSourceUrls(String selectedSourceMode) {
         ArrayList<String> urls = new ArrayList<>();
         if (SOURCE_MODE_ARCHIVE.equals(selectedSourceMode)) {
             urls.add(ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
+            return urls;
+        }
+        if (SOURCE_MODE_COMMUNITY.equals(selectedSourceMode)) {
+            for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getFeedsForSourceMode(selectedSourceMode, currentContentType)) {
+                urls.add(feed.url);
+            }
             return urls;
         }
         if (SOURCE_MODE_NIGHTLIES.equals(selectedSourceMode)) {
@@ -1250,35 +1131,27 @@ public class ContentsFragment extends Fragment {
     }
 
     private String buildSourceSignature(String selectedSourceMode) {
-        String normalized = selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
-        return normalized;
+        ArrayList<String> signatureParts = new ArrayList<>();
+        String normalizedMode = selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
+        signatureParts.add(normalizedMode);
+        signatureParts.add(currentContentType == null ? "" : currentContentType.toString().trim().toLowerCase(Locale.US));
+        for (String sourceUrl : resolveSelectedSourceUrls(normalizedMode)) {
+            if (sourceUrl == null || sourceUrl.trim().isEmpty()) continue;
+            signatureParts.add(sourceUrl.trim().toLowerCase(Locale.US));
+        }
+        return String.join("|", signatureParts);
     }
 
-    private String addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
+    private RemoteFeedPayloadLoader.FeedLoadResult addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
         if (url == null) return null;
         String normalized = url.trim();
         if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return null;
         seenSources.add(normalized);
-        String json = Downloader.downloadString(normalized);
-        if (json != null && !json.trim().isEmpty()) {
-            String enriched = normalizeRemoteFeedPayload(json, normalized);
-            payloads.add(enriched);
-            return enriched;
+        RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNormalizedFeed(normalized);
+        if (result.hasPayload()) {
+            payloads.add(result.payload);
         }
-        return null;
-    }
-
-    private String normalizeRemoteFeedPayload(String payload, String feedUrl) {
-        String normalizedFeedUrl = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
-        String normalizedPayload = payload;
-        if (normalizedFeedUrl.contains("gamehub-components/main/sp_winemu_all_components12.xml")) {
-            normalizedPayload = GamehubFeedNormalizer.normalizeComponentXml(payload);
-        } else if (normalizedFeedUrl.contains("api.github.com/repos/the412banner/nightlies/releases")) {
-            normalizedPayload = GamehubFeedNormalizer.normalizeNightliesReleaseFeed(payload);
-        } else if (normalizedFeedUrl.contains("api.github.com/repos/the412banner/gamehub-components/releases")) {
-            normalizedPayload = GamehubFeedNormalizer.normalizeReleaseFeed(payload);
-        }
-        return injectFeedSourceMetadata(normalizedPayload, feedUrl);
+        return result;
     }
 
     @Nullable
@@ -1287,85 +1160,7 @@ public class ContentsFragment extends Fragment {
         if (getContext() == null) return null;
         String bundled = FileUtils.readAssetsFile(getContext(), BUNDLED_ARCHIVE_FEED_ASSET);
         if (bundled == null || bundled.trim().isEmpty()) return null;
-        return injectFeedSourceMetadata(bundled, ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
-    }
-
-    private String injectFeedSourceMetadata(String json, String feedUrl) {
-        try {
-            JSONArray array = new JSONArray(json);
-            String sourceId = deriveFeedSourceId(feedUrl);
-            String sourceLabel = deriveFeedSourceLabel(feedUrl);
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject object = array.optJSONObject(i);
-                if (object == null) continue;
-                if (object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim().isEmpty()) {
-                    object.put(ContentProfile.MARK_SOURCE_REPO, sourceLabel);
-                }
-                if (object.optString(ContentProfile.MARK_SOURCE_FEED, "").trim().isEmpty()) {
-                    object.put(ContentProfile.MARK_SOURCE_FEED, sourceId);
-                }
-                if (object.optString(ContentProfile.MARK_SOURCE_LABEL, "").trim().isEmpty()) {
-                    object.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
-                }
-                if (object.optString(ContentProfile.MARK_RELEASE_TAG, "").trim().isEmpty()) {
-                    object.put(ContentProfile.MARK_RELEASE_TAG, deriveFeedReleaseTag(feedUrl));
-                }
-            }
-            return array.toString();
-        } catch (Exception ignored) {
-            return json;
-        }
-    }
-
-    private String deriveFeedSourceLabel(String feedUrl) {
-        String sourceId = deriveFeedSourceId(feedUrl);
-        if (SOURCE_MODE_ARCHIVE.equals(sourceId)) return getString(R.string.contents_source_aesolator);
-        if (SOURCE_MODE_NIGHTLIES.equals(sourceId)) return getString(R.string.contents_source_nightlies);
-        if (SOURCE_MODE_GAMEHUB.equals(sourceId)) return getString(R.string.contents_source_gamehub);
-        if (SOURCE_MODE_WCPHUB.equals(sourceId)) return getString(R.string.contents_source_wcphub);
-        try {
-            URI uri = new URI(feedUrl);
-            String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.US);
-            String path = uri.getPath() == null ? "" : uri.getPath().trim();
-            if ("raw.githubusercontent.com".equals(host) && !path.isEmpty()) {
-                String[] parts = path.split("/");
-                if (parts.length >= 3 && !parts[1].isEmpty() && !parts[2].isEmpty()) {
-                    return parts[1] + "/" + parts[2];
-                }
-            }
-            if (!host.isEmpty()) return host;
-        } catch (Exception ignored) {
-        }
-        return "remote-feed";
-    }
-
-    private String deriveFeedSourceId(String feedUrl) {
-        String lower = feedUrl == null ? "" : feedUrl.trim().toLowerCase(Locale.US);
-        if (lower.contains("kosoymiki/wcp-graphics-lanes")
-                || lower.contains("kosoymiki/wcp-runtime-lanes")
-                || lower.contains("ae.solator")
-                || lower.contains("aesolator")) {
-            return SOURCE_MODE_ARCHIVE;
-        }
-        if (lower.contains("the412banner/nightlies")
-                || lower.contains("api.github.com/repos/the412banner/nightlies/releases")
-                || lower.contains("/nightlies/releases")) {
-            return SOURCE_MODE_NIGHTLIES;
-        }
-        if (lower.contains("the412banner/gamehub-components")
-                || lower.contains("api.github.com/repos/the412banner/gamehub-components/releases")
-                || lower.contains("gamehub-components")) {
-            return SOURCE_MODE_GAMEHUB;
-        }
-        if (lower.contains("arihany/winlatorwcphub") || lower.contains("wcphub")) return SOURCE_MODE_WCPHUB;
-        return "remote";
-    }
-
-    private String deriveFeedReleaseTag(String feedUrl) {
-        String lower = feedUrl == null ? "" : feedUrl.toLowerCase(Locale.US);
-        if (lower.contains("nightly")) return ContentProfile.CHANNEL_NIGHTLY;
-        if (lower.contains("beta") || lower.contains("rc")) return ContentProfile.CHANNEL_BETA;
-        return ContentProfile.CHANNEL_STABLE;
+        return RemoteFeedPayloadLoader.normalizePayload(bundled, ContentsManager.REMOTE_WINE_PROTON_OVERLAY);
     }
 
     private boolean isAllowedFeedUrl(String url) {
@@ -1389,90 +1184,6 @@ public class ContentsFragment extends Fragment {
     private boolean isLocalhostHost(String host) {
         return "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
     }
-
-    private String mergeJsonArrays(List<String> payloads) {
-        Map<String, JSONObject> bestByEntry = new LinkedHashMap<>();
-        for (String payload : payloads) {
-            try {
-                JSONArray array = new JSONArray(payload);
-                for (int i = 0; i < array.length(); i++) {
-                    JSONObject candidate = array.getJSONObject(i);
-                    String key = buildMergeEntryKey(candidate);
-                    JSONObject currentBest = bestByEntry.get(key);
-                    if (currentBest == null || isBetterRemoteCandidate(candidate, currentBest)) {
-                        bestByEntry.put(key, candidate);
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        JSONArray merged = new JSONArray();
-        for (JSONObject selected : bestByEntry.values()) {
-            merged.put(selected);
-        }
-        return merged.toString();
-    }
-
-    private String buildMergeEntryKey(JSONObject object) {
-        String type = object.optString("type", "").trim().toLowerCase(Locale.US);
-        String verName = object.optString("verName", "").trim().toLowerCase(Locale.US);
-        String channel = object.optString(ContentProfile.MARK_CHANNEL, "").trim().toLowerCase(Locale.US);
-        String displayCategory = object.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "").trim().toLowerCase(Locale.US);
-        String archHint = resolveRemoteArchHint(object);
-        return type + "|" + verName + "|" + channel + "|" + displayCategory + "|" + archHint;
-    }
-
-    private boolean isBetterRemoteCandidate(JSONObject candidate, JSONObject currentBest) {
-        long candidatePublishedAt = resolveRemotePublishedAtKey(candidate);
-        long currentPublishedAt = resolveRemotePublishedAtKey(currentBest);
-        if (candidatePublishedAt != currentPublishedAt) return candidatePublishedAt > currentPublishedAt;
-
-        int candidateVerCode = parseRemoteVerCode(candidate);
-        int currentVerCode = parseRemoteVerCode(currentBest);
-        if (candidateVerCode != currentVerCode) return candidateVerCode > currentVerCode;
-
-        int candidateSourcePriority = resolveRemoteSourcePriority(candidate);
-        int currentSourcePriority = resolveRemoteSourcePriority(currentBest);
-        if (candidateSourcePriority != currentSourcePriority) return candidateSourcePriority > currentSourcePriority;
-
-        int candidateChannelPriority = resolveChannelPriority(candidate.optString(ContentProfile.MARK_CHANNEL, ""));
-        int currentChannelPriority = resolveChannelPriority(currentBest.optString(ContentProfile.MARK_CHANNEL, ""));
-        if (candidateChannelPriority != currentChannelPriority) return candidateChannelPriority > currentChannelPriority;
-
-        int candidateFormatPriority = resolveRemotePackageFormatPriority(
-                candidate.optString("type", ""),
-                candidate.optString("remoteUrl", "")
-        );
-        int currentFormatPriority = resolveRemotePackageFormatPriority(
-                currentBest.optString("type", ""),
-                currentBest.optString("remoteUrl", "")
-        );
-        if (candidateFormatPriority != currentFormatPriority) return candidateFormatPriority > currentFormatPriority;
-
-        // Stable tie-breaker to avoid flicker.
-        String candidateUrl = candidate.optString("remoteUrl", "");
-        String currentUrl = currentBest.optString("remoteUrl", "");
-        return candidateUrl.compareToIgnoreCase(currentUrl) < 0;
-    }
-
-    private int parseRemoteVerCode(JSONObject object) {
-        Object raw = object.opt("verCode");
-        if (raw instanceof Number) return ((Number) raw).intValue();
-        if (raw instanceof String) {
-            try {
-                return Integer.parseInt(((String) raw).trim());
-            } catch (Exception ignored) {
-            }
-        }
-        return 0;
-    }
-
-    private long resolveRemotePublishedAtKey(JSONObject object) {
-        if (object == null) return 0L;
-        return parsePublishedAtKey(object.optString(ContentProfile.MARK_PUBLISHED_AT, ""));
-    }
-
     private long parsePublishedAtKey(String value) {
         if (value == null) return 0L;
         String digits = value.replaceAll("[^0-9]", "");
@@ -1483,53 +1194,6 @@ public class ContentsFragment extends Fragment {
         } catch (Exception ignored) {
             return 0L;
         }
-    }
-
-    private int resolveRemoteSourcePriority(JSONObject object) {
-        String sourceMode = classifySourceMode(
-                object.optString(ContentProfile.MARK_SOURCE_FEED, ""),
-                object.optString(ContentProfile.MARK_SOURCE_REPO, ""),
-                object.optString(ContentProfile.MARK_SOURCE_LABEL, ""),
-                object.optString("remoteUrl", "")
-        );
-        if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return 300;
-        if (SOURCE_MODE_NIGHTLIES.equals(sourceMode)) return 275;
-        if (SOURCE_MODE_GAMEHUB.equals(sourceMode)) {
-            String sourceRepo = object.optString(ContentProfile.MARK_SOURCE_REPO, "").trim().toLowerCase(Locale.US);
-            if (sourceRepo.contains("releases")) return 255;
-            if (sourceRepo.contains("raw")) return 245;
-            return 250;
-        }
-        if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return 200;
-        String joined = (
-                object.optString(ContentProfile.MARK_SOURCE_REPO, "") + " " +
-                        object.optString("remoteUrl", "")
-        ).toLowerCase(Locale.US);
-        if (joined.contains("stevenmxz") || joined.contains("winlator-contents")) return 100;
-        return 50;
-    }
-
-    private int resolveChannelPriority(String channel) {
-        String normalized = channel == null ? "" : channel.trim().toLowerCase(Locale.US);
-        if (ContentProfile.CHANNEL_STABLE.equals(normalized)) return 30;
-        if (ContentProfile.CHANNEL_BETA.equals(normalized)) return 20;
-        if (ContentProfile.CHANNEL_NIGHTLY.equals(normalized)) return 10;
-        return 0;
-    }
-
-    private String resolveRemoteArchHint(JSONObject object) {
-        String normalizedType = object.optString("type", "").trim().toLowerCase(Locale.US);
-        String combined = (
-                object.optString("verName", "") + " "
-                        + object.optString("description", "") + " "
-                        + object.optString("remoteUrl", "") + " "
-                        + object.optString(ContentProfile.MARK_RELEASE_TAG, "")
-        ).toLowerCase(Locale.US);
-        if (("dxvk".equals(normalizedType) || "vkd3d".equals(normalizedType)) && combined.contains("native")) return "x86_64";
-        if (combined.contains("arm64ec") || combined.contains("arm64-ec")) return "arm64ec";
-        if (combined.contains("x86_64") || combined.contains("x86-64") || combined.contains("amd64")) return "x86_64";
-        if (combined.contains("arm64")) return "arm64";
-        return "generic";
     }
 
     private String normalizeSha256(String value) {
@@ -1780,6 +1444,12 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
         String sourceMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_COMMUNITY.equals(sourceMode)) {
+            if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
+                return profile.sourceLabel.trim();
+            }
+            return getString(R.string.contents_source_community);
+        }
         if (SOURCE_MODE_NIGHTLIES.equals(sourceMode)) return getString(R.string.contents_source_nightlies);
         if (SOURCE_MODE_GAMEHUB.equals(sourceMode)) return getString(R.string.contents_source_gamehub);
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return getString(R.string.contents_source_wcphub);
@@ -1825,18 +1495,28 @@ public class ContentsFragment extends Fragment {
                         .append(getString(R.string.contents_package_dgvoodoo_arch, dgArch.trim().toLowerCase(Locale.US)));
             }
         }
-        boolean runtimeInstalled = isRuntimeInstalled(profile);
-        if (runtimeInstalled) meta.append(" • ").append(getString(R.string.graphics_center_installed_action).toLowerCase(Locale.US));
+        if (isProfilePresentLocally(profile)) {
+            meta.append(" • ").append(ContentStateUi.getStatusLabel(requireContext(), manager, profile, false));
+        }
         return meta.toString();
     }
 
     private String buildProfileSourceLine(ContentProfile profile) {
-        StringBuilder line = new StringBuilder(resolveChannelLabel(profile));
+        StringBuilder line = new StringBuilder();
+        if (isProfileBrokenLocally(profile)) {
+            line.append(getString(R.string.contents_state_broken));
+        } else if (isProfilePresentLocally(profile)) {
+            line.append(getString(R.string.contents_source_installed_local));
+        } else {
+            line.append(resolveChannelLabel(profile));
+        }
         String sourceLabel = getSourceLabel(profile);
         String sourceDetail = getSourceDetailLabel(profile);
         String tag = profile.releaseTag != null ? profile.releaseTag.trim() : "";
 
-        if (!sourceLabel.isEmpty()) {
+        boolean duplicatesLocalState = sourceLabel.equalsIgnoreCase(getString(R.string.contents_source_installed_local))
+                || sourceLabel.equalsIgnoreCase(getString(R.string.contents_package_local));
+        if (!sourceLabel.isEmpty() && !duplicatesLocalState) {
             line.append(" • ").append(sourceLabel);
         }
         if (!sourceDetail.isEmpty() && !sourceDetail.equalsIgnoreCase(sourceLabel)) {
@@ -1855,6 +1535,7 @@ public class ContentsFragment extends Fragment {
     private String getSourceDetailLabel(ContentProfile profile) {
         if (profile == null) return "";
         String sourceMode = resolveProfileSourceMode(profile);
+        if (SOURCE_MODE_COMMUNITY.equals(sourceMode)) return getString(R.string.contents_source_community_lane);
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return "";
         if (SOURCE_MODE_NIGHTLIES.equals(sourceMode)) return getString(R.string.contents_source_nightlies_release_lane);
         if (SOURCE_MODE_GAMEHUB.equals(sourceMode) && profile.sourceRepo != null) {
@@ -1873,6 +1554,7 @@ public class ContentsFragment extends Fragment {
         String lowerRepo = repo.toLowerCase(Locale.US);
         if (lowerRepo.contains("wcp-runtime-lanes")) return getString(R.string.contents_source_archive_runtime_lane);
         if (lowerRepo.contains("wcp-graphics-lanes")) return getString(R.string.contents_source_archive_graphics_lane);
+        if (RuntimeFeedRegistry.looksLikeCommunitySource(lowerRepo)) return getString(R.string.contents_source_community_lane);
         if (lowerRepo.contains("winlatorwcphub") || lowerRepo.contains("arihany")) return getString(R.string.contents_source_wcphub_lane);
         if (lowerRepo.contains("the412banner/nightlies") || lowerRepo.contains("nightlies releases")) {
             return getString(R.string.contents_source_nightlies_release_lane);
@@ -1925,6 +1607,7 @@ public class ContentsFragment extends Fragment {
         if (fileName == null) return null;
         String lower = fileName.trim().toLowerCase(Locale.US);
         if (lower.isEmpty()) return null;
+        if (lower.contains("dgvoodoo")) return ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
         if (lower.contains("vkd3d")) return ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
         if (lower.contains("dxvk")) return ContentProfile.ContentType.CONTENT_TYPE_DXVK;
         if (lower.contains("wowbox64") || (lower.contains("wow64") && lower.contains("box64"))) {
@@ -1983,7 +1666,6 @@ public class ContentsFragment extends Fragment {
         int colorRes = switch (profile.type) {
             case CONTENT_TYPE_WINE -> isDarkMode ? R.color.contents_lane_wine_dark : R.color.contents_lane_wine;
             case CONTENT_TYPE_PROTON -> isDarkMode ? R.color.contents_lane_proton_dark : R.color.contents_lane_proton;
-            case CONTENT_TYPE_VULKAN_SDK -> resolveVulkanFamilyAccentColor(profile);
             case CONTENT_TYPE_TURNIP_DRIVER -> isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
             case CONTENT_TYPE_OPENGL_DRIVER -> isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
             case CONTENT_TYPE_DGVOODOO -> isDarkMode ? R.color.contents_lane_dgvoodoo_dark : R.color.contents_lane_dgvoodoo;
@@ -1992,20 +1674,6 @@ public class ContentsFragment extends Fragment {
             default -> fallbackRes;
         };
         return ContextCompat.getColor(requireContext(), colorRes);
-    }
-
-    private int resolveVulkanFamilyAccentColor(ContentProfile profile) {
-        String category = profile.getDisplayCategory();
-        String source = profile.sourceRepo != null ? profile.sourceRepo : "";
-        String version = profile.verName != null ? profile.verName : "";
-        String laneHint = (category + " " + source + " " + version).toLowerCase(Locale.US);
-        if (laneHint.contains("turnip")) {
-            return isDarkMode ? R.color.contents_lane_turnip_dark : R.color.contents_lane_turnip;
-        }
-        if (laneHint.contains("opengl") || laneHint.contains("zink")) {
-            return isDarkMode ? R.color.contents_lane_opengl_dark : R.color.contents_lane_opengl;
-        }
-        return isDarkMode ? R.color.contents_lane_vulkansdk_dark : R.color.contents_lane_vulkansdk;
     }
 
     private int resolveContentPrimaryTextColor() {
@@ -2134,7 +1802,6 @@ public class ContentsFragment extends Fragment {
                 case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> R.drawable.ae_icon_package;
                 case CONTENT_TYPE_DXVK,
                      CONTENT_TYPE_VKD3D,
-                     CONTENT_TYPE_VULKAN_SDK,
                      CONTENT_TYPE_TURNIP_DRIVER,
                      CONTENT_TYPE_OPENGL_DRIVER,
                      CONTENT_TYPE_DGVOODOO -> R.drawable.ae_icon_open;
@@ -2166,7 +1833,7 @@ public class ContentsFragment extends Fragment {
             holder.tvSource.setText(buildProfileSourceLine(profile));
             holder.tvSource.setTextColor(secondaryColor);
 
-            holder.ibMenu.setVisibility(profile.remoteUrl == null ? View.VISIBLE : View.GONE);
+            holder.ibMenu.setVisibility(isProfilePresentLocally(profile) ? View.VISIBLE : View.GONE);
             holder.ibMenu.setOnClickListener(v -> {
                 PopupMenu selectionMenu = new PopupMenu(getContext(), holder.ibMenu);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) selectionMenu.setForceShowIcon(true);

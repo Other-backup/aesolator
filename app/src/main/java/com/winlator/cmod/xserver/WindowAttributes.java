@@ -33,6 +33,7 @@ public class WindowAttributes {
     private boolean overrideRedirect = false;
     private boolean saveUnder = false;
     private boolean enabled = true;
+    private boolean renderSubwindows = true;
     private WinGravity winGravity = WinGravity.CENTER;
     private WindowClass windowClass = WindowClass.INPUT_OUTPUT;
     public final Window window;
@@ -108,6 +109,14 @@ public class WindowAttributes {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isRenderSubwindows() {
+        return renderSubwindows;
+    }
+
+    public void setRenderSubwindows(boolean renderSubwindows) {
+        this.renderSubwindows = renderSubwindows;
     }
 
     public void update(Bitmask valueMask, XInputStream inputStream, XClient client) {

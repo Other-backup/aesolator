@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_ACTIVITY:=com.winlator.cmod.XServerDisplayActivity}"
 : "${WLT_CONTAINER_IDS:=1 2}"
 : "${WLT_WAIT_SEC:=4}"
 : "${WLT_LOGCAT_LINES:=1200}"
 : "${WLT_OUT_DIR:=/tmp/winlator-upscale-forensics-$(date +%Y%m%d_%H%M%S)}"
+: "${WLT_RUNTIME_LOG_ROOTS:=/sdcard/Ae.solator/logs /storage/emulated/0/Ae.solator/logs /sdcard/Winlator/logs}"
 
 log() { printf '[forensic-upscale] %s\n' "$*"; }
 fail() { printf '[forensic-upscale][error] %s\n' "$*" >&2; exit 1; }
@@ -74,7 +75,7 @@ collect_app_snapshots() {
 
 collect_sdcard_runtime_logs() {
   local out_dir="$1"
-  adb_s shell "find /sdcard/Winlator/logs -maxdepth 1 -type f 2>/dev/null | sort" \
+  adb_s shell "sh -c 'for d in ${WLT_RUNTIME_LOG_ROOTS}; do for f in \"\$d\"/*; do [ -f \"\$f\" ] && printf \"%s\n\" \"\$f\"; done; done | sort -u'" \
     > "${out_dir}/sdcard-runtime-logs-index.txt" 2>&1 || true
 }
 

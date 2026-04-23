@@ -396,6 +396,20 @@
                         android:layout_height="wrap_content"
                         android:text="@string/enable_big_picture_mode_launch" />
 
+                    <CheckBox
+                        android:id="@+id/CBShowShortcutsFirst"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/show_shortcuts_first_on_startup" />
+
+                    <CheckBox
+                        android:id="@+id/CBWarnBeforeExit"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/warn_before_exit" />
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

@@ -6,6 +6,15 @@ This document is the repo-tracked bootstrap path for moving `Ae.solator`
 development onto a new `Termux/Android` device without reopening old setup
 tails.
 
+## Master Engineering Directive
+
+Migration/bootstrap work follows `docs/MASTER_ENGINEERING_DIRECTIVE.md`.
+If the environment permits direct remediation, fix broken paths, configs,
+scripts, docs, and verification steps automatically rather than leaving manual
+instructions as the primary result.
+Process changes must be propagated to `AGENTS.md`, `README.md`, this bootstrap
+doc, the roadmap, and the reflective journal.
+
 ## Target Layout
 
 - workspace root: `/data/data/com.termux/files/home`
@@ -38,6 +47,8 @@ tails.
 4. Verify that `local.properties`, SDK paths, and host LLVM paths are live.
 5. Continue from the latest roadmap/journal state, external forensic logs, and
    `docs/CODEX_OPERATING_CONTRACT.md`.
+6. Build from the repo root only:
+   `./gradlew` is authoritative, `app/gradlew` is not a separate lane.
 
 ## Minimal Commands
 
@@ -73,13 +84,16 @@ Pinned working versions:
 - build-tools: `35.0.0`
 - NDK: `29.0.14206865`
 
-`local.properties` should resolve to:
+`local.properties` should resolve to bootstrap inputs similar to:
 
 ```properties
 sdk.dir=/data/data/com.termux/files/home/android-sdk
-ndk.dir=/data/data/com.termux/files/home/android-sdk/ndk/29.0.14206865
 cmake.dir=/data/data/com.termux/files/usr
 ```
+
+`ndk.dir` may still appear on older devices, but the current root lane should
+not require it when `sdk.dir` and the pinned NDK version are enough to resolve
+the NDK root.
 
 ## Host LLVM
 
@@ -152,6 +166,7 @@ Primary forensic sources on-device:
 - `git status --short` is empty in both repos
 - `git branch --show-current` is `main`
 - `tools/env-android-local.sh` prints the expected SDK and LLVM roots
+- `./gradlew :app:help --configuration-cache` succeeds from repo root
 - `/storage/emulated/0/Download/app-debug.apk` exists after the first local
   build
 - app-owned forensic directory is writable:

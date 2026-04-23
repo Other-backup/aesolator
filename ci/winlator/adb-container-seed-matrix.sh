@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_HOME_ROOT:=files/imagefs/home}"
 : "${WLT_SEED_CONTAINER_ID:=1}"
 : "${WLT_TARGET_CONTAINERS:=2 3 4}"

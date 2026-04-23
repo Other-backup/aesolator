@@ -15,11 +15,7 @@ public class DrawableManager extends XResourceManager implements XResourceManage
     }
 
     public Drawable getDrawable(int id) {
-        Drawable drawable = drawables.get(id);
-        if (drawable != null && drawable.getData() == null) {
-            throw new IllegalStateException("Drawable with id " + id + " has null data when fetched.");
-        }
-        return drawable;
+        return drawables.get(id);
     }
 
 
@@ -46,12 +42,7 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 
     public void removeDrawable(int id) {
         Drawable drawable = drawables.get(id);
-        if (drawable == null) {
-            throw new IllegalStateException("Attempting to remove non-existent Drawable with id " + id);
-        }
-        if (drawable.getData() == null) {
-            throw new IllegalStateException("Drawable with id " + id + " has null data during removal.");
-        }
+        if (drawable == null) return;
 
         final Texture texture = drawable.getTexture();
         if (texture != null) xServer.getRenderer().xServerView.queueEvent(texture::destroy);
@@ -68,11 +59,7 @@ public class DrawableManager extends XResourceManager implements XResourceManage
     public void onFreeResource(XResource resource) {
         if (resource instanceof Pixmap) {
             Pixmap pixmap = (Pixmap) resource;
-            Drawable drawable = pixmap.drawable;
-            if (drawable.getData() == null) {
-                throw new IllegalStateException("Drawable for Pixmap with id " + pixmap.drawable.id + " has null data during free.");
-            }
-            removeDrawable(drawable.id);
+            removeDrawable(pixmap.drawable.id);
         }
     }
 

@@ -192,6 +192,20 @@ data class EnvVarInfo(
                 selectionType = EnvVarSelectionType.TOGGLE,
                 possibleValues = listOf("0", "1"),
             ),
+            "WINEAESYNC" to EnvVarInfo(
+                identifier = "WINEAESYNC",
+                selectionType = EnvVarSelectionType.TOGGLE,
+                possibleValues = listOf("0", "1"),
+            ),
+            "WINEFSYNC" to EnvVarInfo(
+                identifier = "WINEFSYNC",
+                selectionType = EnvVarSelectionType.TOGGLE,
+                possibleValues = listOf("0", "1"),
+            ),
+            "AERO_WINE_SYNC_BACKEND" to EnvVarInfo(
+                identifier = "AERO_WINE_SYNC_BACKEND",
+                possibleValues = listOf("auto", "ntsync", "aesync", "fsync", "esync", "server"),
+            ),
             "TU_DEBUG" to EnvVarInfo(
                 identifier = "TU_DEBUG",
                 selectionType = EnvVarSelectionType.MULTI_SELECT,

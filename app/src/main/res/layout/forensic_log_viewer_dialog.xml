@@ -2,87 +2,156 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/forensic_panel_background_dark"
     android:orientation="vertical"
-    android:padding="10dp"
-    android:tag="preserve_background">
-
-    <TextView
-        android:id="@+id/TVForensicLogFile"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/forensic_badge_text_dark"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/TVForensicLogStats"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:maxLines="2"
-        android:textColor="@color/forensic_log_stats_text"
-        android:textSize="12sp"
-        android:typeface="monospace" />
+    android:padding="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:background="@drawable/surface_runtime_taskmgr_background"
         android:baselineAligned="false"
-        android:gravity="center_horizontal"
-        android:orientation="horizontal">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="7dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="7dp"
+        android:paddingBottom="3dp"
+        android:tag="preserve_background">
 
-        <Button
-            android:id="@+id/BTForensicCopyLog"
-            style="@style/ButtonNeutral"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:maxLines="2"
-            android:minHeight="52dp"
-            android:text="@string/diagnostics_forensic_log_copy" />
-
-        <Button
-            android:id="@+id/BTForensicExportLog"
-            style="@style/ButtonNeutral"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:maxLines="2"
-            android:minHeight="52dp"
-            android:text="@string/diagnostics_forensic_log_export" />
-    </LinearLayout>
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="10dp"
-        android:background="@drawable/forensic_command_background_dark"
-        android:fillViewport="true"
-        android:padding="8dp"
-        android:scrollbars="horizontal">
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:scrollbars="vertical">
+            android:orientation="vertical"
+            android:paddingEnd="8dp">
 
             <TextView
-                android:id="@+id/TVForensicLogBody"
-                android:layout_width="wrap_content"
+                android:id="@+id/TVForensicLogFile"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minWidth="720dp"
-                android:textColor="@color/forensic_log_body_text"
-                android:textIsSelectable="true"
-                android:textSize="12sp"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textColor="@color/surface_runtime_taskmgr_text"
+                android:textSize="10sp"
+                android:textStyle="bold"
                 android:typeface="monospace" />
-        </ScrollView>
-    </HorizontalScrollView>
+
+            <TextView
+                android:id="@+id/TVForensicLogStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textColor="@color/surface_runtime_taskmgr_muted"
+                android:textSize="8.5sp"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/TVForensicLogTicker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textColor="@color/surface_runtime_taskmgr_muted"
+                android:textSize="8.2sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:gravity="end|center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/BTForensicCopyLog"
+                style="@style/ButtonInlineRuntimeNeutral"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="@string/diagnostics_forensic_log_copy_short" />
+
+            <Button
+                android:id="@+id/BTForensicExportLog"
+                style="@style/ButtonInlineRuntimeNeutral"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="@string/diagnostics_forensic_log_export_short" />
+
+            <Button
+                android:id="@+id/BTForensicPauseLog"
+                style="@style/ButtonInlineRuntimeNeutral"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="@string/pause" />
+
+            <Button
+                android:id="@+id/BTForensicCloseLog"
+                style="@style/ButtonInlineRuntimeNeutral"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="@string/close" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="1dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/surface_runtime_log_console_background"
+            android:orientation="vertical"
+            android:padding="0dp"
+            android:tag="preserve_background">
+
+            <TextView
+                android:id="@+id/TVForensicLogStreamBadge"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <com.winlator.cmod.widget.LogView
+                android:id="@+id/LVForensicLogBody"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginStart="2dp"
+                android:layout_marginTop="1dp"
+                android:layout_marginEnd="2dp"
+                android:layout_marginBottom="5dp"
+                android:minHeight="388dp" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

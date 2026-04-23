@@ -20,6 +20,7 @@
 /.tmp*
 /.tmp_*
 /.tmp_adb/
+/.cache/
 /.legacy_rootfs/
 prefixPack.txz
 app/src/main/assets/imagefs.txz
@@ -27,6 +28,7 @@ app/src/main/assets/imagefs.txz.*
 app/src/main/assets/imagefs_bionic.txz
 app/src/main/assets/imagefs_gamenative.txz
 app/src/main/assets/imagefs_patches_gamenative.tzst
+app/src/main/cpp/adrenotools/
 
 # Patch rejection files from manual patch/debug work
 *.rej
@@ -41,3 +43,5 @@ ci/wine11-arm64ec/transfer-lanes/tkg-ge-wave6-runtime/patches-pre-stack-rebase/
 .DS_Store
 Thumbs.db
 *~
+*.bak
+*.bak.*

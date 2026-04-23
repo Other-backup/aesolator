@@ -40,6 +40,9 @@ public class TouchpadView extends View {
     public static final short MAX_TAP_MILLISECONDS = 200;
     public static final float CURSOR_ACCELERATION = 1.25f;
     public static final byte CURSOR_ACCELERATION_THRESHOLD = 6;
+    private static final float DRAWER_EDGE_SWIPE_ZONE_DP = 28f;
+    private static final float DRAWER_EDGE_SWIPE_TRIGGER_DP = 72f;
+    private static final float DRAWER_EDGE_SWIPE_VERTICAL_SLOP_DP = 48f;
     private final Finger[] fingers = new Finger[MAX_FINGERS];
     private byte numFingers = 0;
     private float sensitivity = 1.0f;
@@ -51,6 +54,7 @@ public class TouchpadView extends View {
     private boolean scrolling = false;
     private final XServer xServer;
     private Runnable fourFingersTapCallback;
+    private Runnable leftEdgeSwipeCallback;
     private final float[] xform = XForm.getInstance();
     private boolean simTouchScreen = false;
     private boolean continueClick = true;
@@ -81,6 +85,10 @@ public class TouchpadView extends View {
     private int pendingMoveY = 0;
     private int logicalCursorX = 0;
     private int logicalCursorY = 0;
+    private boolean leftEdgeSwipeCandidate = false;
+    private int leftEdgeSwipePointerId = -1;
+    private float leftEdgeSwipeStartX = 0f;
+    private float leftEdgeSwipeStartY = 0f;
 
     private enum GestureMode {
         NONE,
@@ -368,6 +376,7 @@ public class TouchpadView extends View {
                             continueClick = System.currentTimeMillis() - fingers[0].touchTime > CLICK_DELAYED_TIME;
                     }
                 }
+                startLeftEdgeSwipeCandidate(actionMasked, pointerId, event.getX(actionIndex), event.getY(actionIndex));
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
@@ -377,6 +386,7 @@ public class TouchpadView extends View {
                     else
                         xServer.injectPointerMove((int)transformedPoint[0], (int)transformedPoint[1]);
                 } else {
+                    if (handleLeftEdgeSwipeMove(event)) return true;
                     for (byte i = 0; i < MAX_FINGERS; i++) {
                         if (fingers[i] != null) {
                             int pointerIndex = event.findPointerIndex(i);
@@ -422,13 +432,85 @@ public class TouchpadView extends View {
                         gestureMode = GestureMode.NONE;
                     }
                 }
+                clearLeftEdgeSwipeCandidate(pointerId);
                 break;
             case MotionEvent.ACTION_CANCEL:
+                clearLeftEdgeSwipeCandidate(pointerId);
                 resetTouchpadGestureState(true);
                 break;
         }
 
         return true;
+    }
+
+    private void startLeftEdgeSwipeCandidate(int actionMasked, int pointerId, float rawX, float rawY) {
+        if (leftEdgeSwipeCallback == null) return;
+        if (actionMasked != MotionEvent.ACTION_DOWN || numFingers != 1) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            return;
+        }
+        if (rawX > dpToPx(DRAWER_EDGE_SWIPE_ZONE_DP)) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            return;
+        }
+        leftEdgeSwipeCandidate = true;
+        leftEdgeSwipePointerId = pointerId;
+        leftEdgeSwipeStartX = rawX;
+        leftEdgeSwipeStartY = rawY;
+    }
+
+    private boolean handleLeftEdgeSwipeMove(MotionEvent event) {
+        if (!leftEdgeSwipeCandidate || leftEdgeSwipePointerId < 0) return false;
+        if (numFingers != 1 || event.getPointerCount() != 1) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            return false;
+        }
+
+        int pointerIndex = event.findPointerIndex(leftEdgeSwipePointerId);
+        if (pointerIndex < 0) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            return false;
+        }
+
+        float rawX = event.getX(pointerIndex);
+        float rawY = event.getY(pointerIndex);
+        if (leftEdgeSwipePointerId < fingers.length && leftEdgeSwipePointerId >= 0 && fingers[leftEdgeSwipePointerId] != null) {
+            fingers[leftEdgeSwipePointerId].update(rawX, rawY);
+        }
+
+        float dx = rawX - leftEdgeSwipeStartX;
+        float dy = rawY - leftEdgeSwipeStartY;
+        float absDy = Math.abs(dy);
+        if (absDy > dpToPx(DRAWER_EDGE_SWIPE_VERTICAL_SLOP_DP)) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            return false;
+        }
+
+        if (dx >= dpToPx(DRAWER_EDGE_SWIPE_TRIGGER_DP) && dx > absDy * 1.5f) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+            resetTouchpadGestureState(false);
+            leftEdgeSwipeCallback.run();
+            return true;
+        }
+
+        return dx >= 0f;
+    }
+
+    private void clearLeftEdgeSwipeCandidate(int pointerId) {
+        if (pointerId == leftEdgeSwipePointerId || pointerId < 0) {
+            leftEdgeSwipeCandidate = false;
+            leftEdgeSwipePointerId = -1;
+        }
+    }
+
+    private float dpToPx(float dp) {
+        return dp * getResources().getDisplayMetrics().density;
     }
 
     private void resetTouchpadGestureState(boolean releaseButtons) {
@@ -873,6 +955,10 @@ public class TouchpadView extends View {
 
     public void setFourFingersTapCallback(Runnable fourFingersTapCallback) {
         this.fourFingersTapCallback = fourFingersTapCallback;
+    }
+
+    public void setLeftEdgeSwipeCallback(Runnable leftEdgeSwipeCallback) {
+        this.leftEdgeSwipeCallback = leftEdgeSwipeCallback;
     }
 
     public boolean onExternalMouseEvent(MotionEvent event) {

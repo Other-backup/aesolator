@@ -40,8 +40,6 @@ public final class RuntimeProfileManager {
         envVars.put("AERO_RUNTIME_POLICY_SOURCE", "runtime_profile_manager");
 
         // Baseline shared knobs (independent from FEX/Box profile overlays).
-        envVars.put("WINEESYNC", "1");
-        envVars.put("WINEFSYNC", "0");
         envVars.put("DXVK_LOG_LEVEL", "none");
         envVars.put("vblank_mode", "0");
         envVars.put("MESA_SHADER_CACHE_DISABLE", "0");

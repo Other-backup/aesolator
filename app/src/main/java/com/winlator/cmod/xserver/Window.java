@@ -8,6 +8,7 @@ import com.winlator.cmod.xserver.events.PropertyNotify;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Stack;
 
@@ -35,6 +36,7 @@ public class Window extends XResource {
     private final ArrayList<Window> children = new ArrayList<>();
     private final List<Window> immutableChildren = Collections.unmodifiableList(children);
     private final ArrayList<EventListener> eventListeners = new ArrayList<>();
+    private final HashMap<String, Object> tags = new HashMap<>();
 
     public Window(int id, Drawable content, int x, int y, int width, int height, XClient originClient) {
         super(id);
@@ -173,6 +175,7 @@ public class Window extends XResource {
 
     public long getHandle() {
         Property property = getProperty(Atom.getId("_NET_WM_HWND"));
+        if (property == null) property = getProperty(Atom.getId("_WINE_HWND"));
         return property != null ? property.getLong(0) : 0;
     }
 
@@ -181,12 +184,41 @@ public class Window extends XResource {
         return attributes.isMapped() && windowGroup == id && width > 1 && height > 1;
     }
 
+    public boolean isRenderable() {
+        return isInputOutput() && attributes.isMapped() && attributes.isEnabled() && width > 1 && height > 1;
+    }
+
+    public boolean hasIdentityHints() {
+        return getProcessId() > 0 || getHandle() != 0 || !getClassName().isEmpty() || !getName().isEmpty();
+    }
+
+    public boolean isTrackedVisualWindow(Window rootWindow) {
+        if (this == rootWindow || !isRenderable() || getMapState() != MapState.VIEWABLE) return false;
+        if (isApplicationWindow()) return true;
+        Window parentWindow = getParent();
+        return parentWindow == rootWindow && hasIdentityHints();
+    }
+
     public boolean isInputOutput() {
         return content != null;
     }
 
-    public boolean isRenderable() {
-        return content != null && attributes.isMapped() && width > 1 && height > 1;
+    public Object getTag(String key) {
+        return tags.get(key);
+    }
+
+    public Object getTag(String key, Object fallback) {
+        Object value = tags.get(key);
+        return value != null ? value : fallback;
+    }
+
+    public void setTag(String key, Object value) {
+        if (value == null) tags.remove(key);
+        else tags.put(key, value);
+    }
+
+    public void removeTag(String key) {
+        tags.remove(key);
     }
 
     public void addChild(Window child) {

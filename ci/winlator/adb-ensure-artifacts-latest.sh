@@ -3,12 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-: "${WLT_PACKAGE:=by.aero.so.benchmark}"
+: "${WLT_PACKAGE:=com.winlator.cmod}"
 : "${WLT_SOURCE_MAP:=${ROOT_DIR}/ci/winlator/artifact-source-map.json}"
-: "${WLT_TARGET_KEYS:=freewine11 vulkansdkarm64 vulkansdkx86_64 aedxvkgplasync aedxvkgplasyncarm64ec aevkd3dproton aevkd3dprotonarm64ec}"
+: "${WLT_TARGET_KEYS:=freewine11 aedxvkgplasync aedxvkgplasyncarm64ec aevkd3dproton aevkd3dprotonarm64ec}"
 : "${WLT_INSTALL_TARGET:=run_as_contents}"
 : "${WLT_FORCE_REINSTALL:=1}"
 : "${WLT_OUT_DIR:=/tmp/winlator-artifacts-latest-$(date +%Y%m%d_%H%M%S)}"
+WLT_APP_DATA_DIR=""
+WLT_APP_CONTENTS_DIR=""
 
 log() { printf '[adb-artifacts] %s\n' "$*"; }
 warn() { printf '[adb-artifacts][warn] %s\n' "$*" >&2; }
@@ -38,7 +40,7 @@ trim() {
 download_with_retries() {
   local url="$1"
   local out="$2"
-  curl -fL --retry 3 --retry-all-errors --connect-timeout 20 --max-time 0 -A "Ae.solator artifact sync/0.9c+" -o "${out}" "${url}"
+  curl -fL --retry 3 --retry-all-errors --connect-timeout 20 --max-time 0 -A "Ae.solator artifact sync/0.9q+" -o "${out}" "${url}"
 }
 
 extract_archive() {
@@ -100,25 +102,35 @@ verify_sha_if_available() {
   [[ "${actual}" == "${expected}" ]] || fail "sha mismatch for ${asset_name}: expected=${expected} actual=${actual}"
 }
 
+resolve_app_data_dir() {
+  local app_dir
+  app_dir="$(adb_s shell "run-as ${WLT_PACKAGE} pwd" | tr -d '\r' | tail -n1)"
+  app_dir="$(trim "${app_dir}")"
+  [[ "${app_dir}" == /data/* ]] || fail "unexpected app data dir for ${WLT_PACKAGE}: ${app_dir:-<empty>}"
+  printf '%s\n' "${app_dir}"
+}
+
 install_wcp_to_device() {
   local stage_dir="$1"
   local content_type="$2"
   local content_name="$3"
-  local device_dir="files/contents/${content_type}/${content_name}"
+  local device_dir="${WLT_APP_CONTENTS_DIR}/${content_type}/${content_name}"
+  local profile_path="${device_dir}/profile.json"
 
   if [[ "${WLT_FORCE_REINSTALL}" == "1" ]]; then
-    adb_s shell "run-as ${WLT_PACKAGE} sh -c 'rm -rf ${device_dir}'" >/dev/null
+    adb_s shell "run-as ${WLT_PACKAGE} rm -rf ${device_dir}" >/dev/null
   else
-    if adb_s shell "run-as ${WLT_PACKAGE} sh -c 'test -f ${device_dir}/profile.json'" >/dev/null 2>&1; then
+    if adb_s shell "run-as ${WLT_PACKAGE} test -f ${profile_path}" >/dev/null 2>&1; then
       log "skip existing ${device_dir} (WLT_FORCE_REINSTALL=0)"
       return 0
     fi
   fi
 
+  adb_s shell "run-as ${WLT_PACKAGE} mkdir -p ${device_dir}" >/dev/null
   tar -C "${stage_dir}" -cf - . | \
-    adb_s shell "run-as ${WLT_PACKAGE} sh -c 'mkdir -p ${device_dir} && tar -xf - -C ${device_dir}'"
+    adb_s shell "run-as ${WLT_PACKAGE} tar -xf - -C ${device_dir}"
 
-  adb_s shell "run-as ${WLT_PACKAGE} sh -c 'test -f ${device_dir}/profile.json'" >/dev/null \
+  adb_s shell "run-as ${WLT_PACKAGE} test -f ${profile_path}" >/dev/null \
     || fail "installed profile missing in ${device_dir}"
 }
 
@@ -139,6 +151,9 @@ main() {
     ADB_SERIAL_PICKED="$(pick_serial)"
     [[ -n "${ADB_SERIAL_PICKED}" ]] || fail "no active adb device"
     log "device=${ADB_SERIAL_PICKED} package=${WLT_PACKAGE}"
+    WLT_APP_DATA_DIR="$(resolve_app_data_dir)"
+    WLT_APP_CONTENTS_DIR="${WLT_APP_DATA_DIR}/files/contents"
+    log "app-data=${WLT_APP_DATA_DIR}"
   fi
 
   mkdir -p "${WLT_OUT_DIR}/downloads" "${WLT_OUT_DIR}/stage"
@@ -196,8 +211,14 @@ main() {
   done
 
   if [[ "${WLT_INSTALL_TARGET}" == "run_as_contents" ]]; then
-    adb_s shell "run-as ${WLT_PACKAGE} sh -c 'for f in files/contents/Wine/*/profile.json; do [ -f \"\$f\" ] || continue; echo ===== \$f =====; cat \"\$f\"; echo; done'" \
-      > "${WLT_OUT_DIR}/device-wine-profiles.txt" 2>/dev/null || true
+    {
+      adb_s shell "run-as ${WLT_PACKAGE} find ${WLT_APP_CONTENTS_DIR}/Wine -maxdepth 2 -name profile.json" | tr -d '\r'
+    } | while IFS= read -r profile_path; do
+      [[ -n "${profile_path}" ]] || continue
+      printf '===== %s =====\n' "${profile_path}"
+      adb_s shell "run-as ${WLT_PACKAGE} cat ${profile_path}" | tr -d '\r'
+      printf '\n'
+    done > "${WLT_OUT_DIR}/device-wine-profiles.txt" 2>/dev/null || true
   fi
 
   printf 'time=%s\nsource_map=%s\nkeys=%s\ninstall_target=%s\nforce_reinstall=%s\n' \

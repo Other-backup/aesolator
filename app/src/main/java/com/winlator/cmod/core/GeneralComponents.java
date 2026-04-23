@@ -1,6 +1,8 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
+import android.view.View;
+import android.widget.Spinner;
 
 import com.winlator.cmod.xenvironment.ImageFs;
 
@@ -59,9 +61,10 @@ public abstract class GeneralComponents {
         }
 
         public File getDestination(Context context) {
-            File rootDir = ImageFs.find(context).getRootDir();
+            ImageFs imageFs = ImageFs.find(context);
+            File rootDir = imageFs.getRootDir();
             return switch (this) {
-                case DXVK, VKD3D, WINED3D -> new File(rootDir, "/home/xuser/.wine/drive_c/windows");
+                case DXVK, VKD3D, WINED3D -> new File(imageFs.getWinePrefixDir(), "drive_c/windows");
                 case SOUNDFONT -> {
                     File destination = new File(context.getCacheDir(), "soundfont");
                     if (!destination.isDirectory()) destination.mkdirs();
@@ -99,6 +102,33 @@ public abstract class GeneralComponents {
         File file = new File(context.getFilesDir(), "/installed_components/" + type.lowerName());
         if (!file.isDirectory()) file.mkdirs();
         return file;
+    }
+
+    public static void initViews(Type type, View toolbox, Spinner spinner, String selectedValue, String defaultValue) {
+        if (spinner == null) return;
+        Context context = spinner.getContext();
+        ArrayList<String> items = getBuiltinComponentNames(type);
+        File componentDir = getComponentDir(type, context);
+        File[] installedComponents = componentDir.listFiles();
+        if (installedComponents != null) {
+            for (File component : installedComponents) {
+                String name = component.getName();
+                if (!name.isEmpty() && !items.contains(name)) items.add(name);
+            }
+        }
+
+        String selected = selectedValue == null ? "" : selectedValue.trim();
+        String fallback = defaultValue == null ? "" : defaultValue.trim();
+        if (items.isEmpty() && !fallback.isEmpty()) items.add(fallback);
+        if (!selected.isEmpty() && !items.contains(selected)) items.add(selected);
+
+        spinner.setAdapter(SpinnerAdapters.create(context, items));
+        if (!selected.isEmpty()) {
+            AppUtils.setSpinnerSelectionFromValue(spinner, selected);
+        } else if (!fallback.isEmpty()) {
+            AppUtils.setSpinnerSelectionFromValue(spinner, fallback);
+        }
+        if (toolbox != null) toolbox.setVisibility(items.size() > 1 ? View.VISIBLE : View.GONE);
     }
 
     public static boolean isBuiltinComponent(Type type, String identifier) {

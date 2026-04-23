@@ -122,13 +122,13 @@ public abstract class ManifestComponentHelper {
             ContentsManager manager = new ContentsManager(context);
             manager.syncContents();
             installedContent = new InstalledContentLists(
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE)),
-                    profilesToDisplay(manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON))
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WINE)),
+                    profilesToDisplay(manager, manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON))
             );
         } catch (Exception ignored) {
             installedContent = new InstalledContentLists(
@@ -162,6 +162,59 @@ public abstract class ManifestComponentHelper {
         return new ArrayList<>(versions);
     }
 
+    public static String toManifestKey(ContentProfile.ContentType type) {
+        if (type == null) return "";
+        return switch (type) {
+            case CONTENT_TYPE_DXVK -> ManifestContentTypes.DXVK;
+            case CONTENT_TYPE_VKD3D -> ManifestContentTypes.VKD3D;
+            case CONTENT_TYPE_BOX64 -> ManifestContentTypes.BOX64;
+            case CONTENT_TYPE_WOWBOX64 -> ManifestContentTypes.WOWBOX64;
+            case CONTENT_TYPE_FEXCORE -> ManifestContentTypes.FEXCORE;
+            case CONTENT_TYPE_WINE -> ManifestContentTypes.WINE;
+            case CONTENT_TYPE_PROTON -> ManifestContentTypes.PROTON;
+            default -> "";
+        };
+    }
+
+    public static List<ManifestEntry> getManifestEntriesForType(
+            ManifestData manifest,
+            ContentProfile.ContentType type,
+            String variant
+    ) {
+        ArrayList<ManifestEntry> filtered = new ArrayList<>();
+        if (manifest == null || type == null) return filtered;
+
+        String manifestKey = toManifestKey(type);
+        if (manifestKey.isEmpty()) return filtered;
+
+        List<ManifestEntry> entries = manifest.getItems(manifestKey);
+        String normalizedVariant = ContentProfile.normalizeRuntimeModel(variant);
+        if (normalizedVariant.isEmpty()) {
+            normalizedVariant = variant == null ? "" : variant.trim().toLowerCase(Locale.ENGLISH);
+        }
+        if (normalizedVariant.isEmpty()) {
+            filtered.addAll(entries);
+            return filtered;
+        }
+
+        for (ManifestEntry entry : entries) {
+            if (entry == null) continue;
+            String entryVariant = entry.variant == null ? "" : entry.variant.trim().toLowerCase(Locale.ENGLISH);
+            if (normalizedVariant.equals(entryVariant)) filtered.add(entry);
+        }
+        if (!filtered.isEmpty()) return filtered;
+
+        for (ManifestEntry entry : entries) {
+            if (entry == null) continue;
+            String entryVariant = entry.variant == null ? "" : entry.variant.trim().toLowerCase(Locale.ENGLISH);
+            if (entryVariant.isEmpty()) filtered.add(entry);
+        }
+        if (!filtered.isEmpty()) return filtered;
+
+        filtered.addAll(entries);
+        return filtered;
+    }
+
     public static VersionOptionList buildVersionOptionList(List<String> base, List<String> installed, List<ManifestEntry> manifest) {
         LinkedHashMap<String, VersionOption> options = new LinkedHashMap<>();
         LinkedHashSet<String> installedIds = new LinkedHashSet<>();
@@ -183,7 +236,8 @@ public abstract class ManifestComponentHelper {
             for (ManifestEntry entry : manifest) {
                 if (entry == null || entry.id.isEmpty()) continue;
                 if (!options.containsKey(entry.id)) {
-                    boolean isInstalled = installedIds.contains(entry.id) || installedIds.contains(entry.getDisplayName());
+                    boolean isInstalled = versionExists(entry.id, installed)
+                            || versionExists(entry.getDisplayName(), installed);
                     options.put(entry.id, new VersionOption(entry.id, entry.id, true, isInstalled));
                 }
             }
@@ -257,10 +311,19 @@ public abstract class ManifestComponentHelper {
     public static boolean versionExists(String version, List<String> available) {
         if (version == null || version.trim().isEmpty() || available == null) return false;
         String trimmed = version.trim();
+        String trimmedId = StringUtils.parseIdentifier(trimmed);
         for (String candidate : available) {
             if (candidate == null) continue;
             if (candidate.equalsIgnoreCase(trimmed)) return true;
-            if (StringUtils.parseIdentifier(candidate).equals(StringUtils.parseIdentifier(trimmed))) return true;
+            String candidateId = StringUtils.parseIdentifier(candidate);
+            if (candidateId.equals(trimmedId)) return true;
+            if (candidate.toLowerCase(Locale.ENGLISH).startsWith(trimmed.toLowerCase(Locale.ENGLISH) + "-")
+                    || trimmed.toLowerCase(Locale.ENGLISH).startsWith(candidate.toLowerCase(Locale.ENGLISH) + "-")) {
+                return true;
+            }
+            if (candidateId.startsWith(trimmedId + "-") || trimmedId.startsWith(candidateId + "-")) {
+                return true;
+            }
         }
         return false;
     }
@@ -269,19 +332,53 @@ public abstract class ManifestComponentHelper {
         if (version == null || version.trim().isEmpty() || entries == null) return null;
         String normalized = version.trim();
         String normalizedId = StringUtils.parseIdentifier(normalized);
+        ManifestEntry best = null;
+        int bestScore = -1;
         for (ManifestEntry entry : entries) {
             if (entry == null) continue;
-            if (normalized.equalsIgnoreCase(entry.id)) return entry;
-            if (normalizedId.equals(StringUtils.parseIdentifier(entry.id))) return entry;
+            int score = scoreManifestEntryVersionMatch(normalized, normalizedId, entry);
+            if (score > bestScore) {
+                best = entry;
+                bestScore = score;
+            }
         }
-        return null;
+        return best;
     }
 
-    private static ArrayList<String> profilesToDisplay(List<ContentProfile> profiles) {
+    public static ManifestEntry findManifestEntryForTypeVersion(
+            ManifestData manifest,
+            ContentProfile.ContentType type,
+            String version,
+            String variant
+    ) {
+        return findManifestEntryForVersion(version, getManifestEntriesForType(manifest, type, variant));
+    }
+
+    private static int scoreManifestEntryVersionMatch(String normalized, String normalizedId, ManifestEntry entry) {
+        if (entry == null) return -1;
+
+        String entryId = entry.id == null ? "" : entry.id.trim();
+        String entryName = entry.getDisplayName().trim();
+        String entryIdNormalized = StringUtils.parseIdentifier(entryId);
+        String entryNameNormalized = StringUtils.parseIdentifier(entryName);
+
+        if (normalized.equalsIgnoreCase(entryId) || normalized.equalsIgnoreCase(entryName)) return 500;
+        if (normalizedId.equals(entryIdNormalized) || normalizedId.equals(entryNameNormalized)) return 450;
+        if (entryIdNormalized.startsWith(normalizedId + "-") || entryNameNormalized.startsWith(normalizedId + "-")) return 400;
+        if (normalizedId.startsWith(entryIdNormalized + "-") || normalizedId.startsWith(entryNameNormalized + "-")) return 350;
+        if (!entryIdNormalized.isEmpty() && entryIdNormalized.contains(normalizedId)) return 300;
+        if (!entryNameNormalized.isEmpty() && entryNameNormalized.contains(normalizedId)) return 250;
+        return -1;
+    }
+
+    private static ArrayList<String> profilesToDisplay(ContentsManager manager, List<ContentProfile> profiles) {
         ArrayList<String> display = new ArrayList<>();
         if (profiles == null) return display;
         for (ContentProfile profile : profiles) {
-            if (profile == null || !profile.locallyInstalled) continue;
+            if (profile == null) continue;
+            if (manager == null || !manager.isInstalledProfileUsable(profile)) {
+                continue;
+            }
             String version = profile.verName == null ? "" : profile.verName.trim();
             if (!version.isEmpty()) display.add(version);
         }

@@ -1,13 +1,19 @@
 package com.winlator.cmod.contentdialog;
 
 import android.app.Activity;
+import android.graphics.drawable.ColorDrawable;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.StringUtils;
@@ -81,12 +87,74 @@ public class StorageInfoDialog extends ContentDialog {
 
         updateUI.run();
 
-        ((TextView)findViewById(R.id.BTCancel)).setText(R.string.clear_cache);
+        Button cancelButton = findViewById(R.id.BTCancel);
+        if (cancelButton != null) {
+            cancelButton.setText(R.string.clear_cache);
+            cancelButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            cancelButton.setTextColor(activity.getColor(R.color.surface_runtime_button_text));
+        }
         setOnCancelCallback(() -> {
             FileUtils.clear(cacheDir);
 
             container.putExtra("desktopTheme", null);
             container.saveData();
         });
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.988f),
+                    Math.round(AppUtils.getScreenHeight() * 0.842f)
+            );
+        }
+        ViewGroup.LayoutParams params = getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = Math.round(AppUtils.getScreenHeight() * 0.786f);
+            getContentView().setLayoutParams(params);
+        }
+        getContentView().setMinimumHeight(Math.round(AppUtils.getScreenHeight() * 0.786f));
+        applyRuntimeChrome();
+    }
+
+    private void applyRuntimeChrome() {
+        int horizontalPadding = Math.round(getContext().getResources().getDisplayMetrics().density * 5f);
+        int topPadding = Math.round(getContext().getResources().getDisplayMetrics().density * 4f);
+        View root = getContentView();
+        if (root != null) {
+            root.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            root.setPadding(horizontalPadding, topPadding, horizontalPadding, topPadding);
+        }
+        View frameLayout = findViewById(R.id.FrameLayout);
+        if (frameLayout != null) frameLayout.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        View titleBar = findViewById(R.id.LLTitleBar);
+        if (titleBar != null) {
+            titleBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            titleBar.setPadding(horizontalPadding, topPadding, horizontalPadding, 0);
+        }
+        View bottomBar = findViewById(R.id.LLBottomBar);
+        if (bottomBar != null) bottomBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        TextView titleView = findViewById(R.id.TVTitle);
+        if (titleView != null) titleView.setTextColor(ContextCompat.getColor(getContext(), R.color.surface_runtime_taskmgr_text));
+        TextView messageView = findViewById(R.id.TVMessage);
+        if (messageView != null) messageView.setTextColor(ContextCompat.getColor(getContext(), R.color.surface_runtime_taskmgr_muted));
+        View iconView = findViewById(R.id.IVIcon);
+        if (iconView instanceof android.widget.ImageView) {
+            ((android.widget.ImageView) iconView).setColorFilter(ContextCompat.getColor(getContext(), R.color.surface_runtime_taskmgr_text));
+        }
+        View titleBackButton = findViewById(R.id.BTTitleBack);
+        if (titleBackButton instanceof android.widget.ImageButton) {
+            ((android.widget.ImageButton) titleBackButton).setColorFilter(ContextCompat.getColor(getContext(), R.color.surface_runtime_taskmgr_text));
+            titleBackButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+        }
+        Button confirmButton = findViewById(R.id.BTConfirm);
+        if (confirmButton != null) {
+            confirmButton.setBackgroundResource(R.drawable.surface_runtime_button_positive);
+            confirmButton.setTextColor(ContextCompat.getColor(getContext(), R.color.surface_runtime_button_positive_text));
+        }
     }
 }

@@ -86,6 +86,25 @@ APP_BASE_NAME=${0##*/}
 # Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
 APP_HOME=$( cd "${APP_HOME:-./}" > /dev/null && pwd -P ) || exit
 
+# Auto-wire the local Termux-hosted aapt2 binary when available.
+# Root ./gradlew remains the authoritative lane, but keeping this wrapper
+# aligned avoids a silent host-tool difference if it is invoked anyway.
+TERMUX_AAPT2_DEFAULT=/data/data/com.termux/files/usr/bin/aapt2
+if [ -z "${AEO_AAPT2_OVERRIDE:-}" ] && [ -x "$TERMUX_AAPT2_DEFAULT" ]
+then
+    AEO_AAPT2_OVERRIDE=$TERMUX_AAPT2_DEFAULT
+fi
+case " ${GRADLE_OPTS:-} " in
+  *"org.gradle.project.android.aapt2FromMavenOverride="* ) ;;
+  *)
+    if [ -n "${AEO_AAPT2_OVERRIDE:-}" ] && [ -x "$AEO_AAPT2_OVERRIDE" ]
+    then
+        GRADLE_OPTS="${GRADLE_OPTS:+$GRADLE_OPTS }-Dorg.gradle.project.android.aapt2FromMavenOverride=$AEO_AAPT2_OVERRIDE"
+        export GRADLE_OPTS
+    fi
+    ;;
+esac
+
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 

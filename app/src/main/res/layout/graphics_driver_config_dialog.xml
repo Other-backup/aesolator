@@ -47,6 +47,60 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
+                        android:text="@string/mesa_wrapper_opengl_driver"
+                        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                    <Spinner
+                        android:id="@+id/SWrapperOpenGLDriver"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:entries="@array/gallium_driver_entries"
+                        android:spinnerMode="dropdown" />
+
+                    <TextView
+                        android:id="@+id/TVWrapperOpenGLDriverHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/mesa_wrapper_opengl_driver_hint" />
+
+                    <TextView
+                        android:id="@+id/TVWrapperOpenGLVersionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/opengl_version"
+                        android:textAppearance="?android:attr/textAppearanceMedium"
+                        android:visibility="gone" />
+
+                    <Spinner
+                        android:id="@+id/SWrapperOpenGLVersion"
+                        style="@style/ComboBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:entries="@array/opengl_version_entries"
+                        android:spinnerMode="dropdown"
+                        android:visibility="gone" />
+
+                    <CheckBox
+                        android:id="@+id/CBWrapperDisableVertexArrayBGRA"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/disable_vertex_array_bgra"
+                        android:visibility="gone" />
+
+                    <CheckBox
+                        android:id="@+id/CBWrapperDisableGLKHRDebug"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mesa_bridge_disable_debug"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         android:text="@string/graphics_driver_version"
                         android:textAppearance="?android:attr/textAppearanceMedium" />
 

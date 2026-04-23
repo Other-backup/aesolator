@@ -33,7 +33,7 @@ public final class ForensicRuntimeSnapshot {
             root.put("processCount", processRows.length());
             root.put("processes", processRows);
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return root;
     }
 
@@ -92,7 +92,7 @@ public final class ForensicRuntimeSnapshot {
             memory.put("pageSizeBytes", getPageSizeBytes());
             host.put("memory", memory);
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return host;
     }
 
@@ -116,7 +116,7 @@ public final class ForensicRuntimeSnapshot {
                 obj.put("comm", row.comm);
                 obj.put("cmdline", row.cmdline);
             }
-            catch (JSONException ignored) {}
+            catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
             out.put(obj);
         }
         return out;
@@ -212,7 +212,7 @@ public final class ForensicRuntimeSnapshot {
                 values.put(key, valueKb);
             }
         }
-        catch (IOException ignored) {}
+        catch (IOException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return values;
     }
 

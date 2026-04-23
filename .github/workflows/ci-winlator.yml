@@ -3,6 +3,13 @@ name: Trigger Aesolator APK lane (WCP Archive)
 on:
   push:
     branches: ["main"]
+    paths:
+      - ".github/workflows/ci-winlator.yml"
+      - "app/**"
+      - "contents/**"
+      - "ci/winlator/**"
+      - "patches/**"
+      - "tools/**"
   workflow_dispatch:
     inputs:
       aesolator_ref:
@@ -20,7 +27,7 @@ on:
 
 concurrency:
   group: aesolator-dispatch-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -35,7 +42,7 @@ jobs:
     steps:
       # Build native Aesolator APK (debug, no embedded runtimes)
       # Contents source: split release repos (`wcp-runtime-lanes`, `wcp-graphics-lanes`)
-      # tag: winlator-latest
+      # release tag owner: wcp-runtime-lanes/aesolator-latest
       - name: Dispatch Aesolator APK build in WCP Archive
         env:
           GH_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}

@@ -41,7 +41,7 @@ public class KeyValueSet implements Iterable<String[]> {
         return "";
     }
 
-    // Method to get the value associated with a key, or a fallback value if the key is not present
+    // Method to get the value associated with a key, or a degrade value if the key is not present
     public String get(String key, String fallback) {
         for (String[] keyValue : this) if (keyValue[0].equals(key)) return keyValue[1];
         return fallback;
@@ -55,20 +55,20 @@ public class KeyValueSet implements Iterable<String[]> {
         return getBoolean(key, false);
     }
 
-    // Method to get a boolean value associated with a key, or a fallback value if the key is not present
+    // Method to get a boolean value associated with a key, or a degrade value if the key is not present
     public boolean getBoolean(String key, boolean fallback) {
         String value = get(key);
         if (value.isEmpty()) return fallback;
         return value.equals("1") || value.equals("t") || value.equalsIgnoreCase("true");
     }
 
-    // Method to get a float value associated with a key, or a fallback value if the key is not present
+    // Method to get a float value associated with a key, or a degrade value if the key is not present
     public float getFloat(String key, float fallback) {
         String value = get(key);
         try {
             if (!value.isEmpty()) return Float.parseFloat(value);
         } catch (NumberFormatException e) {
-            // Ignore exception and return fallback
+            // Ignore exception and return degrade
         }
         return fallback;
     }
@@ -82,7 +82,7 @@ public class KeyValueSet implements Iterable<String[]> {
         try {
             if (!value.isEmpty()) return Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            // Ignore exception and return fallback
+            // Ignore exception and return degrade
         }
         return fallback;
     }

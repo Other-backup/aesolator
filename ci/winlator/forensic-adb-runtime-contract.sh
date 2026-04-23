@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-: "${WLT_OUT_DIR:=/tmp/winlator-runtime-contract-$(date +%Y%m%d_%H%M%S)}"
+: "${WLT_TMP_ROOT:=${TMPDIR:-${ROOT_DIR}/out/forensics-tmp}}"
+: "${WLT_OUT_DIR:=${WLT_TMP_ROOT}/winlator-runtime-contract-$(date +%Y%m%d_%H%M%S)}"
 : "${WLT_BASELINE_LABEL:=freewine11}"
 : "${WLT_SCENARIOS:=freewine11:1}"
 : "${WLT_FAIL_ON_MISMATCH:=0}"

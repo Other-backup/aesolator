@@ -36,6 +36,16 @@ public class StringUtils {
         return text.toString().replaceAll("[^0-9\\.]+", "");
     }
 
+    public static String parseNumber(Object text, String fallback) {
+        if (text == null) return fallback;
+        String parsed = parseNumber(text);
+        return parsed.isEmpty() ? fallback : parsed;
+    }
+
+    public static String parseMemorySize(Object text) {
+        return parseNumber(text, "0");
+    }
+
     public static String getString(Context context, String resName) {
         try {
             resName = resName.toLowerCase(Locale.ENGLISH);

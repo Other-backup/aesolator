@@ -1,11 +1,11 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.SharedPreferences;
-import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Spinner;
@@ -50,14 +50,16 @@ public class ScreenEffectDialog extends ContentDialog {
     public ScreenEffectDialog(XServerDisplayActivity activity) {
         super(activity, R.layout.screen_effect_dialog);
         this.activity = activity;
+        setTitle(R.string.screen_effect);
+        setIcon(R.drawable.ae_icon_screen_effect);
 
         preferences = PreferenceManager.getDefaultSharedPreferences(activity);
 
-        boolean isDarkMode = preferences.getBoolean("dark_mode", false);
-
         TextView lblColorAdjustment = findViewById(R.id.LBLColorAdjustment);
-        applyFieldSetLabelStyle(lblColorAdjustment, isDarkMode);
-        applyModernSectionCardStyle(lblColorAdjustment, isDarkMode);
+        if (lblColorAdjustment != null) {
+            lblColorAdjustment.setTextColor(ContextCompat.getColor(activity, R.color.surface_runtime_taskmgr_text));
+            lblColorAdjustment.setBackground(null);
+        }
 
         sProfile = findViewById(R.id.SProfile);
         sbBrightness = findViewById(R.id.SBBrightness);
@@ -100,17 +102,21 @@ public class ScreenEffectDialog extends ContentDialog {
         cbEnableNTSCEffect.setChecked(ntscEffect != null);
 
         loadProfileSpinner(sProfile, activity.getScreenEffectProfile());
+        updateProfileActionButtons();
 
         sProfile.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateProfileActionButtons();
                 if (position > 0) {
                     loadProfile(sProfile.getSelectedItem().toString());
                 }
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateProfileActionButtons();
+            }
         });
 
         Button resetButton = findViewById(R.id.BTReset);
@@ -136,54 +142,111 @@ public class ScreenEffectDialog extends ContentDialog {
         findViewById(R.id.BTAddProfile).setOnClickListener(v -> promptAddProfile());
         findViewById(R.id.BTRemoveProfile).setOnClickListener(v -> promptDeleteProfile());
 
-        setOnConfirmCallback(() -> {
-            Log.d(TAG, "OnConfirm callback triggered. Applying effects.");
-            applyEffects(colorEffect, renderer, fxaaEffect, crtEffect, toonEffect, ntscEffect);
-            Log.d(TAG, "Effects applied from callback.");
-
-            // Optionally dismiss after applying effects in callback
-            dismiss();
-            Log.d(TAG, "Dialog dismissed after callback.");
-        });
-
+        applyRuntimeSurfaceStyle();
     }
 
-    private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-        if (textView == null) return;
-        textView.setBackgroundResource(isDarkMode
-                ? R.drawable.surface_badge_background_dark
-                : R.drawable.surface_badge_background);
-        textView.setTextColor(ContextCompat.getColor(
-                textView.getContext(),
-                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
-        ));
-        textView.bringToFront();
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.992f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+        ViewGroup.LayoutParams params = getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            getContentView().setLayoutParams(params);
+        }
+        getContentView().setMinimumHeight(0);
+        applyRuntimeSurfaceStyle();
     }
 
-    private static void applyModernSectionCardStyle(TextView textView, boolean isDarkMode) {
-        if (textView == null) return;
-        View parent = (View) textView.getParent();
-        if (!(parent instanceof android.view.ViewGroup)) return;
-        android.view.ViewGroup group = (android.view.ViewGroup) parent;
-        int panelBackground = isDarkMode
-                ? R.drawable.surface_card_background_dark
-                : R.drawable.surface_card_background;
-        int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
-        int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 18f);
-        int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
-        int topMargin = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 6f);
-        for (int i = 0; i < group.getChildCount(); i++) {
-            View child = group.getChildAt(i);
-            if (!(child instanceof android.widget.LinearLayout)) continue;
-            child.setBackgroundResource(panelBackground);
-            child.setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
-            android.view.ViewGroup.LayoutParams rawParams = child.getLayoutParams();
-            if (rawParams instanceof android.view.ViewGroup.MarginLayoutParams) {
-                android.view.ViewGroup.MarginLayoutParams marginParams = (android.view.ViewGroup.MarginLayoutParams) rawParams;
-                marginParams.topMargin = topMargin;
-                child.setLayoutParams(marginParams);
+    private void applyRuntimeSurfaceStyle() {
+        int brightText = ContextCompat.getColor(activity, R.color.surface_runtime_taskmgr_text);
+        View root = getContentView();
+        if (root != null) {
+            root.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            root.setPadding(dp(3), dp(3), dp(3), dp(3));
+        }
+        View frameLayout = findViewById(R.id.FrameLayout);
+        if (frameLayout != null) {
+            frameLayout.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+        }
+        View titleBar = findViewById(R.id.LLTitleBar);
+        if (titleBar != null) {
+            titleBar.setBackgroundResource(R.drawable.surface_runtime_taskmgr_background);
+            titleBar.setPadding(dp(5), dp(3), dp(5), 0);
+        }
+        TextView titleView = findViewById(R.id.TVTitle);
+        if (titleView != null) titleView.setTextColor(brightText);
+        View iconView = findViewById(R.id.IVIcon);
+        if (iconView instanceof android.widget.ImageView) {
+            ((android.widget.ImageView) iconView).setColorFilter(brightText);
+        }
+        View resetButton = findViewById(R.id.BTReset);
+        if (resetButton instanceof Button) {
+            ((Button) resetButton).setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            ((Button) resetButton).setTextColor(ContextCompat.getColor(activity, R.color.surface_runtime_button_text));
+        }
+        View confirmButton = findViewById(R.id.BTConfirm);
+        if (confirmButton instanceof Button) {
+            ((Button) confirmButton).setBackgroundResource(R.drawable.surface_runtime_button_positive);
+            ((Button) confirmButton).setTextColor(ContextCompat.getColor(activity, R.color.surface_runtime_button_positive_text));
+        }
+        View cancelButton = findViewById(R.id.BTCancel);
+        if (cancelButton instanceof Button) {
+            ((Button) cancelButton).setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            ((Button) cancelButton).setTextColor(ContextCompat.getColor(activity, R.color.surface_runtime_button_text));
+        }
+        int[] textIds = new int[] {
+                R.id.CBEnableFXAA,
+                R.id.CBEnableCRTShader,
+                R.id.CBEnableToonShader,
+                R.id.CBEnableNTSCEffect
+        };
+        for (int id : textIds) {
+            TextView textView = findViewById(id);
+            if (textView != null) textView.setTextColor(brightText);
+        }
+        TextView label = findViewById(R.id.LBLColorAdjustment);
+        if (label != null) {
+            label.setTextColor(brightText);
+            label.setBackground(null);
+        }
+        Spinner profile = findViewById(R.id.SProfile);
+        if (profile != null) {
+            SpinnerAdapters.applyRuntimeSurface(profile);
+        }
+        View addButton = findViewById(R.id.BTAddProfile);
+        View removeButton = findViewById(R.id.BTRemoveProfile);
+        if (addButton != null) {
+            addButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            if (addButton instanceof android.widget.ImageButton) {
+                ((android.widget.ImageButton) addButton).setColorFilter(brightText);
             }
         }
+        if (removeButton != null) {
+            removeButton.setBackgroundResource(R.drawable.surface_runtime_button_neutral);
+            if (removeButton instanceof android.widget.ImageButton) {
+                ((android.widget.ImageButton) removeButton).setColorFilter(brightText);
+            }
+        }
+        if (addButton != null && addButton.getParent() instanceof View) {
+            View group = (View) addButton.getParent();
+            if (group != null) {
+                group.setBackground(null);
+                group.setPadding(0, 0, 0, 0);
+            }
+        }
+        updateProfileActionButtons();
+    }
+
+    private int dp(int value) {
+        return Math.round(activity.getResources().getDisplayMetrics().density * value);
     }
 
     private void promptAddProfile() {
@@ -225,8 +288,18 @@ public class ScreenEffectDialog extends ContentDialog {
             }
             position++;
         }
-        sProfile.setAdapter(SpinnerAdapters.create(activity, items));
+        sProfile.setAdapter(SpinnerAdapters.createRuntime(activity, items));
         sProfile.setSelection(selectedPosition);
+        SpinnerAdapters.applyRuntimeSurface(sProfile);
+        updateProfileActionButtons();
+    }
+
+    private void updateProfileActionButtons() {
+        View removeButton = findViewById(R.id.BTRemoveProfile);
+        if (removeButton == null) return;
+        boolean hasCustomProfile = sProfile != null && sProfile.getSelectedItemPosition() > 0;
+        removeButton.setEnabled(hasCustomProfile);
+        removeButton.setAlpha(hasCustomProfile ? 1.0f : 0.46f);
     }
 
     private void loadProfile(String name) {

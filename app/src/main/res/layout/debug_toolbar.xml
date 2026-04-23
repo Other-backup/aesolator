@@ -2,18 +2,24 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:gravity="center_vertical"
     android:orientation="horizontal">
 
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTClear"
         android:src="@drawable/ae_icon_remove"
-        android:layout_marginEnd="8dp" />
+        android:layout_marginEnd="6dp" />
 
     <ImageButton
         style="@style/ListMenuButton"
         android:id="@+id/BTPause"
         android:src="@drawable/ae_icon_pause"
-        android:layout_marginEnd="8dp" />
+        android:layout_marginEnd="4dp" />
+
+    <ImageButton
+        style="@style/ListMenuButton"
+        android:id="@+id/BTCloseLog"
+        android:src="@drawable/ae_icon_back" />
 
 </LinearLayout>

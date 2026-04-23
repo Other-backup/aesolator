@@ -7,6 +7,7 @@ import android.widget.Spinner;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.XServerDisplayActivity;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
@@ -44,25 +45,28 @@ public class WineD3DConfigDialog extends ContentDialog {
         final Spinner sRenderer = findViewById(R.id.SRenderer);
 
         boolean darkMode = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false);
-        sCSMT.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(csmtValues)));
-        sStrictShaderMath.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(strictShaderMathValues)));
-        sOffscreenRenderingMode.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(offscreenRenderingModeValues)));
-        sRenderer.setAdapter(SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(rendererValues)));
+        boolean runtimeMode = context instanceof XServerDisplayActivity;
+        sCSMT.setAdapter(runtimeMode
+                ? SpinnerAdapters.createRuntime(context, java.util.Arrays.asList(csmtValues))
+                : SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(csmtValues)));
+        sStrictShaderMath.setAdapter(runtimeMode
+                ? SpinnerAdapters.createRuntime(context, java.util.Arrays.asList(strictShaderMathValues))
+                : SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(strictShaderMathValues)));
+        sOffscreenRenderingMode.setAdapter(runtimeMode
+                ? SpinnerAdapters.createRuntime(context, java.util.Arrays.asList(offscreenRenderingModeValues))
+                : SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(offscreenRenderingModeValues)));
+        sRenderer.setAdapter(runtimeMode
+                ? SpinnerAdapters.createRuntime(context, java.util.Arrays.asList(rendererValues))
+                : SpinnerAdapters.create(context, darkMode, java.util.Arrays.asList(rendererValues)));
         int popupBg = darkMode ? R.drawable.surface_dialog_background_dark : R.drawable.surface_dialog_background;
-        SpinnerAdapters.applySurface(sCSMT, darkMode);
-        SpinnerAdapters.applySurface(sGPUName, darkMode);
-        SpinnerAdapters.applySurface(sVideoMemorySize, darkMode);
-        SpinnerAdapters.applySurface(sStrictShaderMath, darkMode);
-        SpinnerAdapters.applySurface(sOffscreenRenderingMode, darkMode);
-        SpinnerAdapters.applySurface(sRenderer, darkMode);
-        sCSMT.setPopupBackgroundResource(popupBg);
-        sGPUName.setPopupBackgroundResource(popupBg);
-        sVideoMemorySize.setPopupBackgroundResource(popupBg);
-        sStrictShaderMath.setPopupBackgroundResource(popupBg);
-        sOffscreenRenderingMode.setPopupBackgroundResource(popupBg);
-        sRenderer.setPopupBackgroundResource(popupBg);
+        applySpinnerSurface(sCSMT, runtimeMode, darkMode, popupBg);
+        applySpinnerSurface(sGPUName, runtimeMode, darkMode, popupBg);
+        applySpinnerSurface(sVideoMemorySize, runtimeMode, darkMode, popupBg);
+        applySpinnerSurface(sStrictShaderMath, runtimeMode, darkMode, popupBg);
+        applySpinnerSurface(sOffscreenRenderingMode, runtimeMode, darkMode, popupBg);
+        applySpinnerSurface(sRenderer, runtimeMode, darkMode, popupBg);
 
-        loadGPUNameSpinner(sGPUName);
+        loadGPUNameSpinner(sGPUName, runtimeMode, darkMode, popupBg);
 
         KeyValueSet config = parseConfig(anchor.getTag());
 
@@ -106,7 +110,7 @@ public class WineD3DConfigDialog extends ContentDialog {
         return new KeyValueSet(data);
     }
 
-    private void loadGPUNameSpinner(Spinner spinner)  {
+    private void loadGPUNameSpinner(Spinner spinner, boolean runtimeMode, boolean darkMode, int popupBg)  {
         String gpuNameList = FileUtils.readString(context, "gpu_cards.json");
         ArrayList<String> entries = new ArrayList<>();
 
@@ -117,14 +121,22 @@ public class WineD3DConfigDialog extends ContentDialog {
                 String gpuName = jobj.getString("name");
                 entries.add(gpuName);
             }
-            spinner.setAdapter(SpinnerAdapters.create(
-                    context,
-                    PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", false),
-                    entries
-            ));
+            spinner.setAdapter(runtimeMode
+                    ? SpinnerAdapters.createRuntime(context, entries)
+                    : SpinnerAdapters.create(context, darkMode, entries));
+            applySpinnerSurface(spinner, runtimeMode, darkMode, popupBg);
         }
         catch (JSONException e) {
         }
+    }
+
+    private void applySpinnerSurface(Spinner spinner, boolean runtimeMode, boolean darkMode, int popupBg) {
+        if (runtimeMode) {
+            SpinnerAdapters.applyRuntimeSurface(spinner);
+            return;
+        }
+        SpinnerAdapters.applySurface(spinner, darkMode);
+        spinner.setPopupBackgroundResource(popupBg);
     }
 
     public static String getDeviceIdFromGPUName(Context context, String gpuName) {
@@ -165,7 +177,7 @@ public class WineD3DConfigDialog extends ContentDialog {
 
     public static void setEnvVars(Context context, KeyValueSet config, EnvVars vars) {
         String deviceID = getDeviceIdFromGPUName(context, config.get("gpuName"));
-        String vendorID = getVendorIdFromGPUName(context, config.get("vendorID"));
+        String vendorID = getVendorIdFromGPUName(context, config.get("gpuName"));
         String wined3dConfig = "csmt=0x" + config.get("csmt") + ",strict_shader_math=0x" + config.get("strict_shader_math") + ",OffscreenRenderingMode=" + config.get("OffscreenRenderingMode") + ",VideoMemorySize=" + config.get("videoMemorySize") + ",VideoPciDeviceID=" + deviceID + ",VideoPciVendorID=" + vendorID + ",renderer=" + config.get("renderer");
         vars.put("WINE_D3D_CONFIG", wined3dConfig);
     }

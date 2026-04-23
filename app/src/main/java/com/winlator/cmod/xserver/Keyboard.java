@@ -99,9 +99,6 @@ public class Keyboard {
         int action = event.getAction();
         int keyCode = event.getKeyCode();
 
-        // Let IME/framework handle ACTION_MULTIPLE text composition events for now.
-        if (action == KeyEvent.ACTION_MULTIPLE) return false;
-
         // Patches: Crash on Asus Rog Phone 9 Pro with Game Genie active (This line should be deleted after the merge)
         if (keyCode < 0 || keyCode >= keycodeMap.length) {
             return false; // Ignore unmapped key codes
@@ -127,9 +124,8 @@ public class Keyboard {
                 xServer.injectKeyRelease(XKeycode.KEY_SHIFT_L);
                 xServer.injectKeyRelease(xKeycode);
             }
-            return true;
         }
-        return false;
+        return true;
     }
 
     private static XKeycode[] createKeycodeMap() {

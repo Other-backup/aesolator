@@ -3,34 +3,44 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/surface_runtime_scrim"
     android:clickable="false"
     android:focusable="false"
     android:foregroundGravity="center"
     android:gravity="center">
 
     <LinearLayout
-        android:layout_width="320dp"
+        android:layout_width="340dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/surface_card_background"
+        android:background="@drawable/surface_runtime_taskmgr_background"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="18dp"
-        android:tag="theme_card">
+        android:paddingStart="22dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="18dp"
+        android:tag="preserve_background">
 
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:layout_width="96dp"
+            android:layout_height="88dp"
+            android:layout_gravity="center_horizontal"
+            android:foregroundGravity="center"
+            android:gravity="center"
+            android:padding="4dp"
+            android:translationX="-5dp">
 
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:id="@+id/CircularProgressIndicator"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
                 android:layout_gravity="center"
-                app:indicatorColor="?attr/colorAccent"
-                app:indicatorSize="64dp"
-                app:trackColor="@color/surface_tab_border"
-                app:trackThickness="10dp" />
+                android:indeterminate="true"
+                app:indicatorColor="@color/surface_runtime_taskmgr_border"
+                app:indicatorSize="72dp"
+                app:trackColor="@color/surface_runtime_taskmgr_header_bg"
+                app:trackThickness="8dp" />
 
             <TextView
                 android:id="@+id/TVProgress"
@@ -45,19 +55,31 @@
             android:id="@+id/TextView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="10dp"
             android:gravity="center"
             android:text="@string/downloading_file"
-            android:textSize="18sp"
+            android:textColor="@color/surface_runtime_taskmgr_text"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:gravity="center"
             android:text="@string/download_progress_hint"
-            android:textSize="13sp" />
+            android:textColor="@color/surface_runtime_taskmgr_muted"
+            android:textSize="11sp" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/LinearProgressIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:indeterminate="true"
+            app:indicatorColor="@color/surface_runtime_taskmgr_border"
+            app:trackColor="@color/surface_runtime_taskmgr_header_bg"
+            app:trackThickness="6dp" />
 
         <LinearLayout
             android:id="@+id/LLBottomBar"
@@ -70,7 +92,7 @@
 
             <Button
                 android:id="@+id/BTCancel"
-                style="@style/ButtonNeutral"
+                style="@style/ButtonInlineRuntimeNeutral"
                 android:text="@string/cancel" />
         </LinearLayout>
     </LinearLayout>

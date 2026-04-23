@@ -505,7 +505,7 @@ XRLOADER_ABI_CATCH_BAD_ALLOC_OOM XRLOADER_ABI_CATCH_FALLBACK
 
     static XRAPI_ATTR XrResult XRAPI_CALL
     LoaderTrampolineDestroyDebugUtilsMessengerEXT(XrDebugUtilsMessengerEXT messenger) XRLOADER_ABI_TRY {
-    // TODO: get instance from messenger in loader
+    // Notes: get instance from messenger in loader
     // Also, is the loader really doing all this every call?
     LoaderLogger::LogVerboseMessage("xrDestroyDebugUtilsMessengerEXT", "Entering loader trampoline");
 
@@ -734,7 +734,7 @@ XRAPI_ATTR XrResult XRAPI_CALL LoaderXrGetInstanceProcAddr(XrInstance instance, 
         // Null instance is allowed for a few specific API entry points, otherwise return error
         if (strcmp(name, "xrCreateInstance") != 0 && strcmp(name, "xrEnumerateApiLayerProperties") != 0 &&
             strcmp(name, "xrEnumerateInstanceExtensionProperties") != 0 && strcmp(name, "xrInitializeLoaderKHR") != 0) {
-            // TODO why is xrGetInstanceProcAddr not listed in here?
+            // Notes why is xrGetInstanceProcAddr not listed in here?
             std::string error_str = "XR_NULL_HANDLE for instance but query for ";
             error_str += name;
             error_str += " requires a valid instance";

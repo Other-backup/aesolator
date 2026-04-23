@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.22.1)
 project(Winlator)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration -mno-outline-atomics")
+set(AERO_WINLATOR_COMMON_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/winlator/arrays.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/winlator/hardware_buffer_utils.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/winlator/ring_buffer.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/winlator/shared_memory_utils.c
+)
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
@@ -14,8 +20,13 @@ else()
     set(HAS_ADRENOTOOLS OFF)
 endif()
 
+add_subdirectory(virglrenderer)
+add_subdirectory(vortekrenderer)
+add_subdirectory(gladiorenderer)
+
 # Add Winlator shared libraries
 set(WINLATOR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlator.exports.map.txt")
+set(WINLATORXR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlatorxr.exports.map.txt")
 set(AERO_REDIRECT_GLIBC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_glibc.exports.map.txt")
 set(AERO_REDIRECT_BIONIC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_bionic.exports.map.txt")
 set(AERO_EVSHIM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_evshim.exports.map.txt")
@@ -30,15 +41,26 @@ function(aero_disable_host_rpath target_name)
     )
 endfunction()
 
+aero_disable_host_rpath(virglbridge)
+
 add_library(winlator SHARED
         winlator/getauxval_shim.c
+        ${AERO_WINLATOR_COMMON_SOURCES}
         winlator/drawable.c
+        winlator/egl_context_bridge.c
         winlator/gpu_helper.c
         winlator/gpu_image.c
         winlator/sysvshared_memory.c
+        winlator/wine_registry_editor.c
         winlator/xconnector_epoll.c
+        winlator/xinput_stream.c
+        winlator/xoutput_stream.c
         winlator/alsa_client.c
         winlator/vulkan.c
+)
+
+target_include_directories(winlator PRIVATE
+        winlator/include
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
@@ -74,7 +96,7 @@ add_library(winlatorxr SHARED
 
 target_compile_options(winlatorxr PRIVATE -Wall -Wextra)
 target_link_options(winlatorxr PRIVATE
-        "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
+        "LINKER:--version-script=${WINLATORXR_EXPORT_MAP}"
 )
 aero_disable_host_rpath(winlatorxr)
 

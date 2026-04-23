@@ -2,8 +2,11 @@ package com.winlator.cmod.box64;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.drawable.ColorDrawable;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
 import android.widget.EditText;
@@ -82,6 +85,25 @@ public class Box64EditPresetDialog extends ContentDialog {
         this.onConfirmCallback = onConfirmCallback;
     }
 
+    @Override
+    public void show() {
+        super.show();
+        if (getWindow() != null) {
+            getWindow().setBackgroundDrawable(new ColorDrawable(0));
+            getWindow().setLayout(
+                    Math.round(AppUtils.getScreenWidth() * 0.972f),
+                    Math.round(AppUtils.getScreenHeight() * 0.944f)
+            );
+        }
+        ViewGroup.LayoutParams params = getContentView().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = Math.round(AppUtils.getScreenHeight() * 0.898f);
+            getContentView().setLayoutParams(params);
+        }
+        getContentView().setMinimumHeight(Math.round(AppUtils.getScreenHeight() * 0.898f));
+    }
+
     private EnvVars getEnvVars() {
         EnvVars envVars = new EnvVars();
         LinearLayout parent = findViewById(R.id.LLContent);
@@ -140,18 +162,18 @@ public class Box64EditPresetDialog extends ContentDialog {
                 parent.addView(child);
             }
         }
-        catch (JSONException e) {}
+        catch (JSONException e) {
+            Log.w("Box64EditPresetDialog", "Failed to populate Box64 env var list for prefix " + prefix, e);
+        }
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
         if (textView == null) return;
         Context context = textView.getContext();
-        textView.setBackgroundResource(isDarkMode
-                ? R.drawable.surface_badge_background_dark
-                : R.drawable.surface_badge_background);
+        textView.setBackgroundResource(R.drawable.surface_runtime_taskmgr_header_background);
         textView.setTextColor(ContextCompat.getColor(
                 context,
-                isDarkMode ? R.color.surface_badge_text_dark : R.color.surface_badge_text
+                R.color.surface_runtime_taskmgr_text
         ));
         textView.bringToFront();
     }
@@ -162,13 +184,11 @@ public class Box64EditPresetDialog extends ContentDialog {
         if (!(parent instanceof LinearLayout) && !(parent instanceof android.widget.FrameLayout)) return;
         if (!(parent instanceof android.view.ViewGroup)) return;
         android.view.ViewGroup group = (android.view.ViewGroup) parent;
-        int panelBackground = isDarkMode
-                ? R.drawable.surface_card_background_dark
-                : R.drawable.surface_card_background;
-        int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
-        int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 18f);
-        int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 12f);
-        int topMargin = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 6f);
+        int panelBackground = R.drawable.surface_runtime_taskmgr_background;
+        int horizontalPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 10f);
+        int topPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 30f);
+        int bottomPadding = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 11f);
+        int topMargin = Math.round(textView.getContext().getResources().getDisplayMetrics().density * 8f);
         for (int i = 0; i < group.getChildCount(); i++) {
             View child = group.getChildAt(i);
             if (!(child instanceof LinearLayout)) continue;

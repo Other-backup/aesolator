@@ -29,6 +29,67 @@ public class XClientRequestHandler implements RequestHandler {
     public static final byte RESPONSE_CODE_SUCCESS = 1;
     public static final int MAX_REQUEST_LENGTH = 65535;
 
+    private static abstract class ClientOpcodes {
+        private static final byte CREATE_WINDOW = 1;
+        private static final byte CHANGE_WINDOW_ATTRIBUTES = 2;
+        private static final byte GET_WINDOW_ATTRIBUTES = 3;
+        private static final byte DESTROY_WINDOW = 4;
+        private static final byte DESTROY_SUB_WINDOWS = 5;
+        private static final byte REPARENT_WINDOW = 7;
+        private static final byte MAP_WINDOW = 8;
+        private static final byte MAP_SUB_WINDOWS = 9;
+        private static final byte UNMAP_WINDOW = 10;
+        private static final byte CONFIGURE_WINDOW = 12;
+        private static final byte GET_GEOMETRY = 14;
+        private static final byte QUERY_TREE = 15;
+        private static final byte INTERN_ATOM = 16;
+        private static final byte GET_ATOM_NAME = 17;
+        private static final byte CHANGE_PROPERTY = 18;
+        private static final byte DELETE_PROPERTY = 19;
+        private static final byte GET_PROPERTY = 20;
+        private static final byte SET_SELECTION_OWNER = 22;
+        private static final byte GET_SELECTION_OWNER = 23;
+        private static final byte SEND_EVENT = 25;
+        private static final byte GRAB_POINTER = 26;
+        private static final byte UNGRAB_POINTER = 27;
+        private static final byte QUERY_POINTER = 38;
+        private static final byte TRANSLATE_COORDINATES = 40;
+        private static final byte WARP_POINTER = 41;
+        private static final byte SET_INPUT_FOCUS = 42;
+        private static final byte GET_INPUT_FOCUS = 43;
+        private static final byte QUERY_KEYMAP = 44;
+        private static final byte OPEN_FONT = 45;
+        private static final byte LIST_FONTS = 49;
+        private static final byte CREATE_PIXMAP = 53;
+        private static final byte FREE_PIXMAP = 54;
+        private static final byte CREATE_GC = 55;
+        private static final byte CHANGE_GC = 56;
+        private static final byte COPY_GC = 57;
+        private static final byte SET_CLIP_RECTANGLES = 59;
+        private static final byte FREE_GC = 60;
+        private static final byte COPY_AREA = 62;
+        private static final byte POLY_LINE = 65;
+        private static final byte POLY_SEGMENT = 66;
+        private static final byte POLY_RECTANGLE = 67;
+        private static final byte POLY_FILL_RECTANGLE = 70;
+        private static final byte PUT_IMAGE = 72;
+        private static final byte GET_IMAGE = 73;
+        private static final byte CREATE_COLORMAP = 78;
+        private static final byte FREE_COLORMAP = 79;
+        private static final byte CREATE_CURSOR = 93;
+        private static final byte CREATE_GLYPH_CURSOR = 94;
+        private static final byte FREE_CURSOR = 95;
+        private static final byte QUERY_EXTENSION = 98;
+        private static final byte GET_KEYBOARD_MAPPING = 101;
+        private static final byte BELL = 104;
+        private static final byte SET_SCREEN_SAVER = 107;
+        private static final byte GET_SCREEN_SAVER = 108;
+        private static final byte FORCE_SCREEN_SAVER = 115;
+        private static final byte GET_POINTER_MAPPING = 117;
+        private static final byte GET_MODIFIER_MAPPING = 119;
+        private static final byte NO_OPERATION = 127;
+    }
+
     @Override
     public boolean handleRequest(Client client) throws IOException {
         XClient xClient = (XClient)client.getTag();

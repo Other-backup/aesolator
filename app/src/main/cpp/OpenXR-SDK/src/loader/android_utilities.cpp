@@ -299,7 +299,7 @@ int getActiveRuntimeVirtualManifest(wrap::android::content::Context const &conte
     bool systemBroker = false;
     Cursor cursor;
     if (!getActiveRuntimeCursor(context, projection, systemBroker, cursor)) {
-        // OK, try the system broker as a fallback.
+        // OK, try the system broker as a degrade.
         systemBroker = true;
         getActiveRuntimeCursor(context, projection, systemBroker, cursor);
     }

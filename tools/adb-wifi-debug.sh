@@ -16,6 +16,8 @@ Usage:
   sh tools/adb-wifi-debug.sh status
   sh tools/adb-wifi-debug.sh pair <pair-host:port> <pair-code> [connect-host:port]
   sh tools/adb-wifi-debug.sh connect <host:port>
+  sh tools/adb-wifi-debug.sh connect-loopback [tcp-port]
+  sh tools/adb-wifi-debug.sh tcpip-loopback <serial> [tcp-port]
   sh tools/adb-wifi-debug.sh disconnect [host:port]
   sh tools/adb-wifi-debug.sh install-debug <serial> [apk-path]
   sh tools/adb-wifi-debug.sh launch <serial>
@@ -23,6 +25,8 @@ Usage:
 Examples:
   sh tools/adb-wifi-debug.sh pair 192.168.0.10:37099 123456 192.168.0.10:42363
   sh tools/adb-wifi-debug.sh connect 192.168.0.10:42363
+  sh tools/adb-wifi-debug.sh tcpip-loopback 192.168.0.10:42363
+  sh tools/adb-wifi-debug.sh connect-loopback
   sh tools/adb-wifi-debug.sh install-debug 192.168.0.10:42363
   sh tools/adb-wifi-debug.sh launch 192.168.0.10:42363
 EOF
@@ -71,6 +75,25 @@ connect_device() {
   endpoint="$1"
   ensure_server
   adb_cmd connect "$endpoint"
+  show_devices
+}
+
+connect_loopback() {
+  tcp_port="${1:-5555}"
+  endpoint="127.0.0.1:${tcp_port}"
+  ensure_server
+  adb_cmd connect "$endpoint"
+  show_devices
+}
+
+enable_tcpip_loopback() {
+  serial="$1"
+  tcp_port="${2:-5555}"
+  loopback_endpoint="127.0.0.1:${tcp_port}"
+
+  ensure_server
+  adb_cmd -s "$serial" tcpip "$tcp_port"
+  adb_cmd connect "$loopback_endpoint"
   show_devices
 }
 
@@ -126,6 +149,20 @@ case "$command_name" in
       exit 1
     }
     connect_device "$2"
+    ;;
+  connect-loopback)
+    [ "$#" -le 2 ] || {
+      usage
+      exit 1
+    }
+    connect_loopback "${2:-5555}"
+    ;;
+  tcpip-loopback)
+    [ "$#" -ge 2 ] || {
+      usage
+      exit 1
+    }
+    enable_tcpip_loopback "$2" "${3:-5555}"
     ;;
   disconnect)
     disconnect_device "${2:-}"

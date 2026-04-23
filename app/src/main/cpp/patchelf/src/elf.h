@@ -885,7 +885,7 @@ typedef struct
 #define DT_INIT		12		/* Address of init function */
 #define DT_FINI		13		/* Address of termination function */
 #define DT_SONAME	14		/* Name of shared object */
-#define DT_RPATH	15		/* Library search path (deprecated) */
+#define DT_RPATH	15		/* Library search path (superseded) */
 #define DT_SYMBOLIC	16		/* Start symbol search here */
 #define DT_REL		17		/* Address of Rel relocs */
 #define DT_RELSZ	18		/* Total size of Rel relocs */

@@ -1,5 +1,262 @@
 # Second Developer Reflective Journal
 
+## 2026-04-16
+
+### Entry 8: mandatory systemic auto-fix execution contract
+
+- Goal: promote the user's master engineering directive and enforced repair
+  policy from chat memory into durable repository rules.
+- Context: the operating method is now explicit law for technical work:
+  root-cause first, whole source tree / product surface coverage, no
+  advisory-only completion for fixable defects, no local symptom patching, and
+  full-harvest log handling before build-log repair.
+- Decision: add repo-local `docs/MASTER_ENGINEERING_DIRECTIVE.md`, wire it
+  into `AGENTS.md`, `README.md`, `docs/CODEX_OPERATING_CONTRACT.md`, the docs
+  index, build/device runbooks, and this roadmap/journal path.
+- Tradeoff: process docs get stricter and more repetitive, but new sessions no
+  longer depend on recovering these rules from chat history.
+- Verification: targeted `rg` coverage and syntax compilation of the shared
+  `.codex/rules/master_engineering_directive.rules` file.
+- Next step: apply this method to the active FreeWine/Ae.solator repair
+  frontier after the current full `make -k` harvest reaches a real stop.
+
+### Entry 9: expanded omega authority law
+
+- Goal: fold the expanded master directive into the durable rule surface so
+  future sessions inherit not only root-cause closure, but also the explicit
+  ban on advice-only, minimal workaround, local symptom masking, and
+  close-one-log behavior.
+- Context: the method now explicitly includes execution identity, strict
+  passive-mode prohibitions, whole-tree propagation surfaces, search/context
+  expansion, contract clarity, stable abstractions, systemic consistency, and
+  environment-bound authority.
+- Decision: extend the canonical `.codex` directive, the machine-readable
+  `.rules`, repo-local master directives, AGENTS entrypoints, and the app
+  operating contract rather than relying on chat history.
+- Tradeoff: the operating docs are more forceful and redundant by design, but
+  that prevents method drift after Termux restarts or repo handoff.
+- Verification: rerun targeted rule coverage and `.rules` syntax checks after
+  the update.
+- Next step: continue respecting the active full-harvest rule for `make -k`;
+  do not parse/repair partial live tails before the real stop.
+
+## 2026-03-20
+
+### Entry 7: route-aware runtime dialogs and detached-install proof
+
+- Goal: close the newest user-visible runtime drawer tails without reopening
+  another sequence of cosmetic-only patches.
+- Context: the freshest marked screenshots showed three concrete failures at
+  once:
+  runtime `Logs` still looked like a striped table instead of a console,
+  `Runtime Profiles` still exposed an illogical generic emulator selector with
+  both `Box64` and `FEX` lanes visible together,
+  and direct `Prefix Pack` GUI installers could open while lane state stayed
+  stuck at `queued`, which encouraged retry loops and made the surface feel
+  laggy or broken.
+- Decision: convert `LogView` from alternating-row paint to a real console
+  surface, mark compact runtime dialogs explicitly so `Runtime Profiles`,
+  `Screen Effects`, and `Input Controls` stop inheriting the tall
+  wide-scrollable dialog geometry, replace the runtime profile dialog with an
+  arch-aware `FEX-only` or `Box64-only` lane editor, and promote detached
+  primary-payload installs beyond `queued` as soon as the guest launch is
+  proven to start.
+- Tradeoff: more Java/XML surgery in one batch and a larger final verification
+  surface, but the user-facing behavior is finally aligned with the live
+  runtime model instead of with stale generic container settings.
+- Verification: local `testDebugUnitTest assembleDebug` passed after the batch.
+  Live APK reinstall / screenshot proof is currently blocked only by the
+  device-side Wi-Fi ADB endpoint refusing connections on the last supplied
+  ports.
+- Next step: reconnect ADB to the live device, reinstall once, then capture a
+  fresh screenshot/forensic bundle for `Debug`, `Runtime Profiles`,
+  `Screen Effects`, `Prefix Pack`, and the final `Task Manager` row slack.
+
+## 2026-03-18
+
+### Entry 6: install really means install, not "fetch and hope"
+
+- Goal: close the user's remaining clean-pass complaints without pretending
+  that a cached payload equals a completed install.
+- Context: the user was still calling out the same root problems:
+  `Prefix Pack` felt like a blind cacher instead of a real installer surface,
+  `.NET Framework` gaps were still visible in legacy setup failures,
+  and the Android overlay could hide the very installer GUI the user needed to
+  interact with.
+- Decision: add an explicit official `.NET Framework` lane
+  (`3.5 SP1`, `4.0 Full`, `4.8`), tighten zero-byte validation across shell /
+  Windows / imagefs cache accounting, teach `Install` to auto-run `Prepare`
+  for missing payloads, dismiss the Android dialog before launch, and expose
+  direct per-lane `State` / `Logs` actions on the main loader surface.
+- Tradeoff: the toolkit asset surface widened again and more batch-script exit
+  code handling was needed, but the user-facing contract is finally aligned
+  with what the install button promises.
+- Verification target: one final build/install/device pass should prove the
+  new `r7` toolkit, live `.NET` lane visibility, a real installer launch from
+  `Prefix Pack`, and updated state/log roots from a fresh runtime session.
+- Next step: finish the batched UI cleanup, compile once, then run the live
+  device pass with screenshots and a fresh forensic bundle.
+
+### Entry 5: sectioned loader and task-list root cause closure
+
+- Goal: close the user's newest complaints without pretending that missing
+  process rows or x86-only Mono wording were "just styling".
+- Context: the user kept stressing three concrete failures:
+  `Task Manager` visually lost its process list,
+  `Prefix Pack` still read like a vague fetcher instead of a real loader,
+  and the managed-runtime story still looked falsely limited to `x86`.
+- Decision: fix the actual `Task Manager` layout root cause
+  (`wrap_content` tab container plus weighted zero-height list region), convert
+  `Prefix Pack` into compact sectioned lanes inspired by `Contents`, expose
+  direct cache/log entrypoints, and split managed runtimes into
+  `Wine Mono` versus a separate dual-arch Mono Project lane.
+- Tradeoff: one more asset/UI pass and a bumped toolkit asset version were
+  necessary, but the result is much easier to reason about and no longer hides
+  real process or installer state behind theme noise.
+- Verification: fresh build/install passed, `TASKMGR_REFRESH` still reports
+  `windows_visible=11` and `linux_visible=12`, and `PREFIX_PACK_TOOLKIT_READY`
+  now exposes `catalog_entry_count=16` after app-entry with toolkit `r6`.
+- Next step: run one explicit Mono prepare/install pass so the new managed
+  lane leaves device-side state/log markers in addition to the loader proof.
+
+### Entry 4: Prefix-pack closure exposed transport and staging lies
+
+- Goal: finish the user's clean pass by closing the last false-closure points
+  instead of only repainting the UI.
+- Context: two defects proved that the previous state was not honestly closed:
+  `Prefix Pack` installs could crash the app before launch because
+  `WinHandler.exec()` still behaved like a tiny fixed-packet bridge, and the
+  device staging helper could silently leave zero-byte files while still making
+  the cache look populated.
+- Decision: packetize long `WinHandler.exec()` payloads, tighten cache
+  validation around non-zero files, switch large device staging to the explicit
+  `/data/local/tmp -> run-as cp` bridge with byte-count verification, and keep
+  the updated contract written into `AGENTS.md`/roadmap instead of chat only.
+- Tradeoff: one more closure build/install cycle was needed, but it removed a
+  real crash vector and stopped the toolkit from reporting fake-ready payloads.
+- Verification: the full local cache now validates cleanly, the device rootfs
+  cache is at `14/14` with `DXSDK_Jun10.exe` staged at `599455936` bytes, and
+  the live prefix exposes all 14 files under `C:\AePrefixPack\cache`.
+- Next step: capture one fresh dialog-driven install with state/log markers on
+  the clean post-install process and verify the final live `Prefix Pack`
+  contrast from that fresh instance.
+
+### Entry 3: Visible C-cache install contract and donor-diagnostics preservation
+
+- Goal: close the user's remaining `Prefix Pack` complaints at the contract
+  level instead of just repainting the UI.
+- Context: the user explicitly called out three persistent problems:
+  installers were not visibly landing inside the container,
+  the diagnostics surface still felt too thin,
+  and donor/rootfs diagnostics such as `TestD3D.exe` / `GPUInfo.exe` looked
+  lost or mislinked after runtime patching.
+- Decision: move the written contract to a visible
+  `Z:\opt\ae\prefix-pack\cache -> C:\AePrefixPack\cache -> C:\AePrefixPack\staging`
+  flow, widen the audited catalog with `XNA 3.1`, `OpenAL 1.1`, and the
+  optional `DirectX SDK June 2010` tooling lane, and treat disappearing donor
+  diagnostics as an overlay-preservation bug rather than as an excuse to
+  duplicate payloads.
+- Tradeoff: more batch-script and UI plumbing, plus a larger catalog surface,
+  but far less ambiguity about where installers live and why legacy graphics
+  tools are or are not available.
+- Verification target: one final grouped build/install/device pass should prove
+  the bumped toolkit version, visible C-cache layout, preserved donor
+  diagnostics, and updated Android `Prefix Pack` UI from a fresh live bundle.
+- Next step: run the single closure build, reinstall, verify the live rootfs
+  toolkit version, reproduce the install flow, and capture the freshest
+  post-fix crash/forensic bundle.
+
+### Entry 2: Prefix Pack and legacy-DX clean-pass contract hardened
+
+- Goal: convert the user's ten-point runtime clean-pass feedback into
+  executable repo rules instead of leaving it as fragile chat context.
+- Context: the user called out the same cluster repeatedly:
+  freshest-log-first capture, underdesigned runtime-drawer accents, a confusing
+  `Prefix Pack` that looked like an opaque fetcher instead of a real installer,
+  missing donor diagnostics exposure, unclear `dgVoodoo` routing, and a need
+  for a written roadmap that survives the next agent handoff.
+- Decision: tighten both workspace and repo `AGENTS.md`, add an explicit active
+  roadmap block, and define `Prefix Pack` as an installer/state/diagnostics
+  surface with clear cache/install/log semantics rather than a duplicate
+  runtime-tool bucket.
+- Tradeoff: more doc rigor and more UI/backend plumbing in one pass, but much
+  less ambiguity about ownership, diagnostics discoverability, and what counts
+  as closure.
+- Verification: `AGENTS.md` now carries freshest-crash-first capture, payload
+  ownership boundaries, `Prefix Pack` cache/install/state rules, donor
+  diagnostic discoverability, and `dgVoodoo` route-visibility requirements.
+- Next step: land the corresponding code and asset changes, rebuild, reinstall,
+  and verify the revised `Prefix Pack`/legacy-DX path against a fresh device
+  crash bundle.
+
+### Entry 1: Ajay audit narrowed into an ownership boundary
+
+- Goal: use Ajay's broad component inventory without turning `Ae.solator`
+  `prefix-pack` into a duplicate payload manager.
+- Context: Ajay exposes a much wider app-store/start-menu surface, but the user
+  explicitly ruled that anything already pulled as a payload must not be moved
+  into `prefix-pack`.
+- Decision: classify Ajay into three buckets:
+  dedicated `Contents/payload` families that stay separate,
+  legitimate prefix-local redistributables,
+  and hold items that need more source/license/runtime audit.
+- Tradeoff: this slows down blind catalog expansion, but it preserves one owner
+  per runtime surface and avoids re-importing proprietary Ajay shell logic.
+- Verification: public Ajay README/changelog/wiki plus live device traces and
+  the live `C:\AJAY_PREFIX_PRO` / `Ajay_prefix\save_data` tree were audited;
+  the written result now lives in `docs/AJAY_PREFIX_COMPONENT_AUDIT.md`.
+- Next step: keep `DXVK` / `VKD3D` / `DgVoodoo` / `VulkanSDK` in `Contents`,
+  and only widen `prefix-pack` with source-backed redistributables like
+  `XNA 4.0`, `PhysX`, or `LAVFilters`.
+
+### Entry 0: Prefix-pack toolkit and audited supply-chain lane
+
+- Goal: stop treating extra Windows runtime installs as ad-hoc cache drops and
+  turn them into one reproducible prefix-pack workflow.
+- Context: the user asked for a clean final pass, a custom prefix pack, and a
+  hard choice between opaque mirror pages and transparent upstream sources.
+- Decision: stage a rootfs-visible toolkit under `/opt/ae/prefix-pack`, pin
+  `VC++ AIO` to `abbodi1406/vcredist v0.103.0`, pin `Wine Mono 11.0.0` and
+  `Wine Gecko 2.47.4` to official WineHQ release directories, promote the
+  prefix pack into three aligned surfaces (repo helper, rootfs shell loader,
+  Windows loader), and bind every entry to both a direct download URL and a
+  source page URL.
+- Tradeoff: more manifest and docs discipline is required, and toolkit asset
+  changes now must bump the rootfs `VERSION`, but the lane becomes inspectable
+  and reproducible instead of depending on opaque mirrors or ad-hoc cache
+  dumps.
+- Verification: source-backed URLs chosen, `DirectX June 2010` official binary
+  URL verified from Termux, repo/rootfs loaders updated, and the next step is a
+  fresh APK install plus live device staging/forensic proof.
+- Next step: rebuild/install the APK, confirm `PREFIX_PACK_TOOLKIT_READY`
+  reports the bumped toolkit version, stage the cache into device `imagefs`,
+  and verify the same catalog/loader contract is visible from Windows inside
+  the container.
+
+### Entry 5: Runtime UX closure requires table-stable process rows and one-shot prefix installs
+
+- Goal: stop treating runtime UI regressions as "just layout noise" when they
+  are actually blocking the user from inspecting processes or launching staged
+  installers.
+- Context: live user feedback showed the Linux `Task Manager` rows clipping or
+  visually disappearing during scroll, while `Prefix Pack` kept replaying the
+  previous `.NET Framework` auto-install target and could remain stuck at
+  `scheduled` without proof of runtime dispatch.
+- Decision: tighten the contract so `Task Manager` behaves like a stable
+  left-side Linux telemetry table with fixed headers and non-clipping rows, and
+  make `Prefix Pack` consume deferred install targets once, dismiss before
+  runtime hand-off, and log explicit dispatch or timeout markers instead of
+  hiding behind silent retries.
+- Tradeoff: a little more UI and forensic plumbing, but a far clearer closure
+  signal for the next pass and less ambiguity about whether installers actually
+  launched.
+- Verification: next pass must include a fresh APK install, live screenshots of
+  both `Task Manager` and `Prefix Pack`, plus a clean forensic bundle proving
+  row geometry and runtime dispatch behavior.
+- Next step: complete the Linux table refit, patch the one-shot install
+  consumption path, rebuild once, then verify on device with screenshots and
+  forensic logs.
+
 ## 2026-03-14
 
 ## 2026-03-16
@@ -2785,3 +3042,228 @@
   `dlssg`, or `fsr3`, so the runtime-payload consumption gate for rounds
   `R10-R14` is still genuinely open. The app-side contract is now correct and
   provable; the provider-side payload is still missing from the staged rootfs.
+
+### Entry 114: the current runtime clean-pass is now about UI truthfulness and installer dispatch semantics, not bootstrap
+
+- Goal: fold the latest marked screenshot batch and fresh `Prefix Pack`
+  forensic into one coherent closure slice instead of treating them as
+  unrelated nits.
+- Context: the newest user-visible defects were not generic Android issues.
+  They were precise surface mismatches: `Runtime Profiles` still showed the old
+  dual-Box/FEX layout in the live build; runtime `Logs` still looked like a
+  striped spreadsheet instead of the main forensic console; `Screen Effects`
+  still burned too much vertical space on the profile row; `Task Manager` was
+  already nearly done but still needed safe last-row slack; and `.NET`
+  installer hand-off from `Prefix Pack` did launch a real GUI installer, yet
+  the app kept treating that path as unproved and retried candidates anyway.
+- Decision:
+  `Runtime Profiles` is now route-aware in code and only surfaces the active
+  family (`FEXCore` for `arm64ec`, `Box64` for `x86_64`) with runtime-colored
+  spinners and compact version/preset rows;
+  `Prefix Pack` direct GUI lanes now short-circuit the old detached-proof retry
+  loop by writing a fresh launcher proof log as soon as detached guest launch
+  succeeds; `Task Manager` bottom slack is now adaptive rather than a fixed
+  dead tail; and roadmap upkeep is now explicit session discipline instead of
+  a best-effort note.
+- Tradeoff: direct GUI installer lanes now bias toward user-visible hand-off
+  truth over aggressive automatic proof heuristics. That is the correct bias
+  here because repeated retries were worse than a conservative `interactive`
+  state when the installer was already on screen.
+- Next proof burden: reinstall this batch on device and validate the newest
+  live surfaces against the latest screenshot queue, especially
+  `Runtime Profiles`, runtime `Logs`, `Screen Effects`, `Task Manager`
+  bottom-row geometry, and `Prefix Pack` one-shot `.NET` launch.
+
+### Entry 115: Ajay Prefix Pro v1.6 is now a verified donor base, but it does not replace Ae.solator's stricter install/state contract
+
+- Goal: stop treating Ajay as a vague community reference and turn it into a
+  verified donor baseline with explicit strengths, limits, and local paths.
+- Context: the user asked for a wider donor search and for the latest Ajay
+  prefix to be installed as a donor base. At the same time the active
+  screenshot + forensic queue kept proving that our current blocker is not
+  generic `exe` launch failure, but the much narrower
+  `DXSDK Jun10 -> legacy .NET 2.0 -> error 51023` path plus live
+  `Prefix Pack` UX tails.
+- Decision: pull a broad GitHub donor pool first, then verify the latest
+  official Ajay offline release directly from GitHub Releases, download the
+  archive, validate its hash, fully extract the offline package, and inspect
+  the nested `Setup`, `Start Menu`, and `Resources` payload layers before
+  deciding what should be imported into `Ae.solator`.
+- Verification: `Ajay Prefix Pro v1.6 Offline` is now staged under
+  `/data/data/com.termux/files/home/donors/ajay-prefix/v1.6_offline`,
+  archive hash
+  `e4a23f89c8cc5944b87d7228d04a820e659b494a7e230498910f2c93a2305aa6`
+  matches the official release metadata, and the extracted donor proves real
+  coverage for:
+  `Only Start Menu / Prefix / Both` install modes,
+  visible save-data redirection,
+  `Necessary_Components.bat`,
+  `PhysX`, `XNA`, `OpenAL`, `FAudio/XAudio`, `VC` registry helpers,
+  `DgVoodoo`, `DXVK/VKD3D` references, Wine tools, and GPU/API tests for
+  `D3D8/9/10/11/12`, `DDraw`, `OpenGL`, and `nGlide`.
+- Tradeoff: Ajay is strong on breadth and legacy helper scripts, but weak as a
+  source-of-truth for our current installer closure model. Its scripts still
+  rely heavily on direct `Start <exe>` launches, temp extraction, and looser
+  state assumptions, which is exactly where `Ae.solator` needs stricter proof.
+- Conclusion: Ajay is now the primary donor for coverage, test inventory,
+  start-menu grouping, and script ideas; it is not the source-of-truth for the
+  `Prepare -> Install -> State/Logs` contract or for resolving the current
+  `DXSDK/.NET 2.0` proof-token gap. Those stay app-owned in `Ae.solator`.
+
+### Entry 116: donor transfer can be UI-only, and the management surfaces need a stricter split-pane contract than Ajay or the older runtime dialogs
+
+- Goal: honor the user's narrowed scope and transfer donor value only into the
+  Android-side management surfaces, without reopening the start-menu lane or
+  mixing in premature build/device claims.
+- Context: after the broader donor audit the user explicitly constrained the
+  active pass to `UI contract management only, no start menu`, while the latest
+  screenshot batch still showed heavy `Prefix Pack` chrome, stacked runtime
+  cards, and a nearly-finished `Task Manager` whose only remaining geometry
+  risk was the last Linux row.
+- Decision: treat that wording as a hard scope wall. Import donor structure,
+  not donor volume:
+  use split-pane management geometry, denser rows, slimmer headers, and a
+  route-owned `Runtime Profiles` surface; keep `Task Manager` changes to the
+  last-row guard only; and defer compile/device proof until the whole UI slice
+  is ready because the user explicitly asked for no intermediate builds.
+- Tradeoff: this pass does less immediate runtime validation in exchange for a
+  cleaner batch boundary. That is acceptable because the user asked for one
+  cohesive UI-only donor transfer rather than another half-built build/install
+  loop.
+- Next proof burden: when this donor-driven UI batch is complete, install once
+  and validate the touched surfaces against the freshest user screenshot queue:
+  `Prefix Pack`, `Runtime Profiles`, `Screen Effects`, `Task Manager`, and the
+  shared runtime log/debug surface.
+
+### Entry 117: once the user widened the donor UI pass again, the safe expansion path was adjacent management surfaces, not weaker install logic
+
+- Goal: expand the current no-build donor batch without diluting the stricter
+  runtime-management contract that the previous entries had just established.
+- Context: after narrowing the pass to management UI only, the user explicitly
+  allowed the scope to sprawl again, but only on the condition that logic
+  would not degrade. That changed the problem: the scope wall was no longer
+  absolute, but the contract wall became stricter.
+- Decision: widen only along adjacent management surfaces that share the same
+  runtime chrome family:
+  nested preset editors behind `Runtime Profiles`,
+  `Container Storage Info`,
+  `Input Controls`,
+  and the shared split-pane geometry language.
+  Do not use that wider scope as permission to reopen start-menu cloning or
+  relax `Prepare -> Install -> State/Logs` proof semantics.
+- Tradeoff: the batch touches more XML/Java surfaces before the next build, so
+  closure depends even more on a single careful final proof cycle. That is
+  still the better trade because the user explicitly rejected intermediate
+  build churn and the touched surfaces now form one coherent runtime-management
+  family.
+- Next proof burden: validate that the widened family still reads as one
+  product on device:
+  `Prefix Pack`, `Runtime Profiles`, preset editors, `Screen Effects`,
+  `Container Storage Info`, `Task Manager`, and the runtime log/forensic
+  dialogs must all hold the same contrast, spacing, and control logic without
+  regressing installer or state semantics.
+
+### Entry 118: the widened management pass still has to carry real installer truth, and the auxiliary Prefix Pack dialogs cannot fall back to old chrome
+
+- Goal: keep the broadened UI-only batch honest by folding the freshest
+  screenshot truths back into both layout work and the active logic tail list.
+- Context: the latest manual screenshots (`2026-03-21 11:22-11:24`) did two
+  things at once:
+  they confirmed that the visible cache contract is real because
+  `DXSDK_Jun10.exe`, `PhysX`, `Wine Gecko x86/x64`, and `Wine Mono` are all
+  physically visible under `C:\AePrefixPack\cache`,
+  and they also proved that the legacy DirectX path is still blocked by the
+  live `DXSDK Jun10 -> .NET Framework 2.0 redist -> error 51023` chain.
+- Decision: keep that logic tail live in the roadmap while continuing the
+  widened management pass. Do not pretend a cache-visible installer is the same
+  thing as a solved install flow. At the same time, bring the remaining
+  `Prefix Pack` auxiliary dialogs (`Graphics Diagnostics`, lane `Info`) onto
+  the same split-pane runtime-management contract so the toolkit stops
+  regressing into older badge/button-wall chrome once the user drills deeper.
+- Tradeoff: this increases the breadth of the no-build batch again, but still
+  respects the user's rule because the expansion stays in adjacent management
+  surfaces and does not relax `Prepare -> Install -> State/Logs` semantics.
+- Next proof burden: once the management-family pass is complete, run one fresh
+  device cycle and demand both truths at once:
+  newer live screenshots must show the auxiliary dialogs on the same product
+  surface, and a new forensic bundle must prove whether the `51023` path is
+  closed or still the real blocker.
+
+### Entry 119: the remaining legacy installer tail is a managed-runtime routing problem, not a generic cache or launcher problem
+
+- Goal: collapse the last donor-backed installer tails into one coherent
+  lane-owned contract before the next build/install proof cycle.
+- Context: the freshest `2026-03-21 11:18-11:24` screenshots and
+  `live_verify_20260321_122023_legacy_dxsdk` bundle already proved that the old
+  model was wrong twice:
+  `legacy_dx_sdk` was still redirecting into `dotnet_framework`, and `xna` was
+  still being treated like a `.NET 4` problem even though Ajay's own XNA
+  launchers call out `Wine Mono` first.
+- Decision: keep `.NET Framework` as its own honest lane, but remove the last
+  surprise redirects from adjacent lanes. `legacy_dx_sdk` stays lane-owned
+  under the Mono/DLL-override guard, while `xna` repairs `Wine Mono` in-lane
+  before running the XNA MSI payloads. The staged dispatch helper now also
+  hides its own console so blank `cmd` windows stop polluting runtime UX.
+- Tradeoff: this widens the no-build batch again, but still stays inside the
+  user's scope wall:
+  runtime management UI and installer truth only, no start-menu sprawl and no
+  weakened `Prepare -> Install -> State/Logs` semantics.
+- Next proof burden: the next closure cycle has to beat the historical control
+  bundle. Success means:
+  `legacy_dx_sdk` no longer leaves a fresh `dotnet_framework` redirect trace,
+  `xna` no longer jumps into `.NET 4`,
+  and `PhysX` / `GLview` no longer strand the user in empty helper windows plus
+  a vague `queued` state.
+
+### Entry 120: the pass needs a hard hold on the exact DXSDK continuation point so the next agent does not waste the one-build budget
+
+- Goal: freeze the current omega pass on the real remaining blocker and make
+  continuation deterministic even after a pause.
+- Context: by the time the user asked for a hard hold, the pass had already
+  consumed the single allowed final compile. Fresh screenshots then narrowed
+  the live truth further:
+  `legacy_dx_sdk` is no longer failing at the outer launcher layer. The lane
+  can now open the real DirectX SDK setup and reach `Copying Files`, but then
+  hangs or falls back into the legacy `.NET 2.0 / 51023` family.
+- Decision: record a dedicated checkpoint and explicitly forbid the usual
+  restart mistakes. The next resume must not begin with another compile,
+  another donor sweep, or another broad UI pass. It must begin with a live
+  rootfs sync of the newer unrebuilt
+  `install-directx-sdk-tools.cmd`, then one focused `legacy_dx_sdk` rerun with
+  fresh forensics.
+- Tradeoff: this leaves one known script patch unapplied inside the live APK
+  state until the next resume. That is still the right trade because it
+  preserves the user's one-build constraint while keeping the next action
+  precise and cheap.
+- Next proof burden: once `adb` is restored, prove or disprove the patched
+  live lane in one narrow cycle:
+  rootfs sync -> rerun `legacy_dx_sdk` -> capture fresh state/log/screenshot.
+
+### Entry 121: the Android build lane was cache-capable but still structurally non-reproducible, so the fix had to remove mutation and split authority instead of chasing cache folklore
+
+- Goal: close the repo-local Android build audit instead of merely describing
+  it.
+- Context: the root Gradle lane could already store and reuse configuration
+  cache entries, but the stronger audit showed that the real drift was
+  elsewhere:
+  `preBuild` still reached donor download/mutation logic,
+  `app/build.gradle` still performed host-specific NDK/signing checks during
+  eager configuration,
+  and the repo still carried nested wrapper/property lanes that could
+  undermine a single authoritative build path.
+- Decision: fix the lane structurally.
+  `preBuild` now verifies bundled imagefs/runtime assets and generated JNI
+  state instead of downloading donor archives.
+  NDK runtime resolution now happens through a task-time resolver rather than
+  one eager `linux-x86_64` hard-code.
+  Nested `app/gradle.properties` was neutralized and the nested wrapper was
+  realigned to the root wrapper version.
+- Tradeoff: this keeps an explicit manual donor-rootfs hydration task around,
+  but only as a non-authoritative helper. That is the right trade because it
+  preserves operator escape hatches without letting the default build lane
+  mutate the source tree.
+- Next proof burden: run the root lane again and demand the stronger truth:
+  cache reuse still works,
+  `preBuild` no longer drags network mutation into the task graph,
+  and the remaining build tail is reduced to narrower Gradle/AGP cleanup
+  instead of host-drift folklore.

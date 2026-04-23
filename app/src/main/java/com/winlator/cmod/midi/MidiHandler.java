@@ -103,10 +103,10 @@ public class MidiHandler {
                 handleLongMessage(received, packetLength - 1);
                 break;
             case RequestCodes.MIDI_PREPARE:
-                // stub
+                // unsupported
                 break;
             case RequestCodes.MIDI_UNPREPARE:
-                // stub
+                // unsupported
                 break;
             case RequestCodes.MIDI_OPEN:
                 if (synth == null || recv == null) {

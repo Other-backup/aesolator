@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:padding="0dp">
+
+    <LinearLayout
+        android:id="@+id/SVPrefixPackOverviewPane"
+        android:layout_width="156dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="4dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/LLPrefixPackOverviewCard"
+            style="@style/FieldSet"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/surface_runtime_prefixpack_background"
+            android:paddingStart="9dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="8dp"
+            android:tag="preserve_background">
+
+            <TextView
+                android:id="@+id/TVPrefixPackOverviewBadge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/surface_runtime_prefixpack_header_background"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp"
+                android:text="@string/prefix_pack_overview"
+                android:textColor="@color/surface_runtime_prefixpack_text"
+                android:textSize="8.9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/TVPrefixPackIntro"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:ellipsize="end"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="3"
+                android:text="@string/prefix_pack_toolkit_intro"
+                android:textColor="@color/surface_runtime_prefixpack_muted"
+                android:textSize="7.9sp" />
+
+            <TextView
+                android:id="@+id/TVPrefixPackSession"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="5"
+                android:textColor="@color/surface_runtime_prefixpack_text"
+                android:textSize="8.9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/TVPrefixPackFlow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="4"
+                android:textColor="@color/surface_runtime_prefixpack_muted"
+                android:textSize="7.8sp" />
+
+            <TextView
+                android:id="@+id/TVPrefixPackPaths"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:ellipsize="middle"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="6"
+                android:textColor="@color/surface_runtime_prefixpack_muted"
+                android:textSize="7.4sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/LLPrefixPackLanesCard"
+        style="@style/FieldSet"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@drawable/surface_runtime_prefixpack_background"
+        android:paddingStart="9dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="9dp"
+        android:paddingBottom="8dp"
+        android:tag="preserve_background">
+
+        <TextView
+            android:id="@+id/TVPrefixPackLanesBadge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/surface_runtime_prefixpack_header_background"
+            android:paddingStart="8dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="5dp"
+            android:text="@string/prefix_pack_install_lanes"
+            android:textColor="@color/surface_runtime_prefixpack_text"
+            android:textSize="8.9sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVPrefixPackLaneHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:lineSpacingExtra="1dp"
+            android:maxLines="2"
+            android:text="@string/prefix_pack_lane_hint"
+            android:textColor="@color/surface_runtime_prefixpack_muted"
+            android:textSize="7.6sp" />
+
+        <ScrollView
+            android:id="@+id/SVPrefixPackRoot"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="6dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:fillViewport="true"
+            android:scrollbarStyle="outsideInset">
+
+            <LinearLayout
+                android:id="@+id/LLPrefixPackLaneList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="2dp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>

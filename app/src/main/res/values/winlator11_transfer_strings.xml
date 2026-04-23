@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="active_windows">Active Windows</string>
+    <string name="show_shortcuts_first_on_startup">Open Shortcuts first on startup</string>
+    <string name="runtime_drawer_active_windows_summary">Quick switcher for mapped X11 application windows in the current Wine desktop.</string>
+    <string name="active_windows_meta">PID %1$d | %2$s | %3$dx%4$d</string>
+</resources>

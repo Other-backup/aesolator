@@ -32,7 +32,6 @@ public class ContentProfile {
     public static final String MARK_RUNTIME_MODEL = "runtimeModel";
     public static final String MARK_VULKAN_API_MIN = "vulkanApiMin";
     public static final String MARK_VULKAN_API_MAX = "vulkanApiMax";
-    public static final String MARK_VULKAN_SDK_VERSION = "vulkanSdkVersion";
     public static final String CHANNEL_STABLE = "stable";
     public static final String CHANNEL_BETA = "beta";
     public static final String CHANNEL_NIGHTLY = "nightly";
@@ -44,7 +43,6 @@ public class ContentProfile {
     public enum ContentType {
         CONTENT_TYPE_WINE("Wine"),
         CONTENT_TYPE_PROTON("Proton"),
-        CONTENT_TYPE_VULKAN_SDK("VulkanSDK"),
         CONTENT_TYPE_TURNIP_DRIVER("TurnipDriver"),
         CONTENT_TYPE_OPENGL_DRIVER("OpenGLDriver"),
         CONTENT_TYPE_DGVOODOO("DgVoodoo"),
@@ -81,7 +79,6 @@ public class ContentProfile {
                 return normalized.contains("proton") ? CONTENT_TYPE_PROTON : CONTENT_TYPE_WINE;
             }
 
-            if (normalized.equals("vulkansdk") || normalized.equals("vulkan sdk")) return CONTENT_TYPE_VULKAN_SDK;
             if (normalized.equals("turnipdriver") || normalized.equals("turnip driver") || normalized.equals("turnip")) {
                 return CONTENT_TYPE_TURNIP_DRIVER;
             }
@@ -123,8 +120,7 @@ public class ContentProfile {
     public String runtimeModel = "";
     public int vulkanApiMin = 0;
     public int vulkanApiMax = 0;
-    public String vulkanSdkVersion = "";
-    public boolean locallyInstalled = false;
+    private boolean locallyInstalled = false;
 
     public static String normalizeRuntimeModel(String value) {
         if (value == null || value.trim().isEmpty()) return "";
@@ -210,7 +206,6 @@ public class ContentProfile {
             if (isProtonLike()) return "Proton";
             if (type == ContentType.CONTENT_TYPE_WINE) return "Wine";
         }
-        if (type == ContentType.CONTENT_TYPE_VULKAN_SDK) return "Vulkan SDK";
         if (type == ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
         if (type == ContentType.CONTENT_TYPE_OPENGL_DRIVER) return "OpenGL Driver";
         if (type == ContentType.CONTENT_TYPE_DGVOODOO) return "dgVoodoo";
@@ -259,6 +254,10 @@ public class ContentProfile {
 
     public boolean isInstalledLocally() {
         return locallyInstalled;
+    }
+
+    public void setInstalledLocally(boolean locallyInstalled) {
+        this.locallyInstalled = locallyInstalled;
     }
 
     private String buildArchitectureHintSurface() {
@@ -311,9 +310,14 @@ public class ContentProfile {
     }
 
     public String getArchitectureTag() {
+        String surface = buildArchitectureHintSurface();
+        if (type == ContentType.CONTENT_TYPE_DGVOODOO) {
+            String dgVoodooLane = resolveDgVoodooPackageLane(surface);
+            if (!dgVoodooLane.isEmpty()) return dgVoodooLane;
+        }
+
         if (isBundleLikeArchitecture()) return "bundle";
 
-        String surface = buildArchitectureHintSurface();
         if (containsArchitectureToken(surface, "arm64ec", "arm64-ec")) return "arm64ec";
         if (containsArchitectureToken(surface, "x86_64", "x86-64", "amd64", "/x64/", "/amd64/", "-x64")) return "x86_64";
         if (containsArchitectureToken(surface, " arm64 ", "/arm64/", "-arm64", "aarch64")) return "arm64";
@@ -327,6 +331,19 @@ public class ContentProfile {
             return "x86_64";
         }
         return "generic";
+    }
+
+    private String resolveDgVoodooPackageLane(String surface) {
+        if (surface == null || surface.isEmpty()) return "";
+        if (containsArchitectureToken(surface,
+                "dgvoodoo-arm64ec", "2.87.1-arm64ec", " arm64ec", "-arm64ec", "/arm64ec/", "arm64-ec")) {
+            return "arm64ec";
+        }
+        if (containsArchitectureToken(surface,
+                "dgvoodoo-x86_64", "dgvoodoo-x86-64", "2.87.1-x86_64", " x86_64", "-x86_64", "x86-64", "amd64")) {
+            return "x86_64";
+        }
+        return "";
     }
 
     public boolean matchesArchitectureFilter(String requestedArch) {
@@ -402,9 +419,6 @@ public class ContentProfile {
         }
         if (vulkanApiMax <= 0 && remoteProfile.vulkanApiMax > 0) {
             vulkanApiMax = remoteProfile.vulkanApiMax;
-        }
-        if ((vulkanSdkVersion == null || vulkanSdkVersion.trim().isEmpty()) && remoteProfile.vulkanSdkVersion != null) {
-            vulkanSdkVersion = remoteProfile.vulkanSdkVersion;
         }
         if ((crossFamilyRepair || desc == null || desc.trim().isEmpty() || desc.trim().equalsIgnoreCase(verName))
                 && remoteProfile.desc != null && !remoteProfile.desc.trim().isEmpty()) {

@@ -30,7 +30,7 @@ public abstract class GPUInformation {
                 }
             }
         }
-        catch (JSONException ignored) {}
+        catch (JSONException ignored) { /* best-effort path; keep surrounding flow intact. */ }
         return "";
     }
 

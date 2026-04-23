@@ -158,10 +158,14 @@ public class XConnectorEpoll implements Runnable {
                     try {
                         client.pollThread.join();
                     }
-                    catch (InterruptedException e) {}
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "Interrupted while waiting for client poll thread shutdown", e);
+                        break;
+                    }
                 }
 
-                client.pollThread = null;
+                if (!client.pollThread.isAlive()) client.pollThread = null;
             }
             closeFd(client.shutdownFd);
         }

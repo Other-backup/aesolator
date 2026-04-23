@@ -97,7 +97,7 @@ md.append("- Container creation reads runtime DLL trees directly; missing guards
 md.append("")
 md.append("## Applied Mitigation Strategy")
 md.append("- Patch `WineInfo.fromIdentifier` to parse generic `*-arm64ec` identifiers, not only numeric proton/wine formats.")
-md.append("- Force robust emulator defaults for ARM64EC (`FEXCore`) and explicit Box64 fallback for non-ARM64EC runtimes.")
+md.append("- Force robust emulator defaults for ARM64EC (`FEXCore`) and explicit Box64 secondary path for non-ARM64EC runtimes.")
 md.append("- Expand startup `LD_LIBRARY_PATH` / `WINEDLLPATH` / `PATH` to include selected runtime under `/opt/<runtime>`.")
 md.append("- Fail gracefully during container DLL extraction if expected runtime directories are missing.")
 

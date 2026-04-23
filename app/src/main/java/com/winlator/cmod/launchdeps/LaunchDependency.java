@@ -1,7 +1,5 @@
 package com.winlator.cmod.launchdeps;
 
-import android.content.Context;
-
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.container.Container;
@@ -12,12 +10,12 @@ public interface LaunchDependency {
 
     boolean appliesTo(Container container, @Nullable Shortcut shortcut, @Nullable String appId);
 
-    boolean isSatisfied(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId);
+    boolean isSatisfied(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId);
 
-    String getLoadingMessage(Context context, Container container, @Nullable Shortcut shortcut, @Nullable String appId);
+    String getLoadingMessage(LaunchDependencyContext dependencyContext, Container container, @Nullable Shortcut shortcut, @Nullable String appId);
 
     void install(
-            Context context,
+            LaunchDependencyContext dependencyContext,
             Container container,
             @Nullable Shortcut shortcut,
             @Nullable String appId,

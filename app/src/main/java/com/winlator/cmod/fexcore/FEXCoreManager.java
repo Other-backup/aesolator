@@ -29,14 +29,9 @@ public abstract class FEXCoreManager {
             }
         }
 
-        List<ContentProfile> profiles = contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE);
-        if (profiles != null) {
-            for (ContentProfile profile : profiles) {
-                if (profile == null || !profile.locallyInstalled) continue;
-                if (profile.verName == null || profile.verName.trim().isEmpty()) continue;
-                if (!itemList.contains(profile.verName)) {
-                    itemList.add(profile.verName);
-                }
+        for (String version : contentsManager.getInstalledVersionNames(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, true)) {
+            if (!itemList.contains(version)) {
+                itemList.add(version);
             }
         }
 

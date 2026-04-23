@@ -1,40 +1,105 @@
 import java.net.URL
 import java.nio.file.Files
-import java.nio.file.Paths
-import java.security.MessageDigest
+import java.nio.file.StandardCopyOption
 import java.util.Properties
+
+class AeBuildHostSupport {
+    static String trimValue(Object value) {
+        value == null ? "" : value.toString().trim()
+    }
+
+    static List<String> nonBlank(List values) {
+        values.collect { trimValue(it) }.findAll { !it.isEmpty() }
+    }
+
+    static Properties readLocalProperties(File propsFile) {
+        def props = new Properties()
+        if (propsFile.exists()) {
+            propsFile.withInputStream { props.load(it) }
+        }
+        props
+    }
+
+    static String resolveNdkDir(File propsFile, String ndkVersion, Map<String, String> env) {
+        def props = readLocalProperties(propsFile)
+        def sdkDir = trimValue(props.getProperty("sdk.dir") ?: env["ANDROID_SDK_ROOT"])
+        def candidates = nonBlank([
+                props.getProperty("ndk.dir"),
+                env["ANDROID_NDK_ROOT"],
+                env["ANDROID_NDK_HOME"],
+                sdkDir ? "${sdkDir}/ndk/${ndkVersion}" : ""
+        ])
+        candidates.find { new File(it).isDirectory() } ?: (candidates ? candidates[0] : "")
+    }
+
+    static File resolveNdkPrebuiltRoot(File propsFile, String ndkVersion, Map<String, String> env) {
+        def ndkDir = resolveNdkDir(propsFile, ndkVersion, env)
+        if (!ndkDir) {
+            return null
+        }
+        File prebuiltRoot = new File(ndkDir, "toolchains/llvm/prebuilt")
+        if (!prebuiltRoot.isDirectory()) {
+            return null
+        }
+        def explicitHostTag = trimValue(env["AEO_ANDROID_NDK_HOST_TAG"])
+        if (!explicitHostTag.isEmpty()) {
+            File explicitDir = new File(prebuiltRoot, explicitHostTag)
+            if (explicitDir.isDirectory()) {
+                return explicitDir
+            }
+        }
+        def hostDirs = prebuiltRoot.listFiles()?.findAll { candidate ->
+            candidate.isDirectory() && candidate.name != "bin"
+        }?.toList()?.sort { left, right -> left.name <=> right.name }
+        hostDirs ? hostDirs[0] : null
+    }
+
+    static File resolveLibcxxSharedArm64(File propsFile, String ndkVersion, Map<String, String> env) {
+        File prebuiltRoot = resolveNdkPrebuiltRoot(propsFile, ndkVersion, env)
+        prebuiltRoot == null
+                ? null
+                : new File(prebuiltRoot, "sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+    }
+}
 
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
 }
+def aeAssetDir = new File(rootProject.projectDir, "app/src/main/assets")
+def aeGeneratedJniLibsDir = new File(buildDir, "generated/ae-jniLibs")
+def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
+def aeResolvedNdkVersion = "29.0.14206865"
+def aeRequiredRootfsAssets = [
+        "imagefs_bionic.txz",
+        "imagefs_gamenative.txz",
+        "imagefs_patches_gamenative.tzst"
+]
+def aeRequiredRuntimeAssets = [
+        "freewine11-arm64ec.wcp"
+]
+File aeLocalPropertiesFile = rootProject.file("local.properties")
+def aeBuildEnv = new LinkedHashMap<>(System.getenv())
+def aeEnforceEmbeddedRuntimeAssets = (
+        (project.findProperty("ae.enforceEmbeddedRuntimeAssets")?.toString() ?: "") == "true" ||
+                (aeBuildEnv["AEO_ENFORCE_EMBEDDED_RUNTIME_ASSETS"] ?: "") == "1"
+)
 
 tasks.register("downloadImageFS") {
-    def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    def legacyRootfsArtifacts = [
-            "imagefs.txz",
-            "imagefs.txz.02"
-    ]
     def donorRootfsArtifacts = [
             [name: "imagefs_bionic.txz", url: "https://downloads.gamenative.app/imagefs_bionic.txz"],
             [name: "imagefs_gamenative.txz", url: "https://downloads.gamenative.app/imagefs_gamenative.txz"],
             [name: "imagefs_patches_gamenative.tzst", url: "https://downloads.gamenative.app/imagefs_patches_gamenative.tzst"]
     ]
-
+    def downloadDir = new File(buildDir, "downloads/imagefs")
+    outputs.dir(downloadDir)
     doLast {
-        legacyRootfsArtifacts.each { legacyName ->
-            File legacyAsset = new File(assetDir, legacyName)
-            if (legacyAsset.exists()) {
-                println("Removing legacy rootfs artifact from mainline bundle: ${legacyName}")
-                legacyAsset.delete()
-            }
-        }
         donorRootfsArtifacts.each { artifact ->
-            File destination = new File(assetDir, artifact.name)
-            if (destination.exists()) {
-                println("RootFS artifact already present: ${artifact.name}")
+            File destination = new File(downloadDir, artifact.name)
+            if (destination.exists() && destination.isFile()) {
+                println("Cached rootfs artifact already present: ${artifact.name}")
             } else {
-                println("Downloading donor rootfs artifact ${artifact.name} ...")
+                println("Downloading rootfs artifact into build cache: ${artifact.name}")
                 destination.parentFile.mkdirs()
                 new URL(artifact.url).withInputStream { input ->
                     destination.withOutputStream { output -> output << input }
@@ -44,27 +109,29 @@ tasks.register("downloadImageFS") {
     }
 }
 
-tasks.register("prepareEmbeddedWineAssets") {
-    def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    def enforceEmbeddedRuntimeAssets = (
-            (project.findProperty("ae.enforceEmbeddedRuntimeAssets")?.toString() ?: "") == "true" ||
-                    (System.getenv("AEO_ENFORCE_EMBEDDED_RUNTIME_ASSETS") ?: "") == "1"
-    )
-    def requiredRuntimeAssets = [
-            "freewine11-arm64ec.wcp"
-    ]
-
+tasks.register("verifyBundledImageFsAssets") {
+    inputs.files(aeRequiredRootfsAssets.collect { name -> new File(aeAssetDir, name) })
     doLast {
-        if (!enforceEmbeddedRuntimeAssets) {
+        def missing = aeRequiredRootfsAssets.findAll { name ->
+            File asset = new File(aeAssetDir, name)
+            !asset.exists() || !asset.isFile()
+        }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing bundled imagefs assets: ${missing.join(', ')}")
+        }
+    }
+}
+
+tasks.register("prepareEmbeddedWineAssets") {
+    inputs.files(aeRequiredRuntimeAssets.collect { name -> new File(aeAssetDir, name) })
+    doLast {
+        if (!aeEnforceEmbeddedRuntimeAssets) {
             println("Embedded runtime asset check skipped (Contents-first lane active).")
             return
         }
-        def missing = []
-        requiredRuntimeAssets.each { name ->
-            File f = new File(assetDir, name)
-            if (!f.exists() || !f.isFile()) {
-                missing.add(name)
-            }
+        def missing = aeRequiredRuntimeAssets.findAll { name ->
+            File asset = new File(aeAssetDir, name)
+            !asset.exists() || !asset.isFile()
         }
         if (!missing.isEmpty()) {
             throw new GradleException("Missing embedded runtime assets: ${missing.join(', ')}")
@@ -72,39 +139,93 @@ tasks.register("prepareEmbeddedWineAssets") {
     }
 }
 
-tasks.register("prepareKotlinBuildScriptModel"){}
-prepareEmbeddedWineAssets.dependsOn(downloadImageFS)
-preBuild.dependsOn(prepareEmbeddedWineAssets)
+tasks.register("prepareKotlinBuildScriptModel") {}
 
-def aeLocalProperties = new Properties()
-File aeLocalPropertiesFile = rootProject.file("local.properties")
-if (aeLocalPropertiesFile.exists()) {
-    aeLocalPropertiesFile.withInputStream { aeLocalProperties.load(it) }
-}
-def aeNdkDir = (aeLocalProperties.getProperty("ndk.dir") ?: System.getenv("ANDROID_NDK_ROOT") ?: "").trim()
-def aeGeneratedJniLibsDir = new File(buildDir, "generated/ae-jniLibs")
-def aeLibcxxSharedArm64 = aeNdkDir.isEmpty()
-        ? null
-        : new File(aeNdkDir, "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
-
-tasks.register("prepareRuntimeSharedJni", Copy) {
-    if (aeLibcxxSharedArm64 == null || !aeLibcxxSharedArm64.isFile()) {
-        throw new GradleException("Required NDK runtime library is missing: ${aeLibcxxSharedArm64}")
+tasks.register("prepareRuntimeSharedJni") {
+    File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
+    inputs.file(aeLocalPropertiesFile)
+    inputs.property("aeResolvedNdkVersion", aeResolvedNdkVersion)
+    if (aeBuildEnv["AEO_ANDROID_NDK_HOST_TAG"] != null) {
+        inputs.property("AEO_ANDROID_NDK_HOST_TAG", aeBuildEnv["AEO_ANDROID_NDK_HOST_TAG"])
     }
-    from(aeLibcxxSharedArm64)
-    into(new File(aeGeneratedJniLibsDir, "arm64-v8a"))
+    outputs.file(new File(outputDir, "libc++_shared.so"))
+    doLast {
+        File libcxxSharedArm64 = AeBuildHostSupport.resolveLibcxxSharedArm64(
+                aeLocalPropertiesFile,
+                aeResolvedNdkVersion,
+                aeBuildEnv
+        )
+        if (libcxxSharedArm64 == null || !libcxxSharedArm64.isFile()) {
+            File prebuiltRoot = AeBuildHostSupport.resolveNdkPrebuiltRoot(
+                    aeLocalPropertiesFile,
+                    aeResolvedNdkVersion,
+                    aeBuildEnv
+            )
+            throw new GradleException(
+                    "Required NDK runtime library is missing: ${libcxxSharedArm64} " +
+                            "(resolved prebuilt root: ${prebuiltRoot})"
+            )
+        }
+        outputDir.mkdirs()
+        Files.copy(
+                libcxxSharedArm64.toPath(),
+                new File(outputDir, libcxxSharedArm64.name).toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+        )
+    }
 }
 
-preBuild.dependsOn(prepareRuntimeSharedJni)
+tasks.register("prepareVirglWrapperJni") {
+    File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
+    inputs.file(aeVirglWrapperPointerFile)
+    outputs.files(
+            new File(outputDir, "libvirglrenderer.so"),
+            new File(outputDir, "libepoxy.so")
+    )
+    doLast {
+        if (!aeVirglWrapperPointerFile.exists() || !aeVirglWrapperPointerFile.isFile()) {
+            throw new GradleException("VirGL wrapper pointer is missing: ${aeVirglWrapperPointerFile}")
+        }
 
-def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "20"
+        String runRootPath = aeVirglWrapperPointerFile.getText("UTF-8").trim()
+        if (runRootPath.isEmpty()) {
+            throw new GradleException("VirGL wrapper pointer is empty: ${aeVirglWrapperPointerFile}")
+        }
+
+        File runRoot = new File(runRootPath)
+        File jniSourceDir = new File(runRoot, "jni/arm64-v8a")
+        if (!jniSourceDir.isDirectory()) {
+            throw new GradleException("VirGL wrapper JNI directory is missing: ${jniSourceDir}")
+        }
+
+        outputDir.mkdirs()
+        ["libvirglrenderer.so", "libepoxy.so"].each { fileName ->
+            File source = new File(jniSourceDir, fileName)
+            if (!source.isFile()) {
+                throw new GradleException("Required VirGL JNI payload is missing: ${source}")
+            }
+            Files.copy(
+                    source.toPath(),
+                    new File(outputDir, fileName).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+            )
+        }
+    }
+}
+
+preBuild.dependsOn(verifyBundledImageFsAssets)
+preBuild.dependsOn(prepareEmbeddedWineAssets)
+preBuild.dependsOn(prepareRuntimeSharedJni)
+preBuild.dependsOn(prepareVirglWrapperJni)
+
+def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "21"
 int aeroVersionCode
 try {
     aeroVersionCode = Integer.parseInt(aeroVersionCodeRaw.toString())
 } catch (Exception ignored) {
-    aeroVersionCode = 20
+    aeroVersionCode = 21
 }
-def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9c+").toString()
+def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9q").toString()
 def aeSigningStoreFileRaw = project.findProperty("ae.signing.storeFile")
         ?: System.getenv("AEO_ANDROID_KEYSTORE")
         ?: "${project.projectDir}/testkey_untrusted.jks"
@@ -118,10 +239,6 @@ def aeSigningKeyPassword = (project.findProperty("ae.signing.keyPassword")
         ?: System.getenv("AEO_ANDROID_KEY_PASSWORD")
         ?: aeSigningStorePassword).toString()
 File aeSigningStoreFile = file(aeSigningStoreFileRaw.toString())
-
-if (!aeSigningStoreFile.exists()) {
-    throw new GradleException("Stable signing keystore is missing: ${aeSigningStoreFile}")
-}
 
 android {
     namespace 'com.winlator.cmod'
@@ -189,7 +306,7 @@ android {
         // If you have a release build type, add it here
     }
 
-    ndkVersion '29.0.14206865'
+    ndkVersion aeResolvedNdkVersion
 
     externalNativeBuild {
         cmake {
@@ -226,10 +343,9 @@ dependencies {
     implementation 'org.openjsse:openjsse:1.1.7'
     implementation 'androidx.core:core:1.0.1'
     implementation 'com.github.bumptech.glide:glide:4.11.0'
-    implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
-    implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20251224'
 }
 
 

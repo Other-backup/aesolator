@@ -9,6 +9,16 @@ This runbook defines the device-side automation loop for the Winlator matrix:
 5. classify runtime mismatch vs baseline,
 6. export per-scenario forensic bundles.
 
+## Master Engineering Directive
+
+Device forensics follows `docs/MASTER_ENGINEERING_DIRECTIVE.md`.
+Forensic logs are evidence portals, not the target: if a runtime/app/device
+defect can be fixed in source, config, package routing, or tooling, the agent
+must apply the systemic fix and verify it instead of only describing the
+finding.
+For matrix harvests, wait for the complete capture before declaring the active
+frontier unless the harness itself is broken.
+
 ## Scripts
 
 - `ci/winlator/forensic-adb-issue-capture.sh`

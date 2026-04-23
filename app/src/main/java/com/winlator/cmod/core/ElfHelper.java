@@ -1,5 +1,7 @@
 package com.winlator.cmod.core;
 
+import android.util.Log;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -17,7 +19,9 @@ public abstract class ElfHelper {
                 return header[4];
             }
         }
-        catch (IOException e) {}
+        catch (IOException e) {
+            Log.w("ElfHelper", "Failed to read ELF header from " + binFile, e);
+        }
         return 0;
     }
 

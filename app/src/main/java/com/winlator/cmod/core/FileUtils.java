@@ -104,16 +104,55 @@ public abstract class FileUtils {
         return false;
     }
 
-    public static void symlink(File linkTarget, File linkFile) {
-        symlink(linkTarget.getAbsolutePath(), linkFile.getAbsolutePath());
+    public static boolean symlink(File linkTarget, File linkFile) {
+        return symlink(linkTarget.getAbsolutePath(), linkFile.getAbsolutePath());
     }
 
-    public static void symlink(String linkTarget, String linkFile) {
+    public static boolean symlink(String linkTarget, String linkFile) {
         try {
             (new File(linkFile)).delete();
             Os.symlink(linkTarget, linkFile);
+            return true;
         }
-        catch (ErrnoException e) {}
+        catch (ErrnoException e) {
+            Log.e(TAG, "Failed to create symlink: " + linkFile + " -> " + linkTarget, e);
+            return false;
+        }
+    }
+
+    public static File ensureCanonicalDirectory(File directory) throws IOException {
+        if (directory == null) throw new IOException("Directory is null");
+        File canonical = directory.getCanonicalFile();
+        if (!canonical.exists() && !canonical.mkdirs()) {
+            throw new IOException("Unable to create directory: " + canonical.getAbsolutePath());
+        }
+        if (!canonical.isDirectory()) {
+            throw new IOException("Path is not a directory: " + canonical.getAbsolutePath());
+        }
+        return canonical;
+    }
+
+    public static boolean isSameOrChild(File rootDir, File candidate) throws IOException {
+        if (rootDir == null || candidate == null) return false;
+        File root = rootDir.getCanonicalFile();
+        File target = candidate.getCanonicalFile();
+        String rootPath = root.getPath();
+        String targetPath = target.getPath();
+        return targetPath.equals(rootPath) || targetPath.startsWith(rootPath + File.separator);
+    }
+
+    public static File resolveSafeArchiveEntry(File rootDir, String entryName) throws IOException {
+        if (entryName == null) return null;
+        String normalizedName = entryName.replace('\\', '/');
+        while (normalizedName.startsWith("./")) normalizedName = normalizedName.substring(2);
+        if (normalizedName.isEmpty() || ".".equals(normalizedName)) return ensureCanonicalDirectory(rootDir);
+        if (normalizedName.indexOf('\0') >= 0 || normalizedName.startsWith("/") || new File(normalizedName).isAbsolute()) {
+            return null;
+        }
+
+        File root = ensureCanonicalDirectory(rootDir);
+        File target = new File(root, normalizedName).getCanonicalFile();
+        return isSameOrChild(root, target) ? target : null;
     }
 
     public static boolean isSymlink(File file) {
@@ -266,7 +305,7 @@ public abstract class FileUtils {
                     else copy(context, relativePath, dstFile);
                 }
             }
-            catch (IOException e) {}
+            catch (IOException e) { /* best-effort path; keep surrounding flow intact. */ }
         }
         else {
             if (dstFile.isDirectory()) dstFile = new File(dstFile, FileUtils.getName(assetFile));
@@ -276,7 +315,7 @@ public abstract class FileUtils {
                  BufferedOutputStream outStream = new BufferedOutputStream(new FileOutputStream(dstFile), StreamUtils.BUFFER_SIZE)) {
                 StreamUtils.copy(inStream, outStream);
             }
-            catch (IOException e) {}
+            catch (IOException e) { /* best-effort path; keep surrounding flow intact. */ }
         }
     }
 
@@ -330,7 +369,7 @@ public abstract class FileUtils {
         try {
             Os.chmod(file.getAbsolutePath(), mode);
         }
-        catch (ErrnoException e) {}
+        catch (ErrnoException e) { /* best-effort path; keep surrounding flow intact. */ }
     }
 
     public static File createTempFile(File parent, String prefix) {
@@ -467,7 +506,7 @@ public abstract class FileUtils {
                 result = !line.isEmpty() ? Integer.parseInt(line) : 0;
             }
         }
-        catch (Exception e) {}
+        catch (Exception e) { /* best-effort path; keep surrounding flow intact. */ }
         return result;
     }
 

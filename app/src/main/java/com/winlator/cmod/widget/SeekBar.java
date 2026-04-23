@@ -51,10 +51,10 @@ public class SeekBar extends AppCompatImageView {
         thumbSize = UnitUtils.dpToPx(20.0f);
         thumbRadius = thumbSize / 2.0f;
         textSize = UnitUtils.dpToPx(16.0f);
-        textColor = -0x8c8c8d; // Dark gray color
+        textColor = ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_text);
 
-        colorPrimary = -0x282829; // Primary color
-        colorSecondary = ContextCompat.getColor(context, R.color.colorPrimary); // Color secondary
+        colorPrimary = ContextCompat.getColor(context, R.color.surface_runtime_taskmgr_badge_bg);
+        colorSecondary = ContextCompat.getColor(context, R.color.surface_input_focus_dark);
 
         if (attrs != null) {
             TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.SeekBar, 0, 0);

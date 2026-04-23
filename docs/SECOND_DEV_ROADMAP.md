@@ -11,6 +11,15 @@ Second autonomous developer lane for `aesolator`:
 - close remaining `Contents` UX and device-validation gaps,
 - report deltas clearly to the first developer.
 
+## Master Engineering Directive
+
+`docs/MASTER_ENGINEERING_DIRECTIVE.md` is mandatory for this roadmap.
+Tasks are not closed by diagnosis alone when remediation is possible:
+investigate, identify root cause, cover the defect class, apply the systemic
+fix, update tests/config/docs/tooling, and verify.
+Do not narrow active tails to one file or one visible symptom when the class
+spans app/runtime/package/device surfaces.
+
 ## Execution Policy
 
 - Convert multi-goal user messages into one ordered backlog and keep that order
@@ -394,9 +403,9 @@ Reflective result from the latest clean-session batch:
     `WineRequestComponent` replaces the old standalone handler model, with the
     remaining open tail narrowed to donor-specific Steam/auth branches
   - donor `SteamPipeServer` / `SteamClientComponent` foundation is no longer
-    just staged locally; `SteamClientComponent` is now attached to the local
-    `XEnvironment`, so the remaining tail is runtime verification rather than
-    basic wiring
+    just staged locally; `SteamClientComponent` is now attached through
+    explicit Steam launch evidence instead of ambient startup, so the
+    remaining tail is runtime verification rather than basic wiring
   - latest donor-wrapper closure:
     `PrefManager.kt`, `container/ContainerData.kt`,
     `contentdialog/NavigationDialog.java`, and Kotlin `xserver/XKeycode.kt`
@@ -721,6 +730,34 @@ Reflective result from the latest clean-session batch:
   compositor cursor entirely, not just the root fallback, so duplicate cursor
   reports are now narrowed to classification/owner detection rather than the
   old unconditional draw path.
+- Fresh same-device `FreeWine11` desktop-shell RCA found a later black-screen
+  bootstrap fault: the app could still emit visual-ready from process proof
+  alone while `tracked_window_count=0`, and the direct shell command had
+  drifted from canonical `wine explorer /desktop=shell,<geometry> "explorer.exe"`
+  to `wine explorer.exe /desktop=...`. The runtime rule is now the canonical
+  desktop command plus explicit rejection of process-only readiness until a
+  mapped shell window or fallback bridge appears.
+- The next verified blocker on that same line is the fallback bridge itself:
+  `desktopShellLaunchMode` could flip to `winhandler_shell` while launching
+  only bare `wfm.exe`, then only bare `wine winhandler.exe "wfm.exe"`.
+  Both reopen `winHandlerReady=false` stalls. The fallback contract is now
+  explicit: keep the same desktop host and launch
+  `wine explorer /desktop=shell,<geometry> winhandler.exe "wfm.exe"`, while
+  collecting runtime logs from the current `Ae.solator/logs` root instead of
+  stale `Winlator/logs`-only tooling.
+- Fresh device RCA then proved a deeper structural tail: even with the correct
+  hosted fallback command, the Android-side `WinHandler` UDP bridge could still
+  stay invisible because `start()` swallowed bind/receive failures and could be
+  started after guest launch had already begun. The runtime contract now
+  requires `WinHandler` to bind before guest submission and to log
+  `socket_starting/socket_bound/init_received/socket_failed` for ports
+  `7947/7946`.
+- The next live pass then proved a second structural tail after the socket fix:
+  `WinHandler` bound correctly, but the fallback still launched while
+  `wineboot.exe --init` was alive. That stacks a second shell route on top of
+  unfinished first-boot init and prevents an honest direct-route settle. The
+  contract is now tightened so fallback is blocked while `wineboot` remains
+  active, and the preloader watch window is widened for first-boot containers.
 - Manual trackpad taps now share the same queued left-click transport as the
   already proven `DESKTOP_DEBUG_START_PROBE_DISPATCHED` path. The remaining
   click risk is no longer "debug probe works but finger tap uses another code
@@ -881,6 +918,12 @@ Reflective result from the latest clean-session batch:
   `usr/share/vulkan/icd.d/wrapper_icd.aarch64.json`, and the same launch emits
   `vulkan_sdk_profiles=VulkanSDK-1.4.341.1-arm64-1` in
   `GRAPHICS_ROUTE_APPLIED`.
+- The wrapper provenance contract is now stricter than that older `Vulkan SDK`
+  proof: `Ae.solator` should treat `wrapper_icd.aarch64.json` as the source of
+  runtime wrapper API truth, not `vulkan-sdk` payload metadata. The current
+  canonical source-build baseline is official non-main `Mesa staging/26.1`
+  plus local `aeso-wrapper-forwardport-mesa26-v1`; older `staging/26.0`
+  wrapper archives remain historical evidence, not current source truth.
 - The remaining framegen tail is now narrowed, not speculative: the staged
   rootfs currently contains no `mobfgsr` / `dlssg` / `fsr3` payload files, so
   the open gate is provider-side runtime consumption, not app-side env export
@@ -1152,3 +1195,87 @@ Reflective result from the latest clean-session batch:
   integrate the packaged `FreeWine11` WCP into `Ae.solator`, then continue the
   next dense runtime debug passes from the app surface rather than from
   disconnected repo-local assumptions.
+
+## 2026-03-26 Container 2 FreeWine11 forensic closure
+
+- Fresh direct-route `adb` forensics for `Container 2` on
+  `FreeWine11 11.4-arm64ec-1` are now clean:
+  `issue_count=0`, `wait_status intent=1 submit=1 terminal=0`,
+  `wine_process_present=1`.
+- The critical runtime/package fix behind that proof is now explicit:
+  preserve the ABI subtree `arm64-v8a/*` inside the WCP and expose
+  compatibility symlinks instead of flattening the runtime root.
+- `Ae.solator` now emits trace-aware `ROUTE_INTENT_RECEIVED` and
+  `LAUNCH_EXEC_SUBMIT` markers for direct forensic launches, so host tooling no
+  longer guesses the launch edge from side effects.
+- The forensic parser no longer escalates a missing terminal marker to a
+  bootstrap failure when desktop-shell runtime evidence already proves the
+  session is alive.
+- Wrapper-embedded Vulkan forensics now keep requested/applied layer state
+  visible without treating missing validation/api_dump layers as active
+  warnings in this product line.
+- Same-device `adb` screenshot/UI capture still tends to foreground
+  `com.termux`; treat that as a capture limitation, not as a runtime failure
+  in `Ae.solator`.
+
+## 2026-03-27 Whole-frontier hardening
+
+- The integrated `Ae.solator -> WCP -> FreeWine11` debug loop is now locked to
+  whole-frontier operation by rule:
+  structural tails must open with freshest full-harvest proof and whole-tree
+  logic reflection, not repo-local or one-module retries.
+- Integration-first development is now explicit, not implied:
+  design and bug-fix passes must start from the live integrated product path,
+  and a pass is incomplete if it proves only the app symptom or only one repo
+  in isolation.
+- If the same runtime/forensic visibility gap appears twice, the next pass
+  must add durable instrumentation or helper tooling instead of repeating a
+  manual `adb` read.
+- Any cross-cutting runtime/source rule learned during these passes must be
+  written back into the shared contracts in the same batch.
+
+## 2026-03-27 Reverse-engineering skill intake
+
+- App/runtime forensic work now has a default reverse-engineering spine:
+  `reverse-engineering`,
+  `rev-symbol`,
+  `rev-struct`,
+  `radare2-hatchery`,
+  `cantordust-viz`.
+- `P4nda0s/reverse-skills` was accepted only as a narrow donor for
+  `IDA-NO-MCP` export analysis.
+- `plurigrid/asi` was accepted only as a curated reverse-engineering donor;
+  the remaining skill zoo was explicitly rejected as default live workflow.
+- Full chosen-vs-rejected reasoning lives in
+  `/data/data/com.termux/files/home/.codex/REVERSE_ENGINEERING_SELECTION.md`.
+- This widened into a broader rule:
+  future skill intake must cover the whole development/debug lifecycle, not
+  only reverse engineering or the current tail.
+  The live curated stack now lives in
+  `/data/data/com.termux/files/home/.codex/CURATED_SKILL_STACK.md`.
+
+## 2026-03-27 Whole-lotta lower-layer closure rule
+
+- The Chapter 2 loop is now explicitly stricter than the minimum app/runtime/
+  source triad.
+- If a structural `FreeWine11` class reaches lower static libs, helper
+  objects, provider archives, direct-linked owners, parser classes, generated
+  artifacts, package/runtime validators, or stale integration bridges, the
+  entire blast radius must move in one batch before the app-side black-screen
+  class is considered honestly closed.
+
+## 2026-03-29 Android build reproducibility closure
+
+- The root `Ae.solator` Gradle lane now has a stricter contract:
+  repo-root `./gradlew` is authoritative, nested `app/` Gradle entrypoints
+  are not.
+- `preBuild` no longer owns donor rootfs download/mutation. It now verifies
+  bundled imagefs/runtime assets and generated JNI state instead of mutating
+  `src/main/assets`.
+- NDK runtime resolution moved away from eager configuration-time file probes
+  toward task-time resolution, and the hard-coded `linux-x86_64` prebuilt
+  assumption is no longer embedded directly in the main DSL path.
+- Remaining build-repro tail is no longer "why is Gradle caching weirdly?".
+  It is the narrower follow-up class:
+  final deterministic root lane plus cleanup of remaining Gradle 9
+  deprecations.

@@ -354,7 +354,9 @@ public class InputControlsFragment extends Fragment {
                 try {
                     if (content != null) manager.importProfile(new JSONObject(content));
                 }
-                catch (JSONException e) {}
+                catch (JSONException e) {
+                    Log.w("InputControlsFragment", "Unable to import downloaded controls profile", e);
+                }
                 if (processedItemCount.incrementAndGet() == positions.size()) {
                     activity.runOnUiThread(() -> {
                         activity.preloaderDialog.close();
@@ -495,7 +497,7 @@ public class InputControlsFragment extends Fragment {
         inputControlsView.getStickElement().setType(ControlElement.Type.STICK); // Set the type to STICK
 
 
-        // Add the InputControlsView to the placeholder in your dialog layout
+        // Add the InputControlsView to the reservation in your dialog layout
         FrameLayout placeholder = dialogView.findViewById(R.id.stick_placeholder);
         placeholder.addView(inputControlsView);
 

@@ -949,12 +949,9 @@ public class AdrenotoolsFragment extends Fragment {
 
     private void refreshGraphicsCenterStatus() {
         if (!isAdded() || rootView == null || tvGraphicsCenterStatus == null) return;
-        ContentsManager contentsManager = new ContentsManager(requireContext());
-        contentsManager.syncContents();
-
         int localDrivers = adrenotoolsManager.enumarateInstalledDrivers().size();
-        int turnip = countInstalled(contentsManager, ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER);
-        int openGl = countInstalled(contentsManager, ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER);
+        int turnip = countInstalled(ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER);
+        int openGl = countInstalled(ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER);
 
         tvGraphicsCenterStatus.setText(getString(
                 R.string.graphics_center_status_format,
@@ -964,14 +961,8 @@ public class AdrenotoolsFragment extends Fragment {
         ));
     }
 
-    private int countInstalled(ContentsManager manager, ContentProfile.ContentType type) {
-        List<ContentProfile> profiles = manager.getProfiles(type);
-        if (profiles == null || profiles.isEmpty()) return 0;
-        int count = 0;
-        for (ContentProfile profile : profiles) {
-            if (profile != null && profile.locallyInstalled) count++;
-        }
-        return count;
+    private int countInstalled(ContentProfile.ContentType type) {
+        return adrenotoolsManager.countInstalledDriverPackages(type);
     }
 
     private void refreshGraphicsFeed() {
@@ -1030,7 +1021,10 @@ public class AdrenotoolsFragment extends Fragment {
         }
 
         Collections.sort(profiles, (left, right) -> {
-            int installCmp = Boolean.compare(right != null && right.locallyInstalled, left != null && left.locallyInstalled);
+            int installCmp = Boolean.compare(
+                    right != null && adrenotoolsManager.isInstalledDriverProfile(right),
+                    left != null && adrenotoolsManager.isInstalledDriverProfile(left)
+            );
             if (installCmp != 0) return installCmp;
 
             int sourceCmp = Integer.compare(resolveGraphicsSourcePriority(left), resolveGraphicsSourcePriority(right));
@@ -1096,7 +1090,6 @@ public class AdrenotoolsFragment extends Fragment {
                     profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                     profile.delivery = resolveAssetBranch(sourceKey, lowerName, tag, releaseName);
                     profile.channel = resolveGraphicsChannel(lowerName, tag, releaseName);
-                    profile.locallyInstalled = isLikelyInstalledDriver(profile);
                     profiles.add(profile);
                 }
             }
@@ -1151,7 +1144,6 @@ public class AdrenotoolsFragment extends Fragment {
                 profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
                 profile.delivery = branch;
                 profile.channel = resolveGraphicsChannel(laneHint, branch, candidate.hint);
-                profile.locallyInstalled = isLikelyInstalledDriver(profile);
                 profiles.add(profile);
             }
         } catch (Exception ignored) {
@@ -1490,7 +1482,7 @@ public class AdrenotoolsFragment extends Fragment {
                 : ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER;
         profile.verName = verName;
         profile.verCode = verCode;
-        profile.desc = verName + " (fallback mirror)";
+        profile.desc = verName + " (secondary path mirror)";
         profile.remoteUrl = remoteUrl;
         profile.sourceRepo = sourceRepo;
         profile.sourceFeed = sourceKey == null ? "" : sourceKey;
@@ -1499,7 +1491,6 @@ public class AdrenotoolsFragment extends Fragment {
         profile.delivery = delivery;
         profile.channel = resolveGraphicsChannel(verName, releaseTag, delivery);
         profile.displayCategory = LANE_OPENGL.equals(lane) ? "OpenGL Driver" : "Turnip";
-        profile.locallyInstalled = isLikelyInstalledDriver(profile);
         return profile;
     }
 
@@ -1522,62 +1513,6 @@ public class AdrenotoolsFragment extends Fragment {
             out = out.substring(0, out.length() - 4);
         }
         return out;
-    }
-
-    private boolean isLikelyInstalledDriver(ContentProfile remoteProfile) {
-        if (remoteProfile == null) return false;
-        ArrayList<AdrenotoolsManager.DriverPackageInfo> installed = adrenotoolsManager.enumerateInstalledDriverPackages();
-        for (AdrenotoolsManager.DriverPackageInfo info : installed) {
-            if (matchesInstalledDriverProfile(remoteProfile, info)) return true;
-        }
-        return false;
-    }
-
-    private boolean matchesInstalledDriverProfile(ContentProfile remoteProfile, AdrenotoolsManager.DriverPackageInfo info) {
-        if (remoteProfile == null || info == null) return false;
-        String expectedLane = remoteProfile.type == ContentProfile.ContentType.CONTENT_TYPE_OPENGL_DRIVER
-                ? "freedreno-opengl"
-                : "turnip-vulkan";
-        if (!info.providerLane.isEmpty() && !expectedLane.equalsIgnoreCase(info.providerLane)) return false;
-
-        String remoteNameToken = normalizeDriverToken(remoteProfile.verName);
-        String remoteTagToken = normalizeDriverToken(remoteProfile.releaseTag);
-        String remoteDescToken = normalizeDriverToken(remoteProfile.desc);
-
-        ArrayList<String> localTokens = new ArrayList<>();
-        localTokens.add(normalizeDriverToken(info.entryId));
-        localTokens.add(normalizeDriverToken(info.name));
-        localTokens.add(normalizeDriverToken(stripZipSuffix(info.artifactName)));
-        localTokens.add(normalizeDriverToken(info.releaseTag));
-        localTokens.add(normalizeDriverToken(info.driverVersion));
-
-        for (String localToken : localTokens) {
-            if (localToken.isEmpty()) continue;
-            if (!remoteNameToken.isEmpty() && localToken.equals(remoteNameToken)) return true;
-            if (!remoteTagToken.isEmpty() && localToken.equals(remoteTagToken)) return true;
-        }
-
-        boolean sameSource = info.sourceRepo != null
-                && remoteProfile.sourceRepo != null
-                && !info.sourceRepo.trim().isEmpty()
-                && info.sourceRepo.equalsIgnoreCase(remoteProfile.sourceRepo);
-
-        for (String localToken : localTokens) {
-            if (localToken.isEmpty()) continue;
-            if (remoteNameToken.length() >= 8 && (localToken.contains(remoteNameToken) || remoteNameToken.contains(localToken))) {
-                return true;
-            }
-            if (sameSource && remoteDescToken.length() >= 10
-                    && (localToken.contains(remoteDescToken) || remoteDescToken.contains(localToken))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String normalizeDriverToken(String value) {
-        if (value == null) return "";
-        return value.toLowerCase(Locale.US).replaceAll("[^a-z0-9]+", "");
     }
 
     private void updateSourceSelector() {
@@ -1896,7 +1831,6 @@ public class AdrenotoolsFragment extends Fragment {
             case CONTENT_TYPE_DGVOODOO -> colorRes = R.color.contents_lane_dgvoodoo;
             case CONTENT_TYPE_DXVK -> colorRes = R.color.contents_lane_dxvk;
             case CONTENT_TYPE_VKD3D -> colorRes = R.color.contents_lane_vkd3d;
-            case CONTENT_TYPE_VULKAN_SDK -> colorRes = R.color.contents_lane_vulkansdk;
             default -> colorRes = R.color.colorAccent;
         }
         boolean isDark = sharedPreferences.getBoolean("dark_mode", false);
@@ -1907,7 +1841,6 @@ public class AdrenotoolsFragment extends Fragment {
                 case CONTENT_TYPE_DGVOODOO -> colorRes = R.color.contents_lane_dgvoodoo_dark;
                 case CONTENT_TYPE_DXVK -> colorRes = R.color.contents_lane_dxvk_dark;
                 case CONTENT_TYPE_VKD3D -> colorRes = R.color.contents_lane_vkd3d_dark;
-                case CONTENT_TYPE_VULKAN_SDK -> colorRes = R.color.contents_lane_vulkansdk_dark;
                 default -> colorRes = R.color.colorAccentDark;
             }
         }
@@ -1952,7 +1885,9 @@ public class AdrenotoolsFragment extends Fragment {
             meta.append(" • ").append(profile.releaseTag.trim());
         }
         if (profile.verCode > 0) meta.append(" • ").append("verCode=").append(profile.verCode);
-        if (profile.locallyInstalled) meta.append(" • ").append(getString(R.string.content_installed));
+        if (profile != null && adrenotoolsManager.isInstalledDriverProfile(profile)) {
+            meta.append(" • ").append(getString(R.string.content_installed));
+        }
         return meta.toString();
     }
 
@@ -2038,7 +1973,7 @@ public class AdrenotoolsFragment extends Fragment {
         Executors.newSingleThreadExecutor().execute(() -> {
             String installedDriverName = "";
             try {
-                installedDriverName = adrenotoolsManager.installDriver(Uri.fromFile(downloadedArchive));
+                installedDriverName = adrenotoolsManager.installDriver(Uri.fromFile(downloadedArchive), requestedProfile);
             } catch (Exception ignored) {
             }
 
@@ -2118,7 +2053,7 @@ public class AdrenotoolsFragment extends Fragment {
             ContentProfile profile = profiles.get(position);
             int accent = resolveFeedAccentColor(profile);
             boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
-            boolean installed = profile != null && profile.locallyInstalled;
+            boolean installed = profile != null && adrenotoolsManager.isInstalledDriverProfile(profile);
             boolean canInstall = profile != null && profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty();
             String entryName = ContentsManager.getEntryName(profile);
             boolean isInstalling = installingEntries.contains(entryName);

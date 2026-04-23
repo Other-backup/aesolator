@@ -3,6 +3,11 @@ package com.winlator.cmod.contents;
 import android.os.Build;
 import android.text.Html;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParser;
@@ -36,6 +41,16 @@ public final class GamehubFeedNormalizer {
             Pattern.compile("sha256:([0-9a-fA-F]{64})");
     private static final Pattern EXPANDED_ASSET_DATETIME_PATTERN =
             Pattern.compile("datetime=\"([^\"]+)\"");
+    private static final Pattern ATOM_ENTRY_PATTERN =
+            Pattern.compile("(?is)<entry\\b[^>]*>(.*?)</entry>");
+    private static final Pattern ATOM_UPDATED_PATTERN =
+            Pattern.compile("(?is)<updated\\b[^>]*>(.*?)</updated>");
+    private static final Pattern ATOM_CONTENT_PATTERN =
+            Pattern.compile("(?is)<content\\b[^>]*>(.*?)</content>");
+    private static final Pattern ATOM_LINK_TAG_PATTERN =
+            Pattern.compile("(?is)<link\\b([^>]*)/?>");
+    private static final Pattern ATOM_HREF_ATTR_PATTERN =
+            Pattern.compile("(?is)href\\s*=\\s*\"([^\"]+)\"");
 
     private GamehubFeedNormalizer() {
     }
@@ -74,6 +89,14 @@ public final class GamehubFeedNormalizer {
                 NIGHTLIES_REPO_RELEASES,
                 "The412Banner nightly package"
         );
+    }
+
+    public static String normalizeGitHubReleaseFeed(String json,
+                                                    String sourceFeedId,
+                                                    String sourceLabel,
+                                                    String sourceRepo,
+                                                    String descriptionPrefix) {
+        return normalizeReleaseFeed(json, sourceFeedId, sourceLabel, sourceRepo, descriptionPrefix);
     }
 
     public static List<ReleaseFeedEntry> parseGitHubReleaseAtom(String atom, String repoPath) {
@@ -122,6 +145,9 @@ public final class GamehubFeedNormalizer {
             }
         } catch (Exception ignored) {
         }
+        if (entries.isEmpty()) {
+            parseGitHubReleaseAtomRegex(atom, repoPath, entries, seen);
+        }
         return entries;
     }
 
@@ -131,7 +157,7 @@ public final class GamehubFeedNormalizer {
                                                     String sourceLabel,
                                                     String sourceRepo,
                                                     String descriptionPrefix) {
-        JSONArray normalized = new JSONArray();
+        JsonArray normalized = new JsonArray();
         if (html == null || html.trim().isEmpty() || entry == null || !entry.isValid()) {
             return normalized.toString();
         }
@@ -155,30 +181,30 @@ public final class GamehubFeedNormalizer {
                 if (publishedAt.isEmpty()) publishedAt = entry.publishedAt;
                 int versionCode = deriveReleaseVersionCode(publishedAt, assetName);
 
-                JSONObject candidate = new JSONObject();
-                candidate.put("type", type.toString());
-                candidate.put("verName", stripArchiveSuffix(assetName));
-                candidate.put("verCode", versionCode);
-                candidate.put("description", buildReleaseDescription(assetName, entry.tag, type, descriptionPrefix));
-                candidate.put("remoteUrl", downloadUrl);
-                candidate.put(ContentProfile.MARK_CHANNEL, deriveReleaseChannel(null, entry.tag, assetName));
-                candidate.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
-                candidate.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
+                JsonObject candidate = new JsonObject();
+                candidate.addProperty("type", type.toString());
+                candidate.addProperty("verName", stripArchiveSuffix(assetName));
+                candidate.addProperty("verCode", versionCode);
+                candidate.addProperty("description", buildReleaseDescription(assetName, entry.tag, type, descriptionPrefix));
+                candidate.addProperty("remoteUrl", downloadUrl);
+                candidate.addProperty(ContentProfile.MARK_CHANNEL, deriveReleaseChannel((JsonObject) null, entry.tag, assetName));
+                candidate.addProperty(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
+                candidate.addProperty(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
                 String runtimeModel = resolveRuntimeModel(type, assetName, entry.tag, sourceRepo, sourceLabel);
-                if (!runtimeModel.isEmpty()) candidate.put(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
-                candidate.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
-                candidate.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
-                candidate.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
-                candidate.put(ContentProfile.MARK_RELEASE_TAG, entry.tag);
-                candidate.put(ContentProfile.MARK_ARTIFACT_NAME, assetName);
-                if (!publishedAt.isEmpty()) candidate.put(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
-                if (!entry.releaseNotes.isEmpty()) candidate.put(ContentProfile.MARK_RELEASE_NOTES, entry.releaseNotes);
+                if (!runtimeModel.isEmpty()) candidate.addProperty(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
+                candidate.addProperty(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
+                candidate.addProperty(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
+                candidate.addProperty(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
+                candidate.addProperty(ContentProfile.MARK_RELEASE_TAG, entry.tag);
+                candidate.addProperty(ContentProfile.MARK_ARTIFACT_NAME, assetName);
+                if (!publishedAt.isEmpty()) candidate.addProperty(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
+                if (!entry.releaseNotes.isEmpty()) candidate.addProperty(ContentProfile.MARK_RELEASE_NOTES, entry.releaseNotes);
 
                 String digest = findFirstGroup(EXPANDED_ASSET_DIGEST_PATTERN, rowHtml);
-                if (!digest.isEmpty()) candidate.put(ContentProfile.MARK_SHA256, digest);
+                if (!digest.isEmpty()) candidate.addProperty(ContentProfile.MARK_SHA256, digest);
 
                 String key = buildFeedKey(candidate);
-                if (seen.add(key)) normalized.put(candidate);
+                if (seen.add(key)) normalized.add(candidate);
             }
         } catch (Exception ignored) {
         }
@@ -190,23 +216,25 @@ public final class GamehubFeedNormalizer {
                                                String sourceLabel,
                                                String sourceRepo,
                                                String descriptionPrefix) {
-        JSONArray normalized = new JSONArray();
+        JsonArray normalized = new JsonArray();
         if (json == null || json.trim().isEmpty()) return normalized.toString();
 
         HashSet<String> seen = new HashSet<>();
         try {
-            JSONArray releases = new JSONArray(json);
-            for (int i = 0; i < releases.length(); i++) {
-                JSONObject release = releases.optJSONObject(i);
-                if (release == null) continue;
-                JSONArray assets = release.optJSONArray("assets");
-                if (assets == null) continue;
+            JsonElement parsed = JsonParser.parseString(json);
+            if (!parsed.isJsonArray()) return normalized.toString();
+            JsonArray releases = parsed.getAsJsonArray();
+            for (JsonElement releaseElement : releases) {
+                if (!releaseElement.isJsonObject()) continue;
+                JsonObject release = releaseElement.getAsJsonObject();
+                JsonElement assetsElement = release.get("assets");
+                if (assetsElement == null || !assetsElement.isJsonArray()) continue;
 
-                for (int j = 0; j < assets.length(); j++) {
-                    JSONObject asset = assets.optJSONObject(j);
-                    JSONObject candidate = normalizeReleaseAsset(
+                for (JsonElement assetElement : assetsElement.getAsJsonArray()) {
+                    if (!assetElement.isJsonObject()) continue;
+                    JsonObject candidate = normalizeReleaseAsset(
                             release,
-                            asset,
+                            assetElement.getAsJsonObject(),
                             sourceFeedId,
                             sourceLabel,
                             sourceRepo,
@@ -214,7 +242,7 @@ public final class GamehubFeedNormalizer {
                     );
                     if (candidate == null) continue;
                     String key = buildFeedKey(candidate);
-                    if (seen.add(key)) normalized.put(candidate);
+                    if (seen.add(key)) normalized.add(candidate);
                 }
             }
         } catch (Exception ignored) {
@@ -224,7 +252,7 @@ public final class GamehubFeedNormalizer {
 
     public static String normalizeComponentXml(String xml) {
         JSONArray normalized = new JSONArray();
-        if (xml == null || xml.trim().isEmpty()) return normalized.toString();
+        if (xml == null || xml.trim().isEmpty()) return JsonPayloadSerializer.toJson(normalized);
 
         HashSet<String> seen = new HashSet<>();
         try {
@@ -248,58 +276,54 @@ public final class GamehubFeedNormalizer {
             }
         } catch (Exception ignored) {
         }
-        return normalized.toString();
+        return JsonPayloadSerializer.toJson(normalized);
     }
 
-    private static JSONObject normalizeReleaseAsset(JSONObject release,
-                                                   JSONObject asset,
-                                                   String sourceFeedId,
-                                                   String sourceLabel,
-                                                   String sourceRepo,
-                                                   String descriptionPrefix) {
+    private static JsonObject normalizeReleaseAsset(JsonObject release,
+                                                    JsonObject asset,
+                                                    String sourceFeedId,
+                                                    String sourceLabel,
+                                                    String sourceRepo,
+                                                    String descriptionPrefix) {
         if (asset == null) return null;
-        String assetName = asset.optString("name", "").trim();
-        String downloadUrl = asset.optString("browser_download_url", "").trim();
+        String assetName = optString(asset, "name").trim();
+        String downloadUrl = optString(asset, "browser_download_url").trim();
         if (assetName.isEmpty() || downloadUrl.isEmpty() || !looksLikeArchive(assetName)) return null;
 
         ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName);
         if (type == null) return null;
 
-        String releaseTag = release == null ? "" : release.optString("tag_name", "").trim();
+        String releaseTag = optString(release, "tag_name").trim();
         String versionName = stripArchiveSuffix(assetName);
         String channel = deriveReleaseChannel(release, releaseTag, assetName);
-        String publishedAt = release == null ? "" : release.optString("published_at", asset.optString("updated_at", "")).trim();
-        String releaseNotes = release == null ? "" : release.optString("body", "").trim();
+        String publishedAt = optString(release, "published_at", optString(asset, "updated_at")).trim();
+        String releaseNotes = optString(release, "body").trim();
         int versionCode = deriveReleaseVersionCode(
                 publishedAt,
                 assetName
         );
 
-        JSONObject normalized = new JSONObject();
-        try {
-            normalized.put("type", type.toString());
-            normalized.put("verName", versionName);
-            normalized.put("verCode", versionCode);
-            normalized.put("description", buildReleaseDescription(assetName, releaseTag, type, descriptionPrefix));
-            normalized.put("remoteUrl", downloadUrl);
-            normalized.put(ContentProfile.MARK_CHANNEL, channel);
-            normalized.put(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
-            normalized.put(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
-            String runtimeModel = resolveRuntimeModel(type, assetName, releaseTag, sourceRepo, sourceLabel);
-            if (!runtimeModel.isEmpty()) normalized.put(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
-            normalized.put(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
-            normalized.put(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
-            normalized.put(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
-            if (!releaseTag.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_TAG, releaseTag);
-            if (!assetName.isEmpty()) normalized.put(ContentProfile.MARK_ARTIFACT_NAME, assetName);
-            if (!publishedAt.isEmpty()) normalized.put(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
-            if (!releaseNotes.isEmpty()) normalized.put(ContentProfile.MARK_RELEASE_NOTES, releaseNotes);
-            String digest = asset.optString("digest", "").trim();
-            if (!digest.isEmpty()) normalized.put(ContentProfile.MARK_SHA256, digest);
-            return normalized;
-        } catch (Exception ignored) {
-            return null;
-        }
+        JsonObject normalized = new JsonObject();
+        normalized.addProperty("type", type.toString());
+        normalized.addProperty("verName", versionName);
+        normalized.addProperty("verCode", versionCode);
+        normalized.addProperty("description", buildReleaseDescription(assetName, releaseTag, type, descriptionPrefix));
+        normalized.addProperty("remoteUrl", downloadUrl);
+        normalized.addProperty(ContentProfile.MARK_CHANNEL, channel);
+        normalized.addProperty(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
+        normalized.addProperty(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
+        String runtimeModel = resolveRuntimeModel(type, assetName, releaseTag, sourceRepo, sourceLabel);
+        if (!runtimeModel.isEmpty()) normalized.addProperty(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
+        normalized.addProperty(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
+        normalized.addProperty(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
+        normalized.addProperty(ContentProfile.MARK_SOURCE_LABEL, sourceLabel);
+        if (!releaseTag.isEmpty()) normalized.addProperty(ContentProfile.MARK_RELEASE_TAG, releaseTag);
+        if (!assetName.isEmpty()) normalized.addProperty(ContentProfile.MARK_ARTIFACT_NAME, assetName);
+        if (!publishedAt.isEmpty()) normalized.addProperty(ContentProfile.MARK_PUBLISHED_AT, publishedAt);
+        if (!releaseNotes.isEmpty()) normalized.addProperty(ContentProfile.MARK_RELEASE_NOTES, releaseNotes);
+        String digest = optString(asset, "digest").trim();
+        if (!digest.isEmpty()) normalized.addProperty(ContentProfile.MARK_SHA256, digest);
+        return normalized;
     }
 
     private static JSONObject normalizeComponentEntry(String itemName, String payload) {
@@ -356,6 +380,7 @@ public final class GamehubFeedNormalizer {
         if (lower.contains("wow64") && lower.contains("box64")) return ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64;
         if (lower.contains("box64")) return ContentProfile.ContentType.CONTENT_TYPE_BOX64;
         if (lower.startsWith("proton-") || lower.contains("-proton-")) return ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+        if (lower.startsWith("freewine") || lower.contains("freewine")) return ContentProfile.ContentType.CONTENT_TYPE_WINE;
         if (lower.startsWith("wine-") || lower.contains("-wine-")) return ContentProfile.ContentType.CONTENT_TYPE_WINE;
         return null;
     }
@@ -443,6 +468,15 @@ public final class GamehubFeedNormalizer {
         return derived;
     }
 
+    private static String deriveReleaseChannel(JsonObject release, String releaseTag, String assetName) {
+        String derived = deriveChannel(releaseTag + " " + assetName);
+        if (!ContentProfile.CHANNEL_STABLE.equals(derived)) return derived;
+        if (release != null && optBoolean(release, "prerelease", false)) {
+            return ContentProfile.CHANNEL_NIGHTLY;
+        }
+        return derived;
+    }
+
     private static int stableVersionCode(String seed) {
         String normalized = seed == null ? "" : seed.trim();
         return Math.max(1, normalized.hashCode() & 0x7fffffff);
@@ -463,6 +497,12 @@ public final class GamehubFeedNormalizer {
         return object.optString("type", "").trim() + "|"
                 + object.optString("verName", "").trim() + "|"
                 + object.optString("remoteUrl", "").trim();
+    }
+
+    private static String buildFeedKey(JsonObject object) {
+        return optString(object, "type").trim() + "|"
+                + optString(object, "verName").trim() + "|"
+                + optString(object, "remoteUrl").trim();
     }
 
     private static boolean looksLikePackagedRuntime(String fileName) {
@@ -515,10 +555,23 @@ public final class GamehubFeedNormalizer {
 
     private static String decodeHtmlEntities(String value) {
         if (value == null || value.trim().isEmpty()) return "";
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            return Html.fromHtml(value, Html.FROM_HTML_MODE_LEGACY).toString().trim();
+        String normalized = value.trim();
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                return Html.fromHtml(normalized, Html.FROM_HTML_MODE_LEGACY).toString().trim();
+            }
+            return Html.fromHtml(normalized).toString().trim();
+        } catch (Throwable ignored) {
+            return normalized
+                    .replace("&nbsp;", " ")
+                    .replace("&#160;", " ")
+                    .replace("&amp;", "&")
+                    .replace("&quot;", "\"")
+                    .replace("&#39;", "'")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .trim();
         }
-        return Html.fromHtml(value).toString().trim();
     }
 
     private static String findFirstGroup(Pattern pattern, String value) {
@@ -527,5 +580,61 @@ public final class GamehubFeedNormalizer {
         if (!matcher.find() || matcher.groupCount() < 1) return "";
         String group = matcher.group(1);
         return group == null ? "" : group.trim();
+    }
+
+    private static void parseGitHubReleaseAtomRegex(String atom,
+                                                    String repoPath,
+                                                    List<ReleaseFeedEntry> entries,
+                                                    HashSet<String> seen) {
+        Matcher entryMatcher = ATOM_ENTRY_PATTERN.matcher(atom);
+        while (entryMatcher.find()) {
+            String entryBlock = entryMatcher.group(1);
+            String updatedAt = findFirstGroup(ATOM_UPDATED_PATTERN, entryBlock);
+            String content = findFirstGroup(ATOM_CONTENT_PATTERN, entryBlock);
+            String alternateLink = findAlternateLink(entryBlock);
+            String tag = extractReleaseTagFromLink(alternateLink, repoPath);
+            if (!tag.isEmpty() && seen.add(tag)) {
+                entries.add(new ReleaseFeedEntry(tag, updatedAt, sanitizeReleaseNotes(content)));
+            }
+        }
+    }
+
+    private static String findAlternateLink(String entryBlock) {
+        Matcher linkMatcher = ATOM_LINK_TAG_PATTERN.matcher(entryBlock == null ? "" : entryBlock);
+        while (linkMatcher.find()) {
+            String attributes = linkMatcher.group(1);
+            if (attributes == null) continue;
+            String normalized = attributes.toLowerCase(Locale.US);
+            if (!normalized.contains("rel=\"alternate\"") && !normalized.contains("rel='alternate'")) continue;
+            String href = findFirstGroup(ATOM_HREF_ATTR_PATTERN, attributes);
+            if (!href.isEmpty()) return href;
+        }
+        return "";
+    }
+
+    private static String optString(JsonObject object, String key) {
+        return optString(object, key, "");
+    }
+
+    private static String optString(JsonObject object, String key, String fallback) {
+        if (object == null || key == null || !object.has(key)) return fallback == null ? "" : fallback;
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) return fallback == null ? "" : fallback;
+        try {
+            return element.getAsString();
+        } catch (Exception ignored) {
+            return fallback == null ? "" : fallback;
+        }
+    }
+
+    private static boolean optBoolean(JsonObject object, String key, boolean fallback) {
+        if (object == null || key == null || !object.has(key)) return fallback;
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) return fallback;
+        try {
+            return element.getAsBoolean();
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.winlator.cmod;
 
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
@@ -340,7 +341,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 iconIds[i] = Byte.parseByte(FileUtils.getBasename(filenames[i]));
             }
         }
-        catch (IOException e) {}
+        catch (IOException e) {
+            Log.w("ControlsEditorActivity", "Failed to enumerate input control icons", e);
+        }
 
         Arrays.sort(iconIds);
 
@@ -365,7 +368,9 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             try (InputStream is = getAssets().open("inputcontrols/icons/"+id+".png")) {
                 imageView.setImageBitmap(BitmapFactory.decodeStream(is));
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                Log.w("ControlsEditorActivity", "Failed to load input control icon " + id, e);
+            }
 
             parent.addView(imageView);
         }
