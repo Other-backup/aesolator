@@ -45,7 +45,7 @@ jobs:
       # release tag owner: wcp-runtime-lanes/aesolator-latest
       - name: Dispatch Aesolator APK build in WCP Archive
         env:
-          GH_TOKEN: ${{ secrets.AEO_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.AEO_WORKFLOW_PAT || secrets.AEO_RELEASE_TOKEN }}
           AESOLATOR_REF: ${{ github.event.inputs.aesolator_ref || github.ref_name || 'main' }}
           AESOLATOR_COMMIT: ${{ github.event.inputs.aesolator_commit || github.sha }}
           RUNTIME_RELEASE_TAG: ${{ github.event.inputs.runtime_release_tag || 'freewine11-arm64ec-latest' }}
