@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public abstract class ImageFsInstaller {
     public static final byte LATEST_VERSION = 27;
     private static final String GLIBC_IMAGEFS_ARCHIVE = "imagefs_gamenative.txz";
-    private static final String BIONIC_IMAGEFS_ARCHIVE = "imagefs_bionic.txz";
+    private static final String BIONIC_IMAGEFS_ARCHIVE = GLIBC_IMAGEFS_ARCHIVE;
     private static final String GLIBC_PATCH_ARCHIVE = "imagefs_patches_gamenative.tzst";
     private static final String EXTRAS_ARCHIVE = "extras.tzst";
     private static final String BIONIC_HOST_SUPPORT_ARCHIVE = "bionic_host_support.tzst";

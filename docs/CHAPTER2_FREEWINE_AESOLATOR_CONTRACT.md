@@ -354,6 +354,13 @@ is missing.
   forest. Measure closure from emitted PE truth and live runtime behavior; do
   not reopen this class by editing `netapi32`, `ws2_32`, `comctl32`,
   `shell32`, and neighbors one by one.
+- The same central emitted-PE attach rule applies to direct consumer calls of
+  `LdrDisableThreadCalloutsForDll()`. Keep the exported implementation owned
+  by `ntdll`, but collapse ARM64 / ARM64EC consumer callsites through the
+  central header/remap surface so `wow64`, `wow64win`, `xtajit64`,
+  `winecrt0`, and related PE attach paths stop importing it across the forest.
+  Measure closure from emitted PE truth; do not reopen this class by editing
+  those modules one by one.
 - On locked/rootless Android, omega sync closure now targets a userspace
   broker backend tentatively named `Aesync`, not arbitrary kernel-module
   loading and not another env-only tuning round.

@@ -103,9 +103,11 @@ def aeBundledArm64JniLibsDir = new File(rootProject.projectDir, "app/src/main/jn
 def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
 def aeResolvedNdkVersion = "29.0.14206865"
 def aeRequiredRootfsAssets = [
-        "imagefs_bionic.txz",
         "imagefs_gamenative.txz",
         "imagefs_patches_gamenative.tzst"
+]
+def aeRetiredRootfsAssets = [
+        "imagefs_bionic.txz"
 ]
 def aeRequiredRuntimeAssets = [
         "freewine11-arm64ec.wcp"
@@ -120,10 +122,13 @@ def aeEnforceEmbeddedRuntimeAssets = (
         (project.findProperty("ae.enforceEmbeddedRuntimeAssets")?.toString() ?: "") == "true" ||
                 (aeBuildEnv["AEO_ENFORCE_EMBEDDED_RUNTIME_ASSETS"] ?: "") == "1"
 )
+def aeEnableUbuntuFsFeature = (
+        (project.findProperty("ae.enableUbuntuFsFeature")?.toString() ?: "") == "true" ||
+                (aeBuildEnv["AEO_ENABLE_UBUNTUFS_FEATURE"] ?: "") == "1"
+)
 
 tasks.register("downloadImageFS") {
     def donorRootfsArtifacts = [
-            [name: "imagefs_bionic.txz", url: "https://downloads.gamenative.app/imagefs_bionic.txz"],
             [name: "imagefs_gamenative.txz", url: "https://downloads.gamenative.app/imagefs_gamenative.txz"],
             [name: "imagefs_patches_gamenative.tzst", url: "https://downloads.gamenative.app/imagefs_patches_gamenative.tzst"]
     ]
@@ -154,6 +159,19 @@ tasks.register("verifyBundledImageFsAssets") {
         }
         if (!missing.isEmpty()) {
             throw new GradleException("Missing bundled imagefs assets: ${missing.join(', ')}")
+        }
+    }
+}
+
+tasks.register("verifyNoRetiredImageFsAssets") {
+    inputs.files(aeRetiredRootfsAssets.collect { name -> new File(aeAssetDir, name) })
+    doLast {
+        def present = aeRetiredRootfsAssets.findAll { name ->
+            File asset = new File(aeAssetDir, name)
+            asset.exists() && asset.isFile()
+        }
+        if (!present.isEmpty()) {
+            throw new GradleException("Retired imagefs assets must not be packaged: ${present.join(', ')}")
         }
     }
 }
@@ -248,6 +266,7 @@ tasks.register("prepareVirglWrapperJni") {
     }
 }
 
+preBuild.dependsOn(verifyNoRetiredImageFsAssets)
 preBuild.dependsOn(verifyBundledImageFsAssets)
 preBuild.dependsOn(prepareEmbeddedWineAssets)
 preBuild.dependsOn(prepareRuntimeSharedJni)
@@ -260,7 +279,9 @@ try {
 } catch (Exception ignored) {
     aeroVersionCode = 21
 }
-def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9q").toString()
+def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9v").toString()
+def aeroApplicationId = (project.findProperty("ae.applicationId") ?: System.getenv("AEROSO_APP_APPLICATION_ID") ?: "com.winlator.cmod").toString()
+def aeroAppLabel = (project.findProperty("ae.appLabel") ?: System.getenv("AEROSO_APP_LABEL") ?: "Ae.solator").toString()
 def aeSigningStoreFileRaw = project.findProperty("ae.signing.storeFile")
         ?: System.getenv("AEO_ANDROID_KEYSTORE")
         ?: "${project.projectDir}/testkey_untrusted.jks"
@@ -280,7 +301,7 @@ android {
     // Keep compileSdk from your current config. If you want to match Termux-X11, you could set to 34.
     compileSdk 34
     buildToolsVersion "35.0.0"
-    dynamicFeatures = [":ubuntufs"]
+    dynamicFeatures = aeEnableUbuntuFsFeature ? [":ubuntufs"] : []
 
     sourceSets {
         main {
@@ -290,13 +311,14 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.winlator.cmod"
+        applicationId aeroApplicationId
         minSdkVersion 26
         // We’re preserving Winlator’s request to keep targetSdkVersion at 28
         targetSdkVersion 28
 
         versionCode aeroVersionCode
         versionName aeroVersionName
+        manifestPlaceholders = [aeAppLabel: aeroAppLabel]
 
         // External native build from Winlator
         externalNativeBuild {

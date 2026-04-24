@@ -9,15 +9,19 @@ DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLEC
 
 : "${WINLATOR_GRADLE_TASK:=assembleDebug}"
 : "${WINLATOR_APK_BASENAME:=by.aero.so.benchmark-debug}"
+: "${AEROSO_APP_APPLICATION_ID:=by.aero.so.benchmark}"
+: "${AEROSO_APP_LABEL:=Ae.solator}"
+: "${AEROSO_APP_RELEASE_VARIANT:=ludashi}"
 : "${AEO_BUILD_FRESH_GRAPHICS:=1}"
 : "${AEO_GRAPHICS_BUILD_JOBS:=8}"
 : "${AEO_HOST_LLVM_VERSION:=22.1.1}"
 : "${AEO_MESA_REF:=freshest-nonmain}"
 : "${AEO_ADRENOTOOLS_REPO:=https://github.com/Pipetto-crypto/libadrenotools.git}"
 : "${AEO_ADRENOTOOLS_REF:=master}"
-: "${AEO_ROOTFS_BIONIC_URL:=https://downloads.gamenative.app/imagefs_bionic.txz}"
 : "${AEO_ROOTFS_GAMENATIVE_URL:=https://downloads.gamenative.app/imagefs_gamenative.txz}"
 : "${AEO_ROOTFS_PATCHES_URL:=https://downloads.gamenative.app/imagefs_patches_gamenative.tzst}"
+
+export AEROSO_APP_APPLICATION_ID AEROSO_APP_LABEL AEROSO_APP_RELEASE_VARIANT
 
 log() { printf '[winlator-ci] %s\n' "$*"; }
 fail() { printf '[winlator-ci][error] %s\n' "$*" >&2; exit 1; }
@@ -40,15 +44,12 @@ configure_app_version_env() {
   fi
 
   if [[ -z "${AEROSO_APP_VERSION_NAME:-}" ]]; then
-    if [[ "${GITHUB_RUN_NUMBER:-}" =~ ^[0-9]+$ ]]; then
-      name="0.9q+.${GITHUB_RUN_NUMBER}"
-    else
-      name="0.9q+.$(date -u +%Y%m%d%H%M)"
-    fi
+    name="0.9v"
     export AEROSO_APP_VERSION_NAME="${name}"
   fi
 
   log "App version env: code=${AEROSO_APP_VERSION_CODE} name=${AEROSO_APP_VERSION_NAME}"
+  log "App package env: variant=${AEROSO_APP_RELEASE_VARIANT} applicationId=${AEROSO_APP_APPLICATION_ID} label=${AEROSO_APP_LABEL}"
 }
 
 prepare_layout() {
@@ -84,9 +85,18 @@ ensure_rootfs_assets() {
   asset_dir="${SRC_DIR}/app/src/main/assets"
   mkdir -p "${asset_dir}"
 
-  ensure_rootfs_asset "${AEO_ROOTFS_BIONIC_URL}" "${asset_dir}/imagefs_bionic.txz"
+  retire_rootfs_asset "${asset_dir}/imagefs_bionic.txz"
   ensure_rootfs_asset "${AEO_ROOTFS_GAMENATIVE_URL}" "${asset_dir}/imagefs_gamenative.txz"
   ensure_rootfs_asset "${AEO_ROOTFS_PATCHES_URL}" "${asset_dir}/imagefs_patches_gamenative.tzst"
+}
+
+retire_rootfs_asset() {
+  local destination
+  destination="$1"
+  if [[ -e "${destination}" || -e "${destination}.part" || -e "${destination}.download" ]]; then
+    rm -f "${destination}" "${destination}.part" "${destination}.download"
+    log "retired stale rootfs asset: ${destination}"
+  fi
 }
 
 ensure_rootfs_asset() {
@@ -309,6 +319,13 @@ source_dir=${SRC_DIR}
 source_branch=${SOURCE_BRANCH}
 source_commit=${SOURCE_COMMIT}
 source_short_sha=${SOURCE_SHORT_SHA}
+app_release_variant=${AEROSO_APP_RELEASE_VARIANT}
+app_application_id=${AEROSO_APP_APPLICATION_ID}
+app_label=${AEROSO_APP_LABEL}
+app_rootfs_base=imagefs_gamenative.txz
+app_rootfs_patch=imagefs_patches_gamenative.tzst
+app_rootfs_donor=GameNative
+app_retired_rootfs=imagefs_bionic.txz
 EOF
 
   cat > "${DOC_REPORT}" <<EOF
@@ -318,6 +335,11 @@ EOF
 - Source directory: \`${SRC_DIR}\`
 - Branch: \`${SOURCE_BRANCH}\`
 - Commit: \`${SOURCE_COMMIT}\`
+- APK variant: \`${AEROSO_APP_RELEASE_VARIANT}\`
+- APK applicationId: \`${AEROSO_APP_APPLICATION_ID}\`
+- Rootfs donor: \`GameNative\`
+- Rootfs payload: \`imagefs_gamenative.txz\` + \`imagefs_patches_gamenative.tzst\`
+- Retired rootfs payload: \`imagefs_bionic.txz\`
 - Captured at (UTC): $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 }
@@ -340,8 +362,20 @@ build_apk() {
 
   (
     cd "${OUT_DIR}"
-    sha256sum "$(basename -- "${out_apk}")" > SHA256SUMS
+    sha256sum "$(basename -- "${out_apk}")" > "SHA256SUMS-${AEROSO_APP_RELEASE_VARIANT}.txt"
+    find . -maxdepth 1 -type f -name '*.apk' -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS
   )
+
+  {
+    if [[ ! -s "${LOG_DIR}/apk-variants.tsv" ]]; then
+      printf 'variant\tapplication_id\tlabel\tapk\n'
+    fi
+    printf '%s\t%s\t%s\t%s\n' \
+      "${AEROSO_APP_RELEASE_VARIANT}" \
+      "${AEROSO_APP_APPLICATION_ID}" \
+      "${AEROSO_APP_LABEL}" \
+      "$(basename -- "${out_apk}")"
+  } >> "${LOG_DIR}/apk-variants.tsv"
 
   log "Built APK: ${out_apk}"
 }
