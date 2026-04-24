@@ -7,7 +7,7 @@ SRC_DIR="${WINLATOR_SRC_DIR:-${ROOT_DIR}}"
 LOG_DIR="${OUT_DIR}/logs"
 DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLECTIVE_ANALYSIS.md}"
 
-: "${WINLATOR_GRADLE_TASK:=assembleDebug}"
+: "${WINLATOR_GRADLE_TASK:=:app:assembleDebug}"
 : "${WINLATOR_APK_BASENAME:=by.aero.so.benchmark-debug}"
 : "${AEROSO_APP_APPLICATION_ID:=by.aero.so.benchmark}"
 : "${AEROSO_APP_LABEL:=Ae.solator}"
