@@ -25,7 +25,12 @@
 - Replaced adaptive launcher XMLs with foreground, background, and Android 13 monochrome icon layers.
 - Added `values/aesolator_blackdiamond_colors.xml` and `values-night/aesolator_blackdiamond_colors.xml` for explicit light/dark brand colors.
 - Added the new Black Diamond banner as `docs/assets/aesolator-banner.png`.
-- The WCP Archive companion banner is tracked in `wcp-runtime-lanes/docs/assets/aesolator-freewine-banner.png`.
+- Replaced legacy banner aliases `docs/assets/winlator-cmod-aesolator-logo.png`
+  and root `logo.png` with the same 2026-04-24 banner.
+- The WCP Archive companion banner is tracked in
+  `wcp-runtime-lanes/docs/assets/aesolator-banner.png`, with
+  `docs/assets/aesolator-freewine-banner.png` kept there as a compatibility
+  mirror.
 
 ## Resource Delta
 
