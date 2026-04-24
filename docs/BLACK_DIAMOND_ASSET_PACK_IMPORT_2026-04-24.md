@@ -32,6 +32,16 @@
   `docs/assets/aesolator-freewine-banner.png` kept there as a compatibility
   mirror.
 
+## Banner Alpha Hardening
+
+- Rebuilt `docs/assets/aesolator-banner.png` as an RGBA transparent PNG.
+- Removed the fake checkerboard background, including enclosed checker holes
+  inside letterforms and separators.
+- Added a light/cyan outer rim plus a soft dark shadow so the banner remains
+  legible on dark README, release, and app-gallery backgrounds.
+- Mirrored the same hardened bytes to `docs/assets/winlator-cmod-aesolator-logo.png`,
+  root `logo.png`, and the WCP Archive banner mirrors.
+
 ## Resource Delta
 
 - Source overlay files: `419`
