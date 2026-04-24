@@ -39,6 +39,8 @@
   inside letterforms and separators.
 - Added a light/cyan outer rim plus a soft dark shadow so the banner remains
   legible on dark README, release, and app-gallery backgrounds.
+- Removed the decorative slash separators between `box64`, `FEX`, `WINE`,
+  and `PROTON`; those product marks now stand as independent icons.
 - Mirrored the same hardened bytes to `docs/assets/winlator-cmod-aesolator-logo.png`,
   root `logo.png`, and the WCP Archive banner mirrors.
 

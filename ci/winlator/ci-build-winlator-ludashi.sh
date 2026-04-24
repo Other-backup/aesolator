@@ -190,11 +190,40 @@ assert_fresh_graphics_asset() {
   find "${SRC_DIR}/app/src/main/assets/graphics_driver" -maxdepth 1 -type f -name "${pattern}" | grep -q .
 }
 
+verify_bundled_graphics_surface() {
+  local asset_dir manifest required_pattern
+  asset_dir="${SRC_DIR}/app/src/main/assets/graphics_driver"
+  manifest="${LOG_DIR}/bundled-graphics-assets.txt"
+
+  [[ -d "${asset_dir}" ]] || fail "bundled graphics asset directory missing: ${asset_dir}"
+  find "${asset_dir}" -maxdepth 1 -type f | sort > "${manifest}"
+  test -s "${manifest}" || fail "bundled graphics asset directory is empty: ${asset_dir}"
+
+  for required_pattern in \
+    'aemali-panvk-*.tzst' \
+    'aemali-gallium-*.tzst' \
+    'virgl-*.tzst' \
+    'zink-*.tzst' \
+    'vortek-*.tzst' \
+    'turnip-*.tzst' \
+    'wrapper.tzst'
+  do
+    find "${asset_dir}" -maxdepth 1 -type f -name "${required_pattern}" | grep -q . \
+      || fail "required bundled graphics asset missing: ${required_pattern}"
+  done
+
+  find "${asset_dir}" -maxdepth 1 -type f -name 'aemali-*.tzst.sha256' | grep -q . \
+    || fail "required AeMali provenance sha256 sidecars missing"
+
+  log "bundled graphics surface verified: $(wc -l < "${manifest}") files"
+}
+
 build_fresh_graphics_surface() {
   local workspace_root llvm_root prefix_root ndk_prebuilt_root ndk_root ndk_sysroot clang_resource_dir android_sysvshm_src_dir common_env virgl_run_root
 
   if [[ "${AEO_BUILD_FRESH_GRAPHICS}" != "1" ]]; then
-    log "fresh graphics build disabled"
+    log "fresh graphics build disabled; verifying bundled source-tree graphics surface"
+    verify_bundled_graphics_surface
     return 0
   fi
 

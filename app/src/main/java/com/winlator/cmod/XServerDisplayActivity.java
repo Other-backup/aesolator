@@ -2586,7 +2586,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (xserverRootView != null) ThemeAssetPainter.apply(this, xserverRootView, isDarkMode);
     }
 
-    private String trimToEmpty(@Nullable String value) {
+    private static String trimToEmpty(@Nullable String value) {
         return value == null ? "" : value.trim();
     }
 
