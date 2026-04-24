@@ -1,0 +1,6 @@
+<resources>
+    <color name="aesolator_bd_primary">#2AE192</color>
+    <color name="aesolator_bd_secondary">#2ABBFF</color>
+    <color name="aesolator_bd_surface">#F8FBFB</color>
+    <color name="aesolator_bd_on_surface">#0F161F</color>
+</resources>

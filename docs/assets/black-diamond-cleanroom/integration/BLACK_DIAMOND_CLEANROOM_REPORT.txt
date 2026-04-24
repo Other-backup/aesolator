@@ -1,0 +1,13 @@
+AESOLATOR Black Diamond Cleanroom Final
+======================================
+
+Built fresh from the v2 asset pack structure.
+No previous final ZIP was reused.
+
+Closure:
+- drawable-hdpi regenerated/re-mastered in place.
+- drawable-night-hdpi generated for theme adaptation.
+- file names and dimensions preserved.
+- .9.png outer stretch/content marker borders preserved.
+- logo.png includes AE.SOLATOR / BIONIC / box64 / FEX / WINE / PROTON lockup.
+- PNGs optimized for smaller transfer size.

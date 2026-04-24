@@ -31,6 +31,38 @@ FreeWine11 ARM64EC, Aesync, bionic-native, bootstrap, X11-first, prefixPack,
 artifact, and provenance contracts into a coherent source state before using a
 broad build wave as proof.
 
+## Visual Asset Contract
+
+Ae.solator visual resources are app-owned product source, not generated WCP
+scratch. The current Black Diamond cleanroom asset pack is recorded in
+`docs/BLACK_DIAMOND_ASSET_PACK_IMPORT_2026-04-24.md` and its source masters
+are preserved under `docs/assets/black-diamond-cleanroom/`.
+
+The Android launcher contract is explicit:
+
+- `AndroidManifest.xml` must keep `android:icon="@mipmap/ic_launcher"`.
+- `AndroidManifest.xml` must keep
+  `android:roundIcon="@mipmap/ic_launcher_round"`.
+- `res/mipmap-anydpi-v26/ic_launcher.xml` and
+  `res/mipmap-anydpi-v26/ic_launcher_round.xml` must reference foreground,
+  background, and monochrome layers so Android 13 themed icons use the
+  cleanroom monochrome source instead of falling back to stale launcher art.
+- Density fallback PNGs in `mipmap-mdpi`, `mipmap-hdpi`, `mipmap-xhdpi`,
+  `mipmap-xxhdpi`, and `mipmap-xxxhdpi` must stay in sync as one resource
+  family; do not update one density or one icon role independently.
+- `drawable-night-hdpi` and `values-night/aesolator_blackdiamond_colors.xml`
+  are part of the adaptive/dark visual surface and must ship with the matching
+  light resources.
+- The public README banner source is
+  `docs/assets/aesolator-banner.png`; release/archive repositories may mirror
+  that banner for documentation but must not become the source of truth for app
+  launcher or UI resources.
+
+Resource replacement must be overlay-complete: when a cleanroom pack is
+accepted, copy the whole validated `res/` surface, preserve its integration
+manifest notes, and verify XML parsing plus Android resource processing before
+release packaging.
+
 ## Proton-Wine Donor Frontier
 
 `FreeWine11` remains the source-of-truth for this line, but Chapter 2 source

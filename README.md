@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/winlator-cmod-aesolator-logo.png" alt="Ae.solator" width="920">
+  <img src="docs/assets/aesolator-banner.png" alt="Ae.solator Black Diamond banner" width="920">
 </p>
 <p align="center">
   <img src="docs/assets/aesolator-accent-bar.svg" alt="Ae.solator accent bar" width="920">
