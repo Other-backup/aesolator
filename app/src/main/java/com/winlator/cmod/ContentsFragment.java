@@ -1404,10 +1404,40 @@ public class ContentsFragment extends Fragment {
                                 manager.finishInstallContent(profile, cb);
                             };
                             preloaderDialog.closeOnUiThread();
+                            ForensicLogger.logEvent(
+                                    getContext(),
+                                    "info",
+                                    "CONTENTS_IMPORT_CONFIRM_READY",
+                                    null,
+                                    "contents_import",
+                                    "awaiting_user_confirm",
+                                    ForensicLogger.fields(
+                                            "file_name", importFileName,
+                                            "type", profile.type != null ? profile.type.toString() : "-",
+                                            "ver_name", profile.verName,
+                                            "detected_arch", getImportArchLabel(detectedArch),
+                                            "source_mode", sourceMode == null ? "-" : sourceMode
+                                    )
+                            );
                             runOnUiThreadIfAttached(() -> {
                                 ContentInfoDialog dialog = new ContentInfoDialog(getContext(), profile);
                                 ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string._continue);
                                 dialog.setOnConfirmCallback(() -> {
+                                    ForensicLogger.logEvent(
+                                            getContext(),
+                                            "info",
+                                            "CONTENTS_IMPORT_CONFIRM_ACCEPTED",
+                                            null,
+                                            "contents_import",
+                                            "user_confirmed_import",
+                                            ForensicLogger.fields(
+                                                    "file_name", importFileName,
+                                                    "type", profile.type != null ? profile.type.toString() : "-",
+                                                    "ver_name", profile.verName,
+                                                    "detected_arch", getImportArchLabel(detectedArch),
+                                                    "source_mode", sourceMode == null ? "-" : sourceMode
+                                            )
+                                    );
                                     isExtracting = false;
                                     List<ContentProfile.ContentFile> untrustedFiles = manager.getUnTrustedContentFiles(profile);
                                     if (!untrustedFiles.isEmpty()) {
@@ -1419,7 +1449,24 @@ public class ContentsFragment extends Fragment {
                                         startInstall.run();
                                     }
                                 });
-                                dialog.setOnCancelCallback(preloaderDialog::closeOnUiThread);
+                                dialog.setOnCancelCallback(() -> {
+                                    ForensicLogger.logEvent(
+                                            getContext(),
+                                            "warn",
+                                            "CONTENTS_IMPORT_CONFIRM_CANCELLED",
+                                            null,
+                                            "contents_import",
+                                            "user_cancelled_import",
+                                            ForensicLogger.fields(
+                                                    "file_name", importFileName,
+                                                    "type", profile.type != null ? profile.type.toString() : "-",
+                                                    "ver_name", profile.verName,
+                                                    "detected_arch", getImportArchLabel(detectedArch),
+                                                    "source_mode", sourceMode == null ? "-" : sourceMode
+                                            )
+                                    );
+                                    preloaderDialog.closeOnUiThread();
+                                });
                                 dialog.show();
                             });
                         } else {
@@ -1627,6 +1674,29 @@ public class ContentsFragment extends Fragment {
             fileName = fallback == null ? "" : fallback;
         }
         return fileName.trim();
+    }
+
+    private File buildRemotePayloadCacheFile(Context appContext, ContentProfile profile, long timestamp) {
+        File downloadDir = new File(appContext.getCacheDir(), "contents-downloads");
+        String suffix = chooseRemotePayloadSuffix(profile, ".wcp");
+        String baseName = ContentsManager.getEntryName(profile) + "-" + timestamp;
+        return new File(downloadDir, baseName + suffix);
+    }
+
+    private String chooseRemotePayloadSuffix(@Nullable ContentProfile remoteProfile, String fallback) {
+        String remoteUrl = remoteProfile == null || remoteProfile.remoteUrl == null
+                ? ""
+                : remoteProfile.remoteUrl.toLowerCase(Locale.US);
+        if (remoteUrl.endsWith(".zip")) return ".zip";
+        if (remoteUrl.endsWith(".tzst")) return ".tzst";
+        if (remoteUrl.endsWith(".txz")) return ".txz";
+        if (remoteUrl.endsWith(".wcp.zst")) return ".wcp.zst";
+        if (remoteUrl.endsWith(".wcp.xz")) return ".wcp.xz";
+        if (remoteUrl.endsWith(".wcp")) return ".wcp";
+        if (remoteUrl.endsWith(".tar.zst")) return ".tar.zst";
+        if (remoteUrl.endsWith(".tar.xz")) return ".tar.xz";
+        if (remoteUrl.endsWith(".tar")) return ".tar";
+        return fallback;
     }
 
     private ContentProfile.ContentType detectExpectedTypeFromName(String fileName) {
@@ -1918,7 +1988,12 @@ public class ContentsFragment extends Fragment {
 
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
-                    File output = new File(appContext.getCacheDir(), "temp_" + timestamp);
+                    File output = buildRemotePayloadCacheFile(appContext, profile, timestamp);
+                    File parent = output.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                        output = new File(appContext.getCacheDir(), "temp_" + timestamp + chooseRemotePayloadSuffix(profile, ".wcp"));
+                    }
+                    if (output.exists()) output.delete();
                     boolean downloaded = Downloader.downloadFile(profile.remoteUrl, output);
                     String expectedSha256 = normalizeSha256(profile.remoteSha256);
                     String actualSha256 = "";
@@ -1936,6 +2011,7 @@ public class ContentsFragment extends Fragment {
                     String finalActualSha256 = actualSha256;
                     String finalExpectedSha256 = expectedSha256;
                     boolean finalDownloaded = downloaded;
+                    File finalOutput = output;
                     runOnUiThreadIfAttached(() -> {
                         holder.progressBar.setVisibility(View.GONE);
                         holder.ibDownload.setVisibility(View.VISIBLE);
@@ -1985,8 +2061,8 @@ public class ContentsFragment extends Fragment {
                                 ForensicLogger.fields(
                                         "type", profile.type.toString(),
                                         "ver_name", profile.verName,
-                                        "file", output.getAbsolutePath(),
-                                        "size_bytes", output.length(),
+                                        "file", finalOutput.getAbsolutePath(),
+                                        "size_bytes", finalOutput.length(),
                                         "sha256", finalActualSha256,
                                         "sha256_expected", finalExpectedSha256,
                                         "sha256_verified", !checksumRequired || finalChecksumVerified
@@ -1994,7 +2070,7 @@ public class ContentsFragment extends Fragment {
                         );
                         pendingRemoteInstallProfile = profile;
                         Intent intent = new Intent();
-                        intent.setData(Uri.parse(output.getAbsolutePath()));
+                        intent.setData(Uri.parse(finalOutput.getAbsolutePath()));
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);
                     });
                 }).start();

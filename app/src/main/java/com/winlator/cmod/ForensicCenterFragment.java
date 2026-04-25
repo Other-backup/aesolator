@@ -293,7 +293,7 @@ public class ForensicCenterFragment extends Fragment {
         if (btCancel != null) btCancel.setVisibility(View.GONE);
 
         View btExport = dialog.findViewById(R.id.BTForensicExportLog);
-        btExport.setOnClickListener(v -> exportForensicSnapshot(currentTail[0]));
+        btExport.setOnClickListener(v -> exportForensicSnapshot(currentFile[0], currentTail[0]));
 
         View btCopy = dialog.findViewById(R.id.BTForensicCopyLog);
         btCopy.setOnClickListener(v -> {
@@ -663,7 +663,7 @@ public class ForensicCenterFragment extends Fragment {
                 + "\nCapture: " + ForensicConfig.buildCaptureSummary(requireContext(), snapshot);
     }
 
-    private void exportForensicSnapshot(String tail) {
+    private void exportForensicSnapshot(File latestFile, String tail) {
         Context context = getContext();
         if (context == null) return;
 
@@ -674,7 +674,17 @@ public class ForensicCenterFragment extends Fragment {
         }
         String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
         File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
-        if (!FileUtils.writeString(outFile, tail)) {
+        String exportBody = tail == null ? "" : tail;
+        if (latestFile != null && latestFile.isFile()) {
+            try {
+                String fullLog = FileUtils.readString(latestFile);
+                if (fullLog != null && !fullLog.trim().isEmpty()) {
+                    exportBody = fullLog;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (!FileUtils.writeString(outFile, exportBody)) {
             AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
             return;
         }
@@ -687,7 +697,10 @@ public class ForensicCenterFragment extends Fragment {
                 "forensic_center",
                 "forensic_log_exported",
                 ForensicLogger.fields(
+                        "source_file", latestFile != null ? latestFile.getAbsolutePath() : "",
+                        "source_file_size", latestFile != null && latestFile.isFile() ? latestFile.length() : 0L,
                         "export_file", outFile.getAbsolutePath(),
+                        "export_chars", exportBody.length(),
                         "tail_chars", tail != null ? tail.length() : 0
                 )
         );

@@ -6,6 +6,8 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.text.format.DateFormat;
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -23,8 +25,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 public final class ForensicIssueComposer {
     private static final String[] RUNTIME_LOG_PREFIXES = {
@@ -287,13 +287,13 @@ public final class ForensicIssueComposer {
     }
 
     private static File zipDirectory(File sourceDir, File output) throws IOException {
-        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(output))) {
+        try (ZipArchiveOutputStream out = new ZipArchiveOutputStream(new FileOutputStream(output))) {
             zipRecursive(sourceDir, sourceDir, out);
         }
         return output;
     }
 
-    private static void zipRecursive(File root, File current, ZipOutputStream out) throws IOException {
+    private static void zipRecursive(File root, File current, ZipArchiveOutputStream out) throws IOException {
         File[] children = current.listFiles();
         if (children == null) return;
         byte[] buffer = new byte[8192];
@@ -303,12 +303,14 @@ public final class ForensicIssueComposer {
                 zipRecursive(root, child, out);
                 continue;
             }
-            out.putNextEntry(new ZipEntry(rel));
+            ZipArchiveEntry entry = new ZipArchiveEntry(child, rel);
+            entry.setUnixMode(0644);
+            out.putArchiveEntry(entry);
             try (FileInputStream in = new FileInputStream(child)) {
                 int read;
                 while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
             }
-            out.closeEntry();
+            out.closeArchiveEntry();
         }
     }
 
