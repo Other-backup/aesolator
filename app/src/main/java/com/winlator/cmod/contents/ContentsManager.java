@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineUtils;
@@ -435,16 +436,29 @@ public class ContentsManager {
         }
 
         File proFile = new File(file, PROFILE_NAME);
-        ContentProfile profile = proFile.isFile() ? readProfile(proFile) : null;
-        if (profile == null && remoteHint != null) {
+        ContentProfile profile = repairImportedProfile(file, proFile.isFile() ? readProfile(proFile) : null, remoteHint);
+        if (profile == null) {
             ContentProfile synthesizedProfile = synthesizeProfileFromExtractedPayload(file, remoteHint);
-            if (synthesizedProfile != null && writeSyntheticProfile(file, synthesizedProfile)) {
-                proFile = new File(file, PROFILE_NAME);
-                profile = readProfile(proFile);
+            if (synthesizedProfile != null) {
+                profile = repairImportedProfile(file, synthesizedProfile, remoteHint);
+                logImportRecovery("CONTENTS_PROFILE_SYNTHESIS_APPLIED", file, remoteHint, profile);
+            } else {
+                logImportRecovery("CONTENTS_PROFILE_SYNTHESIS_MISS", file, remoteHint, null);
             }
+        } else {
+            logImportRecovery("CONTENTS_PROFILE_RECOVERY_APPLIED", file, remoteHint, profile);
         }
         if (profile == null) {
             callback.onFailed(proFile.isFile() ? InstallFailedReason.ERROR_BADPROFILE : InstallFailedReason.ERROR_NOPROFILE, null);
+            return;
+        }
+        if (!writeProfileSnapshot(file, profile)) {
+            callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
+            return;
+        }
+        profile = readProfile(proFile);
+        if (profile == null) {
+            callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
             return;
         }
         profile = normalizeImportedProfile(profile, remoteHint);
@@ -704,74 +718,7 @@ public class ContentsManager {
 
     public ContentProfile readProfile(File file) {
         try {
-            ContentProfile profile = new ContentProfile();
-            JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
-            String typeName = profileJSONObject.optString(ContentProfile.MARK_TYPE, profileJSONObject.optString("contentType", ""));
-            ContentProfile.ContentType resolvedType = ContentProfile.ContentType.getTypeByName(typeName);
-            if (resolvedType == null) return null;
-
-            profile.type = resolvedType;
-            profile.verName = profileJSONObject.optString(
-                    ContentProfile.MARK_VERSION_NAME,
-                    profileJSONObject.optString("verName", profileJSONObject.optString("versionName", ""))
-            );
-            profile.verCode = parseOptionalInt(
-                    profileJSONObject.opt(ContentProfile.MARK_VERSION_CODE),
-                    parseOptionalInt(profileJSONObject.opt("verCode"), 0)
-            );
-            profile.desc = profileJSONObject.optString(ContentProfile.MARK_DESC, profileJSONObject.optString("name", ""));
-            profile.channel = profileJSONObject.optString(ContentProfile.MARK_CHANNEL, ContentProfile.CHANNEL_STABLE);
-            profile.delivery = profileJSONObject.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_EMBEDDED);
-            profile.displayCategory = profileJSONObject.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "");
-            profile.sourceRepo = profileJSONObject.optString(ContentProfile.MARK_SOURCE_REPO, "");
-            profile.sourceFeed = profileJSONObject.optString(ContentProfile.MARK_SOURCE_FEED, "");
-            profile.sourceLabel = profileJSONObject.optString(ContentProfile.MARK_SOURCE_LABEL, "");
-            profile.releaseTag = profileJSONObject.optString(ContentProfile.MARK_RELEASE_TAG, "");
-            profile.artifactName = profileJSONObject.optString(ContentProfile.MARK_ARTIFACT_NAME, "");
-            profile.publishedAt = profileJSONObject.optString(ContentProfile.MARK_PUBLISHED_AT, "");
-            profile.releaseNotes = profileJSONObject.optString(ContentProfile.MARK_RELEASE_NOTES, "");
-            profile.runtimeModel = readRuntimeModelHint(profileJSONObject);
-            profile.vulkanApiMin = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0);
-            profile.vulkanApiMax = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0);
-            profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
-            profile.setInstalledLocally(true);
-
-            List<ContentProfile.ContentFile> fileList = new ArrayList<>();
-            JSONArray fileJSONArray = profileJSONObject.optJSONArray(ContentProfile.MARK_FILE_LIST);
-            if (fileJSONArray == null) {
-                fileJSONArray = profileJSONObject.optJSONArray("fileList");
-            }
-            if (fileJSONArray != null) {
-                for (int i = 0; i < fileJSONArray.length(); i++) {
-                    JSONObject contentFileJSONObject = fileJSONArray.getJSONObject(i);
-                    ContentProfile.ContentFile contentFile = new ContentProfile.ContentFile();
-                    contentFile.source = contentFileJSONObject.optString(ContentProfile.MARK_FILE_SOURCE, contentFileJSONObject.optString("src", ""));
-                    contentFile.target = contentFileJSONObject.optString(ContentProfile.MARK_FILE_TARGET, contentFileJSONObject.optString("dst", ""));
-                    if (contentFile.source.isEmpty() || contentFile.target.isEmpty()) continue;
-                    fileList.add(contentFile);
-                }
-            }
-            profile.fileList = fileList;
-
-            if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                    || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-                JSONObject wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_PROTON);
-                if (wineJSONObject == null) {
-                    wineJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
-                }
-                if (wineJSONObject != null) {
-                    profile.wineLibPath = wineJSONObject.optString(ContentProfile.MARK_WINE_LIBPATH, "");
-                    profile.wineBinPath = wineJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, "");
-                    profile.winePrefixPack = wineJSONObject.optString(ContentProfile.MARK_WINE_PREFIX_PACK, "");
-                }
-                if (profile.wineLibPath.isEmpty() || profile.wineBinPath.isEmpty() || profile.winePrefixPack.isEmpty()) {
-                    return null;
-                }
-                profile.runtimeModel = profile.getRuntimeModel();
-            } else if (fileList.isEmpty()) {
-                return null;
-            }
-            return profile;
+            return ContentProfileParser.parse(FileUtils.readString(file));
         } catch (Exception e) {
             return null;
         }
@@ -2050,7 +1997,7 @@ public class ContentsManager {
         return profile;
     }
 
-    private boolean writeSyntheticProfile(File rootDir, ContentProfile profile) {
+    private boolean writeProfileSnapshot(File rootDir, ContentProfile profile) {
         if (rootDir == null || profile == null) return false;
         boolean hasPayloadFiles = profile.fileList != null && !profile.fileList.isEmpty();
         if (!hasPayloadFiles && !profile.isWineProtonFamily()) return false;
@@ -2102,6 +2049,10 @@ public class ContentsManager {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private boolean writeSyntheticProfile(File rootDir, ContentProfile profile) {
+        return writeProfileSnapshot(rootDir, profile);
     }
 
     private void synthesizeWineFamilyProfile(File rootDir, ContentProfile profile) {
@@ -2184,6 +2135,126 @@ public class ContentsManager {
         item.target = "${system32}/wowbox64.dll";
         files.add(item);
         return files;
+    }
+
+    @Nullable
+    private ContentProfile repairImportedProfile(File rootDir,
+                                                 @Nullable ContentProfile parsedProfile,
+                                                 @Nullable ContentProfile remoteHint) {
+        ContentProfile profile = parsedProfile != null ? parsedProfile : new ContentProfile();
+        ContentProfile.ContentType resolvedType = profile.type != null ? profile.type : remoteHint != null ? remoteHint.type : null;
+        if (resolvedType == null) return null;
+
+        profile.type = resolvedType;
+        if ((profile.verName == null || profile.verName.trim().isEmpty()) && remoteHint != null) {
+            profile.verName = remoteHint.verName;
+        }
+        if (profile.verCode <= 0 && remoteHint != null && remoteHint.verCode > 0) {
+            profile.verCode = remoteHint.verCode;
+        }
+        if ((profile.desc == null || profile.desc.trim().isEmpty()) && remoteHint != null) {
+            profile.desc = remoteHint.desc;
+        }
+        if (profile.fileList == null) {
+            profile.fileList = new ArrayList<>();
+        }
+
+        if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            repairWineFamilyProfile(rootDir, profile);
+            if (isBlank(profile.wineBinPath) || isBlank(profile.wineLibPath) || isBlank(profile.winePrefixPack)) {
+                return null;
+            }
+        } else {
+            profile.fileList = repairContentFiles(rootDir, resolvedType, profile.fileList);
+            if (profile.fileList.isEmpty()) {
+                return null;
+            }
+        }
+
+        profile = normalizeImportedProfile(profile, remoteHint);
+        if ((profile.verName == null || profile.verName.trim().isEmpty()) && profile.remoteUrl != null) {
+            profile.verName = deriveVersionNameFromUrl(profile.remoteUrl);
+        }
+        return profile;
+    }
+
+    private void repairWineFamilyProfile(File rootDir, ContentProfile profile) {
+        if (rootDir == null || profile == null || !profile.isWineProtonFamily()) return;
+        if (isBlank(profile.wineBinPath) || isBlank(profile.wineLibPath) || isBlank(profile.winePrefixPack)
+                || !hasResolvedRuntimePayload(rootDir, profile)) {
+            synthesizeWineFamilyProfile(rootDir, profile);
+        }
+        if (profile.fileList == null) {
+            profile.fileList = new ArrayList<>();
+        }
+    }
+
+    private List<ContentProfile.ContentFile> repairContentFiles(File rootDir,
+                                                                ContentProfile.ContentType type,
+                                                                @Nullable List<ContentProfile.ContentFile> currentFiles) {
+        LinkedHashMap<String, ContentProfile.ContentFile> filesByTarget = new LinkedHashMap<>();
+        addExistingContentFiles(rootDir, currentFiles, filesByTarget);
+        addExistingContentFiles(rootDir, synthesizeFilesForType(rootDir, type), filesByTarget);
+        return new ArrayList<>(filesByTarget.values());
+    }
+
+    private void addExistingContentFiles(File rootDir,
+                                         @Nullable List<ContentProfile.ContentFile> candidates,
+                                         Map<String, ContentProfile.ContentFile> filesByTarget) {
+        if (rootDir == null || candidates == null || filesByTarget == null) return;
+        for (ContentProfile.ContentFile candidate : candidates) {
+            if (candidate == null || isBlank(candidate.source) || isBlank(candidate.target)) continue;
+            File sourceFile = new File(rootDir, candidate.source);
+            if (!sourceFile.isFile()) continue;
+            if (filesByTarget.containsKey(candidate.target)) continue;
+            ContentProfile.ContentFile normalized = new ContentProfile.ContentFile();
+            normalized.source = normalizeRelativePath(candidate.source);
+            normalized.target = candidate.target.trim();
+            filesByTarget.put(normalized.target, normalized);
+        }
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeFilesForType(File rootDir, ContentProfile.ContentType type) {
+        if (rootDir == null || type == null) return new ArrayList<>();
+        return switch (type) {
+            case CONTENT_TYPE_DXVK -> synthesizeDxvkFiles(rootDir);
+            case CONTENT_TYPE_VKD3D -> synthesizeVkd3dFiles(rootDir);
+            case CONTENT_TYPE_DGVOODOO -> synthesizeDgVoodooFiles(rootDir);
+            case CONTENT_TYPE_BOX64 -> synthesizeSingleFile(rootDir, "box64", "${localbin}/box64");
+            case CONTENT_TYPE_WOWBOX64 -> synthesizeWowBox64Files(rootDir);
+            case CONTENT_TYPE_FEXCORE -> synthesizeFexCoreFiles(rootDir);
+            default -> new ArrayList<>();
+        };
+    }
+
+    private void logImportRecovery(String eventId,
+                                   File rootDir,
+                                   @Nullable ContentProfile remoteHint,
+                                   @Nullable ContentProfile profile) {
+        if (context == null) return;
+        ForensicLogger.logEvent(
+                context,
+                profile == null ? "warn" : "info",
+                eventId,
+                null,
+                "contents_import",
+                profile == null ? "profile_recovery_miss" : "profile_recovery_applied",
+                ForensicLogger.fields(
+                        "remote_type", remoteHint != null && remoteHint.type != null ? remoteHint.type.toString() : "-",
+                        "remote_ver_name", remoteHint != null ? remoteHint.verName : "-",
+                        "detected_type", profile != null && profile.type != null ? profile.type.toString() : "-",
+                        "detected_ver_name", profile != null ? profile.verName : "-",
+                        "root_file_count", rootDir != null && rootDir.isDirectory() && rootDir.listFiles() != null ? rootDir.listFiles().length : -1,
+                        "has_profile_json", rootDir != null && new File(rootDir, PROFILE_NAME).isFile(),
+                        "has_runtime_payload", profile != null && profile.isWineProtonFamily() && hasResolvedRuntimePayload(rootDir, profile),
+                        "file_count", profile != null && profile.fileList != null ? profile.fileList.size() : 0
+                )
+        );
+    }
+
+    private boolean isBlank(@Nullable String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private List<ContentProfile.ContentFile> synthesizeFexCoreFiles(File rootDir) {
