@@ -2,6 +2,7 @@ package com.winlator.cmod;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.database.Cursor;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -163,7 +164,8 @@ public class ContentsFragment extends Fragment {
 
     @Override
     public void onDestroy() {
-        FileUtils.clear(requireContext().getCacheDir());
+        Context context = getContext();
+        if (context != null) FileUtils.clear(context.getCacheDir());
         super.onDestroy();
     }
 
@@ -293,7 +295,7 @@ public class ContentsFragment extends Fragment {
                     Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType("*/*");
-                    requireActivity().startActivityFromFragment(this, intent, MainActivity.OPEN_FILE_REQUEST_CODE);
+                    if (getActivity() != null) startActivityForResult(intent, MainActivity.OPEN_FILE_REQUEST_CODE);
                 }
         ));
 
@@ -919,7 +921,7 @@ public class ContentsFragment extends Fragment {
     private void reloadRemoteContents() {
         final String selectedSourceMode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
         final String sourceSignature = buildSourceSignature(selectedSourceMode);
-        final String cachedSourceSignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
+        final String cacheJsonKey = buildRemoteCacheJsonPreferenceKey(sourceSignature);
         ForensicLogger.logEvent(
                 getContext(),
                 "info",
@@ -949,12 +951,10 @@ public class ContentsFragment extends Fragment {
                     }
                 }
 
-                if (!isAdded() || getActivity() == null) return;
                 if (payloads.isEmpty()) {
-                    getActivity().runOnUiThread(() -> {
-                        String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
-                        boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
-                        boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                    runOnUiThreadIfAttached(() -> {
+                        String cached = readRemoteCache(cacheJsonKey, sourceSignature);
+                        boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
                         applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
                         ForensicLogger.logEvent(
                                 getContext(),
@@ -978,8 +978,9 @@ public class ContentsFragment extends Fragment {
 
                 String merged = RemoteProfileFeedMerger.mergePayloads(payloads);
                 final boolean finalUsedBundledArchiveFallback = usedBundledArchiveFallback;
-                getActivity().runOnUiThread(() -> {
+                runOnUiThreadIfAttached(() -> {
                     sharedPreferences.edit()
+                            .putString(cacheJsonKey, merged)
                             .putString(PREF_REMOTE_CACHE_JSON, merged)
                             .putString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, sourceSignature)
                             .apply();
@@ -1004,11 +1005,9 @@ public class ContentsFragment extends Fragment {
                     loadContentList();
                 });
             } catch (Exception ignored) {
-                if (!isAdded() || getActivity() == null) return;
-                getActivity().runOnUiThread(() -> {
-                    String cached = sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
-                    boolean sourceChanged = !sourceSignature.equalsIgnoreCase(cachedSourceSignature);
-                    boolean useCached = !sourceChanged && cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
+                runOnUiThreadIfAttached(() -> {
+                    String cached = readRemoteCache(cacheJsonKey, sourceSignature);
+                    boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
                     applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
                     ForensicLogger.logEvent(
                             getContext(),
@@ -1028,6 +1027,31 @@ public class ContentsFragment extends Fragment {
                 });
             }
         }).start();
+    }
+
+    private boolean runOnUiThreadIfAttached(Runnable action) {
+        Activity activity = getActivity();
+        if (!isAdded() || activity == null || action == null) return false;
+        activity.runOnUiThread(() -> {
+            if (!isAdded() || getActivity() == null) return;
+            action.run();
+        });
+        return true;
+    }
+
+    private String buildRemoteCacheJsonPreferenceKey(String sourceSignature) {
+        String normalized = sourceSignature == null ? "" : sourceSignature.trim().toLowerCase(Locale.US);
+        return PREF_REMOTE_CACHE_JSON + "_" + Integer.toHexString(normalized.hashCode());
+    }
+
+    private String readRemoteCache(String cacheJsonKey, String sourceSignature) {
+        String cached = sharedPreferences.getString(cacheJsonKey, "");
+        if (cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim())) return cached;
+        String legacySignature = sharedPreferences.getString(PREF_REMOTE_CACHE_SOURCE_SIGNATURE, "");
+        if (sourceSignature != null && sourceSignature.equalsIgnoreCase(legacySignature)) {
+            return sharedPreferences.getString(PREF_REMOTE_CACHE_JSON, "[]");
+        }
+        return "[]";
     }
 
     private void applyRemoteProfilesForSelectedSourceMode(String selectedSourceMode, String json) {
@@ -1205,7 +1229,9 @@ public class ContentsFragment extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == MainActivity.OPEN_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK && data != null) {
-            PreloaderDialog preloaderDialog = new PreloaderDialog(requireActivity());
+            Activity activity = getActivity();
+            if (!isAdded() || activity == null) return;
+            PreloaderDialog preloaderDialog = new PreloaderDialog(activity);
             preloaderDialog.showOnUiThread(R.string.installing_content);
             try {
                 final Uri importUri = data.getData();
@@ -1275,7 +1301,7 @@ public class ContentsFragment extends Fragment {
                             case ERROR_UNTRUSTPROFILE -> R.string.content_cannot_be_trusted;
                             default -> R.string.unable_to_install_content;
                         };
-                        requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                        runOnUiThreadIfAttached(() -> ContentDialog.alert(
                                 getContext(),
                                 getString(R.string.install_failed) + ": " + getString(msgId),
                                 preloaderDialog::closeOnUiThread
@@ -1319,7 +1345,7 @@ public class ContentsFragment extends Fragment {
                                         )
                                 );
                                 preloaderDialog.closeOnUiThread();
-                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                                runOnUiThreadIfAttached(() -> ContentDialog.alert(
                                         getContext(),
                                         getString(R.string.install_failed) + ": "
                                                 + getString(R.string.content_type_mismatch_import,
@@ -1346,7 +1372,7 @@ public class ContentsFragment extends Fragment {
                                         )
                                 );
                                 preloaderDialog.closeOnUiThread();
-                                requireActivity().runOnUiThread(() -> ContentDialog.alert(
+                                runOnUiThreadIfAttached(() -> ContentDialog.alert(
                                         getContext(),
                                         getString(R.string.install_failed) + ": "
                                                 + getString(R.string.content_arch_mismatch_import,
@@ -1378,7 +1404,7 @@ public class ContentsFragment extends Fragment {
                                 manager.finishInstallContent(profile, cb);
                             };
                             preloaderDialog.closeOnUiThread();
-                            requireActivity().runOnUiThread(() -> {
+                            runOnUiThreadIfAttached(() -> {
                                 ContentInfoDialog dialog = new ContentInfoDialog(getContext(), profile);
                                 ((TextView) dialog.findViewById(R.id.BTConfirm)).setText(R.string._continue);
                                 dialog.setOnConfirmCallback(() -> {
@@ -1412,7 +1438,7 @@ public class ContentsFragment extends Fragment {
                                     )
                             );
                             preloaderDialog.closeOnUiThread();
-                            requireActivity().runOnUiThread(() -> {
+                            runOnUiThreadIfAttached(() -> {
                                 ContentDialog.alert(getContext(), R.string.content_installed_success, null);
                                 manager.syncContents();
                                 loadContentList();
@@ -1874,6 +1900,7 @@ public class ContentsFragment extends Fragment {
             holder.ibDownload.setOnClickListener(v -> {
                 holder.ibDownload.setVisibility(View.GONE);
                 holder.progressBar.setVisibility(View.VISIBLE);
+                final Context appContext = requireContext().getApplicationContext();
                 ForensicLogger.logEvent(
                         getContext(),
                         "info",
@@ -1891,7 +1918,7 @@ public class ContentsFragment extends Fragment {
 
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
-                    File output = new File(requireContext().getCacheDir(), "temp_" + timestamp);
+                    File output = new File(appContext.getCacheDir(), "temp_" + timestamp);
                     boolean downloaded = Downloader.downloadFile(profile.remoteUrl, output);
                     String expectedSha256 = normalizeSha256(profile.remoteSha256);
                     String actualSha256 = "";
@@ -1909,7 +1936,7 @@ public class ContentsFragment extends Fragment {
                     String finalActualSha256 = actualSha256;
                     String finalExpectedSha256 = expectedSha256;
                     boolean finalDownloaded = downloaded;
-                    requireActivity().runOnUiThread(() -> {
+                    runOnUiThreadIfAttached(() -> {
                         holder.progressBar.setVisibility(View.GONE);
                         holder.ibDownload.setVisibility(View.VISIBLE);
                         if (!finalDownloaded) {

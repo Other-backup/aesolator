@@ -44,6 +44,9 @@ import java.util.zip.ZipInputStream;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
+    private static final String FALLBACK_PREFIX_PACK_NAME = "prefixPack.tzst";
+    private static final String FALLBACK_PREFIX_PACK_COMMON_ASSET = "container_pattern_common.tzst";
+    private static final String FALLBACK_PREFIX_PACK_GAMENATIVE_ASSET = "container_pattern_gamenative.tzst";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/Arihany/WinlatorWCPHub/main/pack.json";
     public static final String REMOTE_PROFILES_AE = "https://raw.githubusercontent.com/kosoymiki/aesolator/main/contents/contents.json";
     public static final String REMOTE_GAMEHUB_RELEASES = "https://api.github.com/repos/The412Banner/Gamehub-Components/releases?per_page=100";
@@ -432,20 +435,16 @@ public class ContentsManager {
         }
 
         File proFile = new File(file, PROFILE_NAME);
-        if (!proFile.exists() && remoteHint != null) {
+        ContentProfile profile = proFile.isFile() ? readProfile(proFile) : null;
+        if (profile == null && remoteHint != null) {
             ContentProfile synthesizedProfile = synthesizeProfileFromExtractedPayload(file, remoteHint);
             if (synthesizedProfile != null && writeSyntheticProfile(file, synthesizedProfile)) {
                 proFile = new File(file, PROFILE_NAME);
+                profile = readProfile(proFile);
             }
         }
-        if (!proFile.exists()) {
-            callback.onFailed(InstallFailedReason.ERROR_NOPROFILE, null);
-            return;
-        }
-
-        ContentProfile profile = readProfile(proFile);
         if (profile == null) {
-            callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
+            callback.onFailed(proFile.isFile() ? InstallFailedReason.ERROR_BADPROFILE : InstallFailedReason.ERROR_NOPROFILE, null);
             return;
         }
         profile = normalizeImportedProfile(profile, remoteHint);
@@ -2109,6 +2108,9 @@ public class ContentsManager {
         File binDir = WineUtils.resolveRuntimeBinDir(rootDir);
         File libDir = WineUtils.resolveRuntimeLibDir(rootDir);
         File prefixPack = WineUtils.resolveRuntimePrefixPack(rootDir);
+        if (prefixPack == null && binDir != null && libDir != null) {
+            prefixPack = materializeFallbackPrefixPack(rootDir, profile);
+        }
 
         String binPath = binDir != null ? relativizePath(rootDir, binDir) : null;
         String libPath = libDir != null ? relativizePath(rootDir, libDir) : null;
@@ -2120,6 +2122,27 @@ public class ContentsManager {
         profile.winePrefixPack = prefixPackPath;
         profile.runtimeModel = profile.getRuntimeModel();
         profile.fileList = new ArrayList<>();
+    }
+
+    @Nullable
+    private File materializeFallbackPrefixPack(File rootDir, ContentProfile profile) {
+        if (context == null || rootDir == null || profile == null || !profile.isWineProtonFamily()) return null;
+        File fallback = new File(rootDir, FALLBACK_PREFIX_PACK_NAME);
+        if (fallback.isFile() && fallback.length() > 0) return fallback;
+
+        String runtimeModel = profile.getRuntimeModel();
+        String assetName = ContentProfile.RUNTIME_MODEL_GLIBC.equals(runtimeModel)
+                ? FALLBACK_PREFIX_PACK_GAMENATIVE_ASSET
+                : FALLBACK_PREFIX_PACK_COMMON_ASSET;
+        FileUtils.copy(context, assetName, fallback);
+        if (fallback.isFile() && fallback.length() > 0) return fallback;
+
+        if (!FALLBACK_PREFIX_PACK_GAMENATIVE_ASSET.equals(assetName)) {
+            FileUtils.copy(context, FALLBACK_PREFIX_PACK_GAMENATIVE_ASSET, fallback);
+            if (fallback.isFile() && fallback.length() > 0) return fallback;
+        }
+        FileUtils.delete(fallback);
+        return null;
     }
 
     private List<ContentProfile.ContentFile> synthesizeDxvkFiles(File rootDir) {
