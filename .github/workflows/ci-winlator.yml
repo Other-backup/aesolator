@@ -20,10 +20,6 @@ on:
         description: "Exact Aesolator commit SHA (optional)"
         required: false
         default: ""
-      runtime_release_tag:
-        description: "Runtime release tag consumed by app defaults"
-        required: false
-        default: "freewine11-arm64ec-latest"
 
 concurrency:
   group: aesolator-dispatch-${{ github.ref }}
@@ -48,11 +44,10 @@ jobs:
           GH_TOKEN: ${{ secrets.AEO_WORKFLOW_PAT || secrets.AEO_RELEASE_TOKEN }}
           AESOLATOR_REF: ${{ github.event.inputs.aesolator_ref || github.ref_name || 'main' }}
           AESOLATOR_COMMIT: ${{ github.event.inputs.aesolator_commit || github.sha }}
-          RUNTIME_RELEASE_TAG: ${{ github.event.inputs.runtime_release_tag || 'freewine11-arm64ec-latest' }}
         run: |
           set -euo pipefail
           if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "::error::AEO_RELEASE_TOKEN is required to dispatch workflow in kosoymiki/wcp-runtime-lanes"
+            echo "::error::AEO_WORKFLOW_PAT or AEO_RELEASE_TOKEN is required to dispatch workflow in kosoymiki/wcp-runtime-lanes"
             exit 1
           fi
 
@@ -61,8 +56,7 @@ jobs:
             repos/kosoymiki/wcp-runtime-lanes/actions/workflows/ci-aesolator-apk.yml/dispatches \
             -f ref=main \
             -f "inputs[aesolator_ref]=${AESOLATOR_REF}" \
-            -f "inputs[aesolator_commit]=${AESOLATOR_COMMIT}" \
-            -f "inputs[runtime_release_tag]=${RUNTIME_RELEASE_TAG}"
+            -f "inputs[aesolator_commit]=${AESOLATOR_COMMIT}"
 
           echo "Dispatched kosoymiki/wcp-runtime-lanes/.github/workflows/ci-aesolator-apk.yml"
           echo "aesolator_ref=${AESOLATOR_REF}"
