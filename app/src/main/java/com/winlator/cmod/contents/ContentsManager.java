@@ -200,11 +200,18 @@ public class ContentsManager {
     private HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
 
     private final LinkedHashMap<String, ArrayList<ContentProfile>> remoteProfilesByScope = new LinkedHashMap<>();
+    private final LinkedHashMap<String, InstalledRuntimeRoot> installedRuntimeRootByKey = new LinkedHashMap<>();
+    private final LinkedHashMap<String, InstalledProfileState> installedProfileStateByKey = new LinkedHashMap<>();
 
     public ContentsManager(Context context) {
         Context applicationContext = context != null ? context.getApplicationContext() : null;
         this.context = applicationContext != null ? applicationContext : context;
         this.preferences = context.getSharedPreferences("contents_manager_prefs", Context.MODE_PRIVATE);
+    }
+
+    private void clearRuntimeResolutionCaches() {
+        installedRuntimeRootByKey.clear();
+        installedProfileStateByKey.clear();
     }
 
     // Method to mark the graphics driver as installed
@@ -403,6 +410,7 @@ public class ContentsManager {
 
     public void syncContents() {
         repairInstalledRuntimeOverlaysForCurrentThread();
+        clearRuntimeResolutionCaches();
         profilesMap = new HashMap<>();
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             profilesMap.put(type, new LinkedList<>());
@@ -422,6 +430,7 @@ public class ContentsManager {
                         if (profile != null && profile.type == type) {
                             classifyRuntimeProfileFromPayload(file, profile);
                             profile.setInstalledLocally(true);
+                            registerInstalledRuntimeRoot(file, profile);
                             profiles.add(profile);
                             profileByEntry.put(getEntryName(profile), profile);
                             profileFileByProfile.put(profile, proFile);
@@ -933,6 +942,27 @@ public class ContentsManager {
         return null;
     }
 
+    @Nullable
+    public ContentProfile findInstallableRemoteProfile(@Nullable ContentProfile requestedProfile) {
+        if (requestedProfile == null || requestedProfile.type == null) return null;
+        if (requestedProfile.isRemoteDownloadable()) return requestedProfile;
+        List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(requestedProfile.type) : null;
+        if (profiles == null || profiles.isEmpty()) return null;
+
+        ContentProfile best = null;
+        for (ContentProfile candidate : profiles) {
+            if (candidate == null || !candidate.isRemoteDownloadable()) continue;
+            if (candidate == requestedProfile) return candidate;
+            if (candidate.sameEntry(requestedProfile)
+                    || requestedProfile.sameEntry(candidate)
+                    || ContentProfileIdentity.areEquivalentProfiles(candidate, requestedProfile)
+                    || matchesInstallableRemoteSemanticIdentity(candidate, requestedProfile)) {
+                best = pickPreferredRemoteInstallCandidate(best, candidate);
+            }
+        }
+        return best;
+    }
+
     public static File getInstallDir(Context context, ContentProfile profile) {
         if (profile != null && profile.isWineProtonFamily()) {
             return new File(getContentTypeDir(context, profile.type), buildRuntimeInstallRootName(profile));
@@ -1016,6 +1046,15 @@ public class ContentsManager {
         if (profile == null) {
             return new InstalledProfileState(false, false, "missing_profile");
         }
+        String cacheKey = buildInstalledProfileStateKey(profile);
+        InstalledProfileState cached = installedProfileStateByKey.get(cacheKey);
+        if (cached != null) return cached;
+        InstalledProfileState resolved = resolveInstalledProfileStateUncached(profile);
+        installedProfileStateByKey.put(cacheKey, resolved);
+        return resolved;
+    }
+
+    private InstalledProfileState resolveInstalledProfileStateUncached(@NonNull ContentProfile profile) {
         File canonicalInstallDir = getInstallDir(context, profile);
         File installDir = resolveInstalledInstallDir(profile, true);
         if (installDir == null && canonicalInstallDir.isDirectory()) {
@@ -1780,7 +1819,7 @@ public class ContentsManager {
                     continue;
                 }
 
-                String runtimeEntry = resolveBestRuntimeEntry(getEntryName(profile), profile.getRuntimeModel());
+                String runtimeEntry = getEntryName(profile);
                 if (runtimeEntry != null && !runtimeEntry.trim().isEmpty()) {
                     entries.add(runtimeEntry);
                 }
@@ -1799,6 +1838,58 @@ public class ContentsManager {
 
         if (candidate.verCode > currentBest.verCode) return candidate;
         return currentBest;
+    }
+
+    private ContentProfile pickPreferredRemoteInstallCandidate(ContentProfile currentBest, ContentProfile candidate) {
+        if (candidate == null) return currentBest;
+        if (currentBest == null) return candidate;
+
+        int publishedCompare = comparePublishedAt(candidate.publishedAt, currentBest.publishedAt);
+        if (publishedCompare > 0) return candidate;
+        if (publishedCompare < 0) return currentBest;
+
+        if (candidate.verCode > currentBest.verCode) return candidate;
+        if (candidate.remoteSha256 != null && !candidate.remoteSha256.trim().isEmpty()
+                && (currentBest.remoteSha256 == null || currentBest.remoteSha256.trim().isEmpty())) {
+            return candidate;
+        }
+        return currentBest;
+    }
+
+    private boolean matchesInstallableRemoteSemanticIdentity(@Nullable ContentProfile remote,
+                                                            @Nullable ContentProfile requested) {
+        if (remote == null || requested == null || remote.type == null || requested.type == null) return false;
+        if (remote.type != requested.type) return false;
+
+        String remoteVersion = normalizeInstallIdentityToken(remote.verName);
+        String requestedVersion = normalizeInstallIdentityToken(requested.verName);
+        if (remoteVersion.isEmpty() || requestedVersion.isEmpty()) return false;
+        if (!remoteVersion.equals(requestedVersion)) return false;
+
+        String remoteArch = remote.getArchitectureTag();
+        String requestedArch = requested.getArchitectureTag();
+        boolean archMatches = remoteArch == null || requestedArch == null
+                || remoteArch.isEmpty()
+                || requestedArch.isEmpty()
+                || "generic".equalsIgnoreCase(remoteArch)
+                || "generic".equalsIgnoreCase(requestedArch)
+                || "bundle".equalsIgnoreCase(remoteArch)
+                || "bundle".equalsIgnoreCase(requestedArch)
+                || remoteArch.equalsIgnoreCase(requestedArch);
+        if (!archMatches) return false;
+
+        return remote.getChannel().equalsIgnoreCase(requested.getChannel())
+                || remote.isBetaLike() == requested.isBetaLike();
+    }
+
+    private String normalizeInstallIdentityToken(@Nullable String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.US);
+        normalized = normalized.replaceAll("(?i)\\.(wcp\\.xz|wcp\\.zst|wcp|zip|tar\\.xz|tar\\.zst|tar|txz|tzst)$", "");
+        normalized = normalized.replaceAll("[^a-z0-9._-]+", "-");
+        normalized = normalized.replaceAll("-{2,}", "-");
+        while (normalized.startsWith("-")) normalized = normalized.substring(1);
+        while (normalized.endsWith("-")) normalized = normalized.substring(0, normalized.length() - 1);
+        return normalized;
     }
 
     private boolean matchesInstalledVersion(@Nullable ContentProfile profile, String versionName) {
@@ -1886,6 +1977,13 @@ public class ContentsManager {
             String scheme = uri.getScheme();
             if (scheme == null) return false;
             String normalizedScheme = scheme.trim().toLowerCase(Locale.US);
+            if ("asset".equals(normalizedScheme)) {
+                if (uri.getUserInfo() != null && !uri.getUserInfo().trim().isEmpty()) return false;
+                String assetPath = ((uri.getHost() == null ? "" : uri.getHost()) + "/" + (uri.getPath() == null ? "" : uri.getPath()))
+                        .replace('\\', '/')
+                        .replaceFirst("^/*", "");
+                return hasAllowedArchiveSuffix(assetPath);
+            }
             if (!"https".equals(normalizedScheme) && !"http".equals(normalizedScheme)) return false;
             String host = uri.getHost();
             if (host == null || host.trim().isEmpty()) return false;
@@ -2105,6 +2203,20 @@ public class ContentsManager {
     private InstalledRuntimeRoot findEquivalentInstalledRuntimeRoot(@Nullable ContentProfile requestedProfile,
                                                                    boolean logResult) {
         if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
+        InstalledRuntimeRoot indexedRoot = findRegisteredInstalledRuntimeRoot(requestedProfile);
+        if (indexedRoot != null) {
+            if (logResult) {
+                logEquivalentRuntimeLookup(requestedProfile, indexedRoot, installedRuntimeRootByKey.size(), 1);
+            }
+            return indexedRoot;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            scheduleInstalledRuntimeOverlayRepair();
+            if (logResult) {
+                logEquivalentRuntimeLookup(requestedProfile, null, installedRuntimeRootByKey.size(), 0);
+            }
+            return null;
+        }
         List<File> installedRoots = getInstalledRootsForType(requestedProfile.type);
         if (installedRoots == null || installedRoots.isEmpty()) {
             if (logResult) {
@@ -2133,6 +2245,7 @@ public class ContentsManager {
 
             matchedRoots++;
             InstalledRuntimeRoot candidate = new InstalledRuntimeRoot(installRoot, installedProfile);
+            registerInstalledRuntimeRoot(installRoot, installedProfile);
             if (strictMatch) {
                 if (shouldPreferInstalledRuntimeRoot(candidate, bestStrict)) {
                     bestStrict = candidate;
@@ -2146,6 +2259,84 @@ public class ContentsManager {
             logEquivalentRuntimeLookup(requestedProfile, best, scannedRoots, matchedRoots);
         }
         return best;
+    }
+
+    private void registerInstalledRuntimeRoot(@Nullable File installRoot, @Nullable ContentProfile profile) {
+        if (installRoot == null || profile == null || !profile.isWineProtonFamily()) return;
+        InstalledRuntimeRoot root = new InstalledRuntimeRoot(installRoot, profile);
+        for (String key : buildInstalledRuntimeLookupKeys(profile)) {
+            putInstalledRuntimeRoot(key, root);
+        }
+        installedProfileStateByKey.remove(buildInstalledProfileStateKey(profile));
+    }
+
+    @Nullable
+    private InstalledRuntimeRoot findRegisteredInstalledRuntimeRoot(@Nullable ContentProfile requestedProfile) {
+        if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
+        for (String key : buildInstalledRuntimeLookupKeys(requestedProfile)) {
+            InstalledRuntimeRoot direct = installedRuntimeRootByKey.get(key);
+            if (direct != null) return direct;
+        }
+
+        InstalledRuntimeRoot bestStrict = null;
+        InstalledRuntimeRoot bestCompatible = null;
+        LinkedHashSet<InstalledRuntimeRoot> roots = new LinkedHashSet<>(installedRuntimeRootByKey.values());
+        for (InstalledRuntimeRoot candidate : roots) {
+            if (candidate == null || candidate.profile == null) continue;
+            boolean strictMatch = ContentProfileIdentity.areEquivalentProfiles(candidate.profile, requestedProfile);
+            boolean compatiblePayload = strictMatch
+                    || ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(candidate.profile, requestedProfile);
+            if (!compatiblePayload) continue;
+            if (strictMatch) {
+                if (shouldPreferInstalledRuntimeRoot(candidate, bestStrict)) bestStrict = candidate;
+            } else if (shouldPreferInstalledRuntimeRoot(candidate, bestCompatible)) {
+                bestCompatible = candidate;
+            }
+        }
+        return bestStrict != null ? bestStrict : bestCompatible;
+    }
+
+    private void putInstalledRuntimeRoot(String key, InstalledRuntimeRoot root) {
+        if (key == null || key.isEmpty() || root == null) return;
+        InstalledRuntimeRoot current = installedRuntimeRootByKey.get(key);
+        if (shouldPreferInstalledRuntimeRoot(root, current)) {
+            installedRuntimeRootByKey.put(key, root);
+        }
+    }
+
+    private ArrayList<String> buildInstalledRuntimeLookupKeys(@Nullable ContentProfile profile) {
+        ArrayList<String> keys = new ArrayList<>();
+        if (profile == null || !profile.isWineProtonFamily()) return keys;
+        addRuntimeLookupKey(keys, "entry", getEntryName(profile));
+        addRuntimeLookupKey(keys, "identity", ContentProfileIdentity.describeProfile(profile));
+        addRuntimeLookupKey(keys, "payload", buildInstalledRuntimePayloadKey(profile));
+        return keys;
+    }
+
+    private void addRuntimeLookupKey(ArrayList<String> keys, String scope, String value) {
+        if (keys == null || scope == null || value == null) return;
+        String normalized = value.trim().toLowerCase(Locale.US);
+        if (normalized.isEmpty()) return;
+        keys.add(scope + "|" + normalized);
+    }
+
+    private String buildInstalledRuntimePayloadKey(@Nullable ContentProfile profile) {
+        if (profile == null) return "";
+        String archHint = resolveRuntimeArchHint(profile);
+        if (archHint.isEmpty()) archHint = resolveArchHint(profile);
+        return (profile.isProtonLike() ? "proton" : "wine")
+                + "|" + normalizeFamilyKeyToken(profile.getRuntimeModel())
+                + "|" + normalizeFamilyKeyToken(archHint)
+                + "|" + normalizeFamilyKeyToken(profile.verName)
+                + "|" + normalizeFamilyKeyToken(profile.artifactName);
+    }
+
+    private String buildInstalledProfileStateKey(@Nullable ContentProfile profile) {
+        if (profile == null) return "null";
+        return ContentProfileIdentity.describeProfile(profile)
+                + "|entry=" + getEntryName(profile)
+                + "|local=" + (profile.isInstalledLocally() ? "1" : "0")
+                + "|payload=" + buildInstalledRuntimePayloadKey(profile);
     }
 
     private void migrateLegacyRuntimeDir(File legacyDir, File sharedRuntimeDir) {
@@ -2675,6 +2866,11 @@ public class ContentsManager {
                                                    @Nullable ContentProfile remoteHint,
                                                    @Nullable String importDisplayName) {
         if (rootDir == null || profile == null || !profile.isWineProtonFamily()) return;
+        String existingModel = ContentProfile.normalizeRuntimeModel(profile.runtimeModel);
+        if (Looper.myLooper() == Looper.getMainLooper() && !existingModel.isEmpty()) {
+            profile.runtimeModel = existingModel;
+            return;
+        }
         String payloadModel = ImportedContentHeuristics.inferRuntimeModel(rootDir, profile, remoteHint, importDisplayName);
         if (!payloadModel.isEmpty()) {
             profile.runtimeModel = payloadModel;
@@ -3016,6 +3212,8 @@ public class ContentsManager {
 
     private List<ContentProfile.ContentFile> synthesizeDgVoodooFiles(File rootDir) {
         String[][] mappings = {
+                {"dgvoodoo.conf", "dgVoodoo.conf"},
+                {"dgvoodoocpl.exe", "dgVoodooCpl.exe"},
                 {"d3d8.dll", "${system32}/D3D8.dll"},
                 {"d3d8_dgvoodoo.dll", "${system32}/D3D8_dgvoodoo.dll"},
                 {"d3d9.dll", "${system32}/D3D9.dll"},
@@ -3029,10 +3227,13 @@ public class ContentsManager {
                 {"glide3x.dll", "${system32}/Glide3x.dll"},
                 {"glide3xnapalm.dll", "${system32}/Glide3xNapalm.dll"}
         };
+        return synthesizeMappedFiles(rootDir, mappings);
+    }
 
+    private List<ContentProfile.ContentFile> synthesizeMappedFiles(File rootDir, String[][] mappings) {
         ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
         for (String[] mapping : mappings) {
-            String relative = findRelativeFile(rootDir, mapping[0]);
+            String relative = resolveMappedSourceFile(rootDir, mapping[0], mapping[1]);
             if (relative == null) continue;
             ContentProfile.ContentFile item = new ContentProfile.ContentFile();
             item.source = relative;
@@ -3042,17 +3243,116 @@ public class ContentsManager {
         return files;
     }
 
-    private List<ContentProfile.ContentFile> synthesizeMappedFiles(File rootDir, String[][] mappings) {
-        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
-        for (String[] mapping : mappings) {
-            File file = new File(rootDir, mapping[0]);
-            if (!file.isFile()) continue;
-            ContentProfile.ContentFile item = new ContentProfile.ContentFile();
-            item.source = mapping[0];
-            item.target = mapping[1];
-            files.add(item);
+    @Nullable
+    private String resolveMappedSourceFile(File rootDir, String preferredPath, String targetPath) {
+        if (rootDir == null || preferredPath == null || preferredPath.trim().isEmpty()) return null;
+        String normalizedPreferred = normalizeRelativePath(preferredPath);
+        File direct = new File(rootDir, normalizedPreferred);
+        if (direct.isFile()) return normalizedPreferred;
+
+        String fileName = new File(normalizedPreferred).getName();
+        return findRelativeFileWithPreferredFragments(
+                rootDir,
+                fileName,
+                buildSourcePreferenceFragments(normalizedPreferred, targetPath)
+        );
+    }
+
+    private String[] buildSourcePreferenceFragments(String preferredPath, String targetPath) {
+        ArrayList<String> fragments = new ArrayList<>();
+        addPreferenceFragment(fragments, parentRelativePath(preferredPath));
+
+        String target = targetPath == null ? "" : targetPath.toLowerCase(Locale.US);
+        if (target.contains("${syswow64}")) {
+            addPreferenceFragment(fragments, "syswow64");
+            addPreferenceFragment(fragments, "payload/runtime/x86");
+            addPreferenceFragment(fragments, "ms/x86");
+            addPreferenceFragment(fragments, "release/x86");
+            addPreferenceFragment(fragments, "bin/x86");
+            addPreferenceFragment(fragments, "x86");
+            addPreferenceFragment(fragments, "x32");
+            addPreferenceFragment(fragments, "i386");
+            addPreferenceFragment(fragments, "lib/wine/i386-windows");
+        } else if (target.contains("${system32}")) {
+            addPreferenceFragment(fragments, "system32");
+            addPreferenceFragment(fragments, "payload/runtime/arm64ec");
+            addPreferenceFragment(fragments, "ms/arm64ec");
+            addPreferenceFragment(fragments, "release/arm64ec");
+            addPreferenceFragment(fragments, "bin/arm64ec");
+            addPreferenceFragment(fragments, "arm64ec");
+            addPreferenceFragment(fragments, "arm64-ec");
+            addPreferenceFragment(fragments, "payload/runtime/arm64");
+            addPreferenceFragment(fragments, "ms/arm64");
+            addPreferenceFragment(fragments, "aarch64");
+            addPreferenceFragment(fragments, "payload/runtime/x64");
+            addPreferenceFragment(fragments, "ms/x64");
+            addPreferenceFragment(fragments, "x64");
+            addPreferenceFragment(fragments, "x86_64");
+            addPreferenceFragment(fragments, "amd64");
+            addPreferenceFragment(fragments, "lib/wine/aarch64-windows");
+            addPreferenceFragment(fragments, "lib/wine/x86_64-windows");
         }
-        return files;
+        return fragments.toArray(new String[0]);
+    }
+
+    private void addPreferenceFragment(List<String> fragments, @Nullable String fragment) {
+        if (fragments == null || fragment == null) return;
+        String normalized = normalizeRelativePath(fragment).toLowerCase(Locale.US);
+        if (normalized.isEmpty() || ".".equals(normalized)) return;
+        if (!fragments.contains(normalized)) fragments.add(normalized);
+    }
+
+    @Nullable
+    private String findRelativeFileWithPreferredFragments(File rootDir,
+                                                          String fileName,
+                                                          @Nullable String[] preferredFragments) {
+        if (rootDir == null || fileName == null || fileName.trim().isEmpty()) return null;
+        ArrayList<String> matches = new ArrayList<>();
+        collectRelativeFileMatches(rootDir, rootDir, fileName.trim().toLowerCase(Locale.US), matches);
+        if (matches.isEmpty()) return null;
+        matches.sort((left, right) -> {
+            int scoreCompare = Integer.compare(
+                    scoreRelativeFileMatch(right, preferredFragments),
+                    scoreRelativeFileMatch(left, preferredFragments)
+            );
+            if (scoreCompare != 0) return scoreCompare;
+            int lengthCompare = Integer.compare(left.length(), right.length());
+            if (lengthCompare != 0) return lengthCompare;
+            return left.compareToIgnoreCase(right);
+        });
+        return matches.get(0);
+    }
+
+    private void collectRelativeFileMatches(File rootDir, File current, String normalizedName, List<String> matches) {
+        File[] children = current.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectRelativeFileMatches(rootDir, child, normalizedName, matches);
+                continue;
+            }
+            if (child.getName().trim().toLowerCase(Locale.US).equals(normalizedName)) {
+                String relative = relativizePath(rootDir, child);
+                if (relative != null && !relative.trim().isEmpty()) matches.add(normalizeRelativePath(relative));
+            }
+        }
+    }
+
+    private int scoreRelativeFileMatch(String relativePath, @Nullable String[] preferredFragments) {
+        String normalized = normalizeRelativePath(relativePath).toLowerCase(Locale.US);
+        if (!normalized.contains("/")) return 50;
+        int score = 0;
+        if (preferredFragments != null) {
+            for (int i = 0; i < preferredFragments.length; i++) {
+                String fragment = preferredFragments[i];
+                if (fragment == null || fragment.isEmpty()) continue;
+                int weight = Math.max(1, 1000 - (i * 12));
+                if (normalized.equals(fragment)) score = Math.max(score, weight);
+                if (normalized.startsWith(fragment + "/")) score = Math.max(score, weight);
+                if (normalized.contains("/" + fragment + "/")) score = Math.max(score, weight - 120);
+            }
+        }
+        return score;
     }
 
     private void collectTreeMappings(

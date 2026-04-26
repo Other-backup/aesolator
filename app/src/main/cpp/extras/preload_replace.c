@@ -97,6 +97,38 @@ static const char *effective_path(char **storage, const char *path) {
     return *storage ? *storage : path;
 }
 
+static int extract_unix_sockaddr_path(
+        const struct sockaddr *address,
+        socklen_t address_len,
+        char *path,
+        size_t path_size,
+        int *abstract_socket
+) {
+    if (!address || !path || path_size == 0) return 0;
+    path[0] = '\0';
+    if (abstract_socket) *abstract_socket = 0;
+    if (address->sa_family != AF_UNIX) return 0;
+    if (address_len <= offsetof(struct sockaddr_un, sun_path)) return 0;
+
+    const struct sockaddr_un *input = (const struct sockaddr_un *)address;
+    size_t available_len = (size_t)address_len - offsetof(struct sockaddr_un, sun_path);
+    if (available_len > sizeof(input->sun_path)) available_len = sizeof(input->sun_path);
+
+    int is_abstract = input->sun_path[0] == '\0';
+    const char *source = is_abstract ? input->sun_path + 1 : input->sun_path;
+    size_t source_capacity = is_abstract ? (available_len > 0 ? available_len - 1 : 0) : available_len;
+    if (source_capacity == 0) return 0;
+
+    size_t raw_len = is_abstract ? source_capacity : strnlen(source, source_capacity);
+    while (is_abstract && raw_len > 0 && source[raw_len - 1] == '\0') raw_len--;
+    if (raw_len == 0 || raw_len >= path_size) return 0;
+
+    memcpy(path, source, raw_len);
+    path[raw_len] = '\0';
+    if (abstract_socket) *abstract_socket = is_abstract;
+    return 1;
+}
+
 static int rewrite_unix_sockaddr(
         const struct sockaddr *address,
         socklen_t address_len,
@@ -105,21 +137,22 @@ static int rewrite_unix_sockaddr(
         socklen_t *effective_length
 ) {
     if (!address || !storage || !effective_address || !effective_length) return 0;
-    if (address->sa_family != AF_UNIX) return 0;
-    if (address_len <= offsetof(struct sockaddr_un, sun_path)) return 0;
-
-    const struct sockaddr_un *input = (const struct sockaddr_un *)address;
-    if (input->sun_path[0] == '\0') return 0;
-
-    size_t raw_len = strnlen(input->sun_path, sizeof(input->sun_path));
-    if (raw_len == 0) return 0;
-
-    char path[sizeof(input->sun_path) + 1];
-    memcpy(path, input->sun_path, raw_len);
-    path[raw_len] = '\0';
+    char path[sizeof(storage->sun_path) + 1];
+    int abstract_socket = 0;
+    if (!extract_unix_sockaddr_path(address, address_len, path, sizeof(path), &abstract_socket)) return 0;
 
     char *rewritten = aero_rewrite_path(path);
     if (!rewritten) return 0;
+    if (rewritten[0] == '\0' || strlen(rewritten) >= sizeof(storage->sun_path)) {
+        aero_redirect_log(
+                "unix-socket",
+                "skipped rewritten %s unix socket '%s' because target is invalid or too long",
+                abstract_socket ? "abstract" : "pathname",
+                path
+        );
+        free(rewritten);
+        return 0;
+    }
 
     memset(storage, 0, sizeof(*storage));
     storage->sun_family = AF_UNIX;
@@ -128,7 +161,13 @@ static int rewrite_unix_sockaddr(
 
     *effective_address = (const struct sockaddr *)storage;
     *effective_length = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + strlen(storage->sun_path) + 1);
-    aero_redirect_log("unix-socket", "rewrote unix socket path '%s' -> '%s'", path, storage->sun_path);
+    aero_redirect_log(
+            "unix-socket",
+            "rewrote %s unix socket '%s' -> pathname '%s'",
+            abstract_socket ? "abstract" : "pathname",
+            path,
+            storage->sun_path
+    );
     return 1;
 }
 
@@ -301,8 +340,26 @@ int connect(int sockfd, const struct sockaddr *address, socklen_t address_len) {
     struct sockaddr_un rewritten_address;
     const struct sockaddr *effective_address = address;
     socklen_t effective_length = address_len;
-    rewrite_unix_sockaddr(address, address_len, &rewritten_address, &effective_address, &effective_length);
-    return real_connect_fn(sockfd, effective_address, effective_length);
+    char unix_path[sizeof(rewritten_address.sun_path) + 1];
+    int abstract_socket = 0;
+    int is_unix = extract_unix_sockaddr_path(address, address_len, unix_path, sizeof(unix_path), &abstract_socket);
+    int rewritten = rewrite_unix_sockaddr(address, address_len, &rewritten_address, &effective_address, &effective_length);
+    int result = real_connect_fn(sockfd, effective_address, effective_length);
+    int saved_errno = result < 0 ? errno : 0;
+    if (is_unix) {
+        aero_redirect_log(
+                "unix-socket-connect",
+                "%s unix socket '%s'%s result=%d errno=%d (%s)",
+                abstract_socket ? "abstract" : "pathname",
+                unix_path,
+                rewritten ? " redirected" : "",
+                result,
+                saved_errno,
+                result < 0 ? strerror(saved_errno) : "ok"
+        );
+    }
+    if (result < 0) errno = saved_errno;
+    return result;
 }
 
 int bind(int sockfd, const struct sockaddr *address, socklen_t address_len) {
@@ -314,8 +371,26 @@ int bind(int sockfd, const struct sockaddr *address, socklen_t address_len) {
     struct sockaddr_un rewritten_address;
     const struct sockaddr *effective_address = address;
     socklen_t effective_length = address_len;
-    rewrite_unix_sockaddr(address, address_len, &rewritten_address, &effective_address, &effective_length);
-    return real_bind_fn(sockfd, effective_address, effective_length);
+    char unix_path[sizeof(rewritten_address.sun_path) + 1];
+    int abstract_socket = 0;
+    int is_unix = extract_unix_sockaddr_path(address, address_len, unix_path, sizeof(unix_path), &abstract_socket);
+    int rewritten = rewrite_unix_sockaddr(address, address_len, &rewritten_address, &effective_address, &effective_length);
+    int result = real_bind_fn(sockfd, effective_address, effective_length);
+    int saved_errno = result < 0 ? errno : 0;
+    if (is_unix) {
+        aero_redirect_log(
+                "unix-socket-bind",
+                "%s unix socket '%s'%s result=%d errno=%d (%s)",
+                abstract_socket ? "abstract" : "pathname",
+                unix_path,
+                rewritten ? " redirected" : "",
+                result,
+                saved_errno,
+                result < 0 ? strerror(saved_errno) : "ok"
+        );
+    }
+    if (result < 0) errno = saved_errno;
+    return result;
 }
 
 int execve(const char *path, char *const argv[], char *const envp[]) {

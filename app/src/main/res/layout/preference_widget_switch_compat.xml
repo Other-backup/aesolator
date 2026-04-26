@@ -10,6 +10,8 @@
     android:clickable="false"
     android:focusable="false"
     android:minHeight="32dp"
+    android:thumb="@drawable/ae_switch_thumb"
     app:showText="false"
-    app:switchMinWidth="52dp"
+    app:switchMinWidth="56dp"
+    app:track="@drawable/ae_switch_track"
     app:splitTrack="false" />

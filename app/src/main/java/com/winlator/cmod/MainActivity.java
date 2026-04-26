@@ -333,6 +333,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void showContainersAfterContainerCreated(@Nullable Container container) {
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "CONTAINER_CREATE_NAVIGATION_RESOLVED",
+                null,
+                "navigation",
+                "container_create_return_to_containers",
+                ForensicLogger.fields(
+                        "container_id", container != null ? container.id : -1,
+                        "container_name", container != null ? container.getName() : "-",
+                        "destination", "containers",
+                        "reason", "create_complete"
+                )
+        );
+        show(new ContainersFragment(), true);
+    }
+
     private void openBigPictureMode() {
         startActivity(new Intent(this, BigPictureActivity.class));
         overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
@@ -676,14 +694,19 @@ public class MainActivity extends AppCompatActivity {
                     "<b>Primary Wine / Proton source lines</b>",
                     "WineHQ / Wine upstream (<a href=\"https://www.winehq.org\">winehq.org</a>)",
                     "Valve Proton / proton-wine 11 (<a href=\"https://github.com/ValveSoftware/wine\">github.com/ValveSoftware/wine</a>)",
+                    "AndreVto / proton-wine Bionic ARM64EC patches (<a href=\"https://github.com/AndreVto/proton-wine\">github.com/AndreVto/proton-wine</a>)",
                     "AndreRH Wine ARM64EC / Hangover references (<a href=\"https://github.com/AndreRH/wine\">github.com/AndreRH/wine</a>)",
                     "GameNative Wine / Proton Android-facing line (<a href=\"https://github.com/GameNative/wine\">github.com/GameNative/wine</a>)",
                     "Valve Proton packaging context (<a href=\"https://github.com/ValveSoftware/Proton\">github.com/ValveSoftware/Proton</a>)",
                     "---",
                     "<b>Android app and runtime donor lines</b>",
                     "BrunoSX / Winlator and WFM (<a href=\"https://github.com/brunodev85/winlator\">github.com/brunodev85/winlator</a>)",
+                    "MaxsTechReview / WinNative runtime model (<a href=\"https://github.com/MaxsTechReview/WinNative\">github.com/MaxsTechReview/WinNative</a>)",
+                    "utkarshdalal / GameNative imagefs and runtime route (<a href=\"https://github.com/utkarshdalal/GameNative\">github.com/utkarshdalal/GameNative</a>)",
+                    "palazos / winlatorCmod input and controller donor line (<a href=\"https://github.com/palazos/winlatorCmod\">github.com/palazos/winlatorCmod</a>)",
                     "SEGAINDEED / winlator-bionic-vortek (<a href=\"https://github.com/SEGAINDEED/winlator-bionic-vortek\">github.com/SEGAINDEED/winlator-bionic-vortek</a>)",
                     "Xnick417x / Winlator-Bionic-Nightly-wcp (<a href=\"https://github.com/Xnick417x/Winlator-Bionic-Nightly-wcp\">github.com/Xnick417x/Winlator-Bionic-Nightly-wcp</a>)",
+                    "The412Banner / Nightlies and Gamehub Components (<a href=\"https://github.com/The412Banner/Nightlies\">github.com/The412Banner/Nightlies</a>)",
                     "Pipetto-crypto / gladiorenderer (<a href=\"https://github.com/Pipetto-crypto/gladiorenderer\">github.com/Pipetto-crypto/gladiorenderer</a>)",
                     "leegao / bionic-vulkan-wrapper (<a href=\"https://github.com/leegao/bionic-vulkan-wrapper\">github.com/leegao/bionic-vulkan-wrapper</a>)",
                     "---",

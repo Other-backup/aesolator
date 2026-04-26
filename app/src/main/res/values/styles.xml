@@ -285,9 +285,12 @@
 
     <style name="SwitchControl" parent="Widget.AppCompat.CompoundButton.Switch">
         <item name="android:minHeight">32dp</item>
+        <item name="android:thumb">@drawable/ae_switch_thumb</item>
+        <item name="track">@drawable/ae_switch_track</item>
         <item name="showText">false</item>
-        <item name="switchMinWidth">52dp</item>
+        <item name="switchMinWidth">56dp</item>
         <item name="splitTrack">false</item>
+        <item name="thumbTextPadding">0dp</item>
     </style>
 
     <style name="ButtonPositive" parent="BaseButton">

@@ -35,8 +35,7 @@ final class ImportedContentHeuristics {
             return ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
         }
         if (findRelativeFile(rootDir, "box64") != null) return ContentProfile.ContentType.CONTENT_TYPE_BOX64;
-        if (findRelativeFile(rootDir, "d3d8_dgvoodoo.dll") != null
-                || findRelativeFile(rootDir, "ddraw_dgvoodoo.dll") != null) {
+        if (looksLikeDgVoodooPayload(rootDir)) {
             return ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO;
         }
         if (findRelativeFile(rootDir, "d3d11.dll") != null
@@ -126,6 +125,23 @@ final class ImportedContentHeuristics {
                         + firstNonBlank(remoteHint != null ? remoteHint.artifactName : "", "")
         ).toLowerCase(Locale.US);
         return surface.contains("proton");
+    }
+
+    private static boolean looksLikeDgVoodooPayload(File rootDir) {
+        if (findRelativeFile(rootDir, "d3d8_dgvoodoo.dll") != null
+                || findRelativeFile(rootDir, "d3d9_dgvoodoo.dll") != null
+                || findRelativeFile(rootDir, "ddraw_dgvoodoo.dll") != null) {
+            return true;
+        }
+        boolean hasDgVoodooMarker = findRelativeFile(rootDir, "dgvoodoo.conf") != null
+                || findRelativeFile(rootDir, "dgvoodoocpl.exe") != null;
+        if (!hasDgVoodooMarker) return false;
+        return findRelativeFile(rootDir, "ddraw.dll") != null
+                || findRelativeFile(rootDir, "d3d8.dll") != null
+                || findRelativeFile(rootDir, "d3d9.dll") != null
+                || findRelativeFile(rootDir, "glide.dll") != null
+                || findRelativeFile(rootDir, "glide2x.dll") != null
+                || findRelativeFile(rootDir, "glide3x.dll") != null;
     }
 
     @Nullable

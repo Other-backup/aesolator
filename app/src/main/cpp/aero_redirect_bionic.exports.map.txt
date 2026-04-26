@@ -1,12 +1,21 @@
 {
     global:
+        access;
+        bind;
+        connect;
+        dlopen;
+        faccessat;
+        fopen;
+        fopen64;
         fstatat;
         ioctl;
+        lstat;
         open;
         open64;
         openat;
         read;
         readlink;
+        stat;
     local:
         *;
 };

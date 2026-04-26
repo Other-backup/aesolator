@@ -658,9 +658,76 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_TMP_PATH", imageFs.getTmpDir().getAbsolutePath());
         launchEnv.put("AERO_RUNTIME_WINE_PATH", winePath);
         launchEnv.put("AERO_RUNTIME_ANDROID_HOST_LIB_PATH", imageFs.getAndroidHostLibDir().getAbsolutePath());
-        if (!launchEnv.has("AERO_REDIRECT_DEBUG")) {
+        applyXlibPathContracts(context, rootDir, launchEnv);
+        if (shouldEnableRuntimeRedirectDebug(launchEnv)) {
+            launchEnv.put("AERO_REDIRECT_DEBUG", "1");
+        } else if (!launchEnv.has("AERO_REDIRECT_DEBUG")) {
             launchEnv.put("AERO_REDIRECT_DEBUG", "0");
         }
+    }
+
+    private void applyXlibPathContracts(Context context, File rootDir, EnvVars launchEnv) {
+        if (rootDir == null || launchEnv == null) return;
+        File x11ShareDir = new File(rootDir, "usr/share/X11");
+        File x11LocaleDir = new File(x11ShareDir, "locale");
+        File x11KeysymDb = new File(x11ShareDir, "XKeysymDB");
+        File x11ErrorDb = new File(x11ShareDir, "XErrorDB");
+        File x11XcmsDb = new File(x11ShareDir, "Xcms.txt");
+        File termuxX11Socket = new File(rootDir, "usr/tmp/.X11-unix/X0");
+
+        if (x11LocaleDir.isDirectory()) launchEnv.put("XLOCALEDIR", x11LocaleDir.getAbsolutePath());
+        if (x11KeysymDb.isFile()) launchEnv.put("XKEYSYMDB", x11KeysymDb.getAbsolutePath());
+        if (x11ErrorDb.isFile()) launchEnv.put("XERRORDB", x11ErrorDb.getAbsolutePath());
+        if (x11XcmsDb.isFile()) launchEnv.put("XCMSDB", x11XcmsDb.getAbsolutePath());
+
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "XLIB_PATH_CONTRACT_APPLIED",
+                null,
+                "guest_program_launcher",
+                "xlib_path_contract_applied",
+                ForensicLogger.fields(
+                        "xlocale_dir", launchEnv.get("XLOCALEDIR"),
+                        "xlocale_dir_present", x11LocaleDir.isDirectory(),
+                        "xkeysymdb", launchEnv.get("XKEYSYMDB"),
+                        "xkeysymdb_present", x11KeysymDb.isFile(),
+                        "xerrordb", launchEnv.get("XERRORDB"),
+                        "xerrordb_present", x11ErrorDb.isFile(),
+                        "xcmsdb", launchEnv.get("XCMSDB"),
+                        "xcmsdb_present", x11XcmsDb.isFile(),
+                        "termux_hardcoded_socket_source", "/data/data/com.termux/files/usr/tmp/.X11-unix/X0",
+                        "termux_hardcoded_socket_target", termuxX11Socket.getAbsolutePath(),
+                        "termux_hardcoded_socket_target_present", termuxX11Socket.exists()
+                )
+        );
+    }
+
+    protected boolean shouldEnableRuntimeRedirectDebug(EnvVars launchEnv) {
+        if (launchEnv == null) return false;
+        return "1".equals(launchEnv.get("AERO_FORENSIC_MODE").trim())
+                || !launchEnv.get("AERO_FORENSIC_TRACE_ID").trim().isEmpty()
+                || "1".equals(launchEnv.get("AERO_RUNTIME_FORENSIC_DEBUG").trim());
+    }
+
+    private void applyRuntimeRedirectDebugContract(Context context, EnvVars launchEnv, String traceId, String appId) {
+        if (!shouldEnableRuntimeRedirectDebug(launchEnv)) return;
+        String previous = launchEnv.get("AERO_REDIRECT_DEBUG");
+        launchEnv.put("AERO_REDIRECT_DEBUG", "1");
+        logLaunchStageEvent(
+                context,
+                "info",
+                "RUNTIME_REDIRECT_FORENSIC_DEBUG_ENABLED",
+                traceId,
+                "runtime_redirect_forensic_debug",
+                appId,
+                -1L,
+                null,
+                "previous_redirect_debug", previous,
+                "redirect_debug", launchEnv.get("AERO_REDIRECT_DEBUG"),
+                "forensic_mode", launchEnv.get("AERO_FORENSIC_MODE"),
+                "forensic_trace_id_present", !launchEnv.get("AERO_FORENSIC_TRACE_ID").trim().isEmpty()
+        );
     }
 
     private boolean shouldDisableFullscreenHack() {
@@ -974,7 +1041,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "LD_LIBRARY_PATH",
                 wineLibPath + ":" + wineLib64Path + ":" + wineUnixPath + ":" + rootDir.getPath() + "/usr/lib" + ":" + rootDir.getPath() + "/usr/lib64" + ":" + "/system/lib64"
         );
-        launchEnv.put("WINEDLLPATH", wineDllPath + "/aarch64-windows:" + wineDllPath + "/i386-windows:" + wineDllPath);
+        String wineDllSearchPath = buildRuntimeWineDllPath(wineDllPath, wineUnixPath);
+        launchEnv.put("WINEDLLPATH", wineDllSearchPath);
         launchEnv.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
         launchEnv.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
         launchEnv.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
@@ -1015,6 +1083,24 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("AERO_RUNTIME_WINE_BIN_PATH", wineBinPath);
         launchEnv.put("AERO_RUNTIME_WINE_LIB_PATH", wineLibPath);
         launchEnv.put("AERO_RUNTIME_WINE_DLL_PATH", wineDllPath);
+        launchEnv.put("AERO_RUNTIME_WINE_UNIX_PATH", wineUnixPath);
+        logLaunchStageEvent(
+                context,
+                "info",
+                "RUNTIME_WINE_DLLPATH_CONTRACT_APPLIED",
+                stageTraceId,
+                "runtime_winedllpath_contract",
+                appId,
+                -1L,
+                null,
+                "runtime_root", wineRootPath,
+                "wine_dll_path", wineDllPath,
+                "wine_unix_path", wineUnixPath,
+                "winedllpath_head", summarizePathHead(wineDllSearchPath, 8),
+                "contains_unix_path", wineDllSearchPath.contains(wineUnixPath),
+                "winex11_unix_present", new File(wineUnixPath, "winex11.so").isFile(),
+                "winex11_pe_present", new File(wineDllPath + "/aarch64-windows", "winex11.drv").isFile()
+        );
 
 
         launchEnv.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
@@ -1047,6 +1133,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         ensureRuntimeSdlCompatLink(context, imageFs);
         applyProtonControllerBridgeEnv(context, imageFs, launchEnv);
         mergeExternalEnvVars(launchEnv, ownedLdPreload.toString(), launchEnv.get("FAKE_EVDEV_DIR"));
+        applyRuntimeRedirectDebugContract(context, launchEnv, stageTraceId, appId);
 
         if (openWithAndroidBrowser) {
             launchEnv.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
@@ -1065,6 +1152,17 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         applyLauncherSpecificEnvVars(context, imageFs, rootDir, launchEnv);
         if (usesAndroidBionicHostEnv(effectiveEmulator, desktopShellBootstrap)) {
             applyAndroidBionicHostEnv(context, imageFs, rootDir, launchEnv);
+            applyDesktopShellX11BootstrapIsolation(context, imageFs, rootDir, launchEnv, stageTraceId, appId, effectiveEmulator, desktopShellBootstrap);
+            logAndroidBionicHostFinalEnv(
+                    context,
+                    imageFs,
+                    rootDir,
+                    launchEnv,
+                    stageTraceId,
+                    appId,
+                    effectiveEmulator,
+                    desktopShellBootstrap
+            );
         }
 
         if (launchEnv.has("MANGOHUD")) {
@@ -1256,13 +1354,159 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "android_bionic_host_library_path_order_applied",
                 ForensicLogger.fields(
                         "owner", owner == null ? "" : owner,
-                        "mode", "runtime_first_host_second_system_tail_without_guest_usr_lib",
+                        "mode", "runtime_first_system_tail_host_last_without_guest_usr_lib",
                         "guest_lib_dir", imageFs.getLibDir().getPath(),
                         "host_lib_dir", imageFs.getAndroidHostLibDir().getPath(),
                         "ld_library_path_before", summarizePathHead(currentLdLibraryPath, 6),
                         "ld_library_path_head", summarizePathHead(ldLibraryPath, 6)
                 )
         );
+    }
+
+    private void logAndroidBionicHostFinalEnv(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv,
+                                             String traceId, String appId, String effectiveEmulator,
+                                             boolean desktopShellBootstrap) {
+        if (imageFs == null || launchEnv == null) return;
+        File runtimeRoot = new File(imageFs.getWinePath());
+        File wineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRoot);
+        File hostLibDir = imageFs.getAndroidHostLibDir();
+        File eglStubDir = new File(hostLibDir, "wine-x11-egl-stub");
+        File redirectLib = new File(hostLibDir, "libredirect-bionic.so");
+        File rootedX11Socket = rootDir != null ? new File(rootDir, UnixSocketConfig.XSERVER_PATH.substring(1)) : null;
+        File rootedSysvShmSocket = rootDir != null ? new File(rootDir, UnixSocketConfig.SYSVSHM_SERVER_PATH.substring(1)) : null;
+        String ldLibraryPath = launchEnv.get("LD_LIBRARY_PATH");
+        String ldPreload = launchEnv.get("LD_PRELOAD");
+
+        logLaunchStageEvent(
+                context,
+                "info",
+                "ANDROID_BIONIC_HOST_FINAL_ENV_APPLIED",
+                traceId,
+                "android_bionic_host_final_env",
+                appId,
+                -1L,
+                null,
+                "effective_emulator", effectiveEmulator,
+                "desktop_shell_bootstrap", desktopShellBootstrap,
+                "runtime_root", runtimeRoot.getPath(),
+                "wine_unix_dir", wineUnixDir != null ? wineUnixDir.getPath() : "",
+                "winex11_so_present", wineUnixDir != null && new File(wineUnixDir, "winex11.so").isFile(),
+                "host_lib_dir", hostLibDir.getPath(),
+                "host_libx11_present", new File(hostLibDir, "libX11.so").isFile(),
+                "host_libxext_present", new File(hostLibDir, "libXext.so").isFile(),
+                "host_sysvshm_present", new File(hostLibDir, "libandroid-sysvshm.so").isFile(),
+                "display", launchEnv.get("DISPLAY"),
+                "android_sysvshm_server", launchEnv.get("ANDROID_SYSVSHM_SERVER"),
+                "wine_x11forceglx", launchEnv.get("WINE_X11FORCEGLX"),
+                "wine_use_egl", launchEnv.get("WINE_USE_EGL"),
+                "egl_compat_dir", launchEnv.get("AERO_WINE_X11_EGL_COMPAT_DIR"),
+                "egl_stub_global_ld", launchEnv.get("AERO_WINE_X11_EGL_STUB_GLOBAL_LD"),
+                "redirect_debug", launchEnv.get("AERO_REDIRECT_DEBUG"),
+                "contains_egl_stub_global_ld", containsPathSegment(ldLibraryPath, eglStubDir.getPath()),
+                "host_redirect_present", redirectLib.isFile(),
+                "redirect_preload_present", containsPathSegment(ldPreload, redirectLib.getPath()),
+                "absolute_x11_socket_path", UnixSocketConfig.XSERVER_PATH,
+                "absolute_x11_socket_present", new File(UnixSocketConfig.XSERVER_PATH).exists(),
+                "rooted_x11_socket_path", rootedX11Socket != null ? rootedX11Socket.getPath() : "",
+                "rooted_x11_socket_present", rootedX11Socket != null && rootedX11Socket.exists(),
+                "x11_socket_namespaces", "pathname,abstract",
+                "x11_transport_contract", "DISPLAY=:0 with rooted pathname socket plus Linux abstract /tmp/.X11-unix/X0 fallback",
+                "rooted_sysvshm_socket_path", rootedSysvShmSocket != null ? rootedSysvShmSocket.getPath() : "",
+                "rooted_sysvshm_socket_present", rootedSysvShmSocket != null && rootedSysvShmSocket.exists(),
+                "ld_library_path_head", summarizePathHead(ldLibraryPath, 8),
+                "ld_preload_head", summarizePathHead(ldPreload, 8),
+                "vk_icd_filenames", launchEnv.get("VK_ICD_FILENAMES"),
+                "vk_driver_files", launchEnv.get("VK_DRIVER_FILES"),
+                "vk_layer_path", launchEnv.get("VK_LAYER_PATH"),
+                "vk_implicit_layer_path", launchEnv.get("VK_IMPLICIT_LAYER_PATH"),
+                "vk_loader_drivers_disable", launchEnv.get("VK_LOADER_DRIVERS_DISABLE"),
+                "vk_loader_layers_disable", launchEnv.get("VK_LOADER_LAYERS_DISABLE"),
+                "desktop_shell_vulkan_isolated", launchEnv.get("AERO_DESKTOP_SHELL_VULKAN_ISOLATED"),
+                "desktop_shell_x11_bootstrap_route", launchEnv.get("AERO_DESKTOP_SHELL_X11_BOOTSTRAP_ROUTE")
+        );
+    }
+
+    private void applyDesktopShellX11BootstrapIsolation(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv,
+                                                        String traceId, String appId, String effectiveEmulator,
+                                                        boolean desktopShellBootstrap) {
+        if (!desktopShellBootstrap || imageFs == null || rootDir == null || launchEnv == null) return;
+
+        String previousVkIcdFilenames = launchEnv.get("VK_ICD_FILENAMES");
+        String previousVkDriverFiles = launchEnv.get("VK_DRIVER_FILES");
+        String previousVkLayerPath = launchEnv.get("VK_LAYER_PATH");
+        String previousVkImplicitLayerPath = launchEnv.get("VK_IMPLICIT_LAYER_PATH");
+        String previousLoaderDriversDisable = launchEnv.get("VK_LOADER_DRIVERS_DISABLE");
+        String previousLoaderLayersDisable = launchEnv.get("VK_LOADER_LAYERS_DISABLE");
+
+        File emptyDriverDir = new File(imageFs.getTmpDir(), "x11-bootstrap-empty-vulkan-driver.d");
+        File emptyExplicitLayerDir = new File(imageFs.getTmpDir(), "x11-bootstrap-empty-vulkan-explicit-layer.d");
+        File emptyImplicitLayerDir = new File(imageFs.getTmpDir(), "x11-bootstrap-empty-vulkan-implicit-layer.d");
+        ensureDirectory(emptyDriverDir);
+        ensureDirectory(emptyExplicitLayerDir);
+        ensureDirectory(emptyImplicitLayerDir);
+
+        launchEnv.remove("VK_ICD_FILENAMES");
+        launchEnv.put("VK_DRIVER_FILES", emptyDriverDir.getPath());
+        launchEnv.remove("VK_ADD_DRIVER_FILES");
+        launchEnv.put("VK_LOADER_DRIVERS_DISABLE", appendLoaderFilter(previousLoaderDriversDisable, "*"));
+
+        launchEnv.remove("VK_INSTANCE_LAYERS");
+        launchEnv.put("VK_LAYER_PATH", emptyExplicitLayerDir.getPath());
+        launchEnv.put("VK_IMPLICIT_LAYER_PATH", emptyImplicitLayerDir.getPath());
+        launchEnv.remove("VK_ADD_LAYER_PATH");
+        launchEnv.remove("VK_ADD_IMPLICIT_LAYER_PATH");
+        launchEnv.remove("VK_LOADER_LAYERS_ALLOW");
+        launchEnv.remove("VK_LOADER_LAYERS_ENABLE");
+        launchEnv.put("VK_LOADER_LAYERS_DISABLE", appendLoaderFilter(previousLoaderLayersDisable, "*"));
+
+        launchEnv.put("WINE_X11FORCEGLX", "1");
+        launchEnv.put("WINE_USE_EGL", "0");
+        launchEnv.put("AERO_DESKTOP_SHELL_VULKAN_ISOLATED", "1");
+        launchEnv.put("AERO_DESKTOP_SHELL_X11_BOOTSTRAP_ROUTE", "x11-glx-bootstrap-with-empty-vulkan-driver-discovery");
+        launchEnv.put("AERO_DESKTOP_SHELL_X11_BOOTSTRAP_OWNER", "winex11-process-attach-before-mapwindow");
+
+        logLaunchStageEvent(
+                context,
+                "warn",
+                "DESKTOP_SHELL_X11_BOOTSTRAP_VULKAN_ISOLATED",
+                traceId,
+                "desktop_shell_x11_bootstrap_vulkan_isolated",
+                appId,
+                -1L,
+                null,
+                "effective_emulator", effectiveEmulator,
+                "previous_vk_icd_filenames", previousVkIcdFilenames,
+                "previous_vk_driver_files", previousVkDriverFiles,
+                "previous_vk_layer_path", previousVkLayerPath,
+                "previous_vk_implicit_layer_path", previousVkImplicitLayerPath,
+                "previous_vk_loader_drivers_disable", previousLoaderDriversDisable,
+                "previous_vk_loader_layers_disable", previousLoaderLayersDisable,
+                "vk_driver_files", launchEnv.get("VK_DRIVER_FILES"),
+                "vk_layer_path", launchEnv.get("VK_LAYER_PATH"),
+                "vk_implicit_layer_path", launchEnv.get("VK_IMPLICIT_LAYER_PATH"),
+                "vk_loader_drivers_disable", launchEnv.get("VK_LOADER_DRIVERS_DISABLE"),
+                "vk_loader_layers_disable", launchEnv.get("VK_LOADER_LAYERS_DISABLE"),
+                "wine_x11forceglx", launchEnv.get("WINE_X11FORCEGLX"),
+                "wine_use_egl", launchEnv.get("WINE_USE_EGL"),
+                "reason", "winex11_process_attach_must_reach_mapwindow_before_vulkan_provider_loading"
+        );
+    }
+
+    private static void ensureDirectory(File directory) {
+        if (directory != null && !directory.isDirectory()) {
+            directory.mkdirs();
+        }
+    }
+
+    private static String appendLoaderFilter(String value, String filter) {
+        String normalizedFilter = filter == null ? "" : filter.trim();
+        if (normalizedFilter.isEmpty()) return value == null ? "" : value.trim();
+        String normalizedValue = value == null ? "" : value.trim();
+        if (normalizedValue.isEmpty()) return normalizedFilter;
+        for (String part : normalizedValue.split(",")) {
+            if (normalizedFilter.equalsIgnoreCase(part.trim())) return normalizedValue;
+        }
+        return normalizedValue + "," + normalizedFilter;
     }
 
     protected String buildAndroidBionicHostLdLibraryPath(ImageFs imageFs, String currentLdLibraryPath) {
@@ -1272,6 +1516,33 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 new File(imageFs.getRootDir(), "usr/lib64").getPath(),
                 imageFs.getAndroidHostLibDir().getPath()
         );
+    }
+
+    protected static String buildRuntimeWineDllPath(String wineDllPath, String wineUnixPath) {
+        LinkedHashSet<String> paths = new LinkedHashSet<>();
+        appendLdLibraryPath(paths, wineDllPath + "/aarch64-windows");
+        appendLdLibraryPath(paths, wineDllPath + "/i386-windows");
+        appendLdLibraryPath(paths, wineDllPath);
+        appendLdLibraryPath(paths, wineUnixPath);
+        return String.join(":", paths);
+    }
+
+    private static boolean containsPathSegment(String pathValue, String expectedSegment) {
+        String expected = normalizePathSegment(expectedSegment);
+        if (pathValue == null || pathValue.trim().isEmpty() || expected.isEmpty()) return false;
+        for (String segment : pathValue.split(":")) {
+            if (expected.equals(normalizePathSegment(segment))) return true;
+        }
+        return false;
+    }
+
+    private static String normalizePathSegment(String path) {
+        if (path == null) return "";
+        String normalized = path.trim();
+        while (normalized.endsWith("/") && normalized.length() > 1) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 
     private static void appendLdLibraryDir(Set<String> paths, File directory) {

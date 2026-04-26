@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import android.util.SparseArray;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xserver.errors.BadIdChoice;
 import com.winlator.cmod.xserver.errors.BadMatch;
@@ -70,8 +71,10 @@ public class WindowManager extends XResourceManager {
     public void destroyWindow(int id) {
         Window window = getWindow(id);
         if (window != null && rootWindow.id != id) {
+            logWindowEvent("XSERVER_WINDOW_DESTROY_REQUESTED", "xserver_window_destroy_requested", window);
             unmapWindow(window);
             removeAllSubwindowsAndWindow(window);
+            logWindowEvent("XSERVER_WINDOW_DESTROY_APPLIED", "xserver_window_destroy_applied", window);
             triggerOnDestroyWindow(window);
         }
     }
@@ -91,6 +94,7 @@ public class WindowManager extends XResourceManager {
     }
 
     public void mapWindow(Window window) {
+        logWindowEvent("XSERVER_WINDOW_MAP_REQUESTED", "xserver_window_map_requested", window);
         if (!window.attributes.isMapped()) {
             Window parent = window.getParent();
             if (!parent.hasEventListenerFor(Event.SUBSTRUCTURE_REDIRECT) || window.attributes.isOverrideRedirect()) {
@@ -98,19 +102,25 @@ public class WindowManager extends XResourceManager {
                 window.sendEvent(Event.STRUCTURE_NOTIFY, new MapNotify(window, window));
                 parent.sendEvent(Event.SUBSTRUCTURE_NOTIFY, new MapNotify(parent, window));
                 window.sendEvent(Event.EXPOSURE, new Expose(window));
+                logWindowEvent("XSERVER_WINDOW_MAP_APPLIED", "xserver_window_map_applied", window);
                 triggerOnMapWindow(window);
             }
-            else parent.sendEvent(Event.SUBSTRUCTURE_REDIRECT, new MapRequest(parent, window));
+            else {
+                parent.sendEvent(Event.SUBSTRUCTURE_REDIRECT, new MapRequest(parent, window));
+                logWindowEvent("XSERVER_WINDOW_MAP_DEFERRED_TO_WM", "xserver_window_map_deferred_to_wm", window);
+            }
         }
     }
 
     public void unmapWindow(Window window) {
+        logWindowEvent("XSERVER_WINDOW_UNMAP_REQUESTED", "xserver_window_unmap_requested", window);
         if (rootWindow.id != window.id && window.attributes.isMapped()) {
             window.attributes.setMapped(false);
             Window parent = window.getParent();
             window.sendEvent(Event.STRUCTURE_NOTIFY, new UnmapNotify(window, window));
             parent.sendEvent(Event.SUBSTRUCTURE_NOTIFY, new UnmapNotify(parent, window));
             if (window == focusedWindow) revertFocus();
+            logWindowEvent("XSERVER_WINDOW_UNMAP_APPLIED", "xserver_window_unmap_applied", window);
             triggerOnUnmapWindow(window);
         }
     }
@@ -178,6 +188,7 @@ public class WindowManager extends XResourceManager {
         if (drawable != null) drawable.setOnDrawListener(() -> triggerOnUpdateWindowContent(window));
         windows.put(id, window);
         parent.addChild(window);
+        logWindowEvent("XSERVER_WINDOW_CREATE", "xserver_window_create", window);
         triggerOnCreateResourceListener(window);
         return window;
     }
@@ -204,6 +215,7 @@ public class WindowManager extends XResourceManager {
             window.setY(y);
             window.setWidth(width);
             window.setHeight(height);
+            logWindowEvent("XSERVER_WINDOW_GEOMETRY_CHANGED", "xserver_window_geometry_changed", window);
             triggerOnUpdateWindowGeometry(window, resized);
         }
 
@@ -271,8 +283,12 @@ public class WindowManager extends XResourceManager {
             Window previousSibling = window.previousSibling();
             window.sendEvent(Event.STRUCTURE_NOTIFY, new ConfigureNotify(window, window, previousSibling, x, y, width, height, borderWidth, overrideRedirect));
             parent.sendEvent(Event.SUBSTRUCTURE_NOTIFY, new ConfigureNotify(parent, window, previousSibling, x, y, width, height, borderWidth, overrideRedirect));
+            logWindowEvent("XSERVER_WINDOW_CONFIGURE_APPLIED", "xserver_window_configure_applied", window);
         }
-        else parent.sendEvent(Event.SUBSTRUCTURE_REDIRECT, new ConfigureRequest(parent, window, window.previousSibling(), x, y, width, height, borderWidth, stackMode, valueMask));
+        else {
+            parent.sendEvent(Event.SUBSTRUCTURE_REDIRECT, new ConfigureRequest(parent, window, window.previousSibling(), x, y, width, height, borderWidth, stackMode, valueMask));
+            logWindowEvent("XSERVER_WINDOW_CONFIGURE_DEFERRED_TO_WM", "xserver_window_configure_deferred_to_wm", window);
+        }
     }
 
     public void reparentWindow(Window window, Window newParent) {
@@ -344,6 +360,72 @@ public class WindowManager extends XResourceManager {
     public void triggerOnModifyWindowProperty(Window window, Property property) {
         for (int i = onWindowModificationListeners.size()-1; i >= 0; i--) {
             onWindowModificationListeners.get(i).onModifyWindowProperty(window, property);
+        }
+    }
+
+    private static void logWindowEvent(String eventId, String message, Window window) {
+        if (window == null) return;
+        Window parent = window.getParent();
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                eventId,
+                null,
+                "xserver_window",
+                message,
+                ForensicLogger.fields(
+                        "window_id", window.id,
+                        "parent_window_id", parent != null ? parent.id : 0,
+                        "x", window.getX(),
+                        "y", window.getY(),
+                        "width", window.getWidth(),
+                        "height", window.getHeight(),
+                        "mapped", window.attributes.isMapped(),
+                        "map_state", window.getMapState().name(),
+                        "input_output", window.isInputOutput(),
+                        "override_redirect", window.attributes.isOverrideRedirect(),
+                        "window_class", window.attributes.getWindowClass().name(),
+                        "process_id", safeProcessId(window),
+                        "hwnd", safeHandle(window),
+                        "class_name", safeClassName(window),
+                        "name", safeName(window)
+                )
+        );
+    }
+
+    private static int safeProcessId(Window window) {
+        try {
+            return window.getProcessId();
+        }
+        catch (RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    private static long safeHandle(Window window) {
+        try {
+            return window.getHandle();
+        }
+        catch (RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    private static String safeClassName(Window window) {
+        try {
+            return window.getClassName();
+        }
+        catch (RuntimeException ignored) {
+            return "";
+        }
+    }
+
+    private static String safeName(Window window) {
+        try {
+            return window.getName();
+        }
+        catch (RuntimeException ignored) {
+            return "";
         }
     }
 

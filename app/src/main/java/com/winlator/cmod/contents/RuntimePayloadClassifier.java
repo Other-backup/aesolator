@@ -8,8 +8,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 final class RuntimePayloadClassifier {
     static final class Result {
@@ -90,6 +92,17 @@ final class RuntimePayloadClassifier {
             "usr/lib/x86_64-linux-gnu",
             "lib/x86_64-linux-gnu"
     };
+    private static final int MAX_ELF_PROBE_BYTES = 1024 * 1024;
+    private static final int MAX_CLASSIFICATION_CACHE_ENTRIES = 192;
+    private static final byte[][] BIONIC_ELF_NEEDLE_BYTES = encodeNeedles(BIONIC_ELF_NEEDLES);
+    private static final byte[][] GLIBC_ELF_NEEDLE_BYTES = encodeNeedles(GLIBC_ELF_NEEDLES);
+    private static final LinkedHashMap<String, Result> CLASSIFICATION_CACHE =
+            new LinkedHashMap<String, Result>(MAX_CLASSIFICATION_CACHE_ENTRIES, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Result> eldest) {
+                    return size() > MAX_CLASSIFICATION_CACHE_ENTRIES;
+                }
+            };
 
     private RuntimePayloadClassifier() {
     }
@@ -99,9 +112,32 @@ final class RuntimePayloadClassifier {
                            @Nullable ContentProfile parsedProfile,
                            @Nullable ContentProfile remoteHint,
                            @Nullable String importDisplayName) {
+        String cacheKey = buildClassificationCacheKey(rootDir, parsedProfile, remoteHint, importDisplayName);
+        if (cacheKey != null) {
+            synchronized (CLASSIFICATION_CACHE) {
+                Result cached = CLASSIFICATION_CACHE.get(cacheKey);
+                if (cached != null) return cached;
+            }
+        }
+
+        Result result = classifyUncached(rootDir, parsedProfile, remoteHint, importDisplayName);
+        if (cacheKey != null) {
+            synchronized (CLASSIFICATION_CACHE) {
+                CLASSIFICATION_CACHE.put(cacheKey, result);
+            }
+        }
+        return result;
+    }
+
+    @NonNull
+    private static Result classifyUncached(@Nullable File rootDir,
+                                           @Nullable ContentProfile parsedProfile,
+                                           @Nullable ContentProfile remoteHint,
+                                           @Nullable String importDisplayName) {
         int bionicScore = 0;
         int glibcScore = 0;
         ArrayList<String> signals = new ArrayList<>();
+        ElfNeedleScan elfNeedleScan = new ElfNeedleScan();
 
         if (rootDir != null && rootDir.isDirectory()) {
             bionicScore += scorePaths(rootDir, BIONIC_STRONG_PATHS, 8, "bionic-strong", signals);
@@ -109,16 +145,15 @@ final class RuntimePayloadClassifier {
             glibcScore += scorePaths(rootDir, GLIBC_STRONG_PATHS, 8, "glibc-strong", signals);
             glibcScore += scorePaths(rootDir, GLIBC_WEAK_PATHS, 3, "glibc", signals);
 
-            int bionicElfScore = scoreElfNeedles(rootDir, BIONIC_ELF_NEEDLES, 10, "bionic-elf", signals);
-            int glibcElfScore = scoreElfNeedles(rootDir, GLIBC_ELF_NEEDLES, 10, "glibc-elf", signals);
-            bionicScore += bionicElfScore;
-            glibcScore += glibcElfScore;
+            elfNeedleScan = scanElfNeedles(rootDir, signals);
+            bionicScore += elfNeedleScan.bionicHits * 10;
+            glibcScore += elfNeedleScan.glibcHits * 10;
         }
 
         int strongBionicScore = countExistingPaths(rootDir, BIONIC_STRONG_PATHS);
         int strongGlibcScore = countExistingPaths(rootDir, GLIBC_STRONG_PATHS);
-        int strongBionicElfScore = countElfNeedles(rootDir, BIONIC_ELF_NEEDLES);
-        int strongGlibcElfScore = countElfNeedles(rootDir, GLIBC_ELF_NEEDLES);
+        int strongBionicElfScore = elfNeedleScan.bionicHits;
+        int strongGlibcElfScore = elfNeedleScan.glibcHits;
         String explicit = firstRuntimeModelHint(parsedProfile, remoteHint, importDisplayName);
         if (ContentProfile.RUNTIME_MODEL_BIONIC.equals(explicit)) {
             bionicScore += 2;
@@ -183,59 +218,65 @@ final class RuntimePayloadClassifier {
         return count;
     }
 
-    private static int scoreElfNeedles(File rootDir,
-                                       String[] needles,
-                                       int scorePerHit,
-                                       String label,
-                                       List<String> signals) {
-        if (rootDir == null || needles == null) return 0;
-        int score = 0;
+    private static ElfNeedleScan scanElfNeedles(File rootDir, List<String> signals) {
+        ElfNeedleScan total = new ElfNeedleScan();
+        if (rootDir == null) return total;
         for (String probePath : ELF_PROBE_PATHS) {
             File probeFile = new File(rootDir, probePath);
             if (!probeFile.isFile()) continue;
-            String matchedNeedle = firstNeedleInFile(probeFile, needles);
-            if (matchedNeedle == null) continue;
-            score += scorePerHit;
-            signals.add(label + ":" + probePath + ":" + matchedNeedle);
+            FileNeedleScan fileScan = scanFileForNeedles(probeFile);
+            if (fileScan.bionicNeedle != null) {
+                total.bionicHits++;
+                signals.add("bionic-elf:" + probePath + ":" + fileScan.bionicNeedle);
+            }
+            if (fileScan.glibcNeedle != null) {
+                total.glibcHits++;
+                signals.add("glibc-elf:" + probePath + ":" + fileScan.glibcNeedle);
+            }
         }
-        return score;
+        return total;
     }
 
-    private static int countElfNeedles(@Nullable File rootDir, String[] needles) {
-        if (rootDir == null || needles == null) return 0;
-        int count = 0;
-        for (String probePath : ELF_PROBE_PATHS) {
-            File probeFile = new File(rootDir, probePath);
-            if (probeFile.isFile() && firstNeedleInFile(probeFile, needles) != null) count++;
-        }
-        return count;
-    }
-
-    @Nullable
-    private static String firstNeedleInFile(File file, String[] needles) {
-        if (file == null || needles == null || !file.isFile()) return null;
-        byte[][] encodedNeedles = encodeNeedles(needles);
+    @NonNull
+    private static FileNeedleScan scanFileForNeedles(File file) {
+        FileNeedleScan result = new FileNeedleScan();
+        if (file == null || !file.isFile()) return result;
         byte[] buffer = new byte[65536];
         byte[] carry = new byte[128];
         int carryLength = 0;
         long totalRead = 0;
         try (FileInputStream input = new FileInputStream(file)) {
             int read;
-            while ((read = input.read(buffer)) != -1 && totalRead < 2 * 1024 * 1024L) {
+            while ((read = input.read(buffer)) != -1 && totalRead < MAX_ELF_PROBE_BYTES) {
                 int scanLength = carryLength + read;
                 byte[] scanBuffer = new byte[scanLength];
                 System.arraycopy(carry, 0, scanBuffer, 0, carryLength);
                 System.arraycopy(buffer, 0, scanBuffer, carryLength, read);
-                for (int i = 0; i < encodedNeedles.length; i++) {
-                    if (indexOf(scanBuffer, scanLength, encodedNeedles[i]) >= 0) {
-                        return needles[i];
-                    }
+                if (result.bionicNeedle == null) {
+                    result.bionicNeedle = firstNeedleInBuffer(scanBuffer, scanLength, BIONIC_ELF_NEEDLES, BIONIC_ELF_NEEDLE_BYTES);
+                }
+                if (result.glibcNeedle == null) {
+                    result.glibcNeedle = firstNeedleInBuffer(scanBuffer, scanLength, GLIBC_ELF_NEEDLES, GLIBC_ELF_NEEDLE_BYTES);
+                }
+                if (result.bionicNeedle != null && result.glibcNeedle != null) {
+                    return result;
                 }
                 carryLength = Math.min(carry.length, scanLength);
                 System.arraycopy(scanBuffer, scanLength - carryLength, carry, 0, carryLength);
                 totalRead += read;
             }
         } catch (IOException ignored) {
+        }
+        return result;
+    }
+
+    @Nullable
+    private static String firstNeedleInBuffer(byte[] haystack, int haystackLength, String[] needles, byte[][] encodedNeedles) {
+        if (needles == null || encodedNeedles == null) return null;
+        for (int i = 0; i < encodedNeedles.length; i++) {
+            if (indexOf(haystack, haystackLength, encodedNeedles[i]) >= 0) {
+                return needles[i];
+            }
         }
         return null;
     }
@@ -259,6 +300,39 @@ final class RuntimePayloadClassifier {
             if (j == needle.length) return i;
         }
         return -1;
+    }
+
+    @Nullable
+    private static String buildClassificationCacheKey(@Nullable File rootDir,
+                                                      @Nullable ContentProfile parsedProfile,
+                                                      @Nullable ContentProfile remoteHint,
+                                                      @Nullable String importDisplayName) {
+        if (rootDir == null || !rootDir.isDirectory()) return null;
+        StringBuilder builder = new StringBuilder(rootDir.getAbsolutePath()).append('|');
+        for (String probePath : ELF_PROBE_PATHS) {
+            File probeFile = new File(rootDir, probePath);
+            if (!probeFile.isFile()) continue;
+            builder.append(probePath)
+                    .append(':')
+                    .append(probeFile.length())
+                    .append(':')
+                    .append(probeFile.lastModified())
+                    .append('|');
+        }
+        builder.append(firstRuntimeModelHint(parsedProfile, remoteHint, importDisplayName));
+        return builder.toString();
+    }
+
+    private static final class ElfNeedleScan {
+        private int bionicHits;
+        private int glibcHits;
+    }
+
+    private static final class FileNeedleScan {
+        @Nullable
+        private String bionicNeedle;
+        @Nullable
+        private String glibcNeedle;
     }
 
     private static String firstRuntimeModelHint(@Nullable ContentProfile parsedProfile,

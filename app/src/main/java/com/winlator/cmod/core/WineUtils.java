@@ -17,6 +17,17 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public abstract class WineUtils {
+    private static final String X11_DRIVER_REGISTRY_KEY = "Software\\Wine\\X11 Driver";
+    private static final String X11_APP_DEFAULTS_REGISTRY_PREFIX = "Software\\Wine\\AppDefaults";
+    private static final String[] X11_OPENGL_BACKEND_APP_DEFAULTS = new String[] {
+            "explorer.exe",
+            "wfm.exe",
+            "winhandler.exe",
+            "wineboot.exe",
+            "winecfg.exe",
+            "regedit.exe",
+            "start.exe"
+    };
     public static final class WindowsLaunchTarget {
         public final String rawCommand;
         public final String commandPath;
@@ -493,6 +504,46 @@ public abstract class WineUtils {
                 registryEditor.setStringValue("Software\\Wine\\Drivers", "Graphics", normalizedDriver);
             }
         }
+
+        if (graphicsDriverIncludesX11(normalizedDriver)) {
+            ensureX11OpenGlBackendRegistry(rootDir, true);
+        }
+    }
+
+    public static boolean ensureX11OpenGlBackendRegistry(File rootDir, boolean includeUserDef) {
+        File prefixDir = resolveHostWinePrefixDir(rootDir);
+        File[] registryFiles = includeUserDef
+                ? new File[] { new File(prefixDir, "user.reg"), new File(prefixDir, "userdef.reg") }
+                : new File[] { new File(prefixDir, "user.reg") };
+        boolean applied = false;
+
+        for (File registryFile : registryFiles) {
+            try (WineRegistryEditor registryEditor = new WineRegistryEditor(registryFile)) {
+                applyX11OpenGlBackendRegistry(registryEditor);
+                applied = true;
+            }
+        }
+
+        return applied;
+    }
+
+    private static void applyX11OpenGlBackendRegistry(WineRegistryEditor registryEditor) {
+        registryEditor.setStringValue(X11_DRIVER_REGISTRY_KEY, "UseEGL", "N");
+        for (String appName : X11_OPENGL_BACKEND_APP_DEFAULTS) {
+            registryEditor.setStringValue(
+                    X11_APP_DEFAULTS_REGISTRY_PREFIX + "\\" + appName + "\\X11 Driver",
+                    "UseEGL",
+                    "N"
+            );
+        }
+    }
+
+    public static boolean graphicsDriverIncludesX11(String driver) {
+        if (driver == null) return false;
+        for (String part : driver.split(",")) {
+            if ("x11".equalsIgnoreCase(part.trim())) return true;
+        }
+        return false;
     }
 
     public static String resolvePreferredGraphicsDriver(File runtimeRootDir) {

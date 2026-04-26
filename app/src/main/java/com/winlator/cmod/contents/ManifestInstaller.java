@@ -130,7 +130,7 @@ public abstract class ManifestInstaller {
                 );
             }
             manager.syncContents();
-            if (!manager.hasInstalledVersion(expectedType, entry.id, true)) {
+            if (!hasInstalledManifestPayload(manager, expectedType, entry, profile)) {
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
@@ -152,6 +152,27 @@ public abstract class ManifestInstaller {
                 destFile.delete();
             }
         }
+    }
+
+    private static boolean hasInstalledManifestPayload(ContentsManager manager,
+                                                       ContentProfile.ContentType expectedType,
+                                                       ManifestEntry entry,
+                                                       ContentProfile installedProfile) {
+        if (manager == null || expectedType == null) return false;
+        if (manager.resolveInstalledProfileState(installedProfile).usable) return true;
+
+        String[] candidates = {
+                entry != null ? entry.id : "",
+                entry != null ? entry.getDisplayName() : "",
+                installedProfile != null ? installedProfile.verName : "",
+                installedProfile != null ? installedProfile.artifactName : "",
+                installedProfile != null ? installedProfile.releaseTag : ""
+        };
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.trim().isEmpty()) continue;
+            if (manager.hasInstalledVersion(expectedType, candidate, true)) return true;
+        }
+        return false;
     }
 
     @Nullable

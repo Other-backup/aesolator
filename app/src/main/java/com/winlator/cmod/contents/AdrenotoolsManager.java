@@ -12,6 +12,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
@@ -826,7 +827,11 @@ public class AdrenotoolsManager {
 
         String driverPath = getDriverPath(info.entryId);
         envVars.put("ADRENOTOOLS_DRIVER_PATH", driverPath);
-        envVars.put("ADRENOTOOLS_HOOKS_PATH", imagefs.getLibDir());
+        String nativeHooksDir = AppUtils.getNativeLibDir(mContext);
+        envVars.put("ADRENOTOOLS_HOOKS_PATH",
+                nativeHooksDir == null || nativeHooksDir.trim().isEmpty()
+                        ? imagefs.getLibDir()
+                        : nativeHooksDir);
         envVars.put("ADRENOTOOLS_DRIVER_NAME", info.libraryName);
 
         putIfNotEmpty(envVars, "AERO_GRAPHICS_PROVIDER_ENTRY", info.entryId);

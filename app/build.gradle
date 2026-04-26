@@ -2,6 +2,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Properties
+import groovy.json.JsonSlurper
 
 class AeBuildHostSupport {
     static String trimValue(Object value) {
@@ -98,11 +99,29 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 def aeAssetDir = new File(rootProject.projectDir, "app/src/main/assets")
+def aeBuildEnv = new LinkedHashMap<>(System.getenv())
+def aeGeneratedAssetsDir = new File(buildDir, "generated/ae-assets")
 def aeGeneratedJniLibsDir = new File(buildDir, "generated/ae-jniLibs")
 def aeBundledArm64JniLibsDir = new File(rootProject.projectDir, "app/src/main/jniLibs/arm64-v8a")
 def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
 def aeTarExtractTool = new File(rootProject.projectDir, "tools/extract_tar_member.py")
 def aeVulkanWrapperArchive = new File(aeAssetDir, "graphics_driver/libvulkan_wrapper.tar.xz")
+def aeBundledProton11AssetPath = "contents/runtime/proton11/proton-wine-11-arm64ec.wcp.xz"
+def aeBundledProton11LocalPath = (
+        project.findProperty("ae.proton11.localWcp")
+                ?: aeBuildEnv["AEO_PROTON11_LOCAL_WCP"]
+                ?: "/storage/emulated/0/Download/proton-wine-11.0-1-arm64ec.wcp.xz"
+).toString()
+def aeBundledProton11Url = (
+        project.findProperty("ae.proton11.url")
+                ?: aeBuildEnv["AEO_PROTON11_BUNDLE_URL"]
+                ?: ""
+).toString()
+def aeBundledProton11ReleasesApi = (
+        project.findProperty("ae.proton11.releasesApi")
+                ?: aeBuildEnv["AEO_PROTON11_RELEASES_API"]
+                ?: "https://api.github.com/repos/The412Banner/Nightlies/releases?per_page=100"
+).toString()
 def aeResolvedNdkVersion = "29.0.14206865"
 def aeRequiredRootfsAssets = [
         "imagefs_gamenative.txz",
@@ -115,7 +134,6 @@ def aeRequiredRuntimeAssets = [
         "freewine11-arm64ec.wcp"
 ]
 File aeLocalPropertiesFile = rootProject.file("local.properties")
-def aeBuildEnv = new LinkedHashMap<>(System.getenv())
 def aeRequireVirglWrapperJni = (
         (project.findProperty("ae.requireVirglWrapperJni")?.toString() ?: "") == "true" ||
                 (aeBuildEnv["AEO_REQUIRE_VIRGL_WRAPPER_JNI"] ?: "") == "1"
@@ -192,6 +210,59 @@ tasks.register("prepareEmbeddedWineAssets") {
         if (!missing.isEmpty()) {
             throw new GradleException("Missing embedded runtime assets: ${missing.join(', ')}")
         }
+    }
+}
+
+tasks.register("prepareBundledProton11Asset") {
+    File outputFile = new File(aeGeneratedAssetsDir, aeBundledProton11AssetPath)
+    inputs.property("aeBundledProton11LocalPath", aeBundledProton11LocalPath)
+    inputs.property("aeBundledProton11Url", aeBundledProton11Url)
+    inputs.property("aeBundledProton11ReleasesApi", aeBundledProton11ReleasesApi)
+    outputs.file(outputFile)
+    doLast {
+        outputFile.parentFile.mkdirs()
+        File localPayload = new File(aeBundledProton11LocalPath)
+        if (localPayload.isFile()) {
+            Files.copy(localPayload.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            println("Bundled Proton 11 asset copied from local WCP: ${localPayload}")
+            return
+        }
+
+        String resolvedUrl = aeBundledProton11Url.trim()
+        if (resolvedUrl.isEmpty()) {
+            def apiConnection = new URL(aeBundledProton11ReleasesApi).openConnection()
+            apiConnection.setRequestProperty("User-Agent", "Ae.solator Gradle Proton11 asset resolver")
+            apiConnection.setRequestProperty("Accept", "application/vnd.github+json, application/json;q=0.9, */*;q=0.8")
+            def releases = new JsonSlurper().parse(apiConnection.inputStream)
+            releases.find { release ->
+                def asset = release.assets.find { asset ->
+                    String name = asset.name.toString().toLowerCase(Locale.US)
+                    name.contains("proton")
+                            && name.contains("11")
+                            && name.contains("arm64ec")
+                            && (name.endsWith(".wcp.xz") || name.endsWith(".wcp.zst") || name.endsWith(".wcp"))
+                }
+                if (asset != null) {
+                    resolvedUrl = asset.browser_download_url.toString()
+                    return true
+                }
+                return false
+            }
+        }
+        if (resolvedUrl.isEmpty()) {
+            throw new GradleException("Unable to resolve a Proton 11 ARM64EC WCP asset from ${aeBundledProton11ReleasesApi}")
+        }
+
+        File partFile = new File(outputFile.absolutePath + ".part")
+        if (partFile.exists()) partFile.delete()
+        def payloadConnection = new URL(resolvedUrl).openConnection()
+        payloadConnection.setRequestProperty("User-Agent", "Ae.solator Gradle Proton11 asset resolver")
+        payloadConnection.setRequestProperty("Accept", "application/octet-stream, */*")
+        payloadConnection.inputStream.withCloseable { input ->
+            partFile.withOutputStream { output -> output << input }
+        }
+        Files.move(partFile.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        println("Bundled Proton 11 asset downloaded from Nightlies: ${resolvedUrl}")
     }
 }
 
@@ -306,6 +377,7 @@ tasks.register("prepareVulkanWrapperJni") {
 preBuild.dependsOn(verifyNoRetiredImageFsAssets)
 preBuild.dependsOn(verifyBundledImageFsAssets)
 preBuild.dependsOn(prepareEmbeddedWineAssets)
+preBuild.dependsOn(prepareBundledProton11Asset)
 preBuild.dependsOn(prepareRuntimeSharedJni)
 preBuild.dependsOn(prepareVirglWrapperJni)
 preBuild.dependsOn(prepareVulkanWrapperJni)
@@ -317,7 +389,7 @@ try {
 } catch (Exception ignored) {
     aeroVersionCode = 21
 }
-def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9v").toString()
+def aeroVersionName = (project.findProperty("ae.versionName") ?: System.getenv("AEROSO_APP_VERSION_NAME") ?: "0.9v+").toString()
 def aeroApplicationId = (project.findProperty("ae.applicationId") ?: System.getenv("AEROSO_APP_APPLICATION_ID") ?: "com.winlator.cmod").toString()
 def aeroAppLabel = (project.findProperty("ae.appLabel") ?: System.getenv("AEROSO_APP_LABEL") ?: "Ae.solator").toString()
 def aeSigningStoreFileRaw = project.findProperty("ae.signing.storeFile")
@@ -344,6 +416,7 @@ android {
     sourceSets {
         main {
             assets.srcDirs += [new File(rootProject.projectDir, "contents").absolutePath]
+            assets.srcDirs += [aeGeneratedAssetsDir.absolutePath]
             jniLibs.srcDirs += [aeGeneratedJniLibsDir.absolutePath]
         }
     }

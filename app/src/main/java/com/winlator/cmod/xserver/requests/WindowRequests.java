@@ -2,9 +2,11 @@ package com.winlator.cmod.xserver.requests;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
+import com.winlator.cmod.xserver.Atom;
 import com.winlator.cmod.xserver.Drawable;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.WindowAttributes;
@@ -53,6 +55,7 @@ public abstract class WindowRequests {
         client.setEventListenerForWindow(window, window.attributes.getEventMask());
         client.registerAsOwnerOfResource(window);
         parent.sendEvent(Event.SUBSTRUCTURE_NOTIFY, new CreateNotify(parent, window));
+        logWindowAttributeContract(client, window, valueMask, "create_window");
     }
 
     public static void getWindowAttributes(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
@@ -96,14 +99,49 @@ public abstract class WindowRequests {
                     isClientCanSelectFor(Event.RESIZE_REDIRECT, window, client) &&
                     isClientCanSelectFor(Event.BUTTON_PRESS, window, client)) {
                     client.setEventListenerForWindow(window, window.attributes.getEventMask());
+                    logWindowAttributeContract(client, window, valueMask, "change_window_attributes");
                 }
                 else throw new BadAccess();
+            }
+            else {
+                logWindowAttributeContract(client, window, valueMask, "change_window_attributes");
             }
         }
     }
 
     private static boolean isClientCanSelectFor(int eventId, Window window, XClient client) {
         return !window.attributes.getEventMask().isSet(eventId) || !(window.hasEventListenerFor(eventId) && !client.isInterestedIn(eventId, window));
+    }
+
+    private static void logWindowAttributeContract(XClient client, Window window, Bitmask valueMask, String source) {
+        if (client == null || window == null || valueMask == null) return;
+        Window parent = window.getParent();
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_WINDOW_ATTRIBUTE_CONTRACT",
+                null,
+                "xserver_window",
+                "xserver_window_attribute_contract",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "source", source,
+                        "window_id", window.id,
+                        "parent_window_id", parent != null ? parent.id : 0,
+                        "value_mask", valueMask.getBits(),
+                        "event_mask", window.attributes.getEventMask().getBits(),
+                        "do_not_propagate_mask", window.attributes.getDoNotPropagateMask().getBits(),
+                        "override_redirect", window.attributes.isOverrideRedirect(),
+                        "substructure_redirect", window.hasEventListenerFor(Event.SUBSTRUCTURE_REDIRECT),
+                        "substructure_notify", window.hasEventListenerFor(Event.SUBSTRUCTURE_NOTIFY),
+                        "structure_notify", window.hasEventListenerFor(Event.STRUCTURE_NOTIFY),
+                        "exposure", window.hasEventListenerFor(Event.EXPOSURE),
+                        "property_change", window.hasEventListenerFor(Event.PROPERTY_CHANGE),
+                        "root_window", window == client.xServer.windowManager.rootWindow,
+                        "mapped", window.attributes.isMapped(),
+                        "map_state", window.getMapState().name()
+                )
+        );
     }
 
     public static void destroyWindow(XClient client, XInputStream inputStream, XOutputStream outputStream) {
@@ -182,6 +220,7 @@ public abstract class WindowRequests {
         Property property = window.modifyProperty(atom, type, Property.Format.valueOf(format), mode, data);
         if (property == null) throw new BadMatch();
 
+        logPropertyChanged(client, window, property, mode, data);
         client.xServer.windowManager.triggerOnModifyWindowProperty(window, property);
     }
 
@@ -189,7 +228,9 @@ public abstract class WindowRequests {
         int windowId = inputStream.readInt();
         Window window = client.xServer.windowManager.getWindow(windowId);
         if (window == null) throw new BadWindow(windowId);
-        window.removeProperty(inputStream.readInt());
+        int atom = inputStream.readInt();
+        window.removeProperty(atom);
+        logPropertyDeleted(client, window, atom);
     }
 
     public static void getProperty(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
@@ -360,6 +401,77 @@ public abstract class WindowRequests {
                 if (window == null) throw new BadWindow(windowId);
                 client.xServer.windowManager.setFocus(window, focusRevertTo);
                 break;
+        }
+    }
+
+    private static void logPropertyChanged(XClient client, Window window, Property property, Property.Mode mode, byte[] data) {
+        String atomName = safeAtomName(property.name);
+        String typeName = safeAtomName(property.type);
+        int byteLength = data != null ? data.length : 0;
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_WINDOW_PROPERTY_CHANGED",
+                null,
+                "xserver_window",
+                "xserver_window_property_changed",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "window_id", window.id,
+                        "atom", property.name,
+                        "atom_name", atomName,
+                        "type", property.type,
+                        "type_name", typeName,
+                        "format", property.format != null ? property.format.value : 0,
+                        "mode", mode.name(),
+                        "byte_length", byteLength,
+                        "value_sha256", byteLength > 0 ? ForensicLogger.sha256Hex(data) : "",
+                        "identity_property", isIdentityAtom(atomName)
+                )
+        );
+    }
+
+    private static void logPropertyDeleted(XClient client, Window window, int atom) {
+        String atomName = safeAtomName(atom);
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_WINDOW_PROPERTY_DELETED",
+                null,
+                "xserver_window",
+                "xserver_window_property_deleted",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "window_id", window.id,
+                        "atom", atom,
+                        "atom_name", atomName,
+                        "identity_property", isIdentityAtom(atomName)
+                )
+        );
+    }
+
+    private static String safeAtomName(int id) {
+        try {
+            return Atom.isValid(id) ? Atom.getName(id) : "";
+        }
+        catch (RuntimeException ignored) {
+            return "";
+        }
+    }
+
+    private static boolean isIdentityAtom(String atomName) {
+        switch (atomName) {
+            case "WM_NAME":
+            case "WM_CLASS":
+            case "WM_HINTS":
+            case "WM_CLIENT_MACHINE":
+            case "_NET_WM_PID":
+            case "_NET_WM_HWND":
+            case "_WINE_HWND":
+            case "_NET_WM_WOW64":
+                return true;
+            default:
+                return false;
         }
     }
 

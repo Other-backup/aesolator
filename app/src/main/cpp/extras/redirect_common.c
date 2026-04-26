@@ -163,6 +163,35 @@ char *aero_rewrite_path(const char *input) {
         current = aero_apply_replacement(current, "/data/user/0/com.winlator/files/rootfs", rootfs, &changed);
         current = aero_apply_replacement(current, "/data/data/com.winlator/files/imagefs", rootfs, &changed);
         current = aero_apply_replacement(current, "/data/user/0/com.winlator/files/imagefs", rootfs, &changed);
+
+        char *termux_usr_tmp_root = aero_join_path_root(rootfs, "/usr/tmp");
+        char *termux_usr_share_root = aero_join_path_root(rootfs, "/usr/share");
+        char *termux_usr_lib_root = aero_join_path_root(rootfs, "/usr/lib");
+        char *termux_usr_etc_root = aero_join_path_root(rootfs, "/usr/etc");
+        char *termux_usr_var_root = aero_join_path_root(rootfs, "/usr/var");
+        char *termux_usr_bin_root = aero_join_path_root(rootfs, "/usr/bin");
+        char *termux_usr_root = aero_join_path_root(rootfs, "/usr");
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/tmp", termux_usr_tmp_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/tmp", termux_usr_tmp_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/share", termux_usr_share_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/share", termux_usr_share_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/lib", termux_usr_lib_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/lib", termux_usr_lib_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/etc", termux_usr_etc_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/etc", termux_usr_etc_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/var", termux_usr_var_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/var", termux_usr_var_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr/bin", termux_usr_bin_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr/bin", termux_usr_bin_root, &changed);
+        current = aero_apply_replacement(current, "/data/data/com.termux/files/usr", termux_usr_root, &changed);
+        current = aero_apply_replacement(current, "/data/user/0/com.termux/files/usr", termux_usr_root, &changed);
+        free(termux_usr_tmp_root);
+        free(termux_usr_share_root);
+        free(termux_usr_lib_root);
+        free(termux_usr_etc_root);
+        free(termux_usr_var_root);
+        free(termux_usr_bin_root);
+        free(termux_usr_root);
     }
 
     if (files_dir) {

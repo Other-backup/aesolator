@@ -88,7 +88,7 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
             String fexcoreVersion = resolveFexcoreVersion(container, shortcut);
 
             boolean wowbox64Ready = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64, wowbox64Version, true)
-                    || hasEmbeddedArchive(context, "wowbox64/wowbox64-" + wowbox64Version + ".tzst")
+                    || hasEmbeddedWowbox64Archive(context, wowbox64Version)
                     || new File(winePrefixDir, "drive_c/windows/system32/wowbox64.dll").isFile();
             if (!wowbox64Ready) {
                 missing.add(new ManifestDependencyInstaller.RequiredContent(
@@ -99,7 +99,7 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
             }
 
             boolean fexcoreReady = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, fexcoreVersion, true)
-                    || hasEmbeddedArchive(context, "fexcore/fexcore-" + fexcoreVersion + ".tzst")
+                    || hasEmbeddedFexcoreArchive(context, fexcoreVersion)
                     || new File(winePrefixDir, "drive_c/windows/system32/libwow64fex.dll").isFile()
                     || new File(winePrefixDir, "drive_c/windows/system32/libarm64ecfex.dll").isFile();
             if (!fexcoreReady) {
@@ -113,8 +113,9 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
         }
 
         String box64Version = resolveBox64Version(container, shortcut, false);
+        boolean bionicRuntime = ContentProfile.RUNTIME_MODEL_BIONIC.equalsIgnoreCase(requestedRuntimeModel);
         boolean box64Ready = manager.hasInstalledVersion(ContentProfile.ContentType.CONTENT_TYPE_BOX64, box64Version, true)
-                || hasEmbeddedArchive(context, "box64/box64-" + box64Version + ".tzst")
+                || hasEmbeddedBox64Archive(context, box64Version, bionicRuntime)
                 || new File(imageFsRoot, "usr/bin/box64").isFile();
         if (!box64Ready) {
             missing.add(new ManifestDependencyInstaller.RequiredContent(
@@ -128,6 +129,26 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
 
     private boolean hasEmbeddedArchive(Context context, String assetPath) {
         return FileUtils.getSize(context, assetPath) > 0;
+    }
+
+    private boolean hasEmbeddedBox64Archive(Context context, String version, boolean bionicRuntime) {
+        if (version == null || version.trim().isEmpty()) return false;
+        String normalizedVersion = version.trim();
+        return (bionicRuntime && hasEmbeddedArchive(context, "box86_64/box64-" + normalizedVersion + "-bionic.tzst"))
+                || hasEmbeddedArchive(context, "box86_64/box64-" + normalizedVersion + ".tzst")
+                || hasEmbeddedArchive(context, "box64/box64-" + normalizedVersion + ".tzst");
+    }
+
+    private boolean hasEmbeddedWowbox64Archive(Context context, String version) {
+        return version != null
+                && !version.trim().isEmpty()
+                && hasEmbeddedArchive(context, "wowbox64/wowbox64-" + version.trim() + ".tzst");
+    }
+
+    private boolean hasEmbeddedFexcoreArchive(Context context, String version) {
+        return version != null
+                && !version.trim().isEmpty()
+                && hasEmbeddedArchive(context, "fexcore/fexcore-" + version.trim() + ".tzst");
     }
 
     private String resolveWineIdentifier(Container container, @Nullable Shortcut shortcut) {

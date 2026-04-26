@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project(Winlator)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration -mno-outline-atomics")
+set(CMAKE_SKIP_RPATH TRUE)
 set(AERO_WINLATOR_COMMON_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/winlator/arrays.c
         ${CMAKE_CURRENT_SOURCE_DIR}/winlator/hardware_buffer_utils.c
@@ -42,6 +43,17 @@ function(aero_disable_host_rpath target_name)
     )
 endfunction()
 
+find_program(AERO_PATCHELF_EXECUTABLE patchelf)
+
+function(aero_strip_host_rpath_after_build target_name)
+    if (AERO_PATCHELF_EXECUTABLE)
+        add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${AERO_PATCHELF_EXECUTABLE} --remove-rpath "$<TARGET_FILE:${target_name}>"
+                COMMENT "Removing host RUNPATH/RPATH from $<TARGET_FILE_NAME:${target_name}>"
+        )
+    endif()
+endfunction()
+
 aero_disable_host_rpath(virglbridge)
 
 add_library(winlator SHARED
@@ -71,6 +83,7 @@ target_link_options(winlator PRIVATE
         "LINKER:--version-script=${WINLATOR_EXPORT_MAP}"
 )
 aero_disable_host_rpath(winlator)
+aero_strip_host_rpath_after_build(winlator)
 
 target_link_libraries(winlator
         log
@@ -101,6 +114,7 @@ target_link_options(winlatorxr PRIVATE
         "LINKER:--version-script=${WINLATORXR_EXPORT_MAP}"
 )
 aero_disable_host_rpath(winlatorxr)
+aero_strip_host_rpath_after_build(winlatorxr)
 
 target_link_libraries(winlatorxr
         log
@@ -122,6 +136,7 @@ target_link_options(aero_redirect_glibc PRIVATE
         "LINKER:--version-script=${AERO_REDIRECT_GLIBC_EXPORT_MAP}"
 )
 aero_disable_host_rpath(aero_redirect_glibc)
+aero_strip_host_rpath_after_build(aero_redirect_glibc)
 target_link_libraries(aero_redirect_glibc
         log
         dl
@@ -138,6 +153,7 @@ target_link_options(aero_redirect_bionic PRIVATE
         "LINKER:--version-script=${AERO_REDIRECT_BIONIC_EXPORT_MAP}"
 )
 aero_disable_host_rpath(aero_redirect_bionic)
+aero_strip_host_rpath_after_build(aero_redirect_bionic)
 target_link_libraries(aero_redirect_bionic
         log
         dl
@@ -152,6 +168,7 @@ target_link_options(aero_evshim PRIVATE
         "LINKER:--version-script=${AERO_EVSHIM_EXPORT_MAP}"
 )
 aero_disable_host_rpath(aero_evshim)
+aero_strip_host_rpath_after_build(aero_evshim)
 target_link_libraries(aero_evshim
         log
         dl
@@ -164,6 +181,7 @@ add_library(aero_fakeinput SHARED
 target_compile_features(aero_fakeinput PRIVATE cxx_std_17)
 target_compile_options(aero_fakeinput PRIVATE -Wall -Wextra -fvisibility=hidden)
 aero_disable_host_rpath(aero_fakeinput)
+aero_strip_host_rpath_after_build(aero_fakeinput)
 target_link_libraries(aero_fakeinput
         log
         dl
@@ -197,6 +215,7 @@ target_link_options(aero_native_xz PRIVATE
         "LINKER:--version-script=${AERO_NATIVE_XZ_EXPORT_MAP}"
 )
 aero_disable_host_rpath(aero_native_xz)
+aero_strip_host_rpath_after_build(aero_native_xz)
 
 add_library(aero_android_sysvshm SHARED
         ../../../../android_sysvshm/android_sysvshm.c
@@ -211,3 +230,4 @@ target_link_options(aero_android_sysvshm PRIVATE
 )
 set_target_properties(aero_android_sysvshm PROPERTIES OUTPUT_NAME "aero_android_sysvshm")
 aero_disable_host_rpath(aero_android_sysvshm)
+aero_strip_host_rpath_after_build(aero_android_sysvshm)

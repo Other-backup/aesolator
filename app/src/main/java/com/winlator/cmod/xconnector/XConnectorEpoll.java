@@ -5,6 +5,7 @@ import android.util.SparseArray;
 
 import androidx.annotation.Keep;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.WinlatorNative;
 
 import java.io.IOException;
@@ -18,6 +19,9 @@ public class XConnectorEpoll implements Runnable {
     private final int epollFd;
     private final int serverFd;
     private final int shutdownFd;
+    private final String socketPath;
+    private final boolean socketAbstractNamespace;
+    private long acceptedConnectionCount = 0;
     private Thread epollThread;
     private boolean running = false;
     private boolean multithreadedClients = false;
@@ -33,9 +37,11 @@ public class XConnectorEpoll implements Runnable {
     public XConnectorEpoll(UnixSocketConfig socketConfig, ConnectionHandler connectionHandler, RequestHandler requestHandler) {
         this.connectionHandler = connectionHandler;
         this.requestHandler = requestHandler;
+        this.socketPath = socketConfig != null ? socketConfig.path : "";
+        this.socketAbstractNamespace = socketConfig != null && socketConfig.abstractNamespace;
         setRLimitToMax();
 
-        serverFd = createAFUnixSocket(socketConfig.path);
+        serverFd = createAFUnixSocket(socketPath, socketAbstractNamespace);
         if (serverFd < 0) {
             throw new RuntimeException("Failed to create an AF_UNIX socket.");
         }
@@ -61,11 +67,28 @@ public class XConnectorEpoll implements Runnable {
         }
 
         epollThread = new Thread(this);
+        epollThread.setName("XConnectorEpoll-" + (socketAbstractNamespace ? "abstract-" : "path-") + sanitizeSocketPathForThread(socketPath));
+        logConnectorEvent(
+                "XCONNECTOR_SOCKET_READY",
+                "xconnector_socket_ready",
+                "server_fd", serverFd,
+                "epoll_fd", epollFd,
+                "shutdown_fd", shutdownFd,
+                "socket_namespace", socketAbstractNamespace ? "abstract" : "pathname",
+                "thread_name", epollThread.getName()
+        );
     }
 
     public synchronized void start() {
         if (running || epollThread == null) return;
         running = true;
+        logConnectorEvent(
+                "XCONNECTOR_THREAD_START",
+                "xconnector_thread_start",
+                "server_fd", serverFd,
+                "epoll_fd", epollFd,
+                "active_clients", connectedClients.size()
+        );
         epollThread.start();
     }
 
@@ -74,6 +97,12 @@ public class XConnectorEpoll implements Runnable {
         if (!running || thread == null) return;
         running = false;
         requestShutdown();
+        logConnectorEvent(
+                "XCONNECTOR_THREAD_STOP_REQUESTED",
+                "xconnector_thread_stop_requested",
+                "active_clients", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount
+        );
 
         if (thread == Thread.currentThread()) {
             epollThread = null;
@@ -107,6 +136,18 @@ public class XConnectorEpoll implements Runnable {
 
     @Keep
     private void handleNewConnection(int fd) {
+        acceptedConnectionCount++;
+        logConnectorEvent(
+                "XCONNECTOR_CLIENT_ACCEPTED",
+                "xconnector_client_accepted",
+                "client_fd", fd,
+                "active_clients_before", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount,
+                "multithreaded_clients", multithreadedClients,
+                "can_receive_ancillary_messages", canReceiveAncillaryMessages,
+                "initial_input_buffer_capacity", initialInputBufferCapacity,
+                "initial_output_buffer_capacity", initialOutputBufferCapacity
+        );
         final Client client = new Client(this, new ClientSocket(fd));
         client.connected = true;
         if (multithreadedClients) {
@@ -119,6 +160,13 @@ public class XConnectorEpoll implements Runnable {
         }
         else connectionHandler.handleNewConnection(client);
         connectedClients.put(fd, client);
+        logConnectorEvent(
+                "XCONNECTOR_CLIENT_REGISTERED",
+                "xconnector_client_registered",
+                "client_fd", fd,
+                "active_clients", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount
+        );
     }
 
     @Keep
@@ -148,6 +196,14 @@ public class XConnectorEpoll implements Runnable {
     }
 
     public void killConnection(Client client) {
+        int clientFd = client != null && client.clientSocket != null ? client.clientSocket.fd : -1;
+        logConnectorEvent(
+                "XCONNECTOR_CLIENT_SHUTDOWN",
+                "xconnector_client_shutdown",
+                "client_fd", clientFd,
+                "active_clients_before", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount
+        );
         client.connected = false;
         connectionHandler.handleConnectionShutdown(client);
         if (multithreadedClients) {
@@ -175,6 +231,12 @@ public class XConnectorEpoll implements Runnable {
     }
 
     private void shutdown() {
+        logConnectorEvent(
+                "XCONNECTOR_SHUTDOWN_BEGIN",
+                "xconnector_shutdown_begin",
+                "active_clients", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount
+        );
         while (connectedClients.size() > 0) {
             Client client = connectedClients.valueAt(connectedClients.size()-1);
             killConnection(client);
@@ -185,6 +247,53 @@ public class XConnectorEpoll implements Runnable {
         closeFd(serverFd);
         closeFd(shutdownFd);
         closeFd(epollFd);
+        logConnectorEvent(
+                "XCONNECTOR_SHUTDOWN_DONE",
+                "xconnector_shutdown_done",
+                "active_clients", connectedClients.size(),
+                "accepted_connection_count", acceptedConnectionCount
+        );
+    }
+
+    private void logConnectorEvent(String eventId, String message, Object... fields) {
+        Object[] base = new Object[fields.length + 6];
+        base[0] = "socket_path";
+        base[1] = socketPath;
+        base[2] = "socket_role";
+        base[3] = classifySocketRole(socketPath);
+        base[4] = "socket_namespace";
+        base[5] = socketAbstractNamespace ? "abstract" : "pathname";
+        System.arraycopy(fields, 0, base, 6, fields.length);
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                eventId,
+                null,
+                "xconnector",
+                message,
+                ForensicLogger.fields(base)
+        );
+    }
+
+    private static String classifySocketRole(String path) {
+        if (path == null) return "unknown";
+        if (path.endsWith("/.X11-unix/X0")) return "x11";
+        if (path.endsWith("/.sysvshm/SM0")) return "sysvshm";
+        if (path.endsWith("/.sound/AS0")) return "alsa";
+        if (path.endsWith("/.sound/PS0")) return "pulseaudio";
+        if (path.endsWith("/.virgl/V0")) return "virgl";
+        if (path.endsWith("/.vortek/V0")) return "vortek";
+        if (path.endsWith("/.steam/steam_pipe")) return "steam";
+        return "other";
+    }
+
+    private static String sanitizeSocketPathForThread(String path) {
+        if (path == null || path.trim().isEmpty()) return "unknown";
+        String normalized = path.trim();
+        int slash = normalized.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < normalized.length()) normalized = normalized.substring(slash + 1);
+        normalized = normalized.replaceAll("[^A-Za-z0-9._-]", "_");
+        return normalized.isEmpty() ? "unknown" : normalized;
     }
 
     public int getInitialInputBufferCapacity() {
@@ -243,5 +352,5 @@ public class XConnectorEpoll implements Runnable {
 
     private native boolean waitForSocketRead(int clientFd, int shutdownFd);
 
-    private native int createAFUnixSocket(String path);
+    private native int createAFUnixSocket(String path, boolean abstractNamespace);
 }

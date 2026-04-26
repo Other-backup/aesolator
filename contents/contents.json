@@ -18,6 +18,24 @@
     "sha256Url": "https://github.com/kosoymiki/wcp-runtime-lanes/releases/download/freewine11-arm64ec-latest/SHA256SUMS-freewine11-arm64ec.txt"
   },
   {
+    "type": "Proton",
+    "internalType": "proton",
+    "verName": "proton-wine-11.0-1-arm64ec",
+    "verCode": 20260425,
+    "description": "Bundled Proton 11 ARM64EC WCP package, resolved from The412Banner/Nightlies at build time",
+    "channel": "stable",
+    "delivery": "embedded",
+    "displayCategory": "Proton",
+    "sourceRepo": "The412Banner/Nightlies Releases",
+    "sourceFeed": "nightlies",
+    "sourceLabel": "Nightlies bundled",
+    "sourceType": "github-release",
+    "sourceVersion": "proton-11-latest",
+    "releaseTag": "proton-11-latest",
+    "artifactName": "proton-wine-11-arm64ec.wcp.xz",
+    "remoteUrl": "asset://contents/runtime/proton11/proton-wine-11-arm64ec.wcp.xz"
+  },
+  {
     "type": "DXVK",
     "internalType": "dxvk",
     "verName": "2.7.1-1-gplasync",

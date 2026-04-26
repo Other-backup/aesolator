@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import android.util.Log;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xconnector.Client;
 import com.winlator.cmod.xconnector.RequestHandler;
 import com.winlator.cmod.xconnector.XInputStream;
@@ -192,7 +193,10 @@ public class XClientRequestHandler implements RequestHandler {
         inputStream.skip(1);
 
         short majorVersion = inputStream.readShort();
-        if (majorVersion != 11) throw new UnsupportedOperationException("Unsupported major X protocol version "+majorVersion+".");
+        if (majorVersion != 11) {
+            logAuthFailure(client, byteOrder, majorVersion);
+            throw new UnsupportedOperationException("Unsupported major X protocol version "+majorVersion+".");
+        }
 
         inputStream.skip(2);
         int nameLength = inputStream.readShort();
@@ -207,6 +211,28 @@ public class XClientRequestHandler implements RequestHandler {
         }
 
         client.setAuthenticated(true);
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_CLIENT_AUTHENTICATED",
+                null,
+                "xserver_protocol",
+                "x11_client_authenticated",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "byte_order", byteOrder == 66 ? "big_endian" : byteOrder == 108 ? "little_endian" : "unknown",
+                        "major_version", majorVersion,
+                        "auth_name_length", nameLength,
+                        "auth_data_length", dataLength,
+                        "vendor", XServer.VENDOR_NAME,
+                        "screen_width", client.xServer.screenInfo.width,
+                        "screen_height", client.xServer.screenInfo.height,
+                        "root_window_id", client.xServer.windowManager.rootWindow.id,
+                        "pixmap_format_count", client.xServer.pixmapManager.supportedPixmapFormats.length,
+                        "visual_count", client.xServer.pixmapManager.supportedVisuals.length
+                )
+        );
         return true;
     }
 
@@ -228,6 +254,7 @@ public class XClientRequestHandler implements RequestHandler {
         client.generateSequenceNumber();
         client.setRequestData(requestData);
         client.setRequestLength(requestLength);
+        logProtocolMilestone(client, opcode, requestLength, inputStream.available());
 
         try {
             switch (opcode) {
@@ -255,6 +282,7 @@ public class XClientRequestHandler implements RequestHandler {
                     try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
                         WindowRequests.destroySubWindows(client, inputStream, outputStream);
                     }
+                    break;
                 case ClientOpcodes.REPARENT_WINDOW:
                     try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
                         WindowRequests.reparentWindow(client, inputStream, outputStream);
@@ -513,15 +541,126 @@ public class XClientRequestHandler implements RequestHandler {
                         Extension extension = client.xServer.extensions.get(opcode);
                         if (extension != null) extension.handleRequest(client, inputStream, outputStream);
                     }
-                    else Log.d("XClientRequestHandler", "Unsupported opcode " + opcode);
+                    else {
+                        Log.d("XClientRequestHandler", "Unsupported opcode " + opcode);
+                        logUnsupportedOpcode(client, opcode, requestLength);
+                    }
                     break;
             }
         }
         catch (XRequestError e) {
+            logProtocolError(client, opcode, requestLength, e);
             client.skipRequest();
             e.sendError(client, opcode);
         }
 
         return true;
+    }
+
+    private static void logProtocolMilestone(XClient client, byte opcode, int requestLength, int availableAfterHeader) {
+        String opcodeName = describeMilestoneOpcode(opcode);
+        if (opcodeName == null) return;
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_PROTOCOL_MILESTONE",
+                null,
+                "xserver_protocol",
+                "x11_protocol_milestone",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "opcode", Byte.toUnsignedInt(opcode),
+                        "opcode_name", opcodeName,
+                        "request_length", requestLength,
+                        "available_after_header", availableAfterHeader
+                )
+        );
+    }
+
+    private static String describeMilestoneOpcode(byte opcode) {
+        switch (opcode) {
+            case ClientOpcodes.CREATE_WINDOW:
+                return "CreateWindow";
+            case ClientOpcodes.CHANGE_WINDOW_ATTRIBUTES:
+                return "ChangeWindowAttributes";
+            case ClientOpcodes.MAP_WINDOW:
+                return "MapWindow";
+            case ClientOpcodes.UNMAP_WINDOW:
+                return "UnmapWindow";
+            case ClientOpcodes.CONFIGURE_WINDOW:
+                return "ConfigureWindow";
+            case ClientOpcodes.INTERN_ATOM:
+                return "InternAtom";
+            case ClientOpcodes.CHANGE_PROPERTY:
+                return "ChangeProperty";
+            case ClientOpcodes.GET_PROPERTY:
+                return "GetProperty";
+            case ClientOpcodes.SEND_EVENT:
+                return "SendEvent";
+            case ClientOpcodes.QUERY_EXTENSION:
+                return "QueryExtension";
+            case ClientOpcodes.NO_OPERATION:
+                return "NoOperation";
+            default:
+                return null;
+        }
+    }
+
+    private static void logAuthFailure(XClient client, byte byteOrder, short majorVersion) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "error",
+                "XSERVER_CLIENT_AUTH_REJECTED",
+                null,
+                "xserver_protocol",
+                "x11_client_auth_rejected",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "byte_order", byteOrder == 66 ? "big_endian" : byteOrder == 108 ? "little_endian" : "unknown",
+                        "major_version", majorVersion
+                )
+        );
+    }
+
+    private static void logUnsupportedOpcode(XClient client, byte opcode, int requestLength) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "XSERVER_UNSUPPORTED_OPCODE",
+                null,
+                "xserver_protocol",
+                "x11_unsupported_opcode",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "opcode", Byte.toUnsignedInt(opcode),
+                        "request_length", requestLength
+                )
+        );
+    }
+
+    private static void logProtocolError(XClient client, byte opcode, int requestLength, XRequestError error) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "XSERVER_PROTOCOL_ERROR",
+                null,
+                "xserver_protocol",
+                "x11_protocol_error",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "opcode", Byte.toUnsignedInt(opcode),
+                        "request_length", requestLength,
+                        "error_class", error.getClass().getName(),
+                        "error_code", Byte.toUnsignedInt(error.getCode()),
+                        "error_data", error.getData()
+                )
+        );
     }
 }

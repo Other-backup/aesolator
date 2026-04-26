@@ -73,6 +73,7 @@ import com.winlator.cmod.contentdialog.VortekConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contract.RuntimeSignalContract;
 import com.winlator.cmod.contents.ContentProfile;
+import com.winlator.cmod.contents.ContentPayloadResolver;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
@@ -93,6 +94,7 @@ import com.winlator.cmod.core.FileDebugLogger;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.core.ForensicUi;
 import com.winlator.cmod.core.GPUHelper;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
@@ -166,6 +168,7 @@ import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.WindowManager;
 import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
+import com.winlator.cmod.xserver.events.Event;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -204,6 +207,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
     public static int NOTIFICATION_ID = -1;
     private static final String NOEXEC_LAUNCH_MIRROR_DIR = "AeLaunchMirror";
     private static final String NOEXEC_LAUNCH_MIRROR_STAMP = ".aelaunchmirror.json";
+    private static final String[] ANDROID_HOST_WRAPPER_REQUIRED_LIBS = {
+            "libandroid-sysvshm.so",
+            "libadrenotools.so",
+            "libnativewindow.so",
+            "libxcb.so",
+            "libX11-xcb.so",
+            "libxcb-dri3.so",
+            "libxcb-present.so",
+            "libxcb-sync.so",
+            "libxcb-randr.so",
+            "libxcb-shm.so",
+            "libxshmfence.so",
+            "libdrm.so"
+    };
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
@@ -212,6 +229,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private View runtimeDrawerScrim;
     private View runtimeDrawerView;
     private boolean runtimeDrawerVisible = false;
+    private boolean xServerViewLifecyclePaused = false;
     private ContainerManager containerManager;
     protected Container container;
     private XServer xServer;
@@ -349,6 +367,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean deferredGuestTerminationScheduled = false;
     private long desktopShellBootstrapStartedAtMs = 0L;
     private volatile boolean guestVisualReady = false;
+    private boolean desktopShellLiveNoWindowHorizonLogged = false;
     private int debugStartProbeTargetX = Integer.MIN_VALUE;
     private int debugStartProbeTargetY = Integer.MIN_VALUE;
     private int debugStartProbeTapCount = 1;
@@ -433,6 +452,35 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 return;
             }
             if (shouldKeepDesktopShellAliveAfterPrimaryTermination(proof, trackedCount)) {
+                boolean withinHorizon = isDesktopShellBootstrapWithinHorizon(proof);
+                if (!withinHorizon && !desktopShellLiveNoWindowHorizonLogged) {
+                    desktopShellLiveNoWindowHorizonLogged = true;
+                    logBootstrapWindowSnapshot(
+                            "XSERVER_WINDOW_FRONTIER_LIVE_NONVISUAL_HORIZON_EXTENDED",
+                            "desktop_shell_live_nonvisual_horizon_extended"
+                    );
+                    ForensicLogger.logEvent(
+                            XServerDisplayActivity.this,
+                            "warn",
+                            "GUEST_PROGRAM_TERMINATION_HORIZON_EXTENDED_FOR_LIVE_SHELL",
+                            null,
+                            "xserver",
+                            "guest_program_termination_horizon_extended_for_live_shell",
+                            ForensicLogger.fields(
+                                    "tracked_window_count", trackedCount,
+                                    "guest_launcher_exit_status", guestLauncherExitStatus,
+                                    "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                                    "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                    "shell_launcher_present", proof != null && proof.shellLauncherPresent,
+                                    "shell_process_present", proof != null && proof.explorerProcessPresent,
+                                    "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                                    "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                                    "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                                    "wineserver_present", proof != null && proof.wineserverPresent,
+                                    "winhandler_ready", winHandler != null && winHandler.isReady()
+                            )
+                    );
+                }
                 scheduleDeferredGuestTermination(guestLauncherExitStatus);
                 ForensicLogger.logEvent(
                         XServerDisplayActivity.this,
@@ -955,6 +1003,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ForensicLogger.fields(
                         "enable_logs", enableLogs,
                         "forensic_mode", forensicModeLaunch,
+                        "runtime_diagnostics_forced", shouldForceRuntimeDiagnosticsForLaunch(),
                         "requested_runtime_summary", ForensicConfig.buildRuntimeSummary(requestedForensicSnapshot),
                         "effective_runtime_summary", ForensicConfig.buildRuntimeSummary(runtimeForensicSnapshot),
                         "runtime_profile_present", selectedRuntimeProfile != null,
@@ -1859,7 +1908,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? ".wcp"
                 : ".pkg";
         File payloadFile = new File(downloadDir, ContentsManager.getEntryName(remoteProfile) + suffix);
-        boolean downloaded = Downloader.downloadFile(remoteProfile.remoteUrl, payloadFile);
+        boolean downloaded = ContentPayloadResolver.materialize(getApplicationContext(), remoteProfile, payloadFile);
         if (!downloaded || !payloadFile.isFile()) {
             return false;
         }
@@ -2220,7 +2269,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         if (environment != null) {
-            xServerView.onResume();
+            resumeXServerViewSurface("activity_resume");
             environment.onResume();
         }
         startTime = System.currentTimeMillis();
@@ -2240,6 +2289,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         boolean enteringPictureInPicture = isInPictureInPictureMode();
+        pauseXServerViewSurface("activity_pause");
         if (!shouldAutoSuspendRuntimeOnLifecycle()) {
             cancelDeferredDesktopRuntimePause("pause_suspend_policy");
             logDesktopRuntimePauseSkipped("pause_suspend_policy");
@@ -2278,6 +2328,70 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "wine_paused", false,
                             "playtime_timer_kept", true
                     )
+            );
+        }
+    }
+
+    private void pauseXServerViewSurface(String reason) {
+        if (xServerView == null || xServerViewLifecyclePaused) return;
+        try {
+            xServerView.onPause();
+            xServerViewLifecyclePaused = true;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_GLSURFACE_LIFECYCLE_PAUSED",
+                    null,
+                    "xserver_surface",
+                    "xserver_glsurface_paused",
+                    ForensicLogger.fields(
+                            "reason", reason,
+                            "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                            "tracked_window_count", getTrackedApplicationWindowCount(),
+                            "runtime_drawer_visible", runtimeDrawerVisible
+                    )
+            );
+        } catch (Throwable e) {
+            ForensicLogger.error(
+                    this,
+                    "XSERVER_GLSURFACE_LIFECYCLE_PAUSE_FAILED",
+                    null,
+                    "xserver_surface",
+                    "xserver_glsurface_pause_failed",
+                    e,
+                    ForensicLogger.fields("reason", reason)
+            );
+        }
+    }
+
+    private void resumeXServerViewSurface(String reason) {
+        if (xServerView == null) return;
+        try {
+            xServerView.onResume();
+            xServerViewLifecyclePaused = false;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_GLSURFACE_LIFECYCLE_RESUMED",
+                    null,
+                    "xserver_surface",
+                    "xserver_glsurface_resumed",
+                    ForensicLogger.fields(
+                            "reason", reason,
+                            "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                            "tracked_window_count", getTrackedApplicationWindowCount(),
+                            "runtime_drawer_visible", runtimeDrawerVisible
+                    )
+            );
+        } catch (Throwable e) {
+            ForensicLogger.error(
+                    this,
+                    "XSERVER_GLSURFACE_LIFECYCLE_RESUME_FAILED",
+                    null,
+                    "xserver_surface",
+                    "xserver_glsurface_resume_failed",
+                    e,
+                    ForensicLogger.fields("reason", reason)
             );
         }
     }
@@ -2890,6 +3004,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.LLRuntimeActionPauseResume,
                 R.id.LLRuntimeActionPip,
                 R.id.LLRuntimeActionTaskManager,
+                R.id.LLRuntimeActionActiveWindows,
                 R.id.LLRuntimeActionMagnifier,
                 R.id.LLRuntimeActionLogs,
                 R.id.LLRuntimeActionPrefixPack,
@@ -2910,6 +3025,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.TVRuntimeActionPauseResumeTitle,
                 R.id.TVRuntimeActionPipTitle,
                 R.id.TVRuntimeActionTaskManagerTitle,
+                R.id.TVRuntimeActionActiveWindowsTitle,
                 R.id.TVRuntimeActionMagnifierTitle,
                 R.id.TVRuntimeActionLogsTitle,
                 R.id.TVRuntimeActionPrefixPackTitle,
@@ -2929,6 +3045,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.TVRuntimeActionPauseResumeSummary,
                 R.id.TVRuntimeActionPipSummary,
                 R.id.TVRuntimeActionTaskManagerSummary,
+                R.id.TVRuntimeActionActiveWindowsSummary,
                 R.id.TVRuntimeActionMagnifierSummary,
                 R.id.TVRuntimeActionLogsSummary,
                 R.id.TVRuntimeActionPrefixPackSummary,
@@ -2949,6 +3066,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.IVRuntimeActionPauseResume,
                 R.id.IVRuntimeActionPip,
                 R.id.IVRuntimeActionTaskManager,
+                R.id.IVRuntimeActionActiveWindows,
                 R.id.IVRuntimeActionMagnifier,
                 R.id.IVRuntimeActionLogs,
                 R.id.IVRuntimeActionPrefixPack,
@@ -2978,6 +3096,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.LLRuntimeActionTaskManager,
                 new int[] {R.id.TVRuntimeActionTaskManagerTitle, R.id.TVRuntimeActionTaskManagerSummary},
                 R.id.IVRuntimeActionTaskManager,
+                R.drawable.surface_runtime_taskmgr_background,
+                ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
+        );
+        styleRuntimeDrawerActionHighlight(
+                R.id.LLRuntimeActionActiveWindows,
+                new int[] {R.id.TVRuntimeActionActiveWindowsTitle, R.id.TVRuntimeActionActiveWindowsSummary},
+                R.id.IVRuntimeActionActiveWindows,
                 R.drawable.surface_runtime_taskmgr_background,
                 ContextCompat.getColor(this, R.color.surface_runtime_taskmgr_text)
         );
@@ -3553,10 +3678,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (tvGraphicsTertiary != null) tvGraphicsTertiary.setText(resolveRuntimeGraphicsTertiaryText());
 
         boolean fullscreenActive = xServerView != null && xServerView.getRenderer() != null && xServerView.getRenderer().isFullscreen();
-        boolean logsEnabled = debugDialog != null
-                && (preferences.getBoolean("enable_wine_debug", false) || preferences.getBoolean("enable_box64_logs", false));
+        boolean logsEnabled = true;
         boolean magnifierEnabled = !XrActivity.isEnabled(this);
-        boolean activeWindowsEnabled = xServer != null && xServer.windowManager != null && winHandler != null && winHandler.isReady();
+        boolean activeWindowsEnabled = xServer != null
+                && xServer.windowManager != null
+                && (getTrackedApplicationWindowCount() > 0 || (winHandler != null && winHandler.isReady()));
 
         updateRuntimeDrawerAction(
                 R.id.LLRuntimeActionRelativeMouse,
@@ -3624,7 +3750,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 R.id.TVRuntimeActionLogsSummary,
                 R.id.IVRuntimeActionLogs,
                 R.string.logs,
-                logsEnabled ? R.string.runtime_drawer_logs_summary : R.string.runtime_drawer_logs_disabled,
+                R.string.runtime_drawer_logs_summary,
                 R.drawable.ae_icon_diagnostics,
                 logsEnabled
         );
@@ -3691,7 +3817,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @SuppressLint("SourceLockedOrientationActivity")
     private void handleRuntimeAction(int actionId) {
-        final GLRenderer renderer = xServerView.getRenderer();
+        final GLRenderer renderer = xServerView != null ? xServerView.getRenderer() : null;
         switch (actionId) {
             case R.id.main_menu_keyboard:
                 AppUtils.showKeyboard(this);
@@ -3704,8 +3830,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 xServer.setRelativeMouseMovement(isRelativeMouseMovement);
                 break;
             case R.id.main_menu_toggle_fullscreen:
-                renderer.toggleFullscreen();
-                touchpadView.toggleFullscreen();
+                if (renderer != null) renderer.toggleFullscreen();
+                if (touchpadView != null) touchpadView.toggleFullscreen();
                 break;
             case R.id.main_menu_pause:
                 if (isPaused) {
@@ -3771,7 +3897,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 styleRuntimeNestedDialog(screenEffectDialog);
                 break;
             case R.id.main_menu_logs:
-                if (debugDialog != null) debugDialog.show();
+                ForensicUi.showForensicLogViewer(this, "runtime_drawer");
                 break;
             case R.id.main_menu_exit:
                 exit();
@@ -4230,6 +4356,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 )
         );
         if (desktopShellBootstrapActive && guestLauncherExited && trackedCount == 0) {
+            DesktopShellBootstrapProof proof = collectDesktopShellBootstrapProof();
+            if (shouldKeepDesktopShellAliveAfterPrimaryTermination(proof, trackedCount)) {
+                ForensicLogger.logEvent(
+                        this,
+                        "info",
+                        "XSERVER_DEFERRED_EXIT_HELD_FOR_LIVE_SHELL",
+                        null,
+                        "xserver",
+                        "deferred_exit_held_for_live_desktop_shell",
+                        ForensicLogger.fields(
+                                "guest_launcher_exit_status", guestLauncherExitStatus,
+                                "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                                "shell_process_present", proof.explorerProcessPresent,
+                                "winhandler_process_present", proof.winHandlerProcessPresent,
+                                "wfm_process_present", proof.wfmProcessPresent,
+                                "wineboot_process_present", proof.winebootProcessPresent,
+                                "wineserver_present", proof.wineserverPresent,
+                                "winhandler_ready", winHandler != null && winHandler.isReady()
+                        )
+                );
+                scheduleDeferredGuestTermination(guestLauncherExitStatus);
+                return;
+            }
             ForensicLogger.logEvent(
                     this,
                     "info",
@@ -4291,7 +4440,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         long remainingMs = Math.max(0L, DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS - elapsedMs);
         long delayMs = remainingMs > 0L
                 ? Math.min(DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS, remainingMs)
-                : 0L;
+                : DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS;
         guestLauncherExitStatus = status;
         runtimePauseHandler.removeCallbacks(deferredGuestTerminationRunnable);
         deferredGuestTerminationScheduled = true;
@@ -4302,8 +4451,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!desktopShellBootstrapActive || guestVisualReady) return false;
         if (trackedWindowCount > 0) return true;
         DesktopShellBootstrapProof liveProof = proof != null ? proof : collectDesktopShellBootstrapProof();
-        if (!isDesktopShellBootstrapWithinHorizon(liveProof)) return false;
         if (desktopShellDetachedFallbackActive) return true;
+        if (!isDesktopShellBootstrapWithinHorizon(liveProof)) {
+            return liveProof.hasRuntimeLivenessProof(winHandler != null && winHandler.isReady());
+        }
         if (desktopShellWinHandlerFallbackAttempted) {
             return liveProof.winHandlerProcessPresent
                     || liveProof.wfmProcessPresent
@@ -4744,17 +4895,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void logBootstrapWindowSnapshot(String eventId, String message) {
         if (xServer == null) return;
-        ArrayList<Window> mappedWindows = new ArrayList<>();
+        ArrayList<Window> frontierWindows = new ArrayList<>();
         int renderableCount = 0;
         int trackedVisualCount = 0;
+        int mappedCount = 0;
+        int unmappedCount = 0;
+        int rootChildCount = 0;
+        boolean rootSubstructureRedirect = false;
+        boolean rootSubstructureNotify = false;
         Window rootWindow = xServer.windowManager.rootWindow;
         try (XLock lock = xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
-            collectMappedWindows(rootWindow, mappedWindows);
-            for (Window mappedWindow : mappedWindows) {
-                if (mappedWindow.isRenderable()) renderableCount++;
-                if (mappedWindow.isTrackedVisualWindow(rootWindow)) trackedVisualCount++;
+            rootSubstructureRedirect = rootWindow.hasEventListenerFor(Event.SUBSTRUCTURE_REDIRECT);
+            rootSubstructureNotify = rootWindow.hasEventListenerFor(Event.SUBSTRUCTURE_NOTIFY);
+            rootChildCount = rootWindow.getChildren().size();
+            collectWindowFrontier(rootWindow, frontierWindows);
+            for (Window window : frontierWindows) {
+                if (window.attributes.isMapped()) mappedCount++;
+                else unmappedCount++;
+                if (window.isRenderable()) renderableCount++;
+                if (window.isTrackedVisualWindow(rootWindow)) trackedVisualCount++;
             }
         }
+        DesktopShellBootstrapProof proof = desktopShellBootstrapActive
+                ? collectDesktopShellBootstrapProof()
+                : null;
 
         ForensicLogger.logEvent(
                 this,
@@ -4764,32 +4928,45 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "xserver",
                 message,
                 ForensicLogger.fields(
-                        "mapped_window_total", mappedWindows.size(),
+                        "created_window_total", frontierWindows.size(),
+                        "mapped_window_total", mappedCount,
+                        "unmapped_window_total", unmappedCount,
                         "renderable_window_total", renderableCount,
                         "tracked_visual_window_total", trackedVisualCount,
                         "tracked_window_count", getTrackedApplicationWindowCount(),
-                        "desktop_shell_bootstrap", desktopShellBootstrapActive
+                        "root_child_count", rootChildCount,
+                        "root_substructure_redirect", rootSubstructureRedirect,
+                        "root_substructure_notify", rootSubstructureNotify,
+                        "desktop_shell_bootstrap", desktopShellBootstrapActive,
+                        "desktop_shell_launch_mode", desktopShellLaunchMode,
+                        "bootstrap_elapsed_ms", proof != null ? proof.bootstrapElapsedMs : 0L,
+                        "shell_launcher_present", proof != null && proof.shellLauncherPresent,
+                        "shell_process_present", proof != null && proof.explorerProcessPresent,
+                        "winhandler_process_present", proof != null && proof.winHandlerProcessPresent,
+                        "wfm_process_present", proof != null && proof.wfmProcessPresent,
+                        "wineboot_process_present", proof != null && proof.winebootProcessPresent,
+                        "wineserver_present", proof != null && proof.wineserverPresent
                 )
         );
 
-        int limit = Math.min(8, mappedWindows.size());
+        int limit = Math.min(12, frontierWindows.size());
         for (int i = 0; i < limit; i++) {
             logBootstrapWindowCandidate(
                     "XSERVER_WINDOW_FRONTIER_ENTRY",
                     "info",
                     "desktop_shell_window_frontier_entry",
-                    mappedWindows.get(i)
+                    frontierWindows.get(i)
             );
         }
     }
 
-    private void collectMappedWindows(@Nullable Window window, ArrayList<Window> out) {
+    private void collectWindowFrontier(@Nullable Window window, ArrayList<Window> out) {
         if (window == null) return;
-        if (window != xServer.windowManager.rootWindow && window.attributes.isMapped()) {
+        if (window != xServer.windowManager.rootWindow) {
             out.add(window);
         }
         for (Window child : window.getChildren()) {
-            collectMappedWindows(child, out);
+            collectWindowFrontier(child, out);
         }
     }
 
@@ -4819,6 +4996,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean winebootProcessPresent;
         boolean wineserverPresent;
         long bootstrapElapsedMs;
+
+        boolean hasRuntimeLivenessProof(boolean winHandlerReady) {
+            return shellLauncherPresent
+                    || explorerProcessPresent
+                    || winHandlerProcessPresent
+                    || wfmProcessPresent
+                    || winebootProcessPresent
+                    || wineserverPresent
+                    || winHandlerReady;
+        }
 
         boolean hasProcessProof(boolean winHandlerReady, boolean requireWinHandler) {
             if (!requireWinHandler) {
@@ -4857,7 +5044,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void pauseDesktopRuntime(String reason) {
         if (environment != null) {
             environment.onPause();
-            xServerView.onPause();
+            pauseXServerViewSurface("runtime_pause_" + reason);
         }
 
         savePlaytimeData();
@@ -4928,6 +5115,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!wincomponents.equals(container.getExtra("wincomponents"))) {
             extractWinComponentFiles();
             container.putExtra("wincomponents", wincomponents);
+            containerDataChanged = true;
+        }
+        if (syncOpenAlRuntimeDlls()) {
             containerDataChanged = true;
         }
 
@@ -5152,6 +5342,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
         desktopShellWinHandlerFallbackAttempted = false;
         desktopShellDetachedFallbackActive = false;
+        desktopShellLiveNoWindowHorizonLogged = false;
         desktopShellBootstrapStartedAtMs = 0L;
         cancelDeferredGuestTermination("setup_xenvironment");
 
@@ -6746,7 +6937,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private ForensicConfig.Snapshot resolveRuntimeForensicSnapshot(ForensicConfig.Snapshot snapshot) {
-        return ForensicConfig.withRuntimeCaptureDefaults(snapshot, forensicModeLaunch);
+        return ForensicConfig.withRuntimeCaptureDefaults(snapshot, shouldForceRuntimeDiagnosticsForLaunch());
+    }
+
+    private boolean shouldForceRuntimeDiagnosticsForLaunch() {
+        if (forensicModeLaunch) return true;
+        String runtimeModel = ContentProfile.normalizeRuntimeModel(effectiveRuntimeModel);
+        boolean knownRuntimeModel = ContentProfile.RUNTIME_MODEL_BIONIC.equals(runtimeModel)
+                || ContentProfile.RUNTIME_MODEL_GLIBC.equals(runtimeModel);
+        if (!knownRuntimeModel) return false;
+        if (selectedRuntimeProfile == null) return wineInfo != null;
+        return selectedRuntimeProfile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || selectedRuntimeProfile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON;
     }
 
     private void applyForensicEnvVars(ForensicConfig.Snapshot snapshot) {
@@ -6809,12 +7011,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         forensicRuntimeCallbacks.clear();
         if (snapshot == null) return;
 
-        addForensicRuntimeFileCallback(forensicModeLaunch,
+        boolean runtimeStreamCapture = snapshot.hasRuntimeDiagnosticsEnabled();
+        addForensicRuntimeFileCallback(runtimeStreamCapture,
                 "runtime_omni");
         addForensicRuntimeFileCallback(forensicModeLaunch,
                 "runtime_bootstrap", "freewine-", "wineboot", "wineserver", "explorer", "services", "winhandler", "wfm", "aesync");
         addForensicRuntimeFileCallback(snapshot.enableWineDebug || snapshot.enableLoaderTrace,
-                "wine_loader", "wine", "loaddll", "module", "ntdll", "kernel32");
+                "wine_loader", "wine", "loaddll", "module", "ntdll", "kernel32", "user32", "gdi32",
+                "win32u", "winex11", "x11drv", "display", "unixlib", "dlopen", "nodrv", "CreateWindow", "winediag");
         addForensicRuntimeFileCallback(snapshot.enableBox64Logs,
                 "box64", "box64", "dynarec");
         addForensicRuntimeFileCallback(snapshot.enableFexLogs,
@@ -7858,8 +8062,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         File icdDir = new File(imageFs.getShareDir(), "vulkan/icd.d");
-        if (!icdDir.isDirectory() && !icdDir.mkdirs()) return null;
         File androidHostIcd = new File(icdDir, "wrapper_icd.android-host.aarch64.json");
+        String missingDependencies = collectAndroidHostWrapperMissingDependencies(new File(nativeLibDir), imageFs.getAndroidHostLibDir());
+        if (!missingDependencies.isEmpty()) {
+            if (androidHostIcd.isFile()) FileUtils.delete(androidHostIcd);
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "WRAPPER_ICD_ANDROID_HOST_REWRITE_UNSATISFIED_CLOSURE",
+                    null,
+                    "graphics_provider",
+                    "wrapper_icd_android_host_rewrite_unsatisfied_closure",
+                    ForensicLogger.fields(
+                            "source_icd_path", sourceIcdFile.getAbsolutePath(),
+                            "stale_icd_path", androidHostIcd.getAbsolutePath(),
+                            "native_wrapper_lib_path", nativeWrapperLib.getAbsolutePath(),
+                            "native_lib_dir", nativeLibDir,
+                            "host_lib_dir", imageFs.getAndroidHostLibDir().getAbsolutePath(),
+                            "missing_libs", missingDependencies
+                    )
+            );
+            return null;
+        }
+
+        if (!icdDir.isDirectory() && !icdDir.mkdirs()) return null;
         try {
             String rewrittenManifest = VulkanIcdManifestHelper.rewriteLibraryPath(
                     FileUtils.readString(sourceIcdFile),
@@ -7885,6 +8111,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
             Log.w(TAG, "Failed to rewrite wrapper ICD for Android host", e);
             return null;
         }
+    }
+
+    private String collectAndroidHostWrapperMissingDependencies(File nativeLibDir, File hostLibDir) {
+        ArrayList<String> missing = new ArrayList<>();
+        for (String dependency : ANDROID_HOST_WRAPPER_REQUIRED_LIBS) {
+            if (dependency == null || dependency.trim().isEmpty()) continue;
+            if (hasAndroidHostWrapperDependency(dependency, nativeLibDir, hostLibDir)) continue;
+            missing.add(dependency);
+        }
+        return String.join(",", missing);
+    }
+
+    private boolean hasAndroidHostWrapperDependency(String dependency, File nativeLibDir, File hostLibDir) {
+        if (new File(nativeLibDir, dependency).isFile()) return true;
+        return new File(hostLibDir, dependency).isFile();
     }
 
     @Nullable
@@ -9983,6 +10224,67 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private boolean syncOpenAlRuntimeDlls() {
+        String dllOverrides = resolveRequestedDllOverrides();
+        String normalizedDllOverrides = dllOverrides.toLowerCase(Locale.US);
+        boolean needsOpenAlDlls = normalizedDllOverrides.contains("openal32")
+                || normalizedDllOverrides.contains("soft_oal");
+        String openAlState = needsOpenAlDlls ? "yes" : "no";
+        if (openAlState.equals(container.getExtra("openal_dlls")) && !firstTimeBoot) {
+            return false;
+        }
+
+        boolean extracted = false;
+        String reason = "";
+        if (needsOpenAlDlls) {
+            if (FileUtils.getSize(this, "wincomponents/openal.tzst") > 0) {
+                File rootDir = imageFs.getRootDir();
+                File prefixDir = WineUtils.resolveHostWinePrefixDir(rootDir);
+                File windowsDir = new File(prefixDir, "drive_c/windows");
+                extracted = TarCompressorUtils.extract(
+                        TarCompressorUtils.Type.ZSTD,
+                        this,
+                        "wincomponents/openal.tzst",
+                        windowsDir,
+                        onExtractFileListener
+                );
+            } else {
+                reason = "embedded_openal_asset_missing";
+            }
+        }
+
+        container.putExtra("openal_dlls", openAlState);
+        ForensicLogger.logEvent(
+                this,
+                needsOpenAlDlls && !extracted ? "warn" : "info",
+                "OPENAL_RUNTIME_DLL_SYNC",
+                null,
+                "wine_components",
+                "openal_runtime_dll_sync",
+                ForensicLogger.fields(
+                        "requested", needsOpenAlDlls,
+                        "state", openAlState,
+                        "extracted", extracted,
+                        "reason", reason,
+                        "dll_overrides", dllOverrides
+                )
+        );
+        return true;
+    }
+
+    private String resolveRequestedDllOverrides() {
+        EnvVars requestedEnv = new EnvVars();
+        if (container != null) requestedEnv.putAll(container.getEnvVars());
+        if (shortcut != null) {
+            String shortcutEnv = shortcut.getExtra("envVars");
+            if (shortcutEnv != null && !shortcutEnv.trim().isEmpty()) {
+                requestedEnv.putAll(shortcutEnv);
+            }
+        }
+        String dllOverrides = requestedEnv.get("WINEDLLOVERRIDES");
+        return dllOverrides == null ? "" : dllOverrides;
+    }
+
     private void restoreOriginalDllFiles(final String... dlls) {
         File rootDir = imageFs.getRootDir();
         File windowsDir = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "drive_c/windows");
@@ -10448,6 +10750,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             WineUtils.ensureGraphicsDriverRegistry(container.getRootDir(), preferredGraphicsDriver);
+            boolean x11OpenGlBackendContractApplied = WineUtils.graphicsDriverIncludesX11(preferredGraphicsDriver)
+                    && WineUtils.ensureX11OpenGlBackendRegistry(container.getRootDir(), true);
             ForensicLogger.logEvent(
                     this,
                     "info",
@@ -10458,6 +10762,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     ForensicLogger.fields(
                             "container_id", container.id,
                             "graphics_driver", preferredGraphicsDriver,
+                            "x11_use_egl", x11OpenGlBackendContractApplied ? "N" : "",
+                            "x11_force_glx_registry", x11OpenGlBackendContractApplied,
                             "runtime_root", runtimeRootDir == null ? "" : runtimeRootDir.getPath(),
                             "runtime_profile", selectedRuntimeProfile == null ? "" : ContentsManager.getEntryName(selectedRuntimeProfile)
                     )

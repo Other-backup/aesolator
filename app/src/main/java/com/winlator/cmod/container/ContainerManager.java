@@ -305,9 +305,38 @@ public class ContainerManager {
         try {
             int id = maxContainerId + 1;
             data.put("id", id);
+            String requestedWineVersion = data.optString("wineVersion", "");
+            String requestedVariant = data.optString("containerVariant", "");
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "CONTAINER_CREATE_START",
+                    null,
+                    "containers",
+                    "container_create_start",
+                    ForensicLogger.fields(
+                            "container_id", id,
+                            "wine_version", requestedWineVersion,
+                            "container_variant", requestedVariant
+                    )
+            );
 
             File containerDir = new File(homeDir, ImageFs.USER+"-"+id);
-            if (!containerDir.mkdirs()) return null;
+            if (!containerDir.mkdirs()) {
+                ForensicLogger.logEvent(
+                        context,
+                        "error",
+                        "CONTAINER_CREATE_FAILED",
+                        null,
+                        "containers",
+                        "container_directory_create_failed",
+                        ForensicLogger.fields(
+                                "container_id", id,
+                                "container_dir", containerDir.getAbsolutePath()
+                        )
+                );
+                return null;
+            }
 
             Container container = new Container(id, this);
             container.setRootDir(containerDir);
@@ -317,6 +346,20 @@ public class ContainerManager {
 
             if (!extractContainerPatternFile(container, container.getWineVersion(), contentsManager, containerDir, null)) {
                 FileUtils.delete(containerDir);
+                ForensicLogger.logEvent(
+                        context,
+                        "error",
+                        "CONTAINER_CREATE_FAILED",
+                        null,
+                        "containers",
+                        "container_prefix_extract_failed",
+                        ForensicLogger.fields(
+                                "container_id", id,
+                                "wine_version", container.getWineVersion(),
+                                "container_variant", container.getContainerVariant(),
+                                "container_dir", containerDir.getAbsolutePath()
+                        )
+                );
                 return null;
             }
 
@@ -332,9 +375,36 @@ public class ContainerManager {
             container.saveData();
             maxContainerId++;
             containers.add(container);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "CONTAINER_CREATE_READY",
+                    null,
+                    "containers",
+                    "container_create_ready",
+                    ForensicLogger.fields(
+                            "container_id", id,
+                            "wine_version", container.getWineVersion(),
+                            "container_variant", container.getContainerVariant(),
+                            "container_dir", containerDir.getAbsolutePath(),
+                            "prefix_valid", WineUtils.isPrefixValid(containerDir)
+                    )
+            );
             return container;
         } catch (Exception e) {
             Log.e("ContainerManager", "Failed to create container", e);
+            ForensicLogger.logEvent(
+                    context,
+                    "error",
+                    "CONTAINER_CREATE_EXCEPTION",
+                    null,
+                    "containers",
+                    "container_create_exception",
+                    ForensicLogger.fields(
+                            "error_class", e.getClass().getName(),
+                            "error_message", e.getMessage() == null ? "" : e.getMessage()
+                    )
+            );
         }
         return null;
     }
@@ -477,29 +547,93 @@ public class ContainerManager {
                 ? container.getContainerVariant()
                 : com.winlator.cmod.contents.ContentProfile.inferRuntimeModelFromEntryName(wineVersion);
         WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion, requestedRuntimeModel);
+        File runtimeRoot = wineInfo.path == null || wineInfo.path.trim().isEmpty() ? null : new File(wineInfo.path);
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "CONTAINER_PREFIX_RUNTIME_RESOLVED",
+                null,
+                "containers",
+                "container_prefix_runtime_resolved",
+                ForensicLogger.fields(
+                        "container_id", container != null ? container.id : -1,
+                        "requested_wine_version", wineVersion == null ? "" : wineVersion,
+                        "requested_runtime_model", requestedRuntimeModel == null ? "" : requestedRuntimeModel,
+                        "resolved_type", wineInfo.type,
+                        "resolved_version", wineInfo.fullVersion(),
+                        "resolved_arch", wineInfo.getArch(),
+                        "resolved_path", wineInfo.path == null ? "" : wineInfo.path,
+                        "runtime_root_exists", runtimeRoot != null && runtimeRoot.isDirectory(),
+                        "runtime_payload_complete", runtimeRoot != null && WineUtils.hasRuntimePayload(runtimeRoot)
+                )
+        );
         if (wineInfo.path == null || wineInfo.path.trim().isEmpty()) {
+            ForensicLogger.logEvent(
+                    context,
+                    "error",
+                    "CONTAINER_PREFIX_RUNTIME_MISSING",
+                    null,
+                    "containers",
+                    "container_prefix_runtime_missing",
+                    ForensicLogger.fields(
+                            "container_id", container != null ? container.id : -1,
+                            "requested_wine_version", wineVersion == null ? "" : wineVersion,
+                            "requested_runtime_model", requestedRuntimeModel == null ? "" : requestedRuntimeModel
+                    )
+            );
             return false;
         }
         boolean result;
+        String patternSource;
         if (WineInfo.isMainWineVersion(wineVersion)) {
+            patternSource = "container_pattern_gamenative.tzst";
             result = TarCompressorUtils.extract(
                     TarCompressorUtils.Type.ZSTD,
                     context,
-                    "container_pattern_gamenative.tzst",
+                    patternSource,
                     containerDir,
                     onExtractFileListener
             );
             if (!result) {
                 String containerPattern = wineVersion + "_container_pattern.tzst";
+                patternSource = containerPattern;
                 result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
             }
         } else {
             String containerPattern = wineVersion + "_container_pattern.tzst";
+            patternSource = containerPattern;
             result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
         }
+        ForensicLogger.logEvent(
+                context,
+                result ? "info" : "warn",
+                "CONTAINER_PREFIX_PATTERN_EXTRACT_RESULT",
+                null,
+                "containers",
+                result ? "container_prefix_pattern_extract_ready" : "container_prefix_pattern_extract_failed",
+                ForensicLogger.fields(
+                        "container_id", container != null ? container.id : -1,
+                        "pattern_source", patternSource,
+                        "result", result
+                )
+        );
 
         if (!result) {
             result = extractPrefixPack(wineInfo.path, containerDir);
+            ForensicLogger.logEvent(
+                    context,
+                    result ? "info" : "error",
+                    "CONTAINER_PREFIX_PACK_EXTRACT_RESULT",
+                    null,
+                    "containers",
+                    result ? "container_prefix_pack_extract_ready" : "container_prefix_pack_extract_failed",
+                    ForensicLogger.fields(
+                            "container_id", container != null ? container.id : -1,
+                            "runtime_root", wineInfo.path,
+                            "prefix_pack_present", WineUtils.resolveRuntimePrefixPack(new File(wineInfo.path)) != null,
+                            "result", result
+                    )
+            );
         }
 
         if (result) {
@@ -510,8 +644,56 @@ public class ContainerManager {
                     extractCommonDlls(wineInfo, "x86_64-windows", "system32", containerDir, onExtractFileListener);
 
                 extractCommonDlls(wineInfo, "i386-windows", "syswow64", containerDir, onExtractFileListener);
+                String preferredGraphicsDriver = WineUtils.resolvePreferredGraphicsDriver(new File(wineInfo.path), wineInfo);
+                if (Container.BIONIC.equalsIgnoreCase(requestedRuntimeModel) && !preferredGraphicsDriver.isEmpty()) {
+                    WineUtils.ensureGraphicsDriverRegistry(containerDir, preferredGraphicsDriver);
+                    boolean x11OpenGlBackendContractApplied = WineUtils.graphicsDriverIncludesX11(preferredGraphicsDriver)
+                            && WineUtils.ensureX11OpenGlBackendRegistry(containerDir, true);
+                    ForensicLogger.logEvent(
+                            context,
+                            "info",
+                            "CONTAINER_PREFIX_GRAPHICS_REGISTRY_SEEDED",
+                            null,
+                            "containers",
+                            "container_prefix_graphics_registry_seeded",
+                            ForensicLogger.fields(
+                                    "container_id", container != null ? container.id : -1,
+                                    "graphics_driver", preferredGraphicsDriver,
+                                    "x11_use_egl", x11OpenGlBackendContractApplied ? "N" : "",
+                                    "x11_force_glx_registry", x11OpenGlBackendContractApplied,
+                                    "runtime_root", wineInfo.path
+                            )
+                    );
+                }
+                ForensicLogger.logEvent(
+                        context,
+                        "info",
+                        "CONTAINER_PREFIX_COMMON_DLLS_READY",
+                        null,
+                        "containers",
+                        "container_prefix_common_dlls_ready",
+                        ForensicLogger.fields(
+                                "container_id", container != null ? container.id : -1,
+                                "wine_arch", wineInfo.getArch(),
+                                "uses_aarch64_windows_tree", wineInfo.usesAarch64WindowsTree(),
+                                "prefix_valid", WineUtils.isPrefixValid(containerDir)
+                        )
+                );
             }
             catch (JSONException e) {
+                ForensicLogger.logEvent(
+                        context,
+                        "error",
+                        "CONTAINER_PREFIX_COMMON_DLLS_FAILED",
+                        null,
+                        "containers",
+                        "container_prefix_common_dlls_failed",
+                        ForensicLogger.fields(
+                                "container_id", container != null ? container.id : -1,
+                                "error_class", e.getClass().getName(),
+                                "error_message", e.getMessage() == null ? "" : e.getMessage()
+                        )
+                );
                 return false;
             }
         }

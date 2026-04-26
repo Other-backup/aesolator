@@ -38,6 +38,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.ContentInfoDialog;
 import com.winlator.cmod.contentdialog.ContentUntrustedDialog;
 import com.winlator.cmod.contents.ContentProfile;
+import com.winlator.cmod.contents.ContentPayloadResolver;
 import com.winlator.cmod.contents.ContentStateUi;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.DgVoodooManager;
@@ -62,6 +63,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -73,6 +75,11 @@ public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_COMMUNITY = RuntimeFeedRegistry.SOURCE_MODE_COMMUNITY;
     private static final int MAX_GAMEHUB_RELEASE_PAGES = 16;
     private static final int MAX_NIGHTLIES_RELEASE_PAGES = 16;
+    private static final ExecutorService CONTENTS_CLEANUP_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "contents-fragment-cleanup");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private enum ImportArchHint {
         UNKNOWN,
@@ -117,6 +124,7 @@ public class ContentsFragment extends Fragment {
     private boolean suppressFilterCallbacks;
     private final AtomicInteger remoteRefreshGeneration = new AtomicInteger();
     private final HashSet<String> downloadingProfileKeys = new HashSet<>();
+    private final LinkedHashMap<String, ContentsManager.InstalledProfileState> localProfileStateCache = new LinkedHashMap<>();
     @Nullable
     private ContentProfile pendingRemoteInstallProfile;
     @Nullable
@@ -171,8 +179,44 @@ public class ContentsFragment extends Fragment {
     @Override
     public void onDestroy() {
         Context context = getContext();
-        if (context != null) FileUtils.clear(context.getCacheDir());
+        if (context != null) {
+            Context appContext = context.getApplicationContext();
+            CONTENTS_CLEANUP_EXECUTOR.execute(() -> cleanupContentsScratch(appContext));
+        }
         super.onDestroy();
+    }
+
+    private static void cleanupContentsScratch(Context context) {
+        if (context == null) return;
+        FileUtils.delete(ContentsManager.getTmpDir(context));
+        File cacheDir = context.getCacheDir();
+        if (cacheDir == null || !cacheDir.isDirectory()) return;
+        FileUtils.delete(new File(cacheDir, "contents-downloads"));
+        File[] cacheFiles = cacheDir.listFiles();
+        if (cacheFiles == null) return;
+        for (File file : cacheFiles) {
+            if (file == null) continue;
+            String name = file.getName();
+            if (name == null) continue;
+            if (name.startsWith("temp_") && isContentScratchName(name)) {
+                FileUtils.delete(file);
+            }
+        }
+    }
+
+    private static boolean isContentScratchName(String name) {
+        String normalized = name == null ? "" : name.toLowerCase(Locale.US);
+        return normalized.endsWith(".wcp")
+                || normalized.endsWith(".wcp.xz")
+                || normalized.endsWith(".wcp.zst")
+                || normalized.endsWith(".zip")
+                || normalized.endsWith(".tar")
+                || normalized.endsWith(".txz")
+                || normalized.endsWith(".tzst")
+                || normalized.endsWith(".tar.xz")
+                || normalized.endsWith(".tar.zst")
+                || normalized.endsWith(".part")
+                || normalized.endsWith(".part.meta");
     }
 
     @Override
@@ -202,6 +246,7 @@ public class ContentsFragment extends Fragment {
                         && !preselectedDisplayCategory.trim().isEmpty()) {
                     preselectedDisplayCategory = "";
                 }
+                applyRepositorySourceRescueForType();
                 boolean sourceModeChanged = refreshSourceSpinnerForType();
                 updateLaneScopeLabel();
                 refreshTypeScopedFilterSpinners();
@@ -362,6 +407,14 @@ public class ContentsFragment extends Fragment {
     }
 
     private List<ContentProfile> getVisibleProfiles() {
+        return getVisibleProfilesFor(sourceMode, channelMode, archMode);
+    }
+
+    private List<ContentProfile> getVisibleProfilesFor(
+            @Nullable String selectedSourceMode,
+            @Nullable String selectedChannelMode,
+            @Nullable String selectedArchMode
+    ) {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return new ArrayList<>();
 
@@ -374,21 +427,21 @@ public class ContentsFragment extends Fragment {
                 continue;
             }
             boolean availableLocally = isProfileInstalled(profile);
-            if (!matchesSelectedSourceMode(profile) && !shouldBypassSourceFilter(profile)) {
+            if (!matchesSourceMode(profile, selectedSourceMode) && !shouldBypassSourceFilter(profile)) {
                 continue;
             }
             if (!availableLocally && supportsChannelFilter(currentContentType)) {
-                if ("stable".equalsIgnoreCase(channelMode) && profile.isBetaLike()) {
+                if ("stable".equalsIgnoreCase(selectedChannelMode) && profile.isBetaLike()) {
                     continue;
                 }
-                if ("nightly".equalsIgnoreCase(channelMode) && !profile.isBetaLike()) {
+                if ("nightly".equalsIgnoreCase(selectedChannelMode) && !profile.isBetaLike()) {
                     continue;
                 }
             }
             if (supportsArchitectureFilters(currentContentType)
-                    && archMode != null
-                    && !"all".equalsIgnoreCase(archMode)) {
-                if (!profile.matchesArchitectureFilter(archMode)) continue;
+                    && selectedArchMode != null
+                    && !"all".equalsIgnoreCase(selectedArchMode)) {
+                if (!profile.matchesArchitectureFilter(selectedArchMode)) continue;
             }
             filtered.add(profile);
         }
@@ -399,14 +452,37 @@ public class ContentsFragment extends Fragment {
     private List<ContentProfile> dedupeVisibleProfiles(List<ContentProfile> profiles) {
         if (profiles == null || profiles.isEmpty()) return new ArrayList<>();
         LinkedHashMap<String, ContentProfile> bestByIdentity = new LinkedHashMap<>();
-        ArrayList<ContentProfile> ordered = new ArrayList<>();
         for (ContentProfile profile : profiles) {
             String identity = buildVisibleProfileIdentity(profile);
-            if (bestByIdentity.containsKey(identity)) continue;
+            ContentProfile existing = bestByIdentity.get(identity);
+            if (existing != null) {
+                if (shouldReplaceVisibleProfile(existing, profile)) {
+                    bestByIdentity.put(identity, profile);
+                }
+                continue;
+            }
             bestByIdentity.put(identity, profile);
-            ordered.add(profile);
         }
-        return ordered;
+        return new ArrayList<>(bestByIdentity.values());
+    }
+
+    private boolean shouldReplaceVisibleProfile(ContentProfile existing, ContentProfile candidate) {
+        if (existing == null) return true;
+        if (candidate == null) return false;
+        boolean existingRemote = existing.isRemoteDownloadable();
+        boolean candidateRemote = candidate.isRemoteDownloadable();
+        if (!isProfilePresentLocally(existing) && !existingRemote && candidateRemote) return true;
+        if (existingRemote != candidateRemote) return false;
+
+        int sourceCompare = Integer.compare(resolveProfileSourcePriority(candidate), resolveProfileSourcePriority(existing));
+        if (sourceCompare > 0) return true;
+        if (sourceCompare < 0) return false;
+
+        long publishedCompare = Long.compare(resolveProfilePublishedAtKey(candidate), resolveProfilePublishedAtKey(existing));
+        if (publishedCompare > 0) return true;
+        if (publishedCompare < 0) return false;
+
+        return candidate.verCode > existing.verCode;
     }
 
     private String buildVisibleProfileIdentity(ContentProfile profile) {
@@ -420,10 +496,19 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean matchesSelectedSourceMode(ContentProfile profile) {
+        return matchesSourceMode(profile, sourceMode);
+    }
+
+    private boolean matchesSourceMode(ContentProfile profile, @Nullable String selectedSourceMode) {
         if (profile == null) return false;
-        String mode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
+        String mode = normalizeSourceMode(selectedSourceMode);
         String profileMode = resolveProfileSourceMode(profile);
         return mode.equals(profileMode);
+    }
+
+    private String normalizeSourceMode(@Nullable String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.US);
+        return normalized.isEmpty() ? SOURCE_MODE_ARCHIVE : normalized;
     }
 
     private boolean shouldBypassSourceFilter(ContentProfile profile) {
@@ -530,6 +615,43 @@ public class ContentsFragment extends Fragment {
 
     private String classifySourceMode(String sourceFeed, String sourceRepo, String sourceLabel, String remoteUrl) {
         return RemoteProfileFeedMerger.classifySourceMode(sourceFeed, sourceRepo, sourceLabel, remoteUrl);
+    }
+
+    private void applyRepositorySourceRescueForType() {
+        if (currentContentType != ContentProfile.ContentType.CONTENT_TYPE_PROTON) return;
+        String previousSourceMode = sourceMode == null ? "" : sourceMode;
+        String previousChannelMode = channelMode == null ? "" : channelMode;
+        boolean changed = false;
+        if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceMode)) {
+            sourceMode = SOURCE_MODE_NIGHTLIES;
+            changed = true;
+        }
+        if (SOURCE_MODE_NIGHTLIES.equalsIgnoreCase(sourceMode) && "stable".equalsIgnoreCase(channelMode)) {
+            channelMode = "nightly";
+            changed = true;
+        }
+        if (!changed) return;
+        ForensicLogger.logEvent(
+                getContext(),
+                "info",
+                "CONTENTS_SOURCE_RESCUE_APPLIED",
+                null,
+                "contents",
+                "proton_archive_source_rescued_to_nightlies",
+                ForensicLogger.fields(
+                        "type", currentContentType.toString(),
+                        "previous_source_mode", previousSourceMode,
+                        "resolved_source_mode", sourceMode,
+                        "previous_channel_mode", previousChannelMode,
+                        "resolved_channel_mode", channelMode
+                )
+        );
+        if (sharedPreferences != null) {
+            sharedPreferences.edit()
+                    .putString("contents_source_mode", sourceMode)
+                    .putString("contents_channel_mode", channelMode)
+                    .apply();
+        }
     }
 
     private void updateFilterPreferencesFromUi() {
@@ -869,12 +991,16 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean currentSourceHasMultipleArchitectureCandidates() {
+        return sourceHasMultipleArchitectureCandidates(sourceMode);
+    }
+
+    private boolean sourceHasMultipleArchitectureCandidates(@Nullable String candidateSourceMode) {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return false;
         HashSet<String> archTags = new HashSet<>();
         for (ContentProfile profile : profiles) {
             if (profile == null || isProfileInstalled(profile)) continue;
-            if (!matchesSelectedSourceMode(profile)) continue;
+            if (!matchesSourceMode(profile, candidateSourceMode)) continue;
             String archTag = resolveProfileArchTag(profile);
             if ("generic".equalsIgnoreCase(archTag)) continue;
             archTags.add(archTag.toLowerCase(Locale.US));
@@ -884,37 +1010,71 @@ public class ContentsFragment extends Fragment {
     }
 
     private boolean currentSourceHasNightlyCandidates() {
+        return sourceHasNightlyCandidates(sourceMode);
+    }
+
+    private boolean sourceHasNightlyCandidates(@Nullable String candidateSourceMode) {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return false;
         for (ContentProfile profile : profiles) {
             if (profile == null || isProfileInstalled(profile)) continue;
-            if (!matchesSelectedSourceMode(profile)) continue;
+            if (!matchesSourceMode(profile, candidateSourceMode)) continue;
             if (profile.isBetaLike()) return true;
         }
         return false;
     }
 
     private boolean currentSourceHasStableCandidates() {
+        return sourceHasStableCandidates(sourceMode);
+    }
+
+    private boolean sourceHasStableCandidates(@Nullable String candidateSourceMode) {
         List<ContentProfile> profiles = manager.getProfiles(currentContentType);
         if (profiles == null) return false;
         for (ContentProfile profile : profiles) {
             if (profile == null || isProfileInstalled(profile)) continue;
-            if (!matchesSelectedSourceMode(profile)) continue;
+            if (!matchesSourceMode(profile, candidateSourceMode)) continue;
             if (!profile.isBetaLike()) return true;
         }
         return false;
     }
 
     private boolean isProfileAvailableLocally(ContentProfile profile) {
-        return ContentStateUi.isProfileUsableLocally(requireContext(), manager, profile);
+        if (profile == null) return false;
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            return ContentStateUi.isProfileUsableLocally(requireContext(), manager, profile);
+        }
+        if (!profile.isInstalledLocally()) return false;
+        ContentsManager.InstalledProfileState state = getCachedInstalledProfileState(profile);
+        return state != null && state.usable;
     }
 
     private boolean isProfilePresentLocally(ContentProfile profile) {
-        return ContentStateUi.isProfilePresentLocally(requireContext(), manager, profile);
+        if (profile == null) return false;
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            return ContentStateUi.isProfilePresentLocally(requireContext(), manager, profile);
+        }
+        if (!profile.isInstalledLocally()) return false;
+        ContentsManager.InstalledProfileState state = getCachedInstalledProfileState(profile);
+        return state != null && state.present;
     }
 
     private boolean isProfileBrokenLocally(ContentProfile profile) {
-        return ContentStateUi.isProfileBrokenLocally(requireContext(), manager, profile);
+        if (profile == null || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) return false;
+        if (!profile.isInstalledLocally()) return false;
+        ContentsManager.InstalledProfileState state = getCachedInstalledProfileState(profile);
+        return state != null && state.isBroken();
+    }
+
+    @Nullable
+    private ContentsManager.InstalledProfileState getCachedInstalledProfileState(ContentProfile profile) {
+        if (profile == null || manager == null) return null;
+        String key = buildContentProfileStableKey(profile);
+        ContentsManager.InstalledProfileState cached = localProfileStateCache.get(key);
+        if (cached != null) return cached;
+        ContentsManager.InstalledProfileState resolved = manager.resolveInstalledProfileState(profile);
+        localProfileStateCache.put(key, resolved);
+        return resolved;
     }
 
     private int resolveProfileLocalRank(ContentProfile profile) {
@@ -926,6 +1086,13 @@ public class ContentsFragment extends Fragment {
     private boolean isProfileInstalled(ContentProfile profile) {
         if (profile == null) return false;
         return isProfilePresentLocally(profile);
+    }
+
+    @Nullable
+    private ContentProfile resolveInstallableRemoteProfile(ContentProfile profile) {
+        if (profile == null) return null;
+        if (profile.isRemoteDownloadable()) return profile;
+        return manager != null ? manager.findInstallableRemoteProfile(profile) : null;
     }
 
     private void reloadRemoteContents() {
@@ -954,28 +1121,26 @@ public class ContentsFragment extends Fragment {
                 appendSourceFeeds(payloads, sources, selectedSourceMode);
 
                 boolean usedBundledArchiveFallback = false;
-                if (payloads.isEmpty()) {
-                    String bundledPayload = loadBundledArchiveFeed(selectedSourceMode);
-                    if (bundledPayload != null && !bundledPayload.trim().isEmpty()) {
-                        payloads.add(bundledPayload);
-                        sources.add("asset://" + BUNDLED_ARCHIVE_FEED_ASSET);
-                        ForensicLogger.logEvent(
-                                getContext(),
-                                "info",
-                                "CONTENTS_FEED_BUNDLED_FALLBACK_USED",
-                                null,
-                                "contents",
-                                "bundled_archive_feed_applied",
-                                ForensicLogger.fields(
-                                        "source_mode", selectedSourceMode,
-                                        "content_type", selectedContentType == null ? "-" : selectedContentType.toString(),
-                                        "asset_name", BUNDLED_ARCHIVE_FEED_ASSET,
-                                        "payload_size", bundledPayload.length(),
-                                        "payload_sha256", ForensicLogger.sha256Hex(bundledPayload)
-                                )
-                        );
-                        usedBundledArchiveFallback = true;
-                    }
+                String bundledPayload = loadBundledArchiveFeed(selectedSourceMode);
+                if (bundledPayload != null && !bundledPayload.trim().isEmpty()) {
+                    payloads.add(0, bundledPayload);
+                    sources.add("asset://" + BUNDLED_ARCHIVE_FEED_ASSET);
+                    ForensicLogger.logEvent(
+                            getContext(),
+                            "info",
+                            payloads.size() == 1 ? "CONTENTS_FEED_BUNDLED_FALLBACK_USED" : "CONTENTS_FEED_BUNDLED_BASE_USED",
+                            null,
+                            "contents",
+                            payloads.size() == 1 ? "bundled_archive_feed_applied" : "bundled_archive_feed_merged",
+                            ForensicLogger.fields(
+                                    "source_mode", selectedSourceMode,
+                                    "content_type", selectedContentType == null ? "-" : selectedContentType.toString(),
+                                    "asset_name", BUNDLED_ARCHIVE_FEED_ASSET,
+                                    "payload_size", bundledPayload.length(),
+                                    "payload_sha256", ForensicLogger.sha256Hex(bundledPayload)
+                            )
+                    );
+                    usedBundledArchiveFallback = payloads.size() == 1;
                 }
 
                 if (payloads.isEmpty()) {
@@ -1676,9 +1841,11 @@ public class ContentsFragment extends Fragment {
     }
 
     private void loadContentList() {
-        List<ContentProfile> profiles = getVisibleProfiles();
+        localProfileStateCache.clear();
         ContentItemAdapter adapter = contentAdapter;
         int previousCount = adapter != null ? adapter.getItemCount() : 0;
+        List<ContentProfile> profiles = getVisibleProfiles();
+        if (profiles.isEmpty() && tryRecoverEmptyContentsLane(previousCount)) return;
         if (adapter != null) {
             adapter.submitProfiles(profiles);
         }
@@ -1690,6 +1857,147 @@ public class ContentsFragment extends Fragment {
             emptyText.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
         }
+    }
+
+    private boolean tryRecoverEmptyContentsLane(int previousCount) {
+        if (currentContentType == null) return false;
+        String currentSource = normalizeSourceMode(sourceMode);
+        ArrayList<String> candidateSources = getAvailableSourceModesForType(currentContentType);
+        for (String candidateSource : candidateSources) {
+            String normalizedCandidate = normalizeSourceMode(candidateSource);
+            if (normalizedCandidate.equals(currentSource)) continue;
+            String candidateChannel = resolveBestChannelForSource(normalizedCandidate);
+            List<ContentProfile> candidateProfiles = getVisibleProfilesFor(normalizedCandidate, candidateChannel, archMode);
+            if (candidateProfiles.isEmpty()) continue;
+            applyContentsLaneRescue(
+                    normalizedCandidate,
+                    candidateChannel,
+                    false,
+                    "empty_visible_set_loaded_alternate_source",
+                    previousCount,
+                    candidateProfiles.size()
+            );
+            return true;
+        }
+
+        if (currentContentType == ContentProfile.ContentType.CONTENT_TYPE_PROTON
+                && !SOURCE_MODE_NIGHTLIES.equals(currentSource)) {
+            applyContentsLaneRescue(
+                    SOURCE_MODE_NIGHTLIES,
+                    "nightly",
+                    true,
+                    "proton_empty_lane_force_nightlies_fetch",
+                    previousCount,
+                    0
+            );
+            return true;
+        }
+
+        logEmptyContentsLaneUnresolved(previousCount);
+        return false;
+    }
+
+    private String resolveBestChannelForSource(@Nullable String candidateSourceMode) {
+        if (!supportsChannelFilter(currentContentType)) return "stable";
+        String normalizedSource = normalizeSourceMode(candidateSourceMode);
+        boolean hasNightly = sourceHasNightlyCandidates(normalizedSource);
+        boolean hasStable = sourceHasStableCandidates(normalizedSource);
+        if (SOURCE_MODE_NIGHTLIES.equals(normalizedSource) && hasNightly) return "nightly";
+        if (hasNightly && !hasStable) return "nightly";
+        return channelMode == null || channelMode.trim().isEmpty() ? "stable" : channelMode;
+    }
+
+    private void applyContentsLaneRescue(String targetSourceMode,
+                                         String targetChannelMode,
+                                         boolean reloadRemote,
+                                         String reason,
+                                         int previousCount,
+                                         int recoveredCount) {
+        String previousSourceMode = sourceMode == null ? "" : sourceMode;
+        String previousChannelMode = channelMode == null ? "" : channelMode;
+        sourceMode = normalizeSourceMode(targetSourceMode);
+        channelMode = targetChannelMode == null || targetChannelMode.trim().isEmpty() ? "stable" : targetChannelMode;
+        if (sharedPreferences != null) {
+            sharedPreferences.edit()
+                    .putString("contents_source_mode", sourceMode)
+                    .putString("contents_channel_mode", channelMode)
+                    .apply();
+        }
+        refreshSourceSpinnerForType();
+        refreshTypeScopedFilterSpinners();
+        updateFilterControlsVisibility();
+        updateLaneScopeLabel();
+        ForensicLogger.logEvent(
+                getContext(),
+                "warn",
+                "CONTENTS_EMPTY_LANE_RESCUE_APPLIED",
+                null,
+                "contents_list",
+                reason,
+                ForensicLogger.fields(
+                        "type", currentContentType != null ? currentContentType.toString() : "-",
+                        "previous_source_mode", previousSourceMode,
+                        "resolved_source_mode", sourceMode,
+                        "previous_channel_mode", previousChannelMode,
+                        "resolved_channel_mode", channelMode,
+                        "previous_visible_count", previousCount,
+                        "recovered_visible_count", recoveredCount,
+                        "remote_reload_requested", reloadRemote ? "1" : "0"
+                )
+        );
+        if (reloadRemote) {
+            reloadRemoteContents();
+        } else {
+            loadContentList();
+        }
+    }
+
+    private void logEmptyContentsLaneUnresolved(int previousCount) {
+        int typeTotal = 0;
+        int archiveCount = 0;
+        int communityCount = 0;
+        int nightliesCount = 0;
+        int gamehubCount = 0;
+        int wcphubCount = 0;
+        List<ContentProfile> profiles = manager.getProfiles(currentContentType);
+        if (profiles != null) {
+            for (ContentProfile profile : profiles) {
+                if (profile == null) continue;
+                typeTotal++;
+                String profileSource = resolveProfileSourceMode(profile);
+                if (SOURCE_MODE_ARCHIVE.equals(profileSource)) archiveCount++;
+                else if (SOURCE_MODE_COMMUNITY.equals(profileSource)) communityCount++;
+                else if (SOURCE_MODE_NIGHTLIES.equals(profileSource)) nightliesCount++;
+                else if (SOURCE_MODE_GAMEHUB.equals(profileSource)) gamehubCount++;
+                else if (SOURCE_MODE_WCPHUB.equals(profileSource)) wcphubCount++;
+            }
+        }
+        ForensicLogger.logEvent(
+                getContext(),
+                "warn",
+                "CONTENTS_EMPTY_LANE_UNRESOLVED",
+                null,
+                "contents_list",
+                "empty_visible_set_no_rescue_candidate",
+                ForensicLogger.fields(
+                        "type", currentContentType != null ? currentContentType.toString() : "-",
+                        "source_mode", sourceMode == null ? "-" : sourceMode,
+                        "channel_mode", channelMode == null ? "-" : channelMode,
+                        "arch_mode", archMode == null ? "-" : archMode,
+                        "previous_visible_count", previousCount,
+                        "type_total_count", typeTotal,
+                        "archive_count", archiveCount,
+                        "community_count", communityCount,
+                        "nightlies_count", nightliesCount,
+                        "gamehub_count", gamehubCount,
+                        "wcphub_count", wcphubCount,
+                        "archive_scope_remote_count", manager.getRemoteProfileCountForScope(ContentsManager.REMOTE_SCOPE_ARCHIVE),
+                        "community_scope_remote_count", manager.getRemoteProfileCountForScope(ContentsManager.REMOTE_SCOPE_COMMUNITY),
+                        "nightlies_scope_remote_count", manager.getRemoteProfileCountForScope(ContentsManager.REMOTE_SCOPE_NIGHTLIES),
+                        "gamehub_scope_remote_count", manager.getRemoteProfileCountForScope(ContentsManager.REMOTE_SCOPE_GAMEHUB),
+                        "wcphub_scope_remote_count", manager.getRemoteProfileCountForScope(ContentsManager.REMOTE_SCOPE_WCPHUB)
+                )
+        );
     }
 
     private void logVisibleProfilesSnapshot(List<ContentProfile> profiles, int previousCount) {
@@ -1826,9 +2134,33 @@ public class ContentsFragment extends Fragment {
             }
         }
         if (isProfilePresentLocally(profile)) {
-            meta.append(" • ").append(ContentStateUi.getStatusLabel(requireContext(), manager, profile, false));
+            meta.append(" • ").append(getCachedProfileStatusLabel(profile, false));
         }
         return meta.toString();
+    }
+
+    private String getCachedProfileStatusLabel(ContentProfile profile, boolean detailed) {
+        if (profile == null) return getString(R.string.contents_state_remote_only);
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            return ContentStateUi.getStatusLabel(requireContext(), manager, profile, detailed);
+        }
+        ContentsManager.InstalledProfileState state = getCachedInstalledProfileState(profile);
+        if (state == null || !state.present) return getString(R.string.contents_state_remote_only);
+        if (state.usable) return getString(R.string.contents_state_installed);
+        if (!detailed) return getString(R.string.contents_state_broken);
+        return getString(R.string.contents_state_broken_detail, getBrokenReasonLabel(state.brokenReason));
+    }
+
+    private String getBrokenReasonLabel(@Nullable String brokenReason) {
+        String normalized = brokenReason == null ? "" : brokenReason.trim();
+        return switch (normalized) {
+            case "missing_install_dir" -> getString(R.string.contents_state_broken_missing_install_dir);
+            case "missing_profile_json" -> getString(R.string.contents_state_broken_missing_profile_json);
+            case "missing_runtime_root" -> getString(R.string.contents_state_broken_missing_runtime_root);
+            case "missing_runtime_payload" -> getString(R.string.contents_state_broken_missing_runtime_payload);
+            case "missing_profile" -> getString(R.string.contents_state_broken_missing_profile);
+            default -> getString(R.string.contents_state_broken_generic);
+        };
     }
 
     private String buildProfileSourceLine(ContentProfile profile) {
@@ -2201,8 +2533,9 @@ public class ContentsFragment extends Fragment {
             holder.tvDescription.setTextColor(secondaryColor);
             holder.tvSource.setText(buildProfileSourceLine(profile));
             holder.tvSource.setTextColor(secondaryColor);
-            String profileKey = buildContentProfileStableKey(profile);
-            boolean downloadInFlight = downloadingProfileKeys.contains(profileKey);
+            final ContentProfile downloadProfile = resolveInstallableRemoteProfile(profile);
+            final String downloadProfileKey = buildContentProfileStableKey(downloadProfile != null ? downloadProfile : profile);
+            boolean downloadInFlight = downloadingProfileKeys.contains(downloadProfileKey);
             holder.progressBar.setVisibility(downloadInFlight ? View.VISIBLE : View.GONE);
 
             holder.ibMenu.setVisibility(isProfilePresentLocally(profile) ? View.VISIBLE : View.GONE);
@@ -2242,11 +2575,16 @@ public class ContentsFragment extends Fragment {
                 selectionMenu.show();
             });
 
-            boolean hasRemoteUrl = profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty();
+            boolean hasRemoteUrl = downloadProfile != null
+                    && downloadProfile.remoteUrl != null
+                    && !downloadProfile.remoteUrl.trim().isEmpty();
             holder.ibDownload.setVisibility(hasRemoteUrl && !downloadInFlight ? View.VISIBLE : View.GONE);
             holder.ibDownload.setOnClickListener(v -> {
-                if (downloadingProfileKeys.contains(profileKey)) return;
-                downloadingProfileKeys.add(profileKey);
+                if (downloadProfile == null || downloadProfile.remoteUrl == null || downloadProfile.remoteUrl.trim().isEmpty()) {
+                    return;
+                }
+                if (downloadingProfileKeys.contains(downloadProfileKey)) return;
+                downloadingProfileKeys.add(downloadProfileKey);
                 holder.ibDownload.setVisibility(View.GONE);
                 holder.progressBar.setVisibility(View.VISIBLE);
                 final Context appContext = requireContext().getApplicationContext();
@@ -2258,23 +2596,26 @@ public class ContentsFragment extends Fragment {
                         "contents",
                         "download_start",
                         ForensicLogger.fields(
-                                "type", profile.type.toString(),
-                                "ver_name", profile.verName,
-                                "ver_code", profile.verCode,
-                                "url", profile.remoteUrl
+                                "type", downloadProfile.type.toString(),
+                                "ver_name", downloadProfile.verName,
+                                "ver_code", downloadProfile.verCode,
+                                "visible_ver_name", profile.verName,
+                                "visible_installed", isProfilePresentLocally(profile),
+                                "visible_broken", isProfileBrokenLocally(profile),
+                                "url", downloadProfile.remoteUrl
                         )
                 );
 
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
-                    File output = buildRemotePayloadCacheFile(appContext, profile, timestamp);
+                    File output = buildRemotePayloadCacheFile(appContext, downloadProfile, timestamp);
                     File parent = output.getParentFile();
                     if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                        output = new File(appContext.getCacheDir(), "temp_" + timestamp + chooseRemotePayloadSuffix(profile, ".wcp"));
+                        output = new File(appContext.getCacheDir(), "temp_" + timestamp + chooseRemotePayloadSuffix(downloadProfile, ".wcp"));
                     }
                     if (output.exists()) output.delete();
-                    boolean downloaded = Downloader.downloadFile(profile.remoteUrl, output);
-                    String expectedSha256 = normalizeSha256(profile.remoteSha256);
+                    boolean downloaded = ContentPayloadResolver.materialize(appContext, downloadProfile, output);
+                    String expectedSha256 = normalizeSha256(downloadProfile.remoteSha256);
                     String actualSha256 = "";
                     boolean checksumVerified = false;
                     if (downloaded && !expectedSha256.isEmpty()) {
@@ -2292,7 +2633,7 @@ public class ContentsFragment extends Fragment {
                     boolean finalDownloaded = downloaded;
                     File finalOutput = output;
                     runOnUiThreadIfAttached(() -> {
-                        downloadingProfileKeys.remove(profileKey);
+                        downloadingProfileKeys.remove(downloadProfileKey);
                         if (contentAdapter != null) contentAdapter.notifyDataSetChanged();
                         if (!finalDownloaded) {
                             if (checksumRequired && !finalChecksumVerified) {
@@ -2304,9 +2645,9 @@ public class ContentsFragment extends Fragment {
                                         "contents",
                                         "sha256_mismatch",
                                         ForensicLogger.fields(
-                                                "type", profile.type.toString(),
-                                                "ver_name", profile.verName,
-                                                "url", profile.remoteUrl,
+                                                "type", downloadProfile.type.toString(),
+                                                "ver_name", downloadProfile.verName,
+                                                "url", downloadProfile.remoteUrl,
                                                 "expected_sha256", finalExpectedSha256,
                                                 "actual_sha256", finalActualSha256
                                         )
@@ -2322,9 +2663,9 @@ public class ContentsFragment extends Fragment {
                                     "contents",
                                     "download_failed",
                                     ForensicLogger.fields(
-                                            "type", profile.type.toString(),
-                                            "ver_name", profile.verName,
-                                            "url", profile.remoteUrl
+                                            "type", downloadProfile.type.toString(),
+                                            "ver_name", downloadProfile.verName,
+                                            "url", downloadProfile.remoteUrl
                                     )
                             );
                             ContentDialog.alert(getContext(), R.string.unable_to_install_content, null);
@@ -2338,8 +2679,8 @@ public class ContentsFragment extends Fragment {
                                 "contents",
                                 "download_complete",
                                 ForensicLogger.fields(
-                                        "type", profile.type.toString(),
-                                        "ver_name", profile.verName,
+                                        "type", downloadProfile.type.toString(),
+                                        "ver_name", downloadProfile.verName,
                                         "file", finalOutput.getAbsolutePath(),
                                         "size_bytes", finalOutput.length(),
                                         "sha256", finalActualSha256,
@@ -2347,7 +2688,7 @@ public class ContentsFragment extends Fragment {
                                         "sha256_verified", !checksumRequired || finalChecksumVerified
                                 )
                         );
-                        pendingRemoteInstallProfile = profile;
+                        pendingRemoteInstallProfile = downloadProfile;
                         Intent intent = new Intent();
                         intent.setData(Uri.parse(finalOutput.getAbsolutePath()));
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);

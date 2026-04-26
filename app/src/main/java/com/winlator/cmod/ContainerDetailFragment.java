@@ -862,6 +862,10 @@ public class ContainerDetailFragment extends Fragment {
                         this.container = container;
                         syncPendingWallpaperToContainerIfNeeded(desktopTheme, container);
                         saveWineRegistryKeys(view);
+                        if (getActivity() instanceof MainActivity mainActivity) {
+                            mainActivity.showContainersAfterContainerCreated(container);
+                            return;
+                        }
                         UiLifecycleGuard.dispatchBackPress(this, "ContainerDetailFragment", "create_container_async_complete");
                     });
                 }
@@ -1483,10 +1487,7 @@ public class ContainerDetailFragment extends Fragment {
                 isArm64EC ? R.array.wowbox64_version_entries : R.array.box64_version_entries
         );
         for (String version : embeddedEntries) {
-            String assetPath = isArm64EC
-                    ? "wowbox64/wowbox64-" + version + ".tzst"
-                    : "box64/box64-" + version + ".tzst";
-            if (hasEmbeddedArchive(context, assetPath)) {
+            if (hasEmbeddedEmulatorArchive(context, version, isArm64EC)) {
                 itemList.add(version);
             }
         }
@@ -1530,6 +1531,17 @@ public class ContainerDetailFragment extends Fragment {
 
     private static boolean hasEmbeddedArchive(Context context, String assetPath) {
         return FileUtils.getSize(context, assetPath) > 0;
+    }
+
+    private static boolean hasEmbeddedEmulatorArchive(Context context, String version, boolean isArm64EC) {
+        if (version == null || version.trim().isEmpty()) return false;
+        String normalizedVersion = version.trim();
+        if (isArm64EC) {
+            return hasEmbeddedArchive(context, "wowbox64/wowbox64-" + normalizedVersion + ".tzst");
+        }
+        return hasEmbeddedArchive(context, "box86_64/box64-" + normalizedVersion + "-bionic.tzst")
+                || hasEmbeddedArchive(context, "box86_64/box64-" + normalizedVersion + ".tzst")
+                || hasEmbeddedArchive(context, "box64/box64-" + normalizedVersion + ".tzst");
     }
 
     private static void appendInstalledContentVersions(List<String> targetList, ContentsManager manager, List<ContentProfile> profiles) {

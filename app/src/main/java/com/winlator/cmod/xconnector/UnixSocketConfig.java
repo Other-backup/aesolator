@@ -13,9 +13,15 @@ public class UnixSocketConfig {
     public static final String VORTEK_SERVER_PATH = "/tmp/.vortek/V0";
     public static final String STEAM_PIPE_PATH = "/tmp/.steam/steam_pipe";
     public final String path;
+    public final boolean abstractNamespace;
 
     private UnixSocketConfig(String path) {
+        this(path, false);
+    }
+
+    private UnixSocketConfig(String path, boolean abstractNamespace) {
         this.path = path;
+        this.abstractNamespace = abstractNamespace;
     }
 
     public static UnixSocketConfig createSocket(String rootPath, String relativePath) {
@@ -32,6 +38,12 @@ public class UnixSocketConfig {
         else socketFile.delete();
 
         return new UnixSocketConfig(socketFile.getPath());
+    }
+
+    public static UnixSocketConfig createAbstractSocket(String abstractPath) {
+        String normalized = abstractPath == null ? "" : abstractPath.trim().replace('\\', '/');
+        while (normalized.startsWith("@")) normalized = normalized.substring(1);
+        return new UnixSocketConfig(normalized, true);
     }
 
     private static String normalizeSocketRelativePath(String path) {

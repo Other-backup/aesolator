@@ -18,6 +18,8 @@ import java.util.Locale;
 
 public final class ForensicConfig {
     public static final String DEFAULT_WINE_DEBUG_CHANNELS = "warn,err,fixme";
+    private static final String RUNTIME_FORENSIC_WINE_DEBUG_CHANNELS =
+            "warn,err,fixme,+module,+loaddll,+x11drv,+display,+win32u,+seh,+tid,+process";
 
     public static final String PREF_ENABLE_WINE_DEBUG = "enable_wine_debug";
     public static final String PREF_WINE_DEBUG_CHANNELS = "wine_debug_channels";
@@ -78,6 +80,19 @@ public final class ForensicConfig {
         if (!forensicMode) return effective;
 
         effective.enableLoaderTrace = true;
+        effective.enableWineDebug = true;
+        effective.wineDebugChannels = mergeChannels(effective.wineDebugChannels, RUNTIME_FORENSIC_WINE_DEBUG_CHANNELS);
+        effective.enableBox64Logs = true;
+        effective.enableFexLogs = true;
+        effective.enableTurnipLogs = true;
+        effective.enableVulkanLoaderDebug = true;
+        effective.enableDxvkLogs = true;
+        effective.enableVkd3dLogs = true;
+        effective.enableDgVoodooLogs = true;
+        effective.enablePulseLogs = true;
+        effective.enableAlsaLogs = true;
+        effective.enableDeviceSnapshot = true;
+        effective.enableNonRootCapture = true;
         return effective;
     }
 
@@ -173,6 +188,17 @@ public final class ForensicConfig {
             for (String token : DEFAULT_WINE_DEBUG_CHANNELS.split(",")) tokens.add(token.trim());
         }
         return String.join(",", tokens);
+    }
+
+    private static String mergeChannels(String baseChannels, String extraChannels) {
+        LinkedHashSet<String> tokens = new LinkedHashSet<>();
+        for (String token : getChannelList(baseChannels)) {
+            if (token != null && !token.trim().isEmpty()) tokens.add(token.trim());
+        }
+        for (String token : getChannelList(extraChannels)) {
+            if (token != null && !token.trim().isEmpty()) tokens.add(token.trim());
+        }
+        return normalizeChannels(String.join(",", tokens));
     }
 
     public static ArrayList<String> getChannelList(String channels) {
@@ -410,5 +436,21 @@ public final class ForensicConfig {
         public boolean enableRootCapture = true;
         public boolean enableShizukuCapture = false;
         public String adbCaptureMode = ADB_CAPTURE_MODE_AUTO;
+
+        public boolean hasRuntimeDiagnosticsEnabled() {
+            return enableWineDebug
+                    || enableLoaderTrace
+                    || enableBox64Logs
+                    || enableFexLogs
+                    || enableTurnipLogs
+                    || enableVulkanApiDump
+                    || enableVulkanLoaderDebug
+                    || enableVulkanValidation
+                    || enableDxvkLogs
+                    || enableVkd3dLogs
+                    || enableDgVoodooLogs
+                    || enablePulseLogs
+                    || enableAlsaLogs;
+        }
     }
 }

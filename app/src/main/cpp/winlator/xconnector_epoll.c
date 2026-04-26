@@ -172,7 +172,7 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_setRLimitToMax(JNIEnv *env, jc
 
 JNIEXPORT jint JNICALL
 Java_com_winlator_cmod_xconnector_XConnectorEpoll_createAFUnixSocket(
-        JNIEnv *env, jobject obj, jstring path) {
+        JNIEnv *env, jobject obj, jstring path, jboolean abstract_namespace) {
     (void)obj;
 
     if (path == NULL) return -1;
@@ -181,8 +181,17 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_createAFUnixSocket(
     if (path_ptr == NULL) return -1;
 
     size_t path_len = strlen(path_ptr);
-    if (path_len == 0 || path_len >= sizeof(((struct sockaddr_un *)0)->sun_path)) {
-        LOGD("AF_UNIX socket path is invalid or too long length=%zu", path_len);
+    size_t max_path_len = abstract_namespace
+            ? sizeof(((struct sockaddr_un *)0)->sun_path) - 1
+            : sizeof(((struct sockaddr_un *)0)->sun_path) - 1;
+    if (path_len == 0 || path_len > max_path_len) {
+        LOGD(
+                "AF_UNIX socket path is invalid or too long namespace=%s length=%zu max=%zu path=%s",
+                abstract_namespace ? "abstract" : "pathname",
+                path_len,
+                max_path_len,
+                path_ptr
+        );
         (*env)->ReleaseStringUTFChars(env, path, path_ptr);
         return -1;
     }
@@ -198,22 +207,47 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_createAFUnixSocket(
     struct sockaddr_un server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sun_family = AF_LOCAL;
-    memcpy(server_addr.sun_path, path_ptr, path_len + 1);
-    socklen_t addr_length = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + path_len + 1);
-    unlink(server_addr.sun_path);
+    socklen_t addr_length;
+    if (abstract_namespace) {
+        server_addr.sun_path[0] = '\0';
+        memcpy(server_addr.sun_path + 1, path_ptr, path_len);
+        addr_length = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + path_len + 1);
+    } else {
+        memcpy(server_addr.sun_path, path_ptr, path_len + 1);
+        addr_length = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + path_len + 1);
+        unlink(server_addr.sun_path);
+    }
     (*env)->ReleaseStringUTFChars(env, path, path_ptr);
 
     if (bind(fd, (struct sockaddr *)&server_addr, addr_length) < 0) {
-        LOGD("bind failed fd=%d errno=%d (%s)", fd, errno, strerror(errno));
+        LOGD(
+                "bind failed namespace=%s fd=%d errno=%d (%s)",
+                abstract_namespace ? "abstract" : "pathname",
+                fd,
+                errno,
+                strerror(errno)
+        );
         close_tracked_fd(fd);
         return -1;
     }
     if (listen(fd, MAX_EVENTS) < 0) {
-        LOGD("listen failed fd=%d errno=%d (%s)", fd, errno, strerror(errno));
+        LOGD(
+                "listen failed namespace=%s fd=%d errno=%d (%s)",
+                abstract_namespace ? "abstract" : "pathname",
+                fd,
+                errno,
+                strerror(errno)
+        );
         close_tracked_fd(fd);
         return -1;
     }
 
+    LOGD(
+            "AF_UNIX socket ready namespace=%s fd=%d addr_length=%u",
+            abstract_namespace ? "abstract" : "pathname",
+            fd,
+            (unsigned)addr_length
+    );
     return fd;
 }
 

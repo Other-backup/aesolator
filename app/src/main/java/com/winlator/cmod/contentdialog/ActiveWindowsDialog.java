@@ -7,8 +7,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
+
 import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
+import com.winlator.cmod.core.ForensicLogger;
+import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
@@ -47,6 +51,8 @@ public class ActiveWindowsDialog extends ContentDialog {
         emptyText.setVisibility(View.GONE);
         LayoutInflater inflater = LayoutInflater.from(activity);
         XServer xServer = activity.getXServer();
+        int brightText = ContextCompat.getColor(activity, R.color.surface_runtime_taskmgr_text);
+        int mutedText = ContextCompat.getColor(activity, R.color.surface_runtime_taskmgr_muted);
         for (int index = windows.size() - 1; index >= 0; index--) {
             final Window window = windows.get(index);
             final String title = safeWindowTitle(window);
@@ -59,7 +65,11 @@ public class ActiveWindowsDialog extends ContentDialog {
             TextView metaView = itemView.findViewById(R.id.TVMeta);
 
             if (titleView != null) titleView.setText(title);
-            if (classView != null) classView.setText(className);
+            if (titleView != null) titleView.setTextColor(brightText);
+            if (classView != null) {
+                classView.setText(className);
+                classView.setTextColor(mutedText);
+            }
             if (metaView != null) {
                 metaView.setText(activity.getString(
                         R.string.active_windows_meta,
@@ -68,9 +78,11 @@ public class ActiveWindowsDialog extends ContentDialog {
                         (int) window.getWidth(),
                         (int) window.getHeight()
                 ));
+                metaView.setTextColor(mutedText);
             }
             if (iconView != null) {
                 iconView.setImageResource(R.drawable.taskmgr_process);
+                iconView.setColorFilter(brightText);
                 if (xServer != null && xServer.pixmapManager != null) {
                     Bitmap icon = xServer.pixmapManager.getWindowIcon(window);
                     if (icon != null) iconView.setImageBitmap(icon);
@@ -79,7 +91,24 @@ public class ActiveWindowsDialog extends ContentDialog {
 
             itemView.setOnClickListener(v -> {
                 String targetName = !className.isEmpty() ? className : title;
-                activity.getWinHandler().bringToFront(targetName, window.getHandle());
+                WinHandler winHandler = activity.getWinHandler();
+                if (winHandler == null || !winHandler.isReady()) {
+                    ForensicLogger.logEvent(
+                            activity,
+                            "warn",
+                            "ACTIVE_WINDOW_SWITCH_SKIPPED",
+                            null,
+                            "runtime_ui",
+                            "active_window_switch_skipped_winhandler_not_ready",
+                            ForensicLogger.fields(
+                                    "target_name", targetName,
+                                    "window_handle", String.format(Locale.US, "0x%x", window.getHandle()),
+                                    "pid", window.getProcessId()
+                            )
+                    );
+                    return;
+                }
+                winHandler.bringToFront(targetName, window.getHandle());
                 dismiss();
             });
             windowList.addView(itemView);

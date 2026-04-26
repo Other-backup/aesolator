@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -54,6 +55,8 @@ public abstract class ImageFsInstaller {
             {"libaero_evshim.so", "libevshim.so"},
             {"libaero_fakeinput.so", "libfakeinput.so"},
             {"libdummyvk.so", "libdummyvk.so"},
+            {"libadrenotools.so", "libadrenotools.so"},
+            {"libnativewindow.so", "libnativewindow.so"},
             {"libc++_shared.so", "libc++_shared.so"}
     };
     private static final String[][] APP_NATIVE_ANDROID_HOST_LIBS = {
@@ -61,7 +64,73 @@ public abstract class ImageFsInstaller {
             {"libaero_android_sysvshm.so", "libandroid-sysvshm.so"},
             {"libaero_evshim.so", "libevshim.so"},
             {"libdummyvk.so", "libdummyvk.so"},
+            {"libadrenotools.so", "libadrenotools.so"},
+            {"libnativewindow.so", "libnativewindow.so"},
             {"libc++_shared.so", "libc++_shared.so"}
+    };
+    private static final String[] ANDROID_VULKAN_STUB_SYSTEM_LIBS = {
+            "libcutils.so",
+            "libhardware.so",
+            "liblog.so",
+            "libnativewindow.so",
+            "libsync.so"
+    };
+    private static final String[] ANDROID_VULKAN_STUB_REQUIRED_LIBS = {
+            "libc++_shared.so",
+            "libcutils.so",
+            "libdrm.so",
+            "libhardware.so",
+            "liblog.so",
+            "libnativewindow.so",
+            "libsync.so",
+            "libz.so.1"
+    };
+    private static final String[] ANDROID_SYSTEM_LIB_SEARCH_DIRS = {
+            "/system/lib64",
+            "/system_ext/lib64",
+            "/product/lib64",
+            "/vendor/lib64",
+            "/apex/com.android.runtime/lib64/bionic",
+            "/apex/com.android.vndk.current/lib64",
+            "/apex/com.android.vndk.v35/lib64",
+            "/apex/com.android.vndk.v34/lib64",
+            "/apex/com.android.vndk.v33/lib64",
+            "/apex/com.android.vndk.v32/lib64",
+            "/apex/com.android.vndk.v31/lib64",
+            "/apex/com.android.vndk.v30/lib64"
+    };
+    private static final String[] BIONIC_HOST_SUPPORT_REQUIRED_LIBS = {
+            "libX11.so",
+            "libXext.so",
+            "libxcb.so",
+            "libxshmfence.so",
+            "libandroid-support.so",
+            "libfontconfig.so",
+            "libfreetype.so",
+            "libexpat.so.1",
+            "libz.so.1",
+            "libbz2.so.1.0",
+            "libpng16.so",
+            "libbrotlidec.so",
+            "libbrotlicommon.so",
+            "libvulkan.so",
+            "libvulkan.so.1",
+            "libdrm.so",
+            "libdrm_freedreno.so",
+            "libEGL.so",
+            "libEGL.so.1",
+            "libGL.so",
+            "libGL.so.1",
+            "libGLX.so.0",
+            "libGLdispatch.so.0",
+            "libXcursor.so",
+            "libXfixes.so",
+            "libXinerama.so",
+            "libXss.so",
+            "libXcomposite.so",
+            "libXxf86vm.so",
+            "wine-x11-egl-stub/libEGL.so",
+            "wine-x11-egl-stub/libEGL.so.1"
     };
     private static final String[] VULKAN_MANIFEST_DIRS = {
             "usr/share/vulkan/icd.d",
@@ -507,6 +576,191 @@ public abstract class ImageFsInstaller {
             chmodIfExists(destination);
         }
 
+        ensureAndroidVulkanStubClosure(context, rootDir);
+    }
+
+    private static void ensureAndroidVulkanStubClosure(Context context, ImageFs imageFs) {
+        if (imageFs == null) return;
+        ensureAndroidVulkanStubClosure(context, imageFs.getRootDir());
+    }
+
+    private static void ensureAndroidVulkanStubClosure(Context context, File rootDir) {
+        if (context == null || rootDir == null || !rootDir.isDirectory()) return;
+        ArrayList<File> stubDirs = resolveAndroidVulkanStubDirs(rootDir);
+        StringBuilder stubDirList = new StringBuilder();
+        StringBuilder missingByDir = new StringBuilder();
+
+        for (File stubDir : stubDirs) {
+            String missing = materializeAndroidVulkanStubDir(context, rootDir, stubDir);
+            if (stubDirList.length() > 0) stubDirList.append(',');
+            stubDirList.append(stubDir.getAbsolutePath());
+            if (!missing.isEmpty()) {
+                if (missingByDir.length() > 0) missingByDir.append(';');
+                missingByDir.append(stubDir.getAbsolutePath()).append('=').append(missing);
+            }
+        }
+
+        ForensicLogger.logEvent(
+                context,
+                missingByDir.length() == 0 ? "info" : "warn",
+                "ANDROID_VULKAN_STUB_CLOSURE",
+                null,
+                "rootfs",
+                missingByDir.length() == 0 ? "android_vulkan_stub_closure_ready" : "android_vulkan_stub_closure_incomplete",
+                ForensicLogger.fields(
+                        "stub_dirs", stubDirList.toString(),
+                        "required_libs", String.join(",", ANDROID_VULKAN_STUB_REQUIRED_LIBS),
+                        "missing_by_dir", missingByDir.toString()
+                )
+        );
+    }
+
+    private static String materializeAndroidVulkanStubDir(Context context, File rootDir, File stubDir) {
+        if (context == null || rootDir == null || stubDir == null) return "";
+        ensureDirectory(stubDir, 0771);
+        File hostLibDir = new File(rootDir, "usr/lib/android-host");
+        String nativeLibDir = AppUtils.getNativeLibDir(context);
+        File nativeLibRoot = nativeLibDir == null || nativeLibDir.trim().isEmpty()
+                ? null
+                : new File(nativeLibDir);
+
+        copyFirstExisting(
+                stubDir,
+                "libc++_shared.so",
+                new File(hostLibDir, "libc++_shared.so"),
+                nativeLibRoot == null ? null : new File(nativeLibRoot, "libc++_shared.so")
+        );
+        copyFirstExisting(
+                stubDir,
+                "libdrm.so",
+                new File(hostLibDir, "libdrm.so"),
+                nativeLibRoot == null ? null : new File(nativeLibRoot, "libdrm.so")
+        );
+        copyFirstExisting(
+                stubDir,
+                "libz.so.1",
+                new File(hostLibDir, "libz.so.1.3.2"),
+                new File(hostLibDir, "libz.so.1"),
+                findAndroidSystemLibrary("libz.so")
+        );
+        for (String libraryName : ANDROID_VULKAN_STUB_SYSTEM_LIBS) {
+            copyFirstExisting(
+                    stubDir,
+                    libraryName,
+                    findAndroidSystemLibrary(libraryName),
+                    new File(hostLibDir, libraryName),
+                    nativeLibRoot == null ? null : new File(nativeLibRoot, libraryName)
+            );
+        }
+        chmodTree(stubDir, 0755);
+        return collectMissingFiles(stubDir, ANDROID_VULKAN_STUB_REQUIRED_LIBS);
+    }
+
+    private static ArrayList<File> resolveAndroidVulkanStubDirs(File rootDir) {
+        ArrayList<File> dirs = new ArrayList<>();
+        addUniqueFile(dirs, new File(rootDir, "android_stub"));
+        addUniqueFile(dirs, new File(rootDir, "opt/android_stub"));
+        File optDir = new File(rootDir, "opt");
+        File[] optChildren = optDir.listFiles();
+        if (optChildren != null) {
+            for (File child : optChildren) {
+                if (child == null || !child.isDirectory()) continue;
+                if (!child.getName().startsWith("runtime-")) continue;
+                addUniqueFile(dirs, new File(child, "android_stub"));
+                addUniqueFile(dirs, new File(child, "lib"));
+                addUniqueFile(dirs, new File(child, "arm64-v8a/lib"));
+            }
+        }
+        return dirs;
+    }
+
+    private static void addUniqueFile(ArrayList<File> files, File file) {
+        if (files == null || file == null) return;
+        String path = canonicalPath(file);
+        for (File existing : files) {
+            if (existing != null && path.equals(canonicalPath(existing))) return;
+        }
+        files.add(file);
+    }
+
+    private static String canonicalPath(File file) {
+        if (file == null) return "";
+        try {
+            return file.getCanonicalPath();
+        } catch (Exception ignored) {
+            return file.getAbsolutePath();
+        }
+    }
+
+    private static boolean copyFirstExisting(File destinationDir, String destinationName, File... candidates) {
+        if (destinationDir == null || destinationName == null || destinationName.trim().isEmpty()) return false;
+        if (!destinationDir.isDirectory() && !destinationDir.mkdirs()) return false;
+        if (candidates == null) return false;
+        for (File candidate : candidates) {
+            File source = resolveRegularFile(candidate);
+            if (source == null || !source.isFile()) continue;
+            File destination = new File(destinationDir, destinationName);
+            if (!destination.isFile() || !FileUtils.contentEquals(source, destination)) {
+                FileUtils.copy(source, destination);
+            }
+            chmodIfExists(destination);
+            return destination.isFile();
+        }
+        return false;
+    }
+
+    private static File resolveRegularFile(File candidate) {
+        if (candidate == null || !candidate.exists()) return null;
+        try {
+            File canonical = candidate.getCanonicalFile();
+            if (canonical != null && canonical.isFile()) return canonical;
+        } catch (Exception ignored) {
+        }
+        return candidate.isFile() ? candidate : null;
+    }
+
+    private static File findAndroidSystemLibrary(String libraryName) {
+        if (libraryName == null || libraryName.trim().isEmpty()) return null;
+        for (String dir : ANDROID_SYSTEM_LIB_SEARCH_DIRS) {
+            File candidate = new File(dir, libraryName);
+            if (candidate.isFile()) return candidate;
+        }
+        return null;
+    }
+
+    private static String collectMissingFiles(File directory, String[] names) {
+        if (directory == null || names == null) return "";
+        StringBuilder missing = new StringBuilder();
+        for (String name : names) {
+            if (name == null || name.trim().isEmpty()) continue;
+            if (new File(directory, name).isFile()) continue;
+            if (missing.length() > 0) missing.append(',');
+            missing.append(name);
+        }
+        return missing.toString();
+    }
+
+    private static String collectMissingFilesByDir(ArrayList<File> directories, String[] names) {
+        if (directories == null || directories.isEmpty()) return "";
+        StringBuilder missing = new StringBuilder();
+        for (File directory : directories) {
+            String dirMissing = collectMissingFiles(directory, names);
+            if (dirMissing.isEmpty()) continue;
+            if (missing.length() > 0) missing.append(';');
+            missing.append(directory.getAbsolutePath()).append('=').append(dirMissing);
+        }
+        return missing.toString();
+    }
+
+    private static String joinFilePaths(ArrayList<File> files) {
+        if (files == null || files.isEmpty()) return "";
+        StringBuilder joined = new StringBuilder();
+        for (File file : files) {
+            if (file == null) continue;
+            if (joined.length() > 0) joined.append(',');
+            joined.append(file.getAbsolutePath());
+        }
+        return joined.toString();
     }
 
     private static void installGuestLibs(Context context, File rootDir) {
@@ -543,7 +797,9 @@ public abstract class ImageFsInstaller {
         chmodIfExists(new File(rootDir, "usr/lib/android-host/libc++_shared.so"));
         chmodTree(new File(rootDir, "usr/lib/android-host"), 0755);
         int removedVulkanResidue = sanitizeVulkanManifestResidue(context, rootDir);
-        logVulkanRuntimeClosure(context, ImageFs.find(rootDir), removedVulkanResidue);
+        ImageFs installedImageFs = ImageFs.find(rootDir);
+        ensureAndroidVulkanStubClosure(context, installedImageFs);
+        logVulkanRuntimeClosure(context, installedImageFs, removedVulkanResidue);
         chmodIfExists(new File(rootDir, "generate_interfaces_file.exe"));
         chmodIfExists(new File(rootDir, "Steamless/Steamless.CLI.exe"));
         chmodIfExists(new File(rootDir, "opt/mono-gecko-offline/wine-mono-11.0.0-x86.msi"));
@@ -684,6 +940,8 @@ public abstract class ImageFsInstaller {
         File hostLibDir = imageFs.getAndroidHostLibDir();
         if (hasBionicHostSupportClosure(hostLibDir)) {
             ensureImageFsLibraryRunpathSanitized(imageFs);
+            ensureAndroidVulkanStubClosure(context, imageFs);
+            logBionicHostSupportClosure(context, hostLibDir);
             return;
         }
 
@@ -695,31 +953,34 @@ public abstract class ImageFsInstaller {
         }
         chmodTree(hostLibDir, 0755);
         ensureImageFsLibraryRunpathSanitized(imageFs);
+        ensureAndroidVulkanStubClosure(context, imageFs);
+        logBionicHostSupportClosure(context, hostLibDir);
     }
 
     private static boolean hasBionicHostSupportClosure(File hostLibDir) {
         if (hostLibDir == null || !hostLibDir.isDirectory()) return false;
-        String[] required = {
-                "libX11.so",
-                "libXext.so",
-                "libxcb.so",
-                "libxshmfence.so",
-                "libandroid-support.so",
-                "libfontconfig.so",
-                "libfreetype.so",
-                "libexpat.so.1",
-                "libz.so.1",
-                "libbz2.so.1.0",
-                "libpng16.so",
-                "libbrotlidec.so",
-                "libbrotlicommon.so",
-                "libvulkan.so",
-                "libvulkan.so.1"
-        };
-        for (String name : required) {
+        for (String name : BIONIC_HOST_SUPPORT_REQUIRED_LIBS) {
             if (!new File(hostLibDir, name).exists()) return false;
         }
         return true;
+    }
+
+    private static void logBionicHostSupportClosure(Context context, File hostLibDir) {
+        if (context == null || hostLibDir == null) return;
+        String missing = collectMissingFiles(hostLibDir, BIONIC_HOST_SUPPORT_REQUIRED_LIBS);
+        ForensicLogger.logEvent(
+                context,
+                missing.isEmpty() ? "info" : "warn",
+                "BIONIC_HOST_SUPPORT_CLOSURE",
+                null,
+                "rootfs",
+                missing.isEmpty() ? "bionic_host_support_closure_ready" : "bionic_host_support_closure_incomplete",
+                ForensicLogger.fields(
+                        "host_lib_dir", hostLibDir.getAbsolutePath(),
+                        "required_libs", String.join(",", BIONIC_HOST_SUPPORT_REQUIRED_LIBS),
+                        "missing_libs", missing
+                )
+        );
     }
 
     public static void ensureAppNativeGuestLibs(Context context, ImageFs imageFs) {
@@ -745,6 +1006,7 @@ public abstract class ImageFsInstaller {
         chmodIfExists(new File(hostLibDir, "libc++_shared.so"));
         int removedVulkanResidue = sanitizeVulkanManifestResidue(context, rootDir);
         ensureImageFsLibraryRunpathSanitized(imageFs);
+        ensureAndroidVulkanStubClosure(context, imageFs);
         logVulkanRuntimeClosure(context, imageFs, removedVulkanResidue);
     }
 
@@ -808,6 +1070,8 @@ public abstract class ImageFsInstaller {
         File rootDir = imageFs.getRootDir();
         File guestLibDir = imageFs.getLibDir();
         File hostLibDir = imageFs.getAndroidHostLibDir();
+        File androidStubDir = new File(rootDir, "android_stub");
+        ArrayList<File> androidStubDirs = resolveAndroidVulkanStubDirs(rootDir);
         File wrapperIcd = new File(rootDir, "usr/share/vulkan/icd.d/wrapper_icd.aarch64.json");
         File wrapperLib = new File(guestLibDir, "libvulkan_wrapper.so");
         File guestLibcxx = new File(guestLibDir, "libc++_shared.so");
@@ -833,6 +1097,10 @@ public abstract class ImageFsInstaller {
                         "guest_libcxx_present", guestLibcxx.isFile(),
                         "host_libcxx_present", hostLibcxx.isFile(),
                         "native_libcxx_present", nativeLibcxx != null && nativeLibcxx.isFile(),
+                        "android_stub_dir", androidStubDir.getAbsolutePath(),
+                        "android_stub_missing_libs", collectMissingFiles(androidStubDir, ANDROID_VULKAN_STUB_REQUIRED_LIBS),
+                        "android_stub_dirs", joinFilePaths(androidStubDirs),
+                        "android_stub_missing_by_dir", collectMissingFilesByDir(androidStubDirs, ANDROID_VULKAN_STUB_REQUIRED_LIBS),
                         "removed_vulkan_manifest_residue", removedVulkanResidue,
                         "remaining_vulkan_manifest_residue", remainingVulkanResidue
                 )

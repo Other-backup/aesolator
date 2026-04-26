@@ -133,9 +133,9 @@
     <string name="duplicate">Duplicate</string>
     <string name="about">About</string>
     <string name="about_app_title">Ae.solator</string>
-    <string name="about_app_summary">Ae.solator is the Android control surface for the Chapter 2 FreeWine11 runtime line: containers, graphics providers, wrapper packages, runtime tuning and forensic export stay in one visible route.</string>
-    <string name="about_runtime_summary">Runtime stack: FreeWine11 ARM64EC, Aesync policy, X11-first desktop shell, Adreno Turnip/Zink, Mali AeMali PanVK/Gallium through Vortek/Gladio, VirGL, DXVK, VKD3D-Proton and dgVoodoo lanes.</string>
-    <string name="about_runtime_detail">Donor logic is filtered through Ae.solator product contracts. FreeWine11 remains runtime source-of-truth; app, package, graphics and forensic routes stay observable before launch.</string>
+    <string name="about_app_summary">Ae.solator 0.9v+ is the Android control surface for the Chapter 2 runtime line: containers, Contents packages, GameNative rootfs, graphics providers, wrapper packages, runtime tuning and forensic export stay in one visible route.</string>
+    <string name="about_runtime_summary">Runtime stack: bundled Proton 11 ARM64EC, FreeWine11 ARM64EC, Aesync policy, X11-first desktop shell, GameNative imagefs, Adreno Turnip/Zink, Mali AeMali PanVK/Gallium through Vortek/Gladio, VirGL, DXVK, VKD3D-Proton and dgVoodoo lanes.</string>
+    <string name="about_runtime_detail">Donor logic is filtered through Ae.solator product contracts. FreeWine11 remains the owned runtime line, Proton 11 is a bundled compatibility baseline, and app/package/graphics/forensic routes stay observable before launch.</string>
     <string name="about_project_url">github.com/kosoymiki/aesolator</string>
     <string name="about_version_format">Version %1$s</string>
     <string name="default_metric_zero">0</string>
@@ -1176,7 +1176,7 @@
     <string name="runtime_drawer_task_manager_summary">Inspect Windows and Linux processes with live runtime telemetry.</string>
     <string name="runtime_drawer_magnifier_summary">Open the magnifier overlay on top of the current renderer.</string>
     <string name="runtime_drawer_magnifier_unavailable">Magnifier is unavailable while XR mode is active.</string>
-    <string name="runtime_drawer_logs_summary">Open the live log viewer for the current session.</string>
+    <string name="runtime_drawer_logs_summary">Open the live forensic/runtime log viewer for this session.</string>
     <string name="runtime_drawer_logs_disabled">Enable Wine or Box64 logging in Settings first.</string>
     <string name="runtime_drawer_exit_summary">Stop the current container session and close the runtime shell.</string>
     <string name="graphics_driver_label">Graphics Driver:</string>
