@@ -489,7 +489,7 @@ public class XClientRequestHandler implements RequestHandler {
                     client.skipRequest();
                     break;
                 case ClientOpcodes.GET_POINTER_MAPPING:
-                    CursorRequests.getPointerMaping(client, inputStream, outputStream);
+                    CursorRequests.getPointerMapping(client, inputStream, outputStream);
                     break;
                 case 36: // X_GrabServer
                     try (XLock lock = client.xServer.lockAll()) {

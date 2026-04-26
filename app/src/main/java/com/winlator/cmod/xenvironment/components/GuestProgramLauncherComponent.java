@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
-import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -18,6 +17,7 @@ import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.core.AndroidBionicHostLdPathHelper;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.DefaultVersion;
@@ -278,7 +278,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     private ContentProfile resolveInstalledContentProfile(ContentProfile.ContentType type, String versionName) {
         if (type == null || versionName == null || versionName.trim().isEmpty()) return null;
-        ContentProfile profile = contentsManager.findProfileByVersion(type, versionName, true);
+        ContentProfile profile = contentsManager.findInstalledProfileByVersion(type, versionName, true);
+        if (profile != null) return profile;
+        profile = contentsManager.findInstalledProfileByVersion(type, versionName, false);
+        if (profile != null) return profile;
+        profile = contentsManager.findProfileByVersion(type, versionName, true);
         if (profile != null) return profile;
         return contentsManager.findProfileByVersion(type, versionName, false);
     }
@@ -504,6 +508,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 failLaunchPreparation(environment.getContext(), traceId, appId, "Pre-launch step failed");
                 return;
             }
+            if (!runLaunchStage(environment.getContext(), traceId, appId, "prelaunch_stale_wine_process_reap",
+                    ProcessHelper::hardKillStaleWineProcesses)) {
+                failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to clear stale Wine processes before launch");
+                return;
+            }
             long execStartedAt = SystemClock.elapsedRealtime();
             try {
                 pid = execGuestProgram();
@@ -546,7 +555,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     public void stop() {
         synchronized (lock) {
             if (pid != -1) {
-                Process.killProcess(pid);
+                ProcessHelper.killProcessTree(pid);
                 pid = -1;
             }
         }
@@ -709,6 +718,29 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (system32Dir == null) return false;
         return new File(system32Dir, "libwow64fex.dll").isFile()
                 && new File(system32Dir, "libarm64ecfex.dll").isFile();
+    }
+
+    protected boolean isDesktopShellBootstrapLaunch() {
+        return isDesktopShellBootstrap();
+    }
+
+    protected String resolveEffectiveArm64EcEmulator() {
+        ImageFs imageFs = environment != null ? environment.getImageFs() : null;
+        return resolveEffectiveEmulator(imageFs, resolveRequestedEmulator(), isDesktopShellBootstrap());
+    }
+
+    protected boolean shouldUseDirectArm64EcGuestLaunch(ImageFs imageFs, String effectiveEmulator, boolean desktopShellBootstrap) {
+        if (wineInfo == null || !wineInfo.isArm64EC() || imageFs == null) {
+            return false;
+        }
+
+        if ("wowbox64".equalsIgnoreCase(effectiveEmulator)) {
+            return hasWowbox64Payload(imageFs);
+        }
+        if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
+            return hasFexArm64EcPayload(imageFs);
+        }
+        return false;
     }
 
     protected String resolveEffectiveEmulator(ImageFs imageFs, String requestedEmulator, boolean desktopShellBootstrap) {
@@ -931,6 +963,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         String wineLib64Path = wineRootPath + "/lib64";
         String wineUnixPath = runtimeWineUnixDir.getPath();
         String wineDllPath = runtimeWineLibDir.getPath();
+        repairRuntimeExecutablePermissions(context, runtimeBinDir);
 
         // Setting up essential environment variables for Wine
         launchEnv.put("HOME", imageFs.home_path);
@@ -1005,18 +1038,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         );
         launchEnv.put("WINE_NEW_NDIS", "1");
 
-        String ld_preload = "";
-
-        // Check for specific shared memory libraries
-        if ((new File(imageFs.getLibDir(), "libandroid-sysvshm.so")).exists()){
-            ld_preload = imageFs.getLibDir() + "/libandroid-sysvshm.so";
-        }
-
-        launchEnv.put("LD_PRELOAD", ld_preload);
-
-        if (this.envVars != null) {
-            launchEnv.putAll(this.envVars);
-        }
+        StringBuilder ownedLdPreload = new StringBuilder();
+        appendFileIfExists(ownedLdPreload, new File(imageFs.getLibDir(), "libandroid-sysvshm.so"));
+        File fakeInputLibrary = applyFakeEvdevRuntimeBridge(context, imageFs, launchEnv);
+        appendFileIfExists(ownedLdPreload, fakeInputLibrary);
+        appendAndroidOemCryptoLdPreload(ownedLdPreload, imageFs);
+        launchEnv.put("LD_PRELOAD", ownedLdPreload.toString());
+        ensureRuntimeSdlCompatLink(context, imageFs);
+        applyProtonControllerBridgeEnv(context, imageFs, launchEnv);
+        mergeExternalEnvVars(launchEnv, ownedLdPreload.toString(), launchEnv.get("FAKE_EVDEV_DIR"));
 
         if (openWithAndroidBrowser) {
             launchEnv.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
@@ -1209,6 +1239,265 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         if (includeRedirect) {
             appendFileIfExists(builder, new File(hostLibDir, "libredirect-bionic.so"));
+        }
+    }
+
+    protected void applyAndroidBionicHostLdLibraryPath(Context context, ImageFs imageFs, EnvVars launchEnv, String owner) {
+        if (imageFs == null || launchEnv == null) return;
+        String currentLdLibraryPath = launchEnv.get("LD_LIBRARY_PATH");
+        String ldLibraryPath = buildAndroidBionicHostLdLibraryPath(imageFs, currentLdLibraryPath);
+        launchEnv.put("LD_LIBRARY_PATH", ldLibraryPath);
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "ANDROID_BIONIC_HOST_LIBPATH_ORDER_APPLIED",
+                null,
+                "guest_program_launcher",
+                "android_bionic_host_library_path_order_applied",
+                ForensicLogger.fields(
+                        "owner", owner == null ? "" : owner,
+                        "mode", "runtime_first_host_second_system_tail_without_guest_usr_lib",
+                        "guest_lib_dir", imageFs.getLibDir().getPath(),
+                        "host_lib_dir", imageFs.getAndroidHostLibDir().getPath(),
+                        "ld_library_path_before", summarizePathHead(currentLdLibraryPath, 6),
+                        "ld_library_path_head", summarizePathHead(ldLibraryPath, 6)
+                )
+        );
+    }
+
+    protected String buildAndroidBionicHostLdLibraryPath(ImageFs imageFs, String currentLdLibraryPath) {
+        return AndroidBionicHostLdPathHelper.buildDirectGuestLdLibraryPath(
+                currentLdLibraryPath,
+                imageFs.getLibDir().getPath(),
+                new File(imageFs.getRootDir(), "usr/lib64").getPath(),
+                imageFs.getAndroidHostLibDir().getPath()
+        );
+    }
+
+    private static void appendLdLibraryDir(Set<String> paths, File directory) {
+        if (directory == null || !directory.isDirectory()) return;
+        appendLdLibraryPath(paths, directory.getPath());
+    }
+
+    private static void appendLdLibraryPath(Set<String> paths, String path) {
+        if (paths == null || path == null) return;
+        String trimmed = path.trim();
+        if (!trimmed.isEmpty()) paths.add(trimmed);
+    }
+
+    protected static String summarizePathHead(String pathValue, int segmentLimit) {
+        if (pathValue == null || pathValue.trim().isEmpty() || segmentLimit <= 0) return "";
+        String[] segments = pathValue.split(":");
+        StringBuilder summary = new StringBuilder();
+        for (int i = 0; i < segments.length && i < segmentLimit; i++) {
+            if (segments[i] == null || segments[i].trim().isEmpty()) continue;
+            if (summary.length() > 0) summary.append(':');
+            summary.append(segments[i].trim());
+        }
+        if (segments.length > segmentLimit && summary.length() > 0) {
+            summary.append(":...");
+        }
+        return summary.toString();
+    }
+
+    private void repairRuntimeExecutablePermissions(Context context, File runtimeBinDir) {
+        if (runtimeBinDir == null || !runtimeBinDir.isDirectory()) return;
+        File[] binaries = runtimeBinDir.listFiles();
+        if (binaries == null) return;
+        int repairedCount = 0;
+        for (File file : binaries) {
+            if (file != null && file.isFile()) {
+                FileUtils.chmod(file, 0755);
+                repairedCount++;
+            }
+        }
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "RUNTIME_BIN_PERMISSION_REPAIR",
+                null,
+                "guest_program_launcher",
+                "runtime_bin_permission_repair",
+                ForensicLogger.fields(
+                        "runtime_bin_dir", runtimeBinDir.getAbsolutePath(),
+                        "repaired_count", repairedCount
+                )
+        );
+    }
+
+    private void ensureRuntimeSdlCompatLink(Context context, ImageFs imageFs) {
+        File libDir = imageFs != null ? imageFs.getLibDir() : null;
+        File sdlSo = libDir != null ? new File(libDir, "libSDL2-2.0.so") : null;
+        File sdlCompatLink = libDir != null ? new File(libDir, "libSDL2-2.0.so.0") : null;
+        boolean created = false;
+        boolean failed = false;
+        String errorDetail = "";
+        if (sdlSo != null && sdlSo.isFile() && sdlCompatLink != null && !sdlCompatLink.exists()) {
+            try {
+                FileUtils.symlink(sdlSo.getName(), sdlCompatLink.getAbsolutePath());
+                created = sdlCompatLink.exists();
+                failed = !created;
+            } catch (Exception e) {
+                failed = true;
+                errorDetail = String.valueOf(e.getMessage());
+            }
+        }
+        ForensicLogger.logEvent(
+                context,
+                failed ? "warn" : "info",
+                "SDL_RUNTIME_COMPAT_LINK",
+                null,
+                "guest_program_launcher",
+                "sdl_runtime_compat_link",
+                ForensicLogger.fields(
+                        "source_exists", sdlSo != null && sdlSo.isFile(),
+                        "source_path", sdlSo != null ? sdlSo.getAbsolutePath() : "",
+                        "compat_link_exists", sdlCompatLink != null && sdlCompatLink.exists(),
+                        "compat_link_path", sdlCompatLink != null ? sdlCompatLink.getAbsolutePath() : "",
+                        "created", created,
+                        "failed", failed,
+                        "error_detail", errorDetail
+                )
+        );
+    }
+
+    private void appendAndroidOemCryptoLdPreload(StringBuilder builder, ImageFs imageFs) {
+        if (builder == null || imageFs == null) return;
+        File[] cryptoCandidates = new File[] {
+                new File("/system/lib64/libcrypto.so"),
+                new File("/system_ext/lib64/libcrypto.so"),
+                new File(imageFs.getLibDir(), "libcrypto.so.3")
+        };
+        File selected = null;
+        for (File candidate : cryptoCandidates) {
+            if (candidate.isFile()) {
+                appendFileIfExists(builder, candidate);
+                selected = candidate;
+                break;
+            }
+        }
+        ForensicLogger.logEvent(
+                appContextOrFallback(imageFs),
+                selected != null ? "info" : "warn",
+                "ANDROID_OEM_CRYPTO_PRELOAD_SELECTED",
+                null,
+                "guest_program_launcher",
+                "android_oem_crypto_preload_selected",
+                ForensicLogger.fields(
+                        "selected_path", selected != null ? selected.getAbsolutePath() : "",
+                        "candidate_count", cryptoCandidates.length
+                )
+        );
+    }
+
+    private Context appContextOrFallback(ImageFs imageFs) {
+        Context forensicContext = environment != null ? environment.getContext() : null;
+        return forensicContext != null ? forensicContext : ForensicLogger.getAppContext();
+    }
+
+    private void applyProtonControllerBridgeEnv(Context context, ImageFs imageFs, EnvVars launchEnv) {
+        launchEnv.put("PROTON_ENABLE_HIDRAW", "0");
+        launchEnv.put("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "1");
+        launchEnv.put("SDL_JOYSTICK_HIDAPI", "0");
+        File evshimLibrary = resolveEvshimLibrary(imageFs);
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "PROTON_CONTROLLER_BRIDGE_ENV_APPLIED",
+                null,
+                "guest_program_launcher",
+                "proton_controller_bridge_env_applied",
+                ForensicLogger.fields(
+                        "evshim_present", evshimLibrary != null && evshimLibrary.isFile(),
+                        "evshim_path", evshimLibrary != null ? evshimLibrary.getAbsolutePath() : "",
+                        "proton_enable_hidraw", launchEnv.get("PROTON_ENABLE_HIDRAW"),
+                        "sdl_virtual_gamepad", launchEnv.get("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD"),
+                        "sdl_hidapi", launchEnv.get("SDL_JOYSTICK_HIDAPI")
+                )
+        );
+    }
+
+    private File applyFakeEvdevRuntimeBridge(Context context, ImageFs imageFs, EnvVars launchEnv) {
+        File fakeInputLibrary = resolveFakeInputLibrary(imageFs);
+        File devInputDir = imageFs != null ? new File(imageFs.getRootDir(), "dev/input") : null;
+        int createdNodeCount = ensureFakeEvdevNodes(devInputDir);
+        if (devInputDir != null && devInputDir.isDirectory()) {
+            launchEnv.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
+            launchEnv.put("FAKE_EVDEV_VIBRATION", "1");
+        }
+        ForensicLogger.logEvent(
+                context,
+                fakeInputLibrary != null && fakeInputLibrary.isFile() ? "info" : "warn",
+                "FAKE_EVDEV_RUNTIME_BRIDGE_READY",
+                null,
+                "guest_program_launcher",
+                "fake_evdev_runtime_bridge_ready",
+                ForensicLogger.fields(
+                        "fakeinput_present", fakeInputLibrary != null && fakeInputLibrary.isFile(),
+                        "fakeinput_path", fakeInputLibrary != null ? fakeInputLibrary.getAbsolutePath() : "",
+                        "fake_evdev_dir", devInputDir != null ? devInputDir.getAbsolutePath() : "",
+                        "fake_evdev_dir_present", devInputDir != null && devInputDir.isDirectory(),
+                        "created_node_count", createdNodeCount
+                )
+        );
+        return fakeInputLibrary;
+    }
+
+    private int ensureFakeEvdevNodes(File devInputDir) {
+        if (devInputDir == null) return 0;
+        if (!devInputDir.exists() && !devInputDir.mkdirs()) return 0;
+        int createdCount = 0;
+        for (int slot = 0; slot < 4; slot++) {
+            createdCount += ensureFakeEvdevNode(new File(devInputDir, "event" + slot));
+            createdCount += ensureFakeEvdevNode(new File(devInputDir, "js" + slot));
+        }
+        return createdCount;
+    }
+
+    private int ensureFakeEvdevNode(File node) {
+        if (node == null || node.exists()) return 0;
+        try {
+            File parent = node.getParentFile();
+            if (parent != null && !parent.exists()) parent.mkdirs();
+            return node.createNewFile() ? 1 : 0;
+        } catch (IOException ignored) {
+            return 0;
+        }
+    }
+
+    protected File resolveEvshimLibrary(ImageFs imageFs) {
+        if (imageFs == null) return null;
+        File hostEvshim = new File(imageFs.getAndroidHostLibDir(), "libevshim.so");
+        if (hostEvshim.isFile()) return hostEvshim;
+        File guestEvshim = new File(imageFs.getLibDir(), "libevshim.so");
+        return guestEvshim.isFile() ? guestEvshim : null;
+    }
+
+    protected File resolveFakeInputLibrary(ImageFs imageFs) {
+        if (imageFs == null) return null;
+        File guestFakeInput = new File(imageFs.getLibDir(), "libfakeinput.so");
+        return guestFakeInput.isFile() ? guestFakeInput : null;
+    }
+
+    private static String mergePreloadValue(String protectedLdPreload, String overrideLdPreload) {
+        String normalizedProtected = protectedLdPreload == null ? "" : protectedLdPreload.trim();
+        String normalizedOverride = overrideLdPreload == null ? "" : overrideLdPreload.trim();
+        if (normalizedProtected.isEmpty()) return normalizedOverride;
+        if (normalizedOverride.isEmpty()) return normalizedProtected;
+        if (normalizedProtected.equals(normalizedOverride)) return normalizedProtected;
+        return normalizedProtected + ":" + normalizedOverride;
+    }
+
+    private void mergeExternalEnvVars(EnvVars launchEnv, String protectedLdPreload, String protectedFakeEvdevDir) {
+        if (launchEnv == null || this.envVars == null) return;
+        String overrideLdPreload = this.envVars.get("LD_PRELOAD");
+        String overrideFakeEvdevDir = this.envVars.get("FAKE_EVDEV_DIR");
+        launchEnv.putAll(this.envVars);
+        launchEnv.put("LD_PRELOAD", mergePreloadValue(protectedLdPreload, overrideLdPreload));
+        if (protectedFakeEvdevDir != null && !protectedFakeEvdevDir.trim().isEmpty()) {
+            launchEnv.put("FAKE_EVDEV_DIR", protectedFakeEvdevDir.trim());
+        } else if (overrideFakeEvdevDir != null && !overrideFakeEvdevDir.trim().isEmpty()) {
+            launchEnv.put("FAKE_EVDEV_DIR", overrideFakeEvdevDir.trim());
         }
     }
 

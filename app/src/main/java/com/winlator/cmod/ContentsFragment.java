@@ -50,6 +50,7 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
+import com.winlator.cmod.core.UiLifecycleGuard;
 
 import java.io.File;
 import java.net.URI;
@@ -62,6 +63,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_WCPHUB = "wcphub";
@@ -113,8 +115,12 @@ public class ContentsFragment extends Fragment {
     private String[] channelValues;
     private String[] archValues;
     private boolean suppressFilterCallbacks;
+    private final AtomicInteger remoteRefreshGeneration = new AtomicInteger();
+    private final HashSet<String> downloadingProfileKeys = new HashSet<>();
     @Nullable
     private ContentProfile pendingRemoteInstallProfile;
+    @Nullable
+    private ContentItemAdapter contentAdapter;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -302,6 +308,10 @@ public class ContentsFragment extends Fragment {
         recyclerView = layout.findViewById(R.id.RecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
         recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
+        contentAdapter = new ContentItemAdapter();
+        recyclerView.setAdapter(contentAdapter);
+        recyclerView.setHasFixedSize(false);
+        recyclerView.setItemAnimator(null);
         loadContentList();
 
         return layout;
@@ -922,6 +932,8 @@ public class ContentsFragment extends Fragment {
         final String selectedSourceMode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
         final String sourceSignature = buildSourceSignature(selectedSourceMode);
         final String cacheJsonKey = buildRemoteCacheJsonPreferenceKey(sourceSignature);
+        final ContentProfile.ContentType selectedContentType = currentContentType;
+        final int refreshGeneration = remoteRefreshGeneration.incrementAndGet();
         ForensicLogger.logEvent(
                 getContext(),
                 "info",
@@ -947,38 +959,61 @@ public class ContentsFragment extends Fragment {
                     if (bundledPayload != null && !bundledPayload.trim().isEmpty()) {
                         payloads.add(bundledPayload);
                         sources.add("asset://" + BUNDLED_ARCHIVE_FEED_ASSET);
+                        ForensicLogger.logEvent(
+                                getContext(),
+                                "info",
+                                "CONTENTS_FEED_BUNDLED_FALLBACK_USED",
+                                null,
+                                "contents",
+                                "bundled_archive_feed_applied",
+                                ForensicLogger.fields(
+                                        "source_mode", selectedSourceMode,
+                                        "content_type", selectedContentType == null ? "-" : selectedContentType.toString(),
+                                        "asset_name", BUNDLED_ARCHIVE_FEED_ASSET,
+                                        "payload_size", bundledPayload.length(),
+                                        "payload_sha256", ForensicLogger.sha256Hex(bundledPayload)
+                                )
+                        );
                         usedBundledArchiveFallback = true;
                     }
                 }
 
                 if (payloads.isEmpty()) {
                     runOnUiThreadIfAttached(() -> {
-                        String cached = readRemoteCache(cacheJsonKey, sourceSignature);
-                        boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                        applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
-                        ForensicLogger.logEvent(
-                                getContext(),
-                                useCached ? "warn" : "warn",
+                        applyRemoteRefreshFallback(
+                                selectedSourceMode,
+                                sourceSignature,
+                                cacheJsonKey,
                                 "CONTENTS_FEED_REFRESH_FALLBACK",
-                                null,
-                                "contents",
-                                useCached ? "all_sources_failed_use_cached" : "all_sources_failed_empty",
-                                ForensicLogger.fields(
-                                        "source_mode", selectedSourceMode,
-                                        "sources_enabled", sources.size(),
-                                        "cached_used", useCached
-                                )
+                                sources.size(),
+                                refreshGeneration,
+                                selectedContentType,
+                                "all_sources_failed"
                         );
-                        refreshTypeScopedFilterSpinners();
-                        updateFilterControlsVisibility();
-                        loadContentList();
                     });
                     return;
                 }
 
                 String merged = RemoteProfileFeedMerger.mergePayloads(payloads);
+                if (!hasUsableRemotePayload(merged)) {
+                    runOnUiThreadIfAttached(() -> applyRemoteRefreshFallback(
+                            selectedSourceMode,
+                            sourceSignature,
+                            cacheJsonKey,
+                            "CONTENTS_FEED_REFRESH_EMPTY",
+                            sources.size(),
+                            refreshGeneration,
+                            selectedContentType,
+                            "merged_payload_empty"
+                    ));
+                    return;
+                }
                 final boolean finalUsedBundledArchiveFallback = usedBundledArchiveFallback;
                 runOnUiThreadIfAttached(() -> {
+                    if (isStaleRemoteRefresh(refreshGeneration, selectedSourceMode, selectedContentType)) {
+                        logStaleRemoteRefresh(selectedSourceMode, refreshGeneration, selectedContentType);
+                        return;
+                    }
                     sharedPreferences.edit()
                             .putString(cacheJsonKey, merged)
                             .putString(PREF_REMOTE_CACHE_JSON, merged)
@@ -997,46 +1032,139 @@ public class ContentsFragment extends Fragment {
                                     "sources_polled", sources.size(),
                                     "payloads_received", payloads.size(),
                                     "merged_size", merged.length(),
-                                    "bundled_fallback", finalUsedBundledArchiveFallback
+                                    "bundled_fallback", finalUsedBundledArchiveFallback,
+                                    "refresh_generation", refreshGeneration
                             )
                     );
-                    refreshTypeScopedFilterSpinners();
-                    updateFilterControlsVisibility();
-                    loadContentList();
+                    finalizeRemoteRefreshUi();
                 });
             } catch (Exception ignored) {
-                runOnUiThreadIfAttached(() -> {
-                    String cached = readRemoteCache(cacheJsonKey, sourceSignature);
-                    boolean useCached = cached != null && !cached.trim().isEmpty() && !"[]".equals(cached.trim());
-                    applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, useCached ? cached : "[]");
-                    ForensicLogger.logEvent(
-                            getContext(),
-                            "warn",
-                            "CONTENTS_FEED_REFRESH_EXCEPTION",
-                            null,
-                            "contents",
-                            useCached ? "refresh_exception_use_cached" : "refresh_exception_empty",
-                            ForensicLogger.fields(
-                                    "source_mode", selectedSourceMode,
-                                    "cached_used", useCached
-                            )
-                    );
-                    refreshTypeScopedFilterSpinners();
-                    updateFilterControlsVisibility();
-                    loadContentList();
-                });
+                runOnUiThreadIfAttached(() -> applyRemoteRefreshFallback(
+                        selectedSourceMode,
+                        sourceSignature,
+                        cacheJsonKey,
+                        "CONTENTS_FEED_REFRESH_EXCEPTION",
+                        -1,
+                        refreshGeneration,
+                        selectedContentType,
+                        "refresh_exception"
+                ));
             }
         }).start();
     }
 
+    private void applyRemoteRefreshFallback(
+            String selectedSourceMode,
+            String sourceSignature,
+            String cacheJsonKey,
+            String eventId,
+            int sourcesEnabled,
+            int refreshGeneration,
+            @Nullable ContentProfile.ContentType selectedContentType,
+            String failureClass
+    ) {
+        if (isStaleRemoteRefresh(refreshGeneration, selectedSourceMode, selectedContentType)) {
+            logStaleRemoteRefresh(selectedSourceMode, refreshGeneration, selectedContentType);
+            return;
+        }
+
+        String cached = readRemoteCache(cacheJsonKey, sourceSignature);
+        boolean useCached = hasUsableRemotePayload(cached);
+        String scopeKey = resolveRemoteScopeKey(selectedSourceMode);
+        int existingCount = manager.getRemoteProfileCountForScope(scopeKey);
+        boolean keepExisting = !useCached && existingCount > 0;
+
+        if (useCached) {
+            applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, cached);
+        } else if (!keepExisting) {
+            applyRemoteProfilesForSelectedSourceMode(selectedSourceMode, "[]");
+        }
+
+        String message;
+        if (useCached) {
+            message = failureClass + "_use_cached";
+        } else if (keepExisting) {
+            message = failureClass + "_keep_existing";
+        } else {
+            message = failureClass + "_empty";
+        }
+
+        ForensicLogger.logEvent(
+                getContext(),
+                "warn",
+                eventId,
+                null,
+                "contents",
+                message,
+                ForensicLogger.fields(
+                        "source_mode", selectedSourceMode,
+                        "sources_enabled", sourcesEnabled,
+                        "cached_used", useCached,
+                        "kept_existing", keepExisting,
+                        "existing_remote_count", existingCount,
+                        "refresh_generation", refreshGeneration
+                )
+        );
+        finalizeRemoteRefreshUi();
+    }
+
+    private boolean hasUsableRemotePayload(@Nullable String payload) {
+        if (payload == null) return false;
+        String normalized = payload.trim();
+        return !normalized.isEmpty() && !"[]".equals(normalized);
+    }
+
+    private String resolveRemoteScopeKey(@Nullable String selectedSourceMode) {
+        if (selectedSourceMode == null || selectedSourceMode.trim().isEmpty()) return ContentsManager.REMOTE_SCOPE_ARCHIVE;
+        String normalized = selectedSourceMode.trim().toLowerCase(Locale.US);
+        if (SOURCE_MODE_ARCHIVE.equals(normalized)) return ContentsManager.REMOTE_SCOPE_ARCHIVE;
+        if (SOURCE_MODE_NIGHTLIES.equals(normalized)) return ContentsManager.REMOTE_SCOPE_NIGHTLIES;
+        if (SOURCE_MODE_GAMEHUB.equals(normalized)) return ContentsManager.REMOTE_SCOPE_GAMEHUB;
+        if (SOURCE_MODE_WCPHUB.equals(normalized)) return ContentsManager.REMOTE_SCOPE_WCPHUB;
+        return ContentsManager.REMOTE_SCOPE_COMMUNITY;
+    }
+
+    private boolean isStaleRemoteRefresh(
+            int refreshGeneration,
+            @Nullable String selectedSourceMode,
+            @Nullable ContentProfile.ContentType selectedContentType
+    ) {
+        if (refreshGeneration != remoteRefreshGeneration.get()) return true;
+        String liveSourceMode = sourceMode == null ? SOURCE_MODE_ARCHIVE : sourceMode.trim().toLowerCase(Locale.US);
+        String requestSourceMode = selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
+        if (!liveSourceMode.equals(requestSourceMode)) return true;
+        return currentContentType != selectedContentType;
+    }
+
+    private void logStaleRemoteRefresh(
+            @Nullable String selectedSourceMode,
+            int refreshGeneration,
+            @Nullable ContentProfile.ContentType selectedContentType
+    ) {
+        ForensicLogger.logEvent(
+                getContext(),
+                "info",
+                "CONTENTS_FEED_REFRESH_STALE",
+                null,
+                "contents",
+                "stale_refresh_ignored",
+                ForensicLogger.fields(
+                        "source_mode", selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode,
+                        "requested_type", selectedContentType == null ? "-" : selectedContentType.toString(),
+                        "live_type", currentContentType == null ? "-" : currentContentType.toString(),
+                        "refresh_generation", refreshGeneration
+                )
+        );
+    }
+
+    private void finalizeRemoteRefreshUi() {
+        refreshTypeScopedFilterSpinners();
+        updateFilterControlsVisibility();
+        loadContentList();
+    }
+
     private boolean runOnUiThreadIfAttached(Runnable action) {
-        Activity activity = getActivity();
-        if (!isAdded() || activity == null || action == null) return false;
-        activity.runOnUiThread(() -> {
-            if (!isAdded() || getActivity() == null) return;
-            action.run();
-        });
-        return true;
+        return UiLifecycleGuard.runOnUiThread(this, action, "ContentsFragment", "run_attached_action");
     }
 
     private String buildRemoteCacheJsonPreferenceKey(String sourceSignature) {
@@ -1070,23 +1198,28 @@ public class ContentsFragment extends Fragment {
 
     private void appendSourceFeeds(List<String> payloads, HashSet<String> seenSources, String selectedSourceMode) {
         if (SOURCE_MODE_NIGHTLIES.equals(selectedSourceMode)) {
-            appendNightliesReleaseFeeds(payloads, seenSources);
+            appendNightliesReleaseFeeds(payloads, seenSources, selectedSourceMode);
             return;
         }
         if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
-            appendGamehubReleaseFeeds(payloads, seenSources);
-            addRemoteFeed(payloads, seenSources, ContentsManager.REMOTE_GAMEHUB_COMPONENTS);
+            appendGamehubReleaseFeeds(payloads, seenSources, selectedSourceMode);
+            addRemoteFeed(payloads, seenSources, ContentsManager.REMOTE_GAMEHUB_COMPONENTS, selectedSourceMode);
             return;
         }
         for (String sourceUrl : resolveSelectedSourceUrls(selectedSourceMode)) {
-            addRemoteFeed(payloads, seenSources, sourceUrl);
+            addRemoteFeed(payloads, seenSources, sourceUrl, selectedSourceMode);
         }
     }
 
-    private void appendGamehubReleaseFeeds(List<String> payloads, HashSet<String> seenSources) {
+    private void appendGamehubReleaseFeeds(List<String> payloads, HashSet<String> seenSources, String selectedSourceMode) {
         int emptyPages = 0;
         for (int page = 1; page <= MAX_GAMEHUB_RELEASE_PAGES && emptyPages < 2; page++) {
-            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(payloads, seenSources, buildGamehubReleasePageUrl(page));
+            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(
+                    payloads,
+                    seenSources,
+                    buildGamehubReleasePageUrl(page),
+                    selectedSourceMode
+            );
             if (result == null || !result.hasPayload()) {
                 emptyPages++;
             } else {
@@ -1095,10 +1228,15 @@ public class ContentsFragment extends Fragment {
         }
     }
 
-    private void appendNightliesReleaseFeeds(List<String> payloads, HashSet<String> seenSources) {
+    private void appendNightliesReleaseFeeds(List<String> payloads, HashSet<String> seenSources, String selectedSourceMode) {
         int emptyPages = 0;
         for (int page = 1; page <= MAX_NIGHTLIES_RELEASE_PAGES && emptyPages < 2; page++) {
-            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(payloads, seenSources, buildNightliesReleasePageUrl(page));
+            RemoteFeedPayloadLoader.FeedLoadResult result = addRemoteFeed(
+                    payloads,
+                    seenSources,
+                    buildNightliesReleasePageUrl(page),
+                    selectedSourceMode
+            );
             if (result == null || !result.hasPayload()) {
                 emptyPages++;
             } else {
@@ -1106,7 +1244,7 @@ public class ContentsFragment extends Fragment {
             }
         }
         if (!payloads.isEmpty()) return;
-        appendNightliesAtomFallbackFeeds(payloads, seenSources);
+        appendNightliesAtomFallbackFeeds(payloads, seenSources, selectedSourceMode);
     }
 
     private String buildGamehubReleasePageUrl(int page) {
@@ -1119,8 +1257,9 @@ public class ContentsFragment extends Fragment {
         return ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES + "&page=" + normalizedPage;
     }
 
-    private void appendNightliesAtomFallbackFeeds(List<String> payloads, HashSet<String> seenSources) {
+    private void appendNightliesAtomFallbackFeeds(List<String> payloads, HashSet<String> seenSources, String selectedSourceMode) {
         RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNightliesAtomFallbackPayload();
+        logRemoteFeedProbe(selectedSourceMode, ContentsManager.REMOTE_THE412BANNER_NIGHTLIES_RELEASES_ATOM, result);
         if (!result.hasPayload() || !isAllowedFeedUrl(result.requestedUrl) || seenSources.contains(result.requestedUrl)) return;
         seenSources.add(result.requestedUrl);
         payloads.add(result.payload);
@@ -1166,16 +1305,51 @@ public class ContentsFragment extends Fragment {
         return String.join("|", signatureParts);
     }
 
-    private RemoteFeedPayloadLoader.FeedLoadResult addRemoteFeed(List<String> payloads, HashSet<String> seenSources, @Nullable String url) {
+    private RemoteFeedPayloadLoader.FeedLoadResult addRemoteFeed(List<String> payloads,
+                                                                 HashSet<String> seenSources,
+                                                                 @Nullable String url,
+                                                                 @Nullable String selectedSourceMode) {
         if (url == null) return null;
         String normalized = url.trim();
         if (normalized.isEmpty() || seenSources.contains(normalized) || !isAllowedFeedUrl(normalized)) return null;
         seenSources.add(normalized);
         RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNormalizedFeed(normalized);
+        logRemoteFeedProbe(selectedSourceMode, normalized, result);
         if (result.hasPayload()) {
             payloads.add(result.payload);
         }
         return result;
+    }
+
+    private void logRemoteFeedProbe(@Nullable String selectedSourceMode,
+                                    @Nullable String requestedUrl,
+                                    @Nullable RemoteFeedPayloadLoader.FeedLoadResult result) {
+        if (getContext() == null) return;
+        String url = requestedUrl == null ? "" : requestedUrl.trim();
+        String sourceModeValue = selectedSourceMode == null ? SOURCE_MODE_ARCHIVE : selectedSourceMode;
+        String payload = result != null ? result.payload : "";
+        String failureClass = result != null ? result.failureClass : "no_result";
+        boolean hasPayload = result != null && result.hasPayload();
+        ForensicLogger.logEvent(
+                getContext(),
+                hasPayload ? "info" : "warn",
+                hasPayload ? "CONTENTS_FEED_PROBE_OK" : "CONTENTS_FEED_PROBE_FAIL",
+                null,
+                "contents",
+                hasPayload ? "feed_probe_ok" : "feed_probe_fail",
+                ForensicLogger.fields(
+                        "source_mode", sourceModeValue,
+                        "content_type", currentContentType == null ? "-" : currentContentType.toString(),
+                        "requested_url", url,
+                        "resolved_url", result != null ? result.requestedUrl : "",
+                        "status_code", result != null ? result.statusCode : 0,
+                        "failure_class", failureClass == null || failureClass.trim().isEmpty() ? "-" : failureClass,
+                        "fallback_used", result != null && result.fallbackUsed ? "1" : "0",
+                        "payload_present", hasPayload ? "1" : "0",
+                        "payload_size", payload == null ? 0 : payload.length(),
+                        "payload_sha256", payload == null || payload.isEmpty() ? "-" : ForensicLogger.sha256Hex(payload)
+                )
+        );
     }
 
     @Nullable
@@ -1503,14 +1677,97 @@ public class ContentsFragment extends Fragment {
 
     private void loadContentList() {
         List<ContentProfile> profiles = getVisibleProfiles();
+        ContentItemAdapter adapter = contentAdapter;
+        int previousCount = adapter != null ? adapter.getItemCount() : 0;
+        if (adapter != null) {
+            adapter.submitProfiles(profiles);
+        }
+        logVisibleProfilesSnapshot(profiles, previousCount);
         if (profiles.isEmpty()) {
             emptyText.setVisibility(View.VISIBLE);
             recyclerView.setVisibility(View.GONE);
         } else {
             emptyText.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
-            recyclerView.setAdapter(new ContentItemAdapter(profiles));
         }
+    }
+
+    private void logVisibleProfilesSnapshot(List<ContentProfile> profiles, int previousCount) {
+        ArrayList<String> profileKeys = new ArrayList<>();
+        int installedCount = 0;
+        int brokenCount = 0;
+        int remoteCount = 0;
+        int protonLikeCount = 0;
+        int archiveCount = 0;
+        int communityCount = 0;
+        int nightlyCount = 0;
+        int gameHubCount = 0;
+        int wcphubCount = 0;
+
+        for (ContentProfile profile : profiles) {
+            if (profile == null) continue;
+            profileKeys.add(buildContentProfileStableKey(profile));
+            if (isProfilePresentLocally(profile)) installedCount++;
+            if (isProfileBrokenLocally(profile)) brokenCount++;
+            if (profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty()) remoteCount++;
+            if (isProtonLike(profile)) protonLikeCount++;
+            String resolvedSourceMode = resolveProfileSourceMode(profile);
+            if (SOURCE_MODE_ARCHIVE.equals(resolvedSourceMode)) archiveCount++;
+            else if (SOURCE_MODE_COMMUNITY.equals(resolvedSourceMode)) communityCount++;
+            else if (SOURCE_MODE_NIGHTLIES.equals(resolvedSourceMode)) nightlyCount++;
+            else if (SOURCE_MODE_GAMEHUB.equals(resolvedSourceMode)) gameHubCount++;
+            else if (SOURCE_MODE_WCPHUB.equals(resolvedSourceMode)) wcphubCount++;
+        }
+
+        ForensicLogger.logEvent(
+                getContext(),
+                "info",
+                "CONTENTS_VISIBLE_SET_REFRESH",
+                null,
+                "contents_list",
+                "visible_profiles_refreshed",
+                ForensicLogger.fields(
+                        "type", currentContentType != null ? currentContentType.toString() : "-",
+                        "source_mode", sourceMode == null ? "-" : sourceMode,
+                        "channel_mode", channelMode == null ? "-" : channelMode,
+                        "arch_mode", archMode == null ? "-" : archMode,
+                        "visible_count", profiles.size(),
+                        "previous_count", previousCount,
+                        "installed_count", installedCount,
+                        "broken_count", brokenCount,
+                        "remote_count", remoteCount,
+                        "proton_like_count", protonLikeCount,
+                        "archive_count", archiveCount,
+                        "community_count", communityCount,
+                        "nightly_count", nightlyCount,
+                        "gamehub_count", gameHubCount,
+                        "wcphub_count", wcphubCount,
+                        "downloading_count", downloadingProfileKeys.size(),
+                        "profile_set_sha256", ForensicLogger.sha256Hex(String.join("\n", profileKeys))
+                )
+        );
+    }
+
+    private String buildContentProfileStableKey(@Nullable ContentProfile profile) {
+        if (profile == null) return "content:-";
+        return String.join("|",
+                profile.type != null ? profile.type.toString() : "-",
+                profile.getRuntimeModel(),
+                profile.verName == null ? "" : profile.verName.trim().toLowerCase(Locale.US),
+                String.valueOf(profile.verCode),
+                profile.artifactName == null ? "" : profile.artifactName.trim().toLowerCase(Locale.US),
+                profile.releaseTag == null ? "" : profile.releaseTag.trim().toLowerCase(Locale.US),
+                profile.remoteUrl == null ? "" : profile.remoteUrl.trim().toLowerCase(Locale.US)
+        );
+    }
+
+    private long buildContentProfileStableId(@Nullable ContentProfile profile) {
+        String key = buildContentProfileStableKey(profile);
+        long hash = 1125899906842597L;
+        for (int i = 0; i < key.length(); i++) {
+            hash = 31L * hash + key.charAt(i);
+        }
+        return hash;
     }
 
     private String getSourceLabel(ContentProfile profile) {
@@ -1846,7 +2103,7 @@ public class ContentsFragment extends Fragment {
     }
 
     private class ContentItemAdapter extends RecyclerView.Adapter<ContentItemAdapter.ViewHolder> {
-        private final List<ContentProfile> data;
+        private final ArrayList<ContentProfile> data = new ArrayList<>();
 
         private class ViewHolder extends RecyclerView.ViewHolder {
             private final ImageView ivIcon;
@@ -1873,8 +2130,16 @@ public class ContentsFragment extends Fragment {
             }
         }
 
-        private ContentItemAdapter(List<ContentProfile> data) {
-            this.data = data;
+        private ContentItemAdapter() {
+            setHasStableIds(true);
+        }
+
+        private void submitProfiles(List<ContentProfile> profiles) {
+            data.clear();
+            if (profiles != null && !profiles.isEmpty()) {
+                data.addAll(profiles);
+            }
+            notifyDataSetChanged();
         }
 
         @NonNull
@@ -1884,9 +2149,17 @@ public class ContentsFragment extends Fragment {
         }
 
         @Override
+        public long getItemId(int position) {
+            if (position < 0 || position >= data.size()) return RecyclerView.NO_ID;
+            return buildContentProfileStableId(data.get(position));
+        }
+
+        @Override
         public void onViewRecycled(@NonNull ViewHolder holder) {
             holder.ibMenu.setOnClickListener(null);
             holder.ibDownload.setOnClickListener(null);
+            holder.progressBar.setVisibility(View.GONE);
+            holder.ibDownload.setVisibility(View.GONE);
             super.onViewRecycled(holder);
         }
 
@@ -1928,6 +2201,9 @@ public class ContentsFragment extends Fragment {
             holder.tvDescription.setTextColor(secondaryColor);
             holder.tvSource.setText(buildProfileSourceLine(profile));
             holder.tvSource.setTextColor(secondaryColor);
+            String profileKey = buildContentProfileStableKey(profile);
+            boolean downloadInFlight = downloadingProfileKeys.contains(profileKey);
+            holder.progressBar.setVisibility(downloadInFlight ? View.VISIBLE : View.GONE);
 
             holder.ibMenu.setVisibility(isProfilePresentLocally(profile) ? View.VISIBLE : View.GONE);
             holder.ibMenu.setOnClickListener(v -> {
@@ -1966,8 +2242,11 @@ public class ContentsFragment extends Fragment {
                 selectionMenu.show();
             });
 
-            holder.ibDownload.setVisibility((profile.remoteUrl != null) && (holder.progressBar.getVisibility() == View.GONE) ? View.VISIBLE : View.GONE);
+            boolean hasRemoteUrl = profile.remoteUrl != null && !profile.remoteUrl.trim().isEmpty();
+            holder.ibDownload.setVisibility(hasRemoteUrl && !downloadInFlight ? View.VISIBLE : View.GONE);
             holder.ibDownload.setOnClickListener(v -> {
+                if (downloadingProfileKeys.contains(profileKey)) return;
+                downloadingProfileKeys.add(profileKey);
                 holder.ibDownload.setVisibility(View.GONE);
                 holder.progressBar.setVisibility(View.VISIBLE);
                 final Context appContext = requireContext().getApplicationContext();
@@ -2013,8 +2292,8 @@ public class ContentsFragment extends Fragment {
                     boolean finalDownloaded = downloaded;
                     File finalOutput = output;
                     runOnUiThreadIfAttached(() -> {
-                        holder.progressBar.setVisibility(View.GONE);
-                        holder.ibDownload.setVisibility(View.VISIBLE);
+                        downloadingProfileKeys.remove(profileKey);
+                        if (contentAdapter != null) contentAdapter.notifyDataSetChanged();
                         if (!finalDownloaded) {
                             if (checksumRequired && !finalChecksumVerified) {
                                 ForensicLogger.logEvent(

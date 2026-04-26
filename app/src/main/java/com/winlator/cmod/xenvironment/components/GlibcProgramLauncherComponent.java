@@ -87,13 +87,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         );
         launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "1");
         launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "host_closure_preload");
-        File androidHostLibDir = imageFs.getAndroidHostLibDir();
-        String androidHostLibPath = androidHostLibDir.isDirectory() ? androidHostLibDir.getPath() + ":" : "";
-        launchEnv.put(
-                "LD_LIBRARY_PATH",
-                androidHostLibPath
-                        + "/system/lib64:/apex/com.android.runtime/lib64"
-        );
+        applyAndroidBionicHostLdLibraryPath(context, imageFs, launchEnv, "glibc_direct_arm64ec");
 
         StringBuilder ldPreload = new StringBuilder();
         appendAndroidHostClosureLdPreload(ldPreload, imageFs, false);
@@ -135,37 +129,6 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         File runtimeRoot = getWineInfo().path == null ? null : new File(getWineInfo().path);
         File wineBinary = WineUtils.resolveRuntimeWineBinary(runtimeRoot);
         return shouldWrapArm64EcWineWithBox64(wineBinary);
-    }
-
-    private String resolveEffectiveArm64EcEmulator() {
-        String requestedEmulator = getContainer() != null ? getContainer().getEmulator() : "";
-        if (getShortcut() != null) {
-            requestedEmulator = getShortcut().getExtra("emulator", requestedEmulator);
-        }
-        boolean desktopShellBootstrap = isDesktopShellBootstrapLaunch();
-        return resolveEffectiveEmulator(environment.getImageFs(), requestedEmulator, desktopShellBootstrap);
-    }
-
-    private boolean isDesktopShellBootstrapLaunch() {
-        String guestExecutable = getGuestExecutable();
-        if (getShortcut() != null || guestExecutable == null) return false;
-        String lowered = guestExecutable.toLowerCase(java.util.Locale.ROOT);
-        return lowered.contains("explorer /desktop=shell")
-                || lowered.contains("explorer.exe /desktop=shell");
-    }
-
-    private boolean shouldUseDirectArm64EcGuestLaunch(ImageFs imageFs, String effectiveEmulator, boolean desktopShellBootstrap) {
-        if (getWineInfo() == null || !getWineInfo().isArm64EC() || imageFs == null) {
-            return false;
-        }
-
-        if ("wowbox64".equalsIgnoreCase(effectiveEmulator)) {
-            return hasWowbox64Payload(imageFs);
-        }
-        if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
-            return hasFexArm64EcPayload(imageFs);
-        }
-        return false;
     }
 
     private void copyDefaultBox64RCFile() {

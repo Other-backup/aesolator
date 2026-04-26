@@ -7,6 +7,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
 include_directories(src)
 
 add_library(patchelf SHARED
-            src/patchelf.cc)
+            src/patchelf.cc
+            src/patchelf_wrapper.cpp)
+
+target_compile_features(patchelf PRIVATE cxx_std_17)
 
 target_link_libraries(patchelf)

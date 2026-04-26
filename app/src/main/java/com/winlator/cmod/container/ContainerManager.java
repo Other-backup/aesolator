@@ -246,8 +246,28 @@ public class ContainerManager {
         if (!targetDir.exists()) targetDir.mkdirs();
 
         File activeHomeLink = new File(homeDir, ImageFs.USER);
+        if (activeHomeLink.exists() && !FileUtils.isSymlink(activeHomeLink)) {
+            migrateEssentialFiles(activeHomeLink, targetDir);
+        }
         FileUtils.delete(activeHomeLink);
         FileUtils.symlink("./" + ImageFs.USER + "-" + container.id, activeHomeLink.getPath());
+    }
+
+    private static void migrateEssentialFiles(File sourceDir, File destDir) {
+        if (sourceDir == null || destDir == null) return;
+        String[] essentialPaths = {
+                ".wine/drive_c/windows/winhandler.exe",
+                ".wine/drive_c/windows/wfm.exe"
+        };
+        for (String path : essentialPaths) {
+            File source = new File(sourceDir, path);
+            File dest = new File(destDir, path);
+            if (!source.isFile() || dest.exists()) continue;
+            File parent = dest.getParentFile();
+            if (parent != null && !parent.exists()) parent.mkdirs();
+            FileUtils.copy(source, dest);
+            Log.d("ContainerManager", "Migrated " + path + " to container");
+        }
     }
 
     public void createContainerAsync(final JSONObject data, ContentsManager contentsManager, Callback<Container> callback) {
@@ -484,8 +504,8 @@ public class ContainerManager {
 
         if (result) {
             try {
-                if (wineInfo.isArm64EC())
-                    extractCommonDlls(wineInfo, "aarch64-windows", "system32", containerDir, onExtractFileListener); // arm64ec only
+                if (wineInfo.usesAarch64WindowsTree())
+                    extractCommonDlls(wineInfo, "aarch64-windows", "system32", containerDir, onExtractFileListener);
                 else
                     extractCommonDlls(wineInfo, "x86_64-windows", "system32", containerDir, onExtractFileListener);
 
@@ -497,6 +517,70 @@ public class ContainerManager {
         }
 
         return result;
+    }
+
+    public boolean repairContainerWinePrefix(
+            Container container,
+            String wineVersion,
+            ContentsManager contentsManager,
+            OnExtractFileListener onExtractFileListener
+    ) {
+        File containerDir = container != null ? container.getRootDir() : null;
+        if (containerDir == null || !containerDir.isDirectory()) return false;
+
+        File tempDir = FileUtils.createTempFile(context.getCacheDir(), "wineprefix-repair");
+        if (!tempDir.mkdirs()) {
+            Log.e("ContainerManager", "repairContainerWinePrefix: failed to create temp dir " + tempDir.getAbsolutePath());
+            return false;
+        }
+
+        try {
+            boolean extracted = extractContainerPatternFile(
+                    container,
+                    wineVersion,
+                    contentsManager,
+                    tempDir,
+                    onExtractFileListener
+            );
+            if (!extracted) {
+                Log.e("ContainerManager", "repairContainerWinePrefix: failed to extract repair prefix for " + wineVersion);
+                return false;
+            }
+
+            File repairedPrefixDir = new File(tempDir, ".wine");
+            if (!WineUtils.isPrefixValid(tempDir) || !repairedPrefixDir.isDirectory()) {
+                Log.e("ContainerManager", "repairContainerWinePrefix: extracted prefix is still invalid");
+                return false;
+            }
+
+            File targetPrefixDir = new File(containerDir, ".wine");
+            if (targetPrefixDir.exists() && !FileUtils.delete(targetPrefixDir)) {
+                Log.e("ContainerManager", "repairContainerWinePrefix: failed to clear existing prefix " + targetPrefixDir.getAbsolutePath());
+                return false;
+            }
+
+            if (!FileUtils.copy(repairedPrefixDir, targetPrefixDir)) {
+                Log.e("ContainerManager", "repairContainerWinePrefix: failed to copy repaired prefix");
+                return false;
+            }
+
+            String requestedRuntimeModel = container != null ? container.getContainerVariant() : null;
+            WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion, requestedRuntimeModel);
+            container.putExtra("wineprefixArch", wineInfo.getArch());
+            container.putExtra("wineprefixNeedsUpdate", null);
+            container.putExtra("appVersion", null);
+            container.putExtra("imgVersion", null);
+            container.putExtra("dxwrapper", null);
+            container.putExtra("wincomponents", null);
+            container.putExtra("desktopTheme", null);
+            container.putExtra("startupSelection", null);
+            container.putExtra("mono_installed", null);
+            container.putExtra("mono_version", null);
+            container.saveData();
+            return true;
+        } finally {
+            FileUtils.delete(tempDir);
+        }
     }
 
     public Container getContainerForShortcut(Shortcut shortcut) {

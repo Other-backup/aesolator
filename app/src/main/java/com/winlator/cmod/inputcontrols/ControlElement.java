@@ -599,8 +599,17 @@ public class ControlElement {
         return !toggleSwitch && (binding == Binding.GAMEPAD_BUTTON_L3 || binding == Binding.GAMEPAD_BUTTON_R3);
     }
 
+    private boolean hasActionBinding() {
+        if (type == Type.RANGE_BUTTON) return true;
+        for (Binding binding : bindings) {
+            if (binding != Binding.NONE) return true;
+        }
+        return false;
+    }
+
     public boolean handleTouchDown(int pointerId, float x, float y) {
         if (currentPointerId == -1 && containsPoint(x, y)) {
+            if (!hasActionBinding()) return false;
             currentPointerId = pointerId;
             if (type == Type.BUTTON) {
                 if (isKeepButtonPressedAfterMinTime()) touchTime = System.currentTimeMillis();

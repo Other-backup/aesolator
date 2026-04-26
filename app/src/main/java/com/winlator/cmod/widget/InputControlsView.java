@@ -772,9 +772,7 @@ public class InputControlsView extends View {
             }
 
             if (winHandler != null) {
-                ExternalController controller = winHandler.getCurrentController();
-                if (controller != null) controller.state.copy(state);
-                winHandler.sendGamepadState();
+                winHandler.sendVirtualGamepadState(state);
             }
         }
         else {

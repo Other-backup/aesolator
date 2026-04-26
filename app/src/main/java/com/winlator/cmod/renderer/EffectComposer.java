@@ -4,6 +4,8 @@ import android.opengl.GLES20;
 import android.util.Log;
 
 import com.winlator.cmod.renderer.effects.Effect;
+import com.winlator.cmod.renderer.effects.RenderScaleEffect;
+import com.winlator.cmod.renderer.effects.SourceTextureFilterEffect;
 import com.winlator.cmod.renderer.effects.ToonEffect;
 import com.winlator.cmod.renderer.material.ShaderMaterial;
 
@@ -11,191 +13,194 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class EffectComposer {
-    // Constants
     private static final String TAG = "EffectComposer";
-    private boolean isRendering = false;
-
-    // Instance fields
-    private final List<Effect> effects = new ArrayList<>();
-    private RenderTarget readBuffer;
-    private RenderTarget writeBuffer;
+    private final ArrayList<Effect> effects = new ArrayList<>();
+    private final RenderTarget sceneBuffer = new RenderTarget();
+    private final RenderTarget readBuffer = new RenderTarget();
+    private final RenderTarget writeBuffer = new RenderTarget();
     private final GLRenderer renderer;
 
-    // Constructor
     public EffectComposer(GLRenderer renderer) {
         this.renderer = renderer;
-//        Log.d(TAG, "EffectComposer created");
     }
 
-    // Initializes the buffers if they are not already initialized
-    private void initBuffers() {
-//        Log.d(TAG, "initBuffers() called");
-
-        if (readBuffer == null) {
-            readBuffer = new RenderTarget();
-            readBuffer.allocateFramebuffer(renderer.getSurfaceWidth(), renderer.getSurfaceHeight());
-//            Log.d(TAG, "Initialized readBuffer with size: " + renderer.getSurfaceWidth() + "x" + renderer.getSurfaceHeight());
-        }
-
-        if (writeBuffer == null) {
-            writeBuffer = new RenderTarget();
-            writeBuffer.allocateFramebuffer(renderer.getSurfaceWidth(), renderer.getSurfaceHeight());
-//            Log.d(TAG, "Initialized writeBuffer with size: " + renderer.getSurfaceWidth() + "x" + renderer.getSurfaceHeight());
-        }
+    public synchronized boolean hasEffects() {
+        return !effects.isEmpty();
     }
 
-    public synchronized void addEffect(Effect effect) {
-        if (!effects.contains(effect)) {
-            effects.add(effect);
-//            Log.d(TAG, "Effect added: " + effect.getClass().getSimpleName());
-        } else {
-//            Log.d(TAG, "Effect already present: " + effect.getClass().getSimpleName());
-        }
-        // Move this call to the end of a batch effect addition or modification to prevent immediate rendering
-        renderer.xServerView.requestRender();
-    }
-
-
-
-    // Gets an effect by its class type
     public synchronized <T extends Effect> T getEffect(Class<T> effectClass) {
-//        Log.d(TAG, "getEffect() called for: " + effectClass.getSimpleName());
-
         for (Effect effect : effects) {
-            if (effect.getClass() == effectClass) {
-//                Log.d(TAG, "Effect found: " + effectClass.getSimpleName());
+            if (effectClass.isInstance(effect)) {
                 return effectClass.cast(effect);
             }
         }
-//        Log.d(TAG, "Effect not found: " + effectClass.getSimpleName());
         return null;
     }
 
-    // Checks if there are any effects present
-    public synchronized boolean hasEffects() {
-        boolean hasEffects = !effects.isEmpty();
-//        Log.d(TAG, "hasEffects() called. Effects present: " + hasEffects);
-        return hasEffects;
-    }
+    public synchronized void setEffects(List<? extends Effect> newEffects) {
+        ArrayList<Effect> previousEffects = new ArrayList<>(effects);
+        effects.clear();
+        effects.addAll(newEffects);
 
-    // Removes a specific effect from the composer
-    public synchronized void removeEffect(Effect effect) {
-        if (effects.remove(effect)) {
-//            Log.d(TAG, "Effect removed: " + effect.getClass().getSimpleName());
-        } else {
-//            Log.d(TAG, "Effect not found for removal: " + effect.getClass().getSimpleName());
+        ArrayList<Effect> removedEffects = new ArrayList<>();
+        for (Effect effect : previousEffects) {
+            if (!effects.contains(effect)) {
+                removedEffects.add(effect);
+            }
+        }
+
+        if (!removedEffects.isEmpty()) {
+            renderer.xServerView.queueEvent(() -> {
+                for (Effect effect : removedEffects) {
+                    effect.destroy();
+                }
+            });
         }
         renderer.xServerView.requestRender();
     }
 
-    // Renders all the effects in the composer
+    public synchronized void addEffect(Effect effect) {
+        for (Effect existing : effects) {
+            if (existing.getClass() == effect.getClass()) {
+                renderer.xServerView.requestRender();
+                return;
+            }
+        }
+        effects.add(effect);
+        renderer.xServerView.requestRender();
+    }
+
+    public synchronized void removeEffect(Effect effect) {
+        if (effect == null) return;
+        if (effects.remove(effect)) {
+            renderer.xServerView.queueEvent(effect::destroy);
+        }
+        renderer.xServerView.requestRender();
+    }
+
+    public synchronized void clearEffects() {
+        setEffects(new ArrayList<Effect>());
+    }
+
     public synchronized void render() {
-        // Check for recursive rendering
-        if (isRendering) {
-//            Log.d(TAG, "Render already in progress, skipping.");
+        int outputWidth = renderer.getSurfaceWidth();
+        int outputHeight = renderer.getSurfaceHeight();
+        if (effects.isEmpty() || outputWidth <= 0 || outputHeight <= 0) {
+            renderer.drawScene();
             return;
         }
 
-        isRendering = true; // Set flag to true
-
-//        Log.d(TAG, "render() called");
-
-        initBuffers();
-
-        // Set up framebuffer if there are effects to render
-        if (hasEffects()) {
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, readBuffer.getFramebuffer());
-//            Log.d(TAG, "Binding to readBuffer framebuffer: " + readBuffer.getFramebuffer());
-        } else {
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
-//            Log.d(TAG, "Binding to default framebuffer (0)");
+        ArrayList<Effect> snapshot = new ArrayList<>(effects);
+        int sceneWidth = outputWidth;
+        int sceneHeight = outputHeight;
+        if (snapshot.get(0) instanceof RenderScaleEffect) {
+            RenderScaleEffect renderScaleEffect = (RenderScaleEffect) snapshot.get(0);
+            sceneWidth = Math.max(1, renderScaleEffect.getRenderWidth(renderer, outputWidth));
+            sceneHeight = Math.max(1, renderScaleEffect.getRenderHeight(renderer, outputHeight));
         }
+        boolean scaledScene = sceneWidth != outputWidth || sceneHeight != outputHeight;
 
-        // Draw the initial frame
-        renderer.drawFrame();
-//        Log.d(TAG, "Initial frame drawn");
+        sceneBuffer.setFilters(GLES20.GL_NEAREST, GLES20.GL_NEAREST);
+        readBuffer.setFilters(GLES20.GL_NEAREST, GLES20.GL_NEAREST);
+        writeBuffer.setFilters(GLES20.GL_NEAREST, GLES20.GL_NEAREST);
 
-        // Iterate through each effect and render it
-        for (Effect effect : effects) {
-            boolean renderToScreen = effect == effects.get(effects.size() - 1);
-            int targetFramebuffer = renderToScreen ? 0 : writeBuffer.getFramebuffer();
+        sceneBuffer.allocateFramebuffer(sceneWidth, sceneHeight);
+        readBuffer.allocateFramebuffer(outputWidth, outputHeight);
+        writeBuffer.allocateFramebuffer(outputWidth, outputHeight);
 
-            // Bind appropriate framebuffer
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, targetFramebuffer);
-//            Log.d(TAG, "Binding to " + (renderToScreen ? "screen" : "writeBuffer") + " framebuffer: " + targetFramebuffer);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, sceneBuffer.getFramebuffer());
+        GLES20.glViewport(0, 0, sceneWidth, sceneHeight);
+        renderer.setViewportNeedsUpdate(true);
+        if (scaledScene) renderer.setRenderTargetSizeOverride(sceneWidth, sceneHeight);
+        renderer.drawScene();
+        if (scaledScene) renderer.clearRenderTargetSizeOverride();
 
-            GLES20.glViewport(0, 0, renderer.surfaceWidth, renderer.surfaceHeight);
-            renderer.setViewportNeedsUpdate(true);
-//            Log.d(TAG, "Viewport updated to size: " + renderer.surfaceWidth + "x" + renderer.surfaceHeight);
+        RenderTarget source = sceneBuffer;
+        RenderTarget target = readBuffer;
+        int sourceWidth = sceneWidth;
+        int sourceHeight = sceneHeight;
 
-            // Clear the buffer
+        for (int i = 0; i < snapshot.size(); i++) {
+            boolean renderToScreen = i == snapshot.size() - 1;
+            int targetWidth = renderToScreen ? outputWidth : target.getWidth();
+            int targetHeight = renderToScreen ? outputHeight : target.getHeight();
+
+            if (renderToScreen) renderer.bindOutputFramebuffer();
+            else GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, target.getFramebuffer());
+            GLES20.glViewport(0, 0, targetWidth, targetHeight);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-//            Log.d(TAG, "Framebuffer cleared");
 
-            // Render the effect
-            renderEffect(effect);
-//            Log.d(TAG, "Effect rendered: " + effect.getClass().getSimpleName());
+            Effect effect = snapshot.get(i);
+            effect.use(renderer);
+            ShaderMaterial material = effect.getMaterial();
 
-            // Swap the read and write buffers
-            swapBuffers();
-//            Log.d(TAG, "Buffers swapped");
+            if (effect instanceof SourceTextureFilterEffect) {
+                SourceTextureFilterEffect textureFilterEffect = (SourceTextureFilterEffect) effect;
+                source.setFilters(textureFilterEffect.getSourceMinFilter(), textureFilterEffect.getSourceMagFilter());
+            }
+            else {
+                source.setFilters(GLES20.GL_NEAREST, GLES20.GL_NEAREST);
+            }
+
+            renderer.getQuadVertices().bind(material.programId);
+            material.setUniformVec2("resolution", targetWidth, targetHeight);
+            material.setUniformVec2("inputResolution", sourceWidth, sourceHeight);
+            material.setUniformVec2("outputResolution", targetWidth, targetHeight);
+            material.setUniformInt("screenTexture", 0);
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, source.getTextureId());
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, renderer.getQuadVertices().count());
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+            renderer.getQuadVertices().disable();
+
+            int error = GLES20.glGetError();
+            if (error != GLES20.GL_NO_ERROR) {
+                Log.e(TAG, "OpenGL error after effect " + effect.getClass().getSimpleName() + ": " + error);
+            }
+
+            if (!renderToScreen) {
+                source = target;
+                sourceWidth = targetWidth;
+                sourceHeight = targetHeight;
+                target = target == readBuffer ? writeBuffer : readBuffer;
+            }
         }
 
-        isRendering = false; // Reset flag after rendering
+        renderer.bindOutputFramebuffer();
+        if (scaledScene) GLES20.glViewport(0, 0, outputWidth, outputHeight);
+        renderer.setViewportNeedsUpdate(true);
     }
 
-    // Renders a single effect
-    private void renderEffect(Effect effect) {
-//        Log.d(TAG, "renderEffect() called for: " + effect.getClass().getSimpleName());
-
-        ShaderMaterial material = effect.getMaterial();
-        if (material == null) {
-//            Log.e(TAG, "Material is null for effect: " + effect.getClass().getSimpleName());
-            return;
+    public synchronized void invalidateGLResources() {
+        for (Effect effect : effects) {
+            effect.destroy();
         }
-
-        material.use();
-//        Log.d(TAG, "ShaderMaterial used: " + material.getClass().getSimpleName());
-
-        // Bind the quad vertices to the shader program
-        renderer.getQuadVertices().bind(material.programId);
-//        Log.d(TAG, "Quad vertices bound to program ID: " + material.programId);
-
-        // Set uniform values
-        material.setUniformVec2("resolution", renderer.surfaceWidth, renderer.surfaceHeight);
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, readBuffer.getTextureId());
-        material.setUniformInt("screenTexture", 0);
-//        Log.d(TAG, "Uniforms set: resolution=" + renderer.surfaceWidth + "x" + renderer.surfaceHeight + ", screenTexture=" + readBuffer.getTextureId());
-
-        // Draw the quad
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, renderer.quadVertices.count());
-//        Log.d(TAG, "Quad drawn");
-
-        // Unbind the texture
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-//        Log.d(TAG, "Texture unbound");
+        sceneBuffer.invalidate();
+        readBuffer.invalidate();
+        writeBuffer.invalidate();
     }
 
-    // Swaps the read and write buffers
-    private void swapBuffers() {
-        RenderTarget tmp = writeBuffer;
-        writeBuffer = readBuffer;
-        readBuffer = tmp;
-//        Log.d(TAG, "swapBuffers() called. Buffers swapped.");
+    public synchronized void destroy() {
+        for (Effect effect : effects) {
+            effect.destroy();
+        }
+        effects.clear();
+        sceneBuffer.destroy();
+        readBuffer.destroy();
+        writeBuffer.destroy();
     }
 
-    // Add a method to add the ToonEffect
     public synchronized void toggleToonEffect() {
         ToonEffect toonEffect = getEffect(ToonEffect.class);
         if (toonEffect != null) {
-            removeEffect(toonEffect); // Remove if already present
+            removeEffect(toonEffect);
             Log.d(TAG, "ToonEffect removed");
-        } else {
-            addEffect(new ToonEffect()); // Add if not present
+        }
+        else {
+            addEffect(new ToonEffect());
             Log.d(TAG, "ToonEffect added");
         }
         renderer.xServerView.requestRender();
     }
-
 }

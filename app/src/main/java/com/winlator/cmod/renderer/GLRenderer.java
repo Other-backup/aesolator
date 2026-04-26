@@ -53,6 +53,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private boolean magnifierEnabled = true;
     public int surfaceWidth;
     public int surfaceHeight;
+    private int renderTargetWidthOverride = 0;
+    private int renderTargetHeightOverride = 0;
     private final EffectComposer effectComposer;
 
     public GLRenderer(XServerView xServerView, XServer xServer) {
@@ -85,6 +87,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        effectComposer.invalidateGLResources();
     }
 
     @Override
@@ -124,13 +127,39 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             xrFrame = XrActivity.getInstance().beginFrame(xrImmersive, XrActivity.getSBS());
         }
 
+        if (effectComposer.hasEffects()) {
+            effectComposer.render();
+        }
+        else {
+            drawScene();
+        }
+
+        if (xrFrame) {
+            XrActivity.getInstance().endFrame();
+            XrActivity.updateControllers();
+            xServerView.requestRender();
+        }
+    }
+
+    void drawScene() {
+        int targetWidth = renderTargetWidthOverride > 0 ? renderTargetWidthOverride : surfaceWidth;
+        int targetHeight = renderTargetHeightOverride > 0 ? renderTargetHeightOverride : surfaceHeight;
+        boolean renderingToOffscreenTarget = renderTargetWidthOverride > 0 && renderTargetHeightOverride > 0;
+        float viewportScaleX = surfaceWidth > 0 ? (float) targetWidth / (float) surfaceWidth : 1.0f;
+        float viewportScaleY = surfaceHeight > 0 ? (float) targetHeight / (float) surfaceHeight : 1.0f;
+
         // Update the viewport if necessary
-        if (viewportNeedsUpdate && magnifierEnabled) {
-            if (fullscreen) {
-                GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight);
+        if (viewportNeedsUpdate) {
+            if (renderingToOffscreenTarget || fullscreen) {
+                GLES20.glViewport(0, 0, targetWidth, targetHeight);
             }
-            else {
-                GLES20.glViewport(viewTransformation.viewOffsetX, viewTransformation.viewOffsetY, viewTransformation.viewWidth, viewTransformation.viewHeight);
+            else if (magnifierEnabled) {
+                GLES20.glViewport(
+                        Math.round(viewTransformation.viewOffsetX * viewportScaleX),
+                        Math.round(viewTransformation.viewOffsetY * viewportScaleY),
+                        Math.round(viewTransformation.viewWidth * viewportScaleX),
+                        Math.round(viewTransformation.viewHeight * viewportScaleY)
+                );
             }
             viewportNeedsUpdate = false;
         }
@@ -139,7 +168,11 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
         // Apply basic transformations and draw windows
-        if (magnifierEnabled) {
+        if (renderingToOffscreenTarget) {
+            GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
+            XForm.identity(tmpXForm2);
+        }
+        else if (magnifierEnabled) {
             // Apply magnifier transformations if enabled
             float pointerX = 0;
             float pointerY = 0;
@@ -167,7 +200,12 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
                 XForm.makeTransform(tmpXForm2, viewTransformation.sceneOffsetX, viewTransformation.sceneOffsetY - pointerY, viewTransformation.sceneScaleX, viewTransformation.sceneScaleY, 0);
 
                 GLES20.glEnable(GLES20.GL_SCISSOR_TEST);
-                GLES20.glScissor(viewTransformation.viewOffsetX, viewTransformation.viewOffsetY, viewTransformation.viewWidth, viewTransformation.viewHeight);
+                GLES20.glScissor(
+                        Math.round(viewTransformation.viewOffsetX * viewportScaleX),
+                        Math.round(viewTransformation.viewOffsetY * viewportScaleY),
+                        Math.round(viewTransformation.viewWidth * viewportScaleX),
+                        Math.round(viewTransformation.viewHeight * viewportScaleY)
+                );
             } else {
                 XForm.identity(tmpXForm2);
             }
@@ -179,20 +217,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         if (cursorVisible) renderCursor();
 
         // Disable scissor test if magnifier is disabled and not in fullscreen mode
-        if (!magnifierEnabled && !fullscreen) {
+        if ((!magnifierEnabled && !fullscreen) || renderingToOffscreenTarget) {
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
-        }
-
-        // Apply all the effects using EffectComposer
-        if (effectComposer.hasEffects()) {
-            effectComposer.render();  // <-- This line applies the effects
-        }
-
-        // Finalize XR frame if supported
-        if (xrFrame) {
-            XrActivity.getInstance().endFrame();
-            XrActivity.updateControllers();
-            xServerView.requestRender();
         }
     }
 
@@ -452,6 +478,29 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     public int getSurfaceHeight() {
         return surfaceHeight;
+    }
+
+    public int getXServerWidth() {
+        return xServer.screenInfo.width;
+    }
+
+    public int getXServerHeight() {
+        return xServer.screenInfo.height;
+    }
+
+    void setRenderTargetSizeOverride(int width, int height) {
+        renderTargetWidthOverride = width;
+        renderTargetHeightOverride = height;
+    }
+
+    void clearRenderTargetSizeOverride() {
+        renderTargetWidthOverride = 0;
+        renderTargetHeightOverride = 0;
+    }
+
+    void bindOutputFramebuffer() {
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        if (XrActivity.isEnabled(null)) XrActivity.getInstance().bindFramebuffer();
     }
 
     public boolean isViewportNeedsUpdate() {

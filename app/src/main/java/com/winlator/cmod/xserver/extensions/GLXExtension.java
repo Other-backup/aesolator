@@ -9,6 +9,7 @@ import android.util.SparseLongArray;
 import androidx.annotation.Keep;
 
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.NativeLibraryLoader;
 import com.winlator.cmod.renderer.Texture;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
@@ -40,7 +41,7 @@ public class GLXExtension implements Extension {
     };
 
     static {
-        System.loadLibrary("gladiorenderer");
+        NativeLibraryLoader.ensureLoaded("gladiorenderer", "GLXExtension");
     }
 
     public GLXExtension(XServer xServer) {

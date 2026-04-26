@@ -52,6 +52,23 @@ public class ContentProfileIdentityTest {
     }
 
     @Test
+    public void acceptsBleedingEdgeAliasForRollingProtonRuntimeWithCapabilitySuffix() {
+        ContentProfile actual = new ContentProfile();
+        actual.type = ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+        actual.verName = "10.0.99-arm64ec-ntsync";
+
+        ContentProfile remote = new ContentProfile();
+        remote.type = ContentProfile.ContentType.CONTENT_TYPE_PROTON;
+        remote.verName = "proton-wine-proton-bleeding-edge-20260414-5edc831-arm64ec-ntsync";
+        remote.artifactName = "proton-wine-proton-bleeding-edge-20260414-5edc831-arm64ec-ntsync.wcp.xz";
+        remote.releaseTag = "proton-bleeding-edge-20260414-5edc831-run180";
+
+        assertFalse(ContentProfileIdentity.isRemoteProfileIdentityMismatch(actual, remote));
+        assertTrue(ContentProfileIdentity.areEquivalentProfiles(actual, remote));
+        assertTrue(ContentProfileIdentity.isRuntimeAliasEquivalent(actual, remote));
+    }
+
+    @Test
     public void rejectsDifferentRuntimeMajorVersion() {
         ContentProfile actual = new ContentProfile();
         actual.type = ContentProfile.ContentType.CONTENT_TYPE_PROTON;

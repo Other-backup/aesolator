@@ -4,13 +4,18 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.input.InputManager;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.InputDevice;
 
 import androidx.preference.PreferenceManager;
 
+import com.winlator.cmod.core.ForensicLogger;
+
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 
 public class ControllerManager {
     @SuppressLint("StaticFieldLeak")
@@ -36,6 +41,7 @@ public class ControllerManager {
 
     public static final String PREF_PLAYER_SLOT_PREFIX = "controller_slot_";
     public static final String PREF_ENABLED_SLOTS_PREFIX = "enabled_slot_";
+    public static final String PREF_VIBRATION_GLOBAL = "vibration_enabled_global";
 
     public void init(Context context) {
         this.context = context.getApplicationContext();
@@ -48,13 +54,59 @@ public class ControllerManager {
     public void scanForDevices() {
         detectedDevices.clear();
         if (inputManager == null) return;
+        LinkedHashMap<String, InputDevice> uniqueDevices = new LinkedHashMap<>();
         int[] deviceIds = inputManager.getInputDeviceIds();
+        int controllerLikeDevices = 0;
+        int rejectedDevices = 0;
         for (int deviceId : deviceIds) {
             InputDevice device = inputManager.getInputDevice(deviceId);
-            if (device != null && !device.isVirtual() && isGameController(device)) {
-                detectedDevices.add(device);
+            if (device == null) continue;
+            InputDeviceHeuristics.Decision decision = InputDeviceHeuristics.inspect(device);
+            if (decision.controllerLike) controllerLikeDevices++;
+            if (decision.accepted) {
+                String identifier = getDeviceIdentifier(device);
+                InputDevice current = uniqueDevices.get(identifier);
+                if (current == null || device.getMotionRanges().size() > current.getMotionRanges().size()) {
+                    uniqueDevices.put(identifier, device);
+                }
+                continue;
+            }
+            if (decision.controllerLike) {
+                rejectedDevices++;
+                ForensicLogger.warn(
+                        context,
+                        "CONTROLLER_SUSPICIOUS_DEVICE_REJECTED",
+                        null,
+                        "input",
+                        "controller_candidate_rejected",
+                        ForensicLogger.fields(
+                                "device_id", deviceId,
+                                "name", device.getName(),
+                                "descriptor", getDeviceIdentifier(device),
+                                "vendor_id", device.getVendorId(),
+                                "product_id", device.getProductId(),
+                                "sources_hex", String.format(Locale.US, "0x%08x", device.getSources()),
+                                "reason", decision.reason
+                        )
+                );
             }
         }
+        detectedDevices.addAll(uniqueDevices.values());
+        ForensicLogger.appCheckpoint(
+                "info",
+                "CONTROLLER_SCAN_SUMMARY",
+                "input",
+                "controller_scan_summary",
+                ForensicLogger.fields(
+                        "detected_devices", detectedDevices.size(),
+                        "accepted_unique_devices", uniqueDevices.size(),
+                        "controller_like_devices", controllerLikeDevices,
+                        "rejected_devices", rejectedDevices
+                )
+        );
+        Log.d("ControllerManager", "scanForDevices detected=" + detectedDevices.size()
+                + " controllerLike=" + controllerLikeDevices
+                + " rejected=" + rejectedDevices);
     }
 
     private void loadAssignments() {
@@ -91,17 +143,18 @@ public class ControllerManager {
     }
 
     public static boolean isGameController(InputDevice device) {
-        int sources = device.getSources();
-        return ((sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)
-                || ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD);
+        return InputDeviceHeuristics.isGameController(device);
     }
 
     public static String getDeviceIdentifier(InputDevice device) {
         if (device == null) return null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            return device.getDescriptor();
+            String descriptor = device.getDescriptor();
+            if (descriptor != null && !descriptor.trim().isEmpty()) return descriptor;
         }
-        return "vendor_" + device.getVendorId() + "_product_" + device.getProductId();
+        return "vendor_" + device.getVendorId()
+                + "_product_" + device.getProductId()
+                + "_name_" + (device.getName() == null ? "" : device.getName().trim().toLowerCase(Locale.US));
     }
 
     public List<InputDevice> getDetectedDevices() {

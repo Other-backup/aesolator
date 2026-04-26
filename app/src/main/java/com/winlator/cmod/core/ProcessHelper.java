@@ -13,7 +13,10 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 
 public abstract class ProcessHelper {
@@ -23,6 +26,26 @@ public abstract class ProcessHelper {
     private static final byte SIGSTOP = 19;
     private static final byte SIGTERM = 15;
     private static final byte SIGKILL = 9;
+    private static volatile boolean nativeLifecycleLoadAttempted = false;
+    private static volatile boolean nativeLifecycleAvailable = false;
+
+    public static class ProcessInfo {
+        public final int pid;
+        public final int ppid;
+        public final String name;
+        public final long rssBytes;
+
+        public ProcessInfo(int pid, int ppid, String name) {
+            this(pid, ppid, name, 0L);
+        }
+
+        public ProcessInfo(int pid, int ppid, String name, long rssBytes) {
+            this.pid = pid;
+            this.ppid = ppid;
+            this.name = name;
+            this.rssBytes = rssBytes;
+        }
+    }
 
     public static void suspendProcess(int pid) {
         Process.sendSignal(pid, SIGSTOP);
@@ -48,6 +71,84 @@ public abstract class ProcessHelper {
         for (String process : listRunningWineProcesses()) {
             terminateProcess(Integer.parseInt(process));
         }
+        startNativeReaperWindow(2500);
+    }
+
+    public static void killAllWineProcesses() {
+        for (String process : listRunningWineProcesses()) {
+            killProcess(Integer.parseInt(process));
+        }
+        startNativeReaperWindow(2500);
+    }
+
+    public static void hardKillStaleWineProcesses() throws InterruptedException {
+        hardKillStaleWineProcesses(5000L);
+    }
+
+    public static void hardKillStaleWineProcesses(long timeoutMs) throws InterruptedException {
+        long deadlineMs = System.currentTimeMillis() + Math.max(0L, timeoutMs);
+        List<String> stalePids = listRunningWineProcesses();
+        if (stalePids.isEmpty()) {
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "info",
+                    "PRELAUNCH_STALE_WINE_SCAN_CLEAN",
+                    null,
+                    "process_helper",
+                    "prelaunch_stale_wine_scan_clean",
+                    ForensicLogger.fields("timeout_ms", timeoutMs)
+            );
+            return;
+        }
+
+        Log.w("ProcessHelper", "Found stale Wine processes before launch; hard-killing: " + String.join(", ", stalePids));
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "PRELAUNCH_STALE_WINE_KILL",
+                null,
+                "process_helper",
+                "prelaunch_stale_wine_kill",
+                ForensicLogger.fields(
+                        "stale_pid_count", stalePids.size(),
+                        "stale_pids", String.join(",", stalePids),
+                        "timeout_ms", timeoutMs
+                )
+        );
+        killAllWineProcesses();
+
+        List<String> remaining;
+        do {
+            Thread.sleep(100L);
+            remaining = listRunningWineProcesses();
+        } while (!remaining.isEmpty() && System.currentTimeMillis() < deadlineMs);
+
+        if (!remaining.isEmpty()) {
+            String remainingText = String.join(",", remaining);
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "error",
+                    "PRELAUNCH_STALE_WINE_KILL_FAILED",
+                    null,
+                    "process_helper",
+                    "prelaunch_stale_wine_kill_failed",
+                    ForensicLogger.fields(
+                            "remaining_pid_count", remaining.size(),
+                            "remaining_pids", remainingText
+                    )
+            );
+            throw new IllegalStateException("Wine processes still present after hard-kill attempt: " + remainingText);
+        }
+
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "PRELAUNCH_STALE_WINE_KILL_DONE",
+                null,
+                "process_helper",
+                "prelaunch_stale_wine_kill_done",
+                ForensicLogger.fields("initial_pid_count", stalePids.size())
+        );
     }
 
     public static void pauseAllWineProcesses() {
@@ -59,6 +160,32 @@ public abstract class ProcessHelper {
     public static void resumeAllWineProcesses() {
         for (String process : listRunningWineProcesses()) {
             resumeProcess(Integer.parseInt(process));
+        }
+    }
+
+    public static void killProcessTree(int rootPid) {
+        signalProcessTree(rootPid, SIGKILL);
+        startNativeReaperWindow(2500);
+    }
+
+    public static void terminateProcessTree(int rootPid) {
+        signalProcessTree(rootPid, SIGTERM);
+        startNativeReaperWindow(2500);
+    }
+
+    private static void signalProcessTree(int rootPid, byte signal) {
+        if (rootPid <= 0) return;
+
+        Set<Integer> signaled = new HashSet<>();
+        for (ProcessInfo process : listDescendantProcesses(rootPid)) {
+            if (process.pid > 0 && signaled.add(process.pid)) {
+                Process.sendSignal(process.pid, signal);
+                Log.d("ProcessHelper", "Signalled child process pid=" + process.pid + " ppid=" + process.ppid + " name=" + process.name + " signal=" + signal);
+            }
+        }
+        if (signaled.add(rootPid)) {
+            Process.sendSignal(rootPid, signal);
+            Log.d("ProcessHelper", "Signalled root process pid=" + rootPid + " signal=" + signal);
         }
     }
 
@@ -83,6 +210,7 @@ public abstract class ProcessHelper {
         int pid = -1;
         boolean forensicMode = isForensicModeEnv(envp);
         int callbackCount = getDebugCallbackCount();
+        boolean nativeLifecycleReady = ensureNativeLifecycleAvailable();
         try {
             Log.d("ProcessHelper", "Splitting command: " + command);
             String[] splitCommand = splitCommand(command);
@@ -109,6 +237,7 @@ public abstract class ProcessHelper {
                             "forensic_mode", forensicMode ? "1" : "0",
                             "debug_callback_count", callbackCount,
                             "stream_capture", (callbackCount > 0 || forensicMode) ? "1" : "0",
+                            "native_lifecycle_ready", nativeLifecycleReady ? "1" : "0",
                             "env_hash", hashEnvp(envp)
                     )
             );
@@ -201,13 +330,57 @@ public abstract class ProcessHelper {
             public void run() {
                 try {
                     int status = process.waitFor();
+                    startNativeReaperWindow(1500);
                     terminationCallback.call(status);
                 }
                 catch (InterruptedException e) {
                     Log.e("ProcessHelper", "Error waiting for process termination", e);
+                    Thread.currentThread().interrupt();
                 }
             }
         });
+    }
+
+    public static int reapDeadChildrenNow() {
+        if (!ensureNativeLifecycleAvailable()) return 0;
+        try {
+            return nativeReapDeadChildrenNow();
+        }
+        catch (UnsatisfiedLinkError e) {
+            nativeLifecycleAvailable = false;
+            Log.w("ProcessHelper", "Native lifecycle reaper is unavailable", e);
+            return 0;
+        }
+    }
+
+    public static void startNativeReaperWindow(int durationMs) {
+        if (durationMs <= 0 || !ensureNativeLifecycleAvailable()) return;
+        try {
+            nativeStartNativeReaperWindow(durationMs);
+        }
+        catch (UnsatisfiedLinkError e) {
+            nativeLifecycleAvailable = false;
+            Log.w("ProcessHelper", "Native lifecycle reaper is unavailable", e);
+        }
+    }
+
+    private static boolean ensureNativeLifecycleAvailable() {
+        if (nativeLifecycleAvailable) return true;
+        if (nativeLifecycleLoadAttempted) return false;
+        synchronized (ProcessHelper.class) {
+            if (nativeLifecycleAvailable) return true;
+            if (nativeLifecycleLoadAttempted) return false;
+            nativeLifecycleLoadAttempted = true;
+            try {
+                WinlatorNative.ensureLoaded("process_lifecycle");
+                nativeLifecycleAvailable = true;
+                return true;
+            }
+            catch (Throwable e) {
+                Log.w("ProcessHelper", "Native lifecycle support is unavailable", e);
+                return false;
+            }
+        }
     }
 
     public static void removeAllDebugCallbacks() {
@@ -323,6 +496,7 @@ public abstract class ProcessHelper {
                 return new File(proc, filename).isDirectory() && filename.matches("[0-9]+");
             }
         });
+        if (allPids == null) return filteredPids;
 
         for (int index = 0; index < allPids.length; index++){
             String data = "";
@@ -343,4 +517,124 @@ public abstract class ProcessHelper {
         }
         return filteredPids;
     }
+
+    public static List<ProcessInfo> listSubProcesses() {
+        List<ProcessInfo> processes = new ArrayList<>();
+        String myUser = null;
+
+        try {
+            java.lang.Process idProcess = Runtime.getRuntime().exec("id");
+            try (
+                    InputStreamReader isr = new InputStreamReader(idProcess.getInputStream());
+                    BufferedReader idReader = new BufferedReader(isr)
+            ) {
+                String idOutput = idReader.readLine();
+                if (idOutput != null) {
+                    int startIndex = idOutput.indexOf('(');
+                    int endIndex = idOutput.indexOf(')');
+                    if (startIndex != -1 && endIndex != -1) {
+                        myUser = idOutput.substring(startIndex + 1, endIndex);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            Log.e("ProcessHelper", "Failed to retrieve user id in order to list processes", e);
+            return processes;
+        }
+
+        if (myUser == null) return processes;
+
+        try {
+            java.lang.Process process = Runtime.getRuntime().exec("ps -A -o USER,PID,PPID,VSZ,RSS,WCHAN,ADDR,S,NAME");
+            try (
+                    InputStreamReader isr = new InputStreamReader(process.getInputStream());
+                    BufferedReader reader = new BufferedReader(isr)
+            ) {
+                String line;
+                reader.readLine();
+
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.trim().split("\\s+", 9);
+                    if (parts.length >= 9) {
+                        String user = parts[0];
+                        int pid = Integer.parseInt(parts[1]);
+                        int ppid = Integer.parseInt(parts[2]);
+                        long rssKb = Long.parseLong(parts[4]);
+                        String processName = parts[8];
+                        if (user.equals(myUser) && pid != Process.myPid()) {
+                            processes.add(new ProcessInfo(pid, ppid, processName, rssKb * 1024L));
+                        }
+                    }
+                }
+            }
+        } catch (IOException | NumberFormatException e) {
+            Log.e("ProcessHelper", "Failed to list sub-processes", e);
+        }
+
+        return processes;
+    }
+
+    public static List<ProcessInfo> listDescendantProcesses(int rootPid) {
+        if (rootPid <= 0) return Collections.emptyList();
+
+        List<ProcessInfo> processes = listProcessesFromProc();
+        ArrayList<ProcessInfo> descendants = new ArrayList<>();
+        Set<Integer> frontier = new HashSet<>();
+        frontier.add(rootPid);
+
+        boolean changed;
+        do {
+            changed = false;
+            for (ProcessInfo process : processes) {
+                if (frontier.contains(process.ppid) && !frontier.contains(process.pid)) {
+                    frontier.add(process.pid);
+                    descendants.add(process);
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        Collections.reverse(descendants);
+        return descendants;
+    }
+
+    public static List<ProcessInfo> listProcessesFromProc() {
+        File proc = new File("/proc");
+        String[] allPids = proc.list((dir, filename) -> new File(dir, filename).isDirectory() && filename.matches("[0-9]+"));
+        if (allPids == null || allPids.length == 0) return Collections.emptyList();
+
+        ArrayList<ProcessInfo> processes = new ArrayList<>();
+        for (String pidName : allPids) {
+            File statFile = new File(new File(proc, pidName), "stat");
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(statFile)))) {
+                ProcessInfo info = parseProcStat(pidName, reader.readLine());
+                if (info != null) processes.add(info);
+            }
+            catch (IOException | NumberFormatException e) {
+                if (PRINT_DEBUG) Log.d("ProcessHelper", "Failed to read process stat for pid " + pidName, e);
+            }
+        }
+        return processes;
+    }
+
+    static ProcessInfo parseProcStat(String pidName, String statLine) {
+        if (statLine == null || statLine.isEmpty()) return null;
+
+        int pid = Integer.parseInt(pidName);
+        int nameStart = statLine.indexOf('(');
+        int nameEnd = statLine.lastIndexOf(')');
+        if (nameStart < 0 || nameEnd <= nameStart) return null;
+
+        String name = statLine.substring(nameStart + 1, nameEnd);
+        String tail = statLine.substring(nameEnd + 1).trim();
+        String[] fields = tail.split("\\s+");
+        if (fields.length < 2) return null;
+
+        int ppid = Integer.parseInt(fields[1]);
+        return new ProcessInfo(pid, ppid, name);
+    }
+
+    private static native int nativeReapDeadChildrenNow();
+
+    private static native void nativeStartNativeReaperWindow(int durationMs);
 }

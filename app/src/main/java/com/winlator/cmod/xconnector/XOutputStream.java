@@ -8,6 +8,7 @@ import java.nio.ByteOrder;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class XOutputStream {
+    private static final double FP3232_SCALE = 4294967296.0;
     private static final byte[] ZERO = new byte[64];
     public ByteBuffer buffer;
     public final ClientSocket clientSocket;
@@ -46,9 +47,31 @@ public class XOutputStream {
         buffer.putInt(value);
     }
 
+    public void writeInt(long value) {
+        writeInt((int)value);
+    }
+
     public void writeLong(long value) {
         ensureSpaceIsAvailable(8);
         buffer.putLong(value);
+    }
+
+    public void writeFP3232(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new IllegalArgumentException("FP3232 value must be finite");
+        }
+
+        long fixed = Math.round(value * FP3232_SCALE);
+        writeInt((int)(fixed >> 32));
+        writeInt((int)fixed);
+    }
+
+    public void writeFP3232(int integerPart, long fractionalPart) {
+        if (fractionalPart < 0L || fractionalPart > 0xffffffffL) {
+            throw new IllegalArgumentException("fractionalPart must be in range 0 .. 0xffffffff");
+        }
+        writeInt(integerPart);
+        writeInt((int)fractionalPart);
     }
 
     public void writeString8(String str) {

@@ -50,6 +50,7 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
 import com.winlator.cmod.fexcore.FEXCorePreset;
 import com.winlator.cmod.fexcore.FEXCorePresetManager;
@@ -233,10 +234,10 @@ public class SettingsFragment extends Fragment {
                     @Override
                     public void onSuccess() {
                         dialog.closeOnUiThread();
-                        requireActivity().runOnUiThread(() -> {
+                        UiLifecycleGuard.runOnUiThread(SettingsFragment.this, () -> {
                             ContentDialog.alert(context, R.string.sound_font_installed_success, null);
                             MidiManager.loadSFSpinnerWithoutDisabled(sMIDISoundFont);
-                        });
+                        }, "SettingsFragment", "soundfont_install_success");
                     }
 
                     @Override
@@ -247,7 +248,12 @@ public class SettingsFragment extends Fragment {
                             case MidiManager.ERROR_EXIST -> R.string.sound_font_already_exist;
                             default -> R.string.sound_font_installed_failed;
                         };
-                        requireActivity().runOnUiThread(() -> ContentDialog.alert(context, resId, null));
+                        UiLifecycleGuard.runOnUiThread(
+                                SettingsFragment.this,
+                                () -> ContentDialog.alert(context, resId, null),
+                                "SettingsFragment",
+                                "soundfont_install_failed"
+                        );
                     }
                 });
             };
@@ -373,9 +379,13 @@ public class SettingsFragment extends Fragment {
                     mainActivity.openMainMenuItem(R.id.main_menu_containers, true);
                 } else {
                     FragmentManager fragmentManager = getParentFragmentManager();
-                    fragmentManager.beginTransaction()
-                            .replace(R.id.FLFragmentContainer, new ContainersFragment())
-                            .commit();
+                    UiLifecycleGuard.commit(
+                            requireActivity(),
+                            fragmentManager.beginTransaction()
+                                    .replace(R.id.FLFragmentContainer, new ContainersFragment()),
+                            "SettingsFragment",
+                            "save_and_return_containers"
+                    );
                 }
             }
         });

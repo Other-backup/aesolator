@@ -325,7 +325,10 @@ public abstract class WindowRequests {
             if (srcHeight == 0) srcHeight = (short)(srcWindow.getHeight() - srcY);
 
             short[] localPoint = srcWindow.rootPointToLocal(client.xServer.pointer.getX(), client.xServer.pointer.getY());
-            boolean isContained = localPoint[0] >= srcX && localPoint[1] >= srcY && localPoint[0] < (srcX + srcWidth) && localPoint[1] < (srcY + srcHeight);
+            short softMarginX = (short)(client.xServer.screenInfo.width * 0.05f);
+            short softMarginY = (short)(client.xServer.screenInfo.height * 0.05f);
+            boolean isContained = localPoint[0] >= srcX - softMarginX && localPoint[1] >= srcY - softMarginY &&
+                    localPoint[0] < (srcX + srcWidth + softMarginX) && localPoint[1] < (srcY + srcHeight + softMarginY);
             if (!isContained) return;
         }
 

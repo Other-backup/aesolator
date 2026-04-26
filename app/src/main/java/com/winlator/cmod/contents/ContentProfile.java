@@ -125,11 +125,25 @@ public class ContentProfile {
     public static String normalizeRuntimeModel(String value) {
         if (value == null || value.trim().isEmpty()) return "";
         String normalized = value.trim().toLowerCase(Locale.ENGLISH);
-        if (normalized.contains(RUNTIME_MODEL_GLIBC) || normalized.contains("gamenative") || normalized.contains("ubuntufs")) {
-            return RUNTIME_MODEL_GLIBC;
-        }
-        if (normalized.contains(RUNTIME_MODEL_BIONIC) || normalized.contains("native")) {
+        normalized = normalized
+                .replace("gamenative", " ")
+                .replace("game native", " ");
+        boolean hasBionicSignal = normalized.contains(RUNTIME_MODEL_BIONIC)
+                || normalized.contains("freewine")
+                || normalized.contains("android native")
+                || normalized.contains("android-native")
+                || normalized.contains("winlator-bionic")
+                || normalized.contains("bionic-native")
+                || normalized.contains("arm64-v8a/bin")
+                || normalized.contains("arm64-v8a/lib")
+                || normalized.contains("wineandroid.so")
+                || normalized.contains("winex11.so")
+                || normalized.equals("native");
+        if (hasBionicSignal) {
             return RUNTIME_MODEL_BIONIC;
+        }
+        if (normalized.contains(RUNTIME_MODEL_GLIBC) || normalized.contains("ubuntufs") || normalized.contains("ubuntu")) {
+            return RUNTIME_MODEL_GLIBC;
         }
         return "";
     }
@@ -145,20 +159,21 @@ public class ContentProfile {
         }
 
         String normalizedHint = combined.toString();
-        if (normalizedHint.contains("glibc")
-                || normalizedHint.contains("gamenative")
-                || normalizedHint.contains("ubuntufs")
-                || normalizedHint.contains("ubuntu")) {
-            return RUNTIME_MODEL_GLIBC;
-        }
-        if (normalizedHint.contains("bionic")
-                || normalizedHint.contains("freewine")
-                || normalizedHint.contains("android native")
-                || normalizedHint.contains("native")) {
+        String runtimeHint = normalizedHint
+                .replace("gamenative", " ")
+                .replace("game native", " ");
+        if (runtimeHint.contains("bionic")
+                || runtimeHint.contains("freewine")
+                || runtimeHint.contains("android-native")
+                || runtimeHint.contains("android native")
+                || runtimeHint.matches("(^|.*\\s)native(\\s.*|$)")) {
             return RUNTIME_MODEL_BIONIC;
         }
-        if (type == ContentType.CONTENT_TYPE_PROTON) return RUNTIME_MODEL_GLIBC;
-        if (type == ContentType.CONTENT_TYPE_WINE) return RUNTIME_MODEL_BIONIC;
+        if (runtimeHint.contains("glibc")
+                || runtimeHint.contains("ubuntufs")
+                || runtimeHint.contains("ubuntu")) {
+            return RUNTIME_MODEL_GLIBC;
+        }
         return "";
     }
 
@@ -190,7 +205,21 @@ public class ContentProfile {
     public String getRuntimeModel() {
         String explicit = normalizeRuntimeModel(runtimeModel);
         if (!explicit.isEmpty()) return explicit;
-        return inferRuntimeModel(type, verName, desc, displayCategory, sourceRepo, sourceFeed, sourceLabel, releaseTag, artifactName, remoteUrl);
+        return inferRuntimeModel(
+                type,
+                verName,
+                desc,
+                displayCategory,
+                sourceRepo,
+                sourceFeed,
+                sourceLabel,
+                releaseTag,
+                artifactName,
+                remoteUrl,
+                wineLibPath,
+                wineBinPath,
+                winePrefixPack
+        );
     }
 
     public boolean isRuntimeModelCompatible(String requestedRuntimeModel) {
@@ -271,6 +300,9 @@ public class ContentProfile {
         appendArchitectureHint(builder, releaseTag);
         appendArchitectureHint(builder, artifactName);
         appendArchitectureHint(builder, remoteUrl);
+        appendArchitectureHint(builder, wineLibPath);
+        appendArchitectureHint(builder, wineBinPath);
+        appendArchitectureHint(builder, winePrefixPack);
         if (fileList != null) {
             for (ContentFile contentFile : fileList) {
                 if (contentFile == null) continue;

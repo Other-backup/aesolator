@@ -400,6 +400,8 @@ public final class ForensicLogger {
     private static void writeFatalCrashSync(Context context, Thread thread, Throwable error, String stage) {
         if (context == null || error == null) return;
 
+        String stackTrace = stackTraceString(error);
+        Throwable rootCause = deepestCause(error);
         JSONObject obj = new JSONObject();
         try {
             obj.put("ts", TS_FORMAT.get().format(new Date()));
@@ -411,6 +413,11 @@ public final class ForensicLogger {
             obj.put("error_class", error.getClass().getName());
             obj.put("thread_name", thread != null ? thread.getName() : "");
             obj.put("thread_id", thread != null ? thread.getId() : -1);
+            obj.put("root_error_class", rootCause.getClass().getName());
+            obj.put("root_error_detail", String.valueOf(rootCause.getMessage()));
+            obj.put("stacktrace_hash", sha256Hex(stackTrace));
+            obj.put("stacktrace_line_count", stackTraceLineCount(stackTrace));
+            obj.put("stacktrace_head", stackTraceHead(stackTrace, 14));
         }
         catch (JSONException ignored) {
             // Fatal crash emission is best-effort; keep the partial JSON payload intact.
@@ -422,6 +429,42 @@ public final class ForensicLogger {
             appendForensicLine(context, line);
             writeCrashTextFile(context, thread, error);
         }
+    }
+
+    private static Throwable deepestCause(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
+    private static String stackTraceString(Throwable error) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        error.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
+    }
+
+    private static int stackTraceLineCount(String stackTrace) {
+        if (stackTrace == null || stackTrace.isEmpty()) return 0;
+        int count = 1;
+        for (int i = 0; i < stackTrace.length(); i++) {
+            if (stackTrace.charAt(i) == '\n') count++;
+        }
+        return count;
+    }
+
+    private static String stackTraceHead(String stackTrace, int lineLimit) {
+        if (stackTrace == null || stackTrace.isEmpty() || lineLimit <= 0) return "";
+        String[] lines = stackTrace.split("\\r?\\n");
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < lines.length && i < lineLimit; i++) {
+            if (builder.length() > 0) builder.append('\n');
+            builder.append(lines[i]);
+        }
+        return builder.toString();
     }
 
     private static void writeCrashTextFile(Context context, Thread thread, Throwable error) {

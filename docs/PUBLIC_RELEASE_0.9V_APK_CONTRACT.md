@@ -6,6 +6,11 @@
 - CI APK lane: `wcp-runtime-lanes/.github/workflows/ci-aesolator-apk.yml`.
 - FreeWine/WCP runtime packages are not built or pulled by the APK CI lane.
 - The first public APK ships the app shell, bundled graphics payloads, translators, support overlays, and the GameNative-adapted rootfs base.
+- Hotfix release requirement: every APK artifact must include the WCP package
+  installer hardening from `2026-04-26` so Winlator/GameHub/GameNative/WinNative
+  Wine/Proton packages can be imported from `.wcp`, `.wcp.xz`, `.wcp.zst`,
+  `.txz`, `.tzst`, raw `.tar`, or `.zip` payloads and classified as bionic or
+  glibc from payload evidence rather than package labels alone.
 
 ## Active APK Donors
 
@@ -25,3 +30,12 @@
 - `benchmark`: `by.aero.so.benchmark.benchmark`
 
 All three variants are built from the same source commit, versioned as `0.9v`, and differ only by installable Android package identity / launcher label.
+
+## 2026-04-26 Hotfix Notes
+
+- Fixes profile-less or foreign-schema WCP imports that previously failed with
+  `Profile cannot be recognized`.
+- Fixes false `Broken install: Install directory missing` states caused by
+  mismatched bionic/glibc runtime labels and canonical install-root drift.
+- Adds forensic fields for archive format, root shape, runtime classifier
+  signals, and installed-profile path diagnostics.

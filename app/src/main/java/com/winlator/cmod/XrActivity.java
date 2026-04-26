@@ -19,6 +19,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.NativeLibraryLoader;
 import com.winlator.cmod.xserver.Keyboard;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XKeycode;
@@ -60,7 +61,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
 
     private static synchronized void ensureNativeLibraryLoaded() {
         if (nativeLibraryLoaded) return;
-        System.loadLibrary("winlatorxr");
+        NativeLibraryLoader.ensureLoaded("winlatorxr", "XrActivity");
         nativeLibraryLoaded = true;
     }
 

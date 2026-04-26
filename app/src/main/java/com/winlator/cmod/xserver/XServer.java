@@ -1,8 +1,10 @@
 package com.winlator.cmod.xserver;
 
+import android.graphics.Rect;
 import android.util.SparseArray;
 
 import com.winlator.cmod.core.CursorLocker;
+import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.extensions.BigReqExtension;
@@ -11,6 +13,7 @@ import com.winlator.cmod.xserver.extensions.Extension;
 import com.winlator.cmod.xserver.extensions.MITSHMExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
+import com.winlator.cmod.xserver.extensions.XInput2Extension;
 
 import java.nio.charset.Charset;
 import java.util.EnumMap;
@@ -158,19 +161,51 @@ public class XServer {
 
     public void injectPointerMoveDelta(int dx, int dy) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
-            pointer.setPosition(pointer.getX() + dx, pointer.getY() + dy);
+            int minX = 0;
+            int minY = 0;
+            int maxX = screenInfo.width - 1;
+            int maxY = screenInfo.height - 1;
+            short clampedX;
+            short clampedY;
+
+            Rect confinement = grabManager.getConfinementBounds();
+            if (confinement != null) {
+                minX = Math.max(minX, confinement.left);
+                minY = Math.max(minY, confinement.top);
+                maxX = Math.min(maxX, confinement.right - 1);
+                maxY = Math.min(maxY, confinement.bottom - 1);
+                if (maxX < minX) maxX = minX;
+                if (maxY < minY) maxY = minY;
+                clampedX = (short)Mathf.clamp(pointer.getX() + dx, minX, maxX);
+                clampedY = (short)Mathf.clamp(pointer.getY() + dy, minY, maxY);
+                pointer.setPosition(clampedX, clampedY);
+            }
+            else {
+                short softMarginX = (short)(screenInfo.width * 0.05f);
+                short softMarginY = (short)(screenInfo.height * 0.05f);
+                short x = (short)Mathf.clamp(pointer.getX() + dx, -softMarginX, screenInfo.width - 1 + softMarginX);
+                short y = (short)Mathf.clamp(pointer.getY() + dy, -softMarginY, screenInfo.height - 1 + softMarginY);
+                pointer.setPosition(x, y);
+            }
+
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            if (xInput2 != null) xInput2.emitRawMotion(2, dx, dy);
         }
     }
 
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, true);
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            if (xInput2 != null) xInput2.emitRawButton(2, buttonCode.code(), true);
         }
     }
 
     public void injectPointerButtonRelease(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, false);
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            if (xInput2 != null) xInput2.emitRawButton(2, buttonCode.code(), false);
         }
     }
 
@@ -196,6 +231,10 @@ public class XServer {
         extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension());
         extensions.put(PresentExtension.MAJOR_OPCODE, new PresentExtension());
         extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension());
+        XInput2Extension xInput2Extension = new XInput2Extension();
+        xInput2Extension.setFirstEventId((byte)65);
+        xInput2Extension.setFirstErrorId((byte)-127);
+        extensions.put(XInput2Extension.MAJOR_OPCODE, xInput2Extension);
     }
 
     public <T extends Extension> T getExtension(int opcode) {

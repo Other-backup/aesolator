@@ -35,6 +35,7 @@ import com.winlator.cmod.contentdialog.StorageInfoDialog;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
@@ -172,11 +173,15 @@ public class ContainersFragment extends Fragment {
                 switch (menuItem.getItemId()) {
                     case R.id.container_edit:
                         FragmentManager fragmentManager = getParentFragmentManager();
-                        fragmentManager.beginTransaction()
+                        UiLifecycleGuard.commit(
+                                requireActivity(),
+                                fragmentManager.beginTransaction()
                                 .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
                                 .addToBackStack(null)
-                                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment(container.id))
-                                .commit();
+                                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment(container.id)),
+                                "ContainersFragment",
+                                "edit_container"
+                        );
                         break;
                     case R.id.container_duplicate:
                         ContentDialog.confirm(getContext(), R.string.do_you_want_to_duplicate_this_container, () -> {

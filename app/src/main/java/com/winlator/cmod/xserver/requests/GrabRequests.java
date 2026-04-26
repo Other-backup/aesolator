@@ -35,7 +35,12 @@ public abstract class GrabRequests {
         if (window == null) throw new BadWindow(windowId);
 
         Bitmask eventMask = new Bitmask(inputStream.readShort());
-        inputStream.skip(14);
+        inputStream.readByte();
+        inputStream.readByte();
+        int confineToWindowId = inputStream.readInt();
+        inputStream.skip(8);
+
+        Window confineToWindow = null;
 
         Status status;
         if (client.xServer.grabManager.getWindow() != null && client.xServer.grabManager.getClient() != client) {
@@ -46,7 +51,13 @@ public abstract class GrabRequests {
         }
         else {
             status = Status.SUCCESS;
-            client.xServer.grabManager.activatePointerGrab(window, ownerEvents, eventMask, client);
+            if (confineToWindowId != 0) {
+                confineToWindow = client.xServer.windowManager.getWindow(confineToWindowId);
+                if (confineToWindow != null && confineToWindow.getMapState() != Window.MapState.VIEWABLE) {
+                    confineToWindow = null;
+                }
+            }
+            client.xServer.grabManager.activatePointerGrab(window, ownerEvents, eventMask, client, confineToWindow);
         }
 
         try (XStreamLock lock = outputStream.lock()) {

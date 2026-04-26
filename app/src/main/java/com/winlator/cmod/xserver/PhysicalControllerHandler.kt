@@ -222,11 +222,6 @@ class PhysicalControllerHandler(
                 }
 
                 if (winHandler != null) {
-                    val controller = winHandler.currentController
-                    if (controller != null) {
-                        controller.state.copy(state)
-                    }
-                    winHandler.sendGamepadState()
                     winHandler.sendVirtualGamepadState(state)
                 }
             }

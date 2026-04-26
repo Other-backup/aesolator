@@ -45,6 +45,12 @@ import java.util.zip.ZipInputStream;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
+    public static final String REMOTE_SCOPE_COMMUNITY = "community";
+    public static final String REMOTE_SCOPE_ARCHIVE = "archive";
+    public static final String REMOTE_SCOPE_GAMEHUB = "gamehub";
+    public static final String REMOTE_SCOPE_NIGHTLIES = "nightlies";
+    public static final String REMOTE_SCOPE_WCPHUB = "wcphub";
+    public static final String REMOTE_SCOPE_HYDRATED_RUNTIME = "hydrated_runtime";
     private static final String FALLBACK_PREFIX_PACK_NAME = "prefixPack.tzst";
     private static final String FALLBACK_PREFIX_PACK_COMMON_ASSET = "container_pattern_common.tzst";
     private static final String FALLBACK_PREFIX_PACK_GAMENATIVE_ASSET = "container_pattern_gamenative.tzst";
@@ -145,11 +151,55 @@ public class ContentsManager {
         }
     }
 
+    public static final class InstalledProfileDiagnostics {
+        public final InstalledProfileState state;
+        public final String entryName;
+        public final String requestedIdentity;
+        public final String type;
+        public final String runtimeModel;
+        public final String canonicalInstallDir;
+        public final String resolvedInstallDir;
+        public final String runtimeRoot;
+        public final String profileJsonPath;
+        public final boolean profileJsonPresent;
+        public final boolean runtimeRootPresent;
+        public final boolean runtimePayloadPresent;
+        public final boolean aliasResolved;
+
+        private InstalledProfileDiagnostics(@NonNull InstalledProfileState state,
+                                           @NonNull String entryName,
+                                           @NonNull String requestedIdentity,
+                                           @NonNull String type,
+                                           @NonNull String runtimeModel,
+                                           @NonNull String canonicalInstallDir,
+                                           @NonNull String resolvedInstallDir,
+                                           @NonNull String runtimeRoot,
+                                           @NonNull String profileJsonPath,
+                                           boolean profileJsonPresent,
+                                           boolean runtimeRootPresent,
+                                           boolean runtimePayloadPresent,
+                                           boolean aliasResolved) {
+            this.state = state;
+            this.entryName = entryName;
+            this.requestedIdentity = requestedIdentity;
+            this.type = type;
+            this.runtimeModel = runtimeModel;
+            this.canonicalInstallDir = canonicalInstallDir;
+            this.resolvedInstallDir = resolvedInstallDir;
+            this.runtimeRoot = runtimeRoot;
+            this.profileJsonPath = profileJsonPath;
+            this.profileJsonPresent = profileJsonPresent;
+            this.runtimeRootPresent = runtimeRootPresent;
+            this.runtimePayloadPresent = runtimePayloadPresent;
+            this.aliasResolved = aliasResolved;
+        }
+    }
+
     private final Context context;
 
     private HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
 
-    private ArrayList<ContentProfile> remoteProfiles;
+    private final LinkedHashMap<String, ArrayList<ContentProfile>> remoteProfilesByScope = new LinkedHashMap<>();
 
     public ContentsManager(Context context) {
         Context applicationContext = context != null ? context.getApplicationContext() : null;
@@ -173,45 +223,85 @@ public class ContentsManager {
     }
 
     public void setRemoteProfiles(String json, boolean includeBeta, boolean ignoreRepoManaged) {
-        remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, includeBeta, ignoreRepoManaged, false, false);
-        syncContents();
+        setRemoteProfilesForScope(REMOTE_SCOPE_COMMUNITY, json, includeBeta, ignoreRepoManaged, false, false);
     }
 
     public void setHubRemoteProfiles(String json) {
-        remoteProfiles = new ArrayList<>();
         // WCPHub must stay visible for overlapping families too; the source
         // selector, not the parser, is what keeps archive/hub provenance apart.
-        appendRemoteProfiles(json, false, false, false, true);
-        syncContents();
+        setRemoteProfilesForScope(REMOTE_SCOPE_WCPHUB, json, false, false, false, true);
     }
 
     public void setArchiveRemoteProfiles(String json) {
-        remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, false, false, true, true);
-        syncContents();
+        setRemoteProfilesForScope(REMOTE_SCOPE_ARCHIVE, json, false, false, true, true);
     }
 
     public void setGamehubRemoteProfiles(String json) {
-        remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, false, false, false, true);
-        syncContents();
+        setRemoteProfilesForScope(REMOTE_SCOPE_GAMEHUB, json, false, false, false, true);
     }
 
     public void setNightliesRemoteProfiles(String json) {
-        remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, false, false, false, true);
-        syncContents();
+        setRemoteProfilesForScope(REMOTE_SCOPE_NIGHTLIES, json, false, false, false, true);
     }
 
     public void setHydratedRuntimeProfiles(String json) {
-        remoteProfiles = new ArrayList<>();
-        appendRemoteProfiles(json, false, false, false, true);
+        setRemoteProfilesForScope(REMOTE_SCOPE_HYDRATED_RUNTIME, json, false, false, false, true);
+    }
+
+    public boolean hasRemoteProfilesForScope(@Nullable String scopeKey) {
+        synchronized (remoteProfilesByScope) {
+            ArrayList<ContentProfile> scoped = remoteProfilesByScope.get(normalizeRemoteScopeKey(scopeKey));
+            return scoped != null && !scoped.isEmpty();
+        }
+    }
+
+    public int getRemoteProfileCountForScope(@Nullable String scopeKey) {
+        synchronized (remoteProfilesByScope) {
+            ArrayList<ContentProfile> scoped = remoteProfilesByScope.get(normalizeRemoteScopeKey(scopeKey));
+            return scoped == null ? 0 : scoped.size();
+        }
+    }
+
+    private void setRemoteProfilesForScope(
+            @Nullable String scopeKey,
+            String json,
+            boolean includeBeta,
+            boolean ignoreRepoManaged,
+            boolean onlyRepoManaged,
+            boolean keepAllChannels
+    ) {
+        ArrayList<ContentProfile> parsedProfiles = parseRemoteProfiles(json, includeBeta, ignoreRepoManaged, onlyRepoManaged, keepAllChannels);
+        synchronized (remoteProfilesByScope) {
+            remoteProfilesByScope.put(normalizeRemoteScopeKey(scopeKey), parsedProfiles);
+        }
         syncContents();
     }
 
-    private void appendRemoteProfiles(String json, boolean includeBeta, boolean ignoreRepoManaged, boolean onlyRepoManaged, boolean keepAllChannels) {
-        if (json == null || json.trim().isEmpty()) return;
+    private String normalizeRemoteScopeKey(@Nullable String scopeKey) {
+        String normalized = scopeKey == null ? "" : scopeKey.trim().toLowerCase(Locale.US);
+        return normalized.isEmpty() ? REMOTE_SCOPE_COMMUNITY : normalized;
+    }
+
+    private ArrayList<ContentProfile> collectRemoteProfilesSnapshot() {
+        ArrayList<ContentProfile> snapshot = new ArrayList<>();
+        synchronized (remoteProfilesByScope) {
+            for (ArrayList<ContentProfile> scopedProfiles : remoteProfilesByScope.values()) {
+                if (scopedProfiles == null || scopedProfiles.isEmpty()) continue;
+                snapshot.addAll(scopedProfiles);
+            }
+        }
+        return snapshot;
+    }
+
+    private ArrayList<ContentProfile> parseRemoteProfiles(
+            String json,
+            boolean includeBeta,
+            boolean ignoreRepoManaged,
+            boolean onlyRepoManaged,
+            boolean keepAllChannels
+    ) {
+        ArrayList<ContentProfile> parsedProfiles = new ArrayList<>();
+        if (json == null || json.trim().isEmpty()) return parsedProfiles;
         try {
             JSONArray content = new JSONArray(json);
             for (int i = 0; i < content.length(); i++) {
@@ -273,7 +363,7 @@ public class ContentsManager {
                         if (!includeBeta && isBeta) continue;
                     }
 
-                    remoteProfiles.add(remoteProfile);
+                    parsedProfiles.add(remoteProfile);
                 } catch (Exception e) {
                     Log.w(TAG, "Failed to parse remote profile row", e);
                 }
@@ -281,6 +371,7 @@ public class ContentsManager {
         } catch (JSONException e) {
             Log.w(TAG, "Failed to parse remote profile feed", e);
         }
+        return parsedProfiles;
     }
 
     private String readRuntimeModelHint(JSONObject object) {
@@ -329,6 +420,7 @@ public class ContentsManager {
                     if (proFile.exists() && proFile.isFile()) {
                         ContentProfile profile = normalizeImportedProfile(readProfile(proFile), null);
                         if (profile != null && profile.type == type) {
+                            classifyRuntimeProfileFromPayload(file, profile);
                             profile.setInstalledLocally(true);
                             profiles.add(profile);
                             profileByEntry.put(getEntryName(profile), profile);
@@ -338,20 +430,19 @@ public class ContentsManager {
                 }
             }
 
-            if (remoteProfiles != null) {
-                for (ContentProfile remote : remoteProfiles) {
-                    if (remote.type != type) continue;
-                    ContentProfile existing = profileByEntry.get(getEntryName(remote));
-                    if (existing == null) {
-                        existing = findEquivalentProfile(profiles, remote);
-                    }
-                    if (existing != null) {
-                        existing.mergeRemoteMetadata(remote);
-                        persistProfileMetadata(profileFileByProfile.get(existing), existing);
-                    } else {
-                        profiles.add(remote);
-                        profileByEntry.put(getEntryName(remote), remote);
-                    }
+            List<ContentProfile> remoteProfiles = collectRemoteProfilesSnapshot();
+            for (ContentProfile remote : remoteProfiles) {
+                if (remote.type != type) continue;
+                ContentProfile existing = profileByEntry.get(getEntryName(remote));
+                if (existing == null) {
+                    existing = findEquivalentProfile(profiles, remote);
+                }
+                if (existing != null) {
+                    existing.mergeRemoteMetadata(remote);
+                    persistProfileMetadata(profileFileByProfile.get(existing), existing);
+                } else {
+                    profiles.add(remote);
+                    profileByEntry.put(getEntryName(remote), remote);
                 }
             }
         }
@@ -418,30 +509,28 @@ public class ContentsManager {
         cleanTmpDir(context);
 
         File file = getTmpDir(context);
+        String importDisplayName = resolveImportDisplayName(uri);
 
-        boolean ret = extractZipSafely(uri, file);
-        if (!ret) {
-            FileUtils.delete(file);
-            if (!file.exists() && !file.mkdirs()) {
-                callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
-                return;
-            }
-        }
-        if (!ret) ret = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, uri, file);
-        if (!ret)
-            ret = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, uri, file);
-        if (!ret) {
+        String archiveFormat = extractContentArchive(uri, file, importDisplayName);
+        if (archiveFormat.isEmpty()) {
+            logInstallFailure("CONTENTS_IMPORT_EXTRACTION_FAILED", "contents_import", InstallFailedReason.ERROR_BADTAR, null, remoteHint, file, null, null);
             callback.onFailed(InstallFailedReason.ERROR_BADTAR, null);
             return;
         }
+        logContentArchiveExtraction("CONTENTS_IMPORT_ARCHIVE_EXTRACTED", importDisplayName, archiveFormat, file);
 
-        normalizeExtractedImportRoot(file, remoteHint);
+        normalizeExtractedImportRoot(file, remoteHint, importDisplayName);
         File proFile = resolveExtractedProfileFile(file);
-        ContentProfile profile = repairImportedProfile(file, proFile != null && proFile.isFile() ? readProfile(proFile) : null, remoteHint);
+        ContentProfile profile = repairImportedProfile(
+                file,
+                proFile != null && proFile.isFile() ? readProfile(proFile) : null,
+                remoteHint,
+                importDisplayName
+        );
         if (profile == null) {
-            ContentProfile synthesizedProfile = synthesizeProfileFromExtractedPayload(file, remoteHint);
+            ContentProfile synthesizedProfile = synthesizeProfileFromExtractedPayload(file, remoteHint, importDisplayName);
             if (synthesizedProfile != null) {
-                profile = repairImportedProfile(file, synthesizedProfile, remoteHint);
+                profile = repairImportedProfile(file, synthesizedProfile, remoteHint, importDisplayName);
                 logImportRecovery("CONTENTS_PROFILE_SYNTHESIS_APPLIED", file, remoteHint, profile);
             } else {
                 logImportRecovery("CONTENTS_PROFILE_SYNTHESIS_MISS", file, remoteHint, null);
@@ -450,20 +539,33 @@ public class ContentsManager {
             logImportRecovery("CONTENTS_PROFILE_RECOVERY_APPLIED", file, remoteHint, profile);
         }
         if (profile == null) {
+            logInstallFailure(
+                    "CONTENTS_IMPORT_PROFILE_REJECTED",
+                    "contents_import",
+                    proFile != null && proFile.isFile() ? InstallFailedReason.ERROR_BADPROFILE : InstallFailedReason.ERROR_NOPROFILE,
+                    null,
+                    remoteHint,
+                    file,
+                    null,
+                    null
+            );
             callback.onFailed(proFile != null && proFile.isFile() ? InstallFailedReason.ERROR_BADPROFILE : InstallFailedReason.ERROR_NOPROFILE, null);
             return;
         }
         if (!writeProfileSnapshot(file, profile)) {
+            logInstallFailure("CONTENTS_IMPORT_PROFILE_WRITE_FAILED", "contents_import", InstallFailedReason.ERROR_BADPROFILE, profile, remoteHint, file, null, null);
             callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
             return;
         }
         profile = readProfile(new File(file, PROFILE_NAME));
         if (profile == null) {
+            logInstallFailure("CONTENTS_IMPORT_PROFILE_READ_FAILED", "contents_import", InstallFailedReason.ERROR_BADPROFILE, null, remoteHint, file, null, null);
             callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
             return;
         }
         profile = normalizeImportedProfile(profile, remoteHint);
         if (ContentProfileIdentity.isRemoteProfileIdentityMismatch(profile, remoteHint)) {
+            logInstallFailure("CONTENTS_IMPORT_IDENTITY_MISMATCH", "contents_import", InstallFailedReason.ERROR_BADPROFILE, profile, remoteHint, file, null, null);
             callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
             return;
         }
@@ -472,17 +574,20 @@ public class ContentsManager {
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
             File tmpFile = new File(file, contentFile.source);
             if (!tmpFile.exists() || !tmpFile.isFile() || !isSubPath(file.getAbsolutePath(), tmpFile.getAbsolutePath())) {
+                logInstallFailure("CONTENTS_IMPORT_MISSING_PAYLOAD", "contents_import", InstallFailedReason.ERROR_MISSINGFILES, profile, remoteHint, file, null, null);
                 callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
                 return;
             }
 
             if (!isTrustedInstallTarget(profile, contentFile.target, imagefsPath)) {
+                logInstallFailure("CONTENTS_IMPORT_UNTRUSTED_TARGET", "contents_import", InstallFailedReason.ERROR_UNTRUSTPROFILE, profile, remoteHint, file, null, null);
                 callback.onFailed(InstallFailedReason.ERROR_UNTRUSTPROFILE, null);
                 return;
             }
         }
 
         if (profile.isWineProtonFamily() && !hasResolvedRuntimePayload(file, profile)) {
+            logInstallFailure("CONTENTS_IMPORT_RUNTIME_INCOMPLETE", "contents_import", InstallFailedReason.ERROR_MISSINGFILES, profile, remoteHint, file, null, null);
             callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
             return;
         }
@@ -538,16 +643,88 @@ public class ContentsManager {
         return FileUtils.resolveSafeArchiveEntry(rootDir, entry.getName());
     }
 
+    @NonNull
+    private String extractContentArchive(Uri uri, File destination, @Nullable String importDisplayName) {
+        for (String format : resolveArchiveProbeOrder(importDisplayName)) {
+            if (!prepareExtractionDestination(destination)) continue;
+            boolean extracted = switch (format) {
+                case "zip" -> extractZipSafely(uri, destination);
+                case "xz-tar" -> TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, uri, destination);
+                case "zstd-tar" -> TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, uri, destination);
+                case "tar" -> TarCompressorUtils.extractTar(context, uri, destination);
+                default -> false;
+            };
+            if (extracted) return format;
+        }
+        FileUtils.delete(destination);
+        destination.mkdirs();
+        return "";
+    }
+
+    private boolean prepareExtractionDestination(File destination) {
+        if (destination == null) return false;
+        if (destination.exists() && !FileUtils.clear(destination)) {
+            FileUtils.delete(destination);
+        }
+        return destination.isDirectory() || destination.mkdirs();
+    }
+
+    private List<String> resolveArchiveProbeOrder(@Nullable String importDisplayName) {
+        String name = importDisplayName == null ? "" : importDisplayName.trim().toLowerCase(Locale.US);
+        ArrayList<String> probes = new ArrayList<>();
+        if (name.endsWith(".zip")) {
+            addArchiveProbe(probes, "zip");
+            addArchiveProbe(probes, "xz-tar");
+            addArchiveProbe(probes, "zstd-tar");
+            addArchiveProbe(probes, "tar");
+            return probes;
+        }
+        if (name.endsWith(".wcp.xz") || name.endsWith(".txz") || name.endsWith(".tar.xz")) {
+            addArchiveProbe(probes, "xz-tar");
+            addArchiveProbe(probes, "zstd-tar");
+            addArchiveProbe(probes, "zip");
+            addArchiveProbe(probes, "tar");
+            return probes;
+        }
+        if (name.endsWith(".wcp.zst") || name.endsWith(".wcp.zstd")
+                || name.endsWith(".tzst") || name.endsWith(".tar.zst") || name.endsWith(".tar.zstd")) {
+            addArchiveProbe(probes, "zstd-tar");
+            addArchiveProbe(probes, "xz-tar");
+            addArchiveProbe(probes, "zip");
+            addArchiveProbe(probes, "tar");
+            return probes;
+        }
+        if (name.endsWith(".wcp")) {
+            addArchiveProbe(probes, "zstd-tar");
+            addArchiveProbe(probes, "xz-tar");
+            addArchiveProbe(probes, "zip");
+            addArchiveProbe(probes, "tar");
+            return probes;
+        }
+        addArchiveProbe(probes, "zip");
+        addArchiveProbe(probes, "xz-tar");
+        addArchiveProbe(probes, "zstd-tar");
+        addArchiveProbe(probes, "tar");
+        return probes;
+    }
+
+    private void addArchiveProbe(List<String> probes, String format) {
+        if (probes == null || format == null || probes.contains(format)) return;
+        probes.add(format);
+    }
+
     public void finishInstallContent(ContentProfile profile, OnInstallFinishedCallback callback) {
         File installPath = getInstallDir(context, profile);
         File tmpPath = getTmpDir(context);
         if (!tmpPath.exists() || !tmpPath.isDirectory()) {
+            logInstallFailure("CONTENTS_INSTALL_TMP_MISSING", "contents_install", InstallFailedReason.ERROR_UNKNOWN, profile, null, tmpPath, installPath, null);
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
 
         File typeDir = installPath.getParentFile();
         if (typeDir == null || (!typeDir.exists() && !typeDir.mkdirs())) {
+            logInstallFailure("CONTENTS_INSTALL_TYPE_DIR_MISSING", "contents_install", InstallFailedReason.ERROR_UNKNOWN, profile, null, tmpPath, installPath, null);
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
@@ -557,9 +734,10 @@ public class ContentsManager {
         clearInstallStageMarker(stageMarker);
 
         if (profile.isWineProtonFamily()) {
-            InstalledRuntimeRoot equivalentInstalledRoot = findEquivalentInstalledRuntimeRoot(profile);
-            if (equivalentInstalledRoot != null) {
-                File installedProfileFile = new File(equivalentInstalledRoot.installRoot, PROFILE_NAME);
+            InstalledRuntimeRoot equivalentInstalledRoot = findEquivalentInstalledRuntimeRoot(profile, true);
+            File equivalentInstallRoot = resolveMatchedInstalledRuntimeInstallDir(profile, equivalentInstalledRoot, true, true);
+            if (equivalentInstalledRoot != null && equivalentInstallRoot != null) {
+                File installedProfileFile = new File(equivalentInstallRoot, PROFILE_NAME);
                 ContentProfile installedProfile = equivalentInstalledRoot.profile;
                 if (installedProfile == null) {
                     installedProfile = normalizeImportedProfile(readProfile(installedProfileFile), profile);
@@ -569,7 +747,7 @@ public class ContentsManager {
                     installedProfile.mergeRemoteMetadata(profile);
                     persistProfileMetadata(installedProfileFile, installedProfile);
                     FileUtils.delete(tmpPath);
-                    logExistingRuntimeReuse(installedProfile, profile, equivalentInstalledRoot.installRoot);
+                    logExistingRuntimeReuse(installedProfile, profile, equivalentInstallRoot);
                     callback.onSucceed(installedProfile);
                     return;
                 }
@@ -579,16 +757,19 @@ public class ContentsManager {
         File backupPath = null;
         if (installPath.exists()) {
             if (!isUpdatableLane(profile.type)) {
+                logInstallFailure("CONTENTS_INSTALL_ALREADY_EXISTS", "contents_install", InstallFailedReason.ERROR_EXIST, profile, null, tmpPath, installPath, null);
                 callback.onFailed(InstallFailedReason.ERROR_EXIST, null);
                 return;
             }
             backupPath = new File(typeDir, installPath.getName() + ".bak-" + UUID.randomUUID().toString().replace("-", ""));
             if (!installPath.renameTo(backupPath)) {
+                logInstallFailure("CONTENTS_INSTALL_BACKUP_RENAME_FAILED", "contents_install", InstallFailedReason.ERROR_UNKNOWN, profile, null, tmpPath, installPath, null);
                 callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
                 return;
             }
             if (!writeInstallStageMarker(stageMarker, installPath, backupPath)) {
                 backupPath.renameTo(installPath);
+                logInstallFailure("CONTENTS_INSTALL_STAGE_MARKER_FAILED", "contents_install", InstallFailedReason.ERROR_UNKNOWN, profile, null, tmpPath, installPath, null);
                 callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
                 return;
             }
@@ -608,6 +789,7 @@ public class ContentsManager {
                 backupPath.renameTo(installPath);
             }
             clearInstallStageMarker(stageMarker);
+            logInstallFailure("CONTENTS_INSTALL_MOVE_FAILED", "contents_install", InstallFailedReason.ERROR_UNKNOWN, profile, null, tmpPath, installPath, null);
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
@@ -825,23 +1007,29 @@ public class ContentsManager {
 
     public File getRuntimeRootDir(@Nullable ContentProfile profile) {
         if (profile == null) return null;
-        return resolveWineRuntimeRoot(getInstallDir(context, profile), profile);
+        File installDir = resolveInstalledInstallDir(profile, false);
+        if (installDir == null) installDir = getInstallDir(context, profile);
+        return resolveWineRuntimeRoot(installDir, profile);
     }
 
     public InstalledProfileState resolveInstalledProfileState(@Nullable ContentProfile profile) {
         if (profile == null) {
             return new InstalledProfileState(false, false, "missing_profile");
         }
-        if (!profile.isInstalledLocally()) {
-            return new InstalledProfileState(false, false, "not_installed");
+        File canonicalInstallDir = getInstallDir(context, profile);
+        File installDir = resolveInstalledInstallDir(profile, true);
+        if (installDir == null && canonicalInstallDir.isDirectory()) {
+            installDir = canonicalInstallDir;
+        }
+
+        boolean present = installDir != null && installDir.isDirectory();
+        if (!present) {
+            return profile.isInstalledLocally()
+                    ? new InstalledProfileState(true, false, "missing_install_dir")
+                    : new InstalledProfileState(false, false, "not_installed");
         }
         if (!profile.isWineProtonFamily()) {
             return new InstalledProfileState(true, true, "");
-        }
-
-        File installDir = getInstallDir(context, profile);
-        if (!installDir.isDirectory()) {
-            return new InstalledProfileState(true, false, "missing_install_dir");
         }
 
         File profileJson = new File(installDir, PROFILE_NAME);
@@ -858,6 +1046,162 @@ public class ContentsManager {
         }
 
         return new InstalledProfileState(true, true, "");
+    }
+
+    @NonNull
+    public InstalledProfileDiagnostics resolveInstalledProfileDiagnostics(@Nullable ContentProfile profile) {
+        InstalledProfileState state = resolveInstalledProfileState(profile);
+        if (profile == null) {
+            return new InstalledProfileDiagnostics(
+                    state,
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    false,
+                    false,
+                    false,
+                    false
+            );
+        }
+
+        File canonicalInstallDir = getInstallDir(context, profile);
+        File resolvedInstallDir = resolveInstalledInstallDir(profile, true);
+        if (resolvedInstallDir == null && canonicalInstallDir.isDirectory()) {
+            resolvedInstallDir = canonicalInstallDir;
+        }
+
+        File installProbeRoot = resolvedInstallDir != null ? resolvedInstallDir : canonicalInstallDir;
+        File profileJson = installProbeRoot != null ? new File(installProbeRoot, PROFILE_NAME) : null;
+        File runtimeRoot = profile.isWineProtonFamily() ? resolveWineRuntimeRoot(installProbeRoot, profile) : null;
+        boolean runtimeRootPresent = runtimeRoot != null && runtimeRoot.isDirectory();
+        boolean runtimePayloadPresent = runtimeRootPresent && (!profile.isWineProtonFamily() || WineUtils.hasRuntimePayload(runtimeRoot));
+        boolean aliasResolved = resolvedInstallDir != null
+                && canonicalInstallDir != null
+                && !canonicalInstallDir.equals(resolvedInstallDir);
+
+        return new InstalledProfileDiagnostics(
+                state,
+                sanitizeInstallToken(getEntryName(profile)),
+                ContentProfileIdentity.describeProfile(profile),
+                profile.type != null ? profile.type.toString() : "-",
+                profile.getRuntimeModel(),
+                normalizePath(canonicalInstallDir),
+                normalizePath(resolvedInstallDir),
+                normalizePath(runtimeRoot),
+                normalizePath(profileJson),
+                profileJson != null && profileJson.isFile(),
+                runtimeRootPresent,
+                runtimePayloadPresent,
+                aliasResolved
+        );
+    }
+
+    @NonNull
+    public JSONObject buildInstalledProfileForensicFields(@Nullable InstalledProfileDiagnostics diagnostics) {
+        InstalledProfileDiagnostics safe = diagnostics != null
+                ? diagnostics
+                : resolveInstalledProfileDiagnostics(null);
+        return ForensicLogger.fields(
+                "entry_name", safe.entryName,
+                "requested_identity", safe.requestedIdentity,
+                "type", safe.type,
+                "runtime_model", safe.runtimeModel,
+                "state_present", safe.state.present ? "1" : "0",
+                "state_usable", safe.state.usable ? "1" : "0",
+                "broken_reason", safe.state.brokenReason.isEmpty() ? "-" : safe.state.brokenReason,
+                "expected_install_root", safe.canonicalInstallDir,
+                "resolved_install_root", safe.resolvedInstallDir,
+                "runtime_root", safe.runtimeRoot,
+                "profile_json_path", safe.profileJsonPath,
+                "profile_json_present", safe.profileJsonPresent ? "1" : "0",
+                "runtime_root_present", safe.runtimeRootPresent ? "1" : "0",
+                "runtime_payload_present", safe.runtimePayloadPresent ? "1" : "0",
+                "alias_resolved", safe.aliasResolved ? "1" : "0"
+        );
+    }
+
+    @NonNull
+    public String buildInstalledProfileUiSummary(@Nullable InstalledProfileDiagnostics diagnostics) {
+        if (diagnostics == null) return "";
+        if (!diagnostics.state.isBroken() && !diagnostics.aliasResolved) return "";
+        ArrayList<String> lines = new ArrayList<>();
+        if (!diagnostics.entryName.equals("-")) lines.add("entry=" + diagnostics.entryName);
+        if (!diagnostics.canonicalInstallDir.equals("-")) lines.add("expected=" + diagnostics.canonicalInstallDir);
+        if (diagnostics.aliasResolved && !diagnostics.resolvedInstallDir.equals("-")) {
+            lines.add("resolved=" + diagnostics.resolvedInstallDir);
+        }
+        if (!diagnostics.runtimeRoot.equals("-")) lines.add("runtime=" + diagnostics.runtimeRoot);
+        return String.join("\n", lines);
+    }
+
+    @Nullable
+    private File resolveInstalledInstallDir(@Nullable ContentProfile profile, boolean allowRepair) {
+        if (profile == null) return null;
+        if (!profile.isWineProtonFamily()) {
+            File installDir = getInstallDir(context, profile);
+            return installDir.isDirectory() ? installDir : null;
+        }
+        return resolveInstalledRuntimeInstallDir(profile, allowRepair, false);
+    }
+
+    @Nullable
+    private File resolveInstalledRuntimeInstallDir(@Nullable ContentProfile requestedProfile,
+                                                   boolean allowRepair,
+                                                   boolean logResolution) {
+        if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
+        InstalledRuntimeRoot matchedRoot = findEquivalentInstalledRuntimeRoot(requestedProfile, logResolution);
+        if (matchedRoot == null) return null;
+        return resolveMatchedInstalledRuntimeInstallDir(requestedProfile, matchedRoot, allowRepair, logResolution);
+    }
+
+    @Nullable
+    private File resolveMatchedInstalledRuntimeInstallDir(@Nullable ContentProfile requestedProfile,
+                                                          @Nullable InstalledRuntimeRoot matchedRoot,
+                                                          boolean allowRepair,
+                                                          boolean logResolution) {
+        if (requestedProfile == null || matchedRoot == null || matchedRoot.installRoot == null) return null;
+        File resolvedRoot = matchedRoot.installRoot;
+        if (!resolvedRoot.isDirectory()) return null;
+
+        File canonicalRoot = getInstallDir(context, requestedProfile);
+        if (canonicalRoot == null || canonicalRoot.equals(resolvedRoot)) {
+            return resolvedRoot;
+        }
+        if (!allowRepair) {
+            return resolvedRoot;
+        }
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            scheduleInstalledRuntimeOverlayRepair();
+            if (logResolution) {
+                logRuntimeInstallRootResolution(requestedProfile, matchedRoot.profile, resolvedRoot, canonicalRoot,
+                        "scheduled_async_repair_keep_existing");
+            }
+            return resolvedRoot;
+        }
+
+        File migratedRoot = migrateRuntimeInstallRoot(resolvedRoot, canonicalRoot);
+        if (migratedRoot != null && migratedRoot.isDirectory()) {
+            ContentProfile persistedProfile = matchedRoot.profile != null ? matchedRoot.profile : requestedProfile;
+            postProcessWineRuntimeInstall(migratedRoot, persistedProfile);
+            persistProfileMetadata(new File(migratedRoot, PROFILE_NAME), persistedProfile);
+            if (logResolution) {
+                logRuntimeInstallRootResolution(requestedProfile, persistedProfile, resolvedRoot, canonicalRoot,
+                        migratedRoot.equals(canonicalRoot) ? "migrated_to_canonical" : "migration_kept_existing_root");
+            }
+            return migratedRoot;
+        }
+
+        if (logResolution) {
+            logRuntimeInstallRootResolution(requestedProfile, matchedRoot.profile, resolvedRoot, canonicalRoot,
+                    "migration_failed_keep_existing");
+        }
+        return resolvedRoot;
     }
 
     public boolean isInstalledProfilePresent(@Nullable ContentProfile profile) {
@@ -973,7 +1317,7 @@ public class ContentsManager {
         profile.wineBinPath = relativizePath(installPath, binDir);
         profile.wineLibPath = relativizePath(installPath, libDir);
         profile.winePrefixPack = relativizePath(installPath, prefixPack);
-        profile.runtimeModel = profile.getRuntimeModel();
+        classifyRuntimeProfileFromPayload(installPath, profile);
     }
 
     private void ensureRuntimePrefixPackAtRoot(File installPath, ContentProfile profile) {
@@ -1185,7 +1529,16 @@ public class ContentsManager {
 
     public void removeContent(ContentProfile profile) {
         if (profilesMap.get(profile.type).contains(profile)) {
-            FileUtils.delete(getInstallDir(context, profile));
+            File installDir = resolveInstalledInstallDir(profile, false);
+            File canonicalInstallDir = getInstallDir(context, profile);
+            if (installDir != null && installDir.exists()) {
+                FileUtils.delete(installDir);
+            }
+            if (canonicalInstallDir != null
+                    && !canonicalInstallDir.equals(installDir)
+                    && canonicalInstallDir.exists()) {
+                FileUtils.delete(canonicalInstallDir);
+            }
             profilesMap.get(profile.type).remove(profile);
             syncContents();
         }
@@ -1217,9 +1570,12 @@ public class ContentsManager {
             return null;
         }
         requested = requested.withRuntimeModel(resolveRequestedRuntimeModel(requestedRuntimeModel, requested));
+        ContentProfile requestedProfile = requested.toProfile();
 
         ContentProfile protonBest = null;
         ContentProfile wineBest = null;
+        ContentProfile protonCompatibleBest = null;
+        ContentProfile wineCompatibleBest = null;
         for (ContentProfile.ContentType type : new ContentProfile.ContentType[] {
                 ContentProfile.ContentType.CONTENT_TYPE_PROTON,
                 ContentProfile.ContentType.CONTENT_TYPE_WINE
@@ -1228,24 +1584,36 @@ public class ContentsManager {
             if (profiles == null) continue;
             for (ContentProfile profile : profiles) {
                 if (!hasInstalledRuntimeProfilePayload(profile)) continue;
-                if (profile.verName == null || !requested.versionName.equalsIgnoreCase(profile.verName)) continue;
-                if (!profile.isRuntimeModelCompatible(requested.runtimeModel)) continue;
-                if (profile.isProtonLike()) {
+                boolean exactVersion = profile.verName != null && requested.versionName.equalsIgnoreCase(profile.verName);
+                boolean compatiblePayload = ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(profile, requestedProfile);
+                if (!exactVersion && !compatiblePayload) continue;
+                boolean strictRuntimeModel = profile.isRuntimeModelCompatible(requested.runtimeModel);
+                if (!strictRuntimeModel && !compatiblePayload) continue;
+                if (strictRuntimeModel && profile.isProtonLike()) {
                     protonBest = pickBetterRuntimeCandidate(protonBest, profile, requested);
-                } else {
+                } else if (strictRuntimeModel) {
                     wineBest = pickBetterRuntimeCandidate(wineBest, profile, requested);
+                } else if (profile.isProtonLike()) {
+                    protonCompatibleBest = pickBetterRuntimeCandidate(protonCompatibleBest, profile, requested);
+                } else {
+                    wineCompatibleBest = pickBetterRuntimeCandidate(wineCompatibleBest, profile, requested);
                 }
             }
         }
 
         if (requested.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             if (protonBest != null) return protonBest;
+            if (protonCompatibleBest != null) return protonCompatibleBest;
         } else {
             if (wineBest != null) return wineBest;
+            if (wineCompatibleBest != null) return wineCompatibleBest;
         }
 
         ContentProfile exact = getProfileByEntryName(entryName);
-        if (exact != null && hasInstalledRuntimeProfilePayload(exact) && exact.isRuntimeModelCompatible(requested.runtimeModel)) {
+        if (exact != null
+                && hasInstalledRuntimeProfilePayload(exact)
+                && (exact.isRuntimeModelCompatible(requested.runtimeModel)
+                || ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(exact, requestedProfile))) {
             return exact;
         }
         return null;
@@ -1266,15 +1634,22 @@ public class ContentsManager {
         if (runtimeEntry != null) {
             List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(runtimeEntry.type) : null;
             if (profiles == null) return null;
+            ContentProfile requestedProfile = runtimeEntry.toProfile();
+            ContentProfile compatibleFallback = null;
 
             for (ContentProfile profile : profiles) {
                 if (profile == null) continue;
-                if (profile.verCode != runtimeEntry.versionCode) continue;
-                if (profile.verName == null || !runtimeEntry.versionName.equalsIgnoreCase(profile.verName)) continue;
-                if (!profile.isRuntimeModelCompatible(runtimeEntry.runtimeModel)) continue;
-                return profile;
+                boolean exactEntry = profile.verCode == runtimeEntry.versionCode
+                        && profile.verName != null
+                        && runtimeEntry.versionName.equalsIgnoreCase(profile.verName);
+                if (exactEntry && profile.isRuntimeModelCompatible(runtimeEntry.runtimeModel)) {
+                    return profile;
+                }
+                if (ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(profile, requestedProfile)) {
+                    compatibleFallback = pickBetterRuntimeCandidate(compatibleFallback, profile, runtimeEntry);
+                }
             }
-            return null;
+            return compatibleFallback;
         }
 
         int firstDashIndex = entryName.indexOf('-');
@@ -1544,6 +1919,65 @@ public class ContentsManager {
         return normalized.length() == 64 ? normalized : "";
     }
 
+    private void logInstallFailure(@NonNull String eventId,
+                                   @NonNull String stage,
+                                   @NonNull InstallFailedReason reason,
+                                   @Nullable ContentProfile profile,
+                                   @Nullable ContentProfile remoteHint,
+                                   @Nullable File tempRoot,
+                                   @Nullable File installPath,
+                                   @Nullable Exception error) {
+        if (context == null) return;
+        ContentProfile diagnosticProfile = profile != null ? profile : remoteHint;
+        InstalledProfileDiagnostics diagnostics = resolveInstalledProfileDiagnostics(diagnosticProfile);
+        JSONObject fields = buildInstalledProfileForensicFields(diagnostics);
+        try {
+            fields.put("reason", reason.name().toLowerCase(Locale.US));
+            fields.put("temp_root", normalizePath(tempRoot));
+            fields.put("temp_exists", tempRoot != null && tempRoot.exists() ? "1" : "0");
+            fields.put("install_path", normalizePath(installPath));
+            fields.put("install_exists", installPath != null && installPath.exists() ? "1" : "0");
+            fields.put("remote_hint_identity", remoteHint != null ? ContentProfileIdentity.describeProfile(remoteHint) : "-");
+            fields.put("remote_hint_entry", remoteHint != null ? sanitizeInstallToken(getEntryName(remoteHint)) : "-");
+            fields.put("temp_root_shape", summarizeRootShape(tempRoot, 24));
+            fields.put("runtime_payload_classifier", tempRoot != null
+                    ? ImportedContentHeuristics.describeRuntimePayload(tempRoot, diagnosticProfile, remoteHint,
+                    diagnosticProfile != null ? diagnosticProfile.artifactName : "")
+                    : "-");
+        } catch (JSONException ignored) {
+        }
+        ForensicLogger.error(
+                context,
+                eventId,
+                null,
+                stage,
+                "content_install_failed",
+                error,
+                fields
+        );
+    }
+
+    private void logContentArchiveExtraction(@NonNull String eventId,
+                                             @Nullable String importDisplayName,
+                                             @NonNull String archiveFormat,
+                                             @Nullable File rootDir) {
+        if (context == null) return;
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                eventId,
+                null,
+                "contents_import",
+                "archive_extracted",
+                ForensicLogger.fields(
+                        "file_name", importDisplayName == null ? "-" : importDisplayName,
+                        "archive_format", archiveFormat,
+                        "root_file_count", rootDir != null && rootDir.isDirectory() && rootDir.listFiles() != null ? rootDir.listFiles().length : -1,
+                        "root_shape", summarizeRootShape(rootDir, 32)
+                )
+        );
+    }
+
     private int parseVerCode(JSONObject object) {
         if (object == null) return 0;
         Object raw = object.opt("verCode");
@@ -1613,10 +2047,15 @@ public class ContentsManager {
 
     private ContentProfile findEquivalentProfile(List<ContentProfile> profiles, ContentProfile remote) {
         if (profiles == null || remote == null) return null;
+        ContentProfile runtimePayloadCompatible = null;
         for (ContentProfile profile : profiles) {
             if (profile == null) continue;
             if (profile.sameEntry(remote)) return profile;
             if (ContentProfileIdentity.areEquivalentProfiles(profile, remote)) return profile;
+            if (runtimePayloadCompatible == null
+                    && ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(profile, remote)) {
+                runtimePayloadCompatible = profile;
+            }
             if (isUpdatableLane(profile.type)
                     && profile.type == remote.type
                     && profile.verName != null
@@ -1629,6 +2068,7 @@ public class ContentsManager {
                 return profile;
             }
         }
+        if (runtimePayloadCompatible != null) return runtimePayloadCompatible;
         return null;
     }
 
@@ -1647,6 +2087,7 @@ public class ContentsManager {
             if (!profileFile.isFile()) continue;
             ContentProfile profile = normalizeImportedProfile(readProfile(profileFile), null);
             if (profile == null || !profile.isWineProtonFamily()) continue;
+            classifyRuntimeProfileFromPayload(installRoot, profile);
             File normalizedRoot = migrateRuntimeInstallRoot(installRoot, getInstallDir(context, profile));
             postProcessWineRuntimeInstall(normalizedRoot, profile);
             persistProfileMetadata(new File(normalizedRoot, PROFILE_NAME), profile);
@@ -1657,12 +2098,23 @@ public class ContentsManager {
 
     @Nullable
     private InstalledRuntimeRoot findEquivalentInstalledRuntimeRoot(@Nullable ContentProfile requestedProfile) {
-        if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
-        File sharedRuntimeDir = ImageFs.find(context).getOptDir();
-        File[] installedRoots = sharedRuntimeDir.listFiles();
-        if (installedRoots == null) return null;
+        return findEquivalentInstalledRuntimeRoot(requestedProfile, true);
+    }
 
-        InstalledRuntimeRoot best = null;
+    @Nullable
+    private InstalledRuntimeRoot findEquivalentInstalledRuntimeRoot(@Nullable ContentProfile requestedProfile,
+                                                                   boolean logResult) {
+        if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
+        List<File> installedRoots = getInstalledRootsForType(requestedProfile.type);
+        if (installedRoots == null || installedRoots.isEmpty()) {
+            if (logResult) {
+                logEquivalentRuntimeLookup(requestedProfile, null, 0, 0);
+            }
+            return null;
+        }
+
+        InstalledRuntimeRoot bestStrict = null;
+        InstalledRuntimeRoot bestCompatible = null;
         int scannedRoots = 0;
         int matchedRoots = 0;
         for (File installRoot : installedRoots) {
@@ -1673,15 +2125,26 @@ public class ContentsManager {
 
             ContentProfile installedProfile = normalizeImportedProfile(readProfile(profileFile), requestedProfile);
             if (installedProfile == null || !installedProfile.isWineProtonFamily()) continue;
-            if (!ContentProfileIdentity.areEquivalentProfiles(installedProfile, requestedProfile)) continue;
+            classifyRuntimeProfileFromPayload(installRoot, installedProfile, requestedProfile, requestedProfile.artifactName);
+            boolean strictMatch = ContentProfileIdentity.areEquivalentProfiles(installedProfile, requestedProfile);
+            boolean compatiblePayload = strictMatch
+                    || ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(installedProfile, requestedProfile);
+            if (!compatiblePayload) continue;
 
             matchedRoots++;
             InstalledRuntimeRoot candidate = new InstalledRuntimeRoot(installRoot, installedProfile);
-            if (shouldPreferInstalledRuntimeRoot(candidate, best)) {
-                best = candidate;
+            if (strictMatch) {
+                if (shouldPreferInstalledRuntimeRoot(candidate, bestStrict)) {
+                    bestStrict = candidate;
+                }
+            } else if (shouldPreferInstalledRuntimeRoot(candidate, bestCompatible)) {
+                bestCompatible = candidate;
             }
         }
-        logEquivalentRuntimeLookup(requestedProfile, best, scannedRoots, matchedRoots);
+        InstalledRuntimeRoot best = bestStrict != null ? bestStrict : bestCompatible;
+        if (logResult) {
+            logEquivalentRuntimeLookup(requestedProfile, best, scannedRoots, matchedRoots);
+        }
         return best;
     }
 
@@ -1696,6 +2159,7 @@ public class ContentsManager {
             if (!profileFile.isFile()) continue;
             ContentProfile profile = normalizeImportedProfile(readProfile(profileFile), null);
             if (profile == null || !profile.isWineProtonFamily()) continue;
+            classifyRuntimeProfileFromPayload(installRoot, profile);
 
             File targetRoot = migrateRuntimeInstallRoot(installRoot, getInstallDir(context, profile));
             postProcessWineRuntimeInstall(targetRoot, profile);
@@ -1946,6 +2410,16 @@ public class ContentsManager {
             return new RuntimeEntryParts(type, versionName, versionCode, archHint, requestedRuntimeModel);
         }
 
+        private ContentProfile toProfile() {
+            ContentProfile profile = new ContentProfile();
+            profile.type = type;
+            profile.verName = versionName;
+            profile.verCode = versionCode;
+            profile.runtimeModel = runtimeModel;
+            profile.artifactName = versionName;
+            return profile;
+        }
+
         @Nullable
         private static RuntimeEntryParts parse(String entryName) {
             if (entryName == null || entryName.trim().isEmpty()) return null;
@@ -2005,30 +2479,36 @@ public class ContentsManager {
     }
 
     @Nullable
-    private ContentProfile synthesizeProfileFromExtractedPayload(File rootDir, ContentProfile remoteHint) {
-        if (rootDir == null || remoteHint == null || remoteHint.type == null) return null;
+    private ContentProfile synthesizeProfileFromExtractedPayload(File rootDir,
+                                                                 @Nullable ContentProfile remoteHint,
+                                                                 @Nullable String importDisplayName) {
+        if (rootDir == null) return null;
+        ContentProfile.ContentType resolvedType = ImportedContentHeuristics.inferContentType(rootDir, null, remoteHint, importDisplayName);
+        if (resolvedType == null) return null;
 
         ContentProfile profile = new ContentProfile();
-        profile.type = remoteHint.type;
-        profile.verName = remoteHint.verName;
-        profile.verCode = remoteHint.verCode;
-        profile.desc = remoteHint.desc;
-        profile.remoteUrl = remoteHint.remoteUrl;
-        profile.remoteSha256 = remoteHint.remoteSha256;
-        profile.channel = remoteHint.getChannel();
-        profile.delivery = remoteHint.getDelivery().isEmpty() ? ContentProfile.DELIVERY_REMOTE : remoteHint.getDelivery();
-        profile.displayCategory = remoteHint.getDisplayCategory();
-        profile.sourceRepo = remoteHint.sourceRepo;
-        profile.sourceFeed = remoteHint.sourceFeed;
-        profile.sourceLabel = remoteHint.sourceLabel;
-        profile.releaseTag = remoteHint.releaseTag;
-        profile.artifactName = remoteHint.artifactName;
-        profile.publishedAt = remoteHint.publishedAt;
-        profile.releaseNotes = remoteHint.releaseNotes;
-        profile.runtimeModel = remoteHint.getRuntimeModel();
-        profile.vulkanApiMin = remoteHint.vulkanApiMin;
-        profile.vulkanApiMax = remoteHint.vulkanApiMax;
-        switch (remoteHint.type) {
+        profile.type = resolvedType;
+        profile.verName = remoteHint != null ? remoteHint.verName : "";
+        profile.verCode = remoteHint != null ? remoteHint.verCode : 0;
+        profile.desc = remoteHint != null ? remoteHint.desc : "";
+        profile.remoteUrl = remoteHint != null ? remoteHint.remoteUrl : "";
+        profile.remoteSha256 = remoteHint != null ? remoteHint.remoteSha256 : "";
+        profile.channel = remoteHint != null ? remoteHint.getChannel() : ContentProfile.CHANNEL_STABLE;
+        profile.delivery = remoteHint != null && !remoteHint.getDelivery().isEmpty()
+                ? remoteHint.getDelivery()
+                : ContentProfile.DELIVERY_REMOTE;
+        profile.displayCategory = remoteHint != null ? remoteHint.getDisplayCategory() : "";
+        profile.sourceRepo = remoteHint != null ? remoteHint.sourceRepo : "";
+        profile.sourceFeed = remoteHint != null ? remoteHint.sourceFeed : "";
+        profile.sourceLabel = remoteHint != null ? remoteHint.sourceLabel : "";
+        profile.releaseTag = remoteHint != null ? remoteHint.releaseTag : "";
+        profile.artifactName = remoteHint != null ? remoteHint.artifactName : importDisplayName;
+        profile.publishedAt = remoteHint != null ? remoteHint.publishedAt : "";
+        profile.releaseNotes = remoteHint != null ? remoteHint.releaseNotes : "";
+        profile.runtimeModel = ImportedContentHeuristics.inferRuntimeModel(rootDir, profile, remoteHint, importDisplayName);
+        profile.vulkanApiMin = remoteHint != null ? remoteHint.vulkanApiMin : 0;
+        profile.vulkanApiMax = remoteHint != null ? remoteHint.vulkanApiMax : 0;
+        switch (resolvedType) {
             case CONTENT_TYPE_DXVK -> profile.fileList = synthesizeDxvkFiles(rootDir);
             case CONTENT_TYPE_VKD3D -> profile.fileList = synthesizeVkd3dFiles(rootDir);
             case CONTENT_TYPE_DGVOODOO -> profile.fileList = synthesizeDgVoodooFiles(rootDir);
@@ -2044,8 +2524,9 @@ public class ContentsManager {
         boolean hasPayloadFiles = profile.fileList != null && !profile.fileList.isEmpty();
         if (!hasPayloadFiles && !profile.isWineProtonFamily()) return null;
         if (profile.verName == null || profile.verName.trim().isEmpty()) {
-            profile.verName = deriveVersionNameFromUrl(profile.remoteUrl);
+            profile.verName = ImportedContentHeuristics.deriveVersionName(importDisplayName, resolvedType, deriveVersionNameFromUrl(profile.remoteUrl));
         }
+        if (profile.verCode <= 0) profile.verCode = 1;
         return profile;
     }
 
@@ -2107,17 +2588,18 @@ public class ContentsManager {
         return writeProfileSnapshot(rootDir, profile);
     }
 
-    private void normalizeExtractedImportRoot(File rootDir, @Nullable ContentProfile remoteHint) {
+    private void normalizeExtractedImportRoot(File rootDir,
+                                              @Nullable ContentProfile remoteHint,
+                                              @Nullable String importDisplayName) {
         if (rootDir == null || !rootDir.isDirectory()) return;
         File candidate = rootDir;
         for (int depth = 0; depth < 4; depth++) {
             File next = singleNestedDirectory(candidate);
             if (next == null) break;
-            boolean nestedHasRuntime = remoteHint != null
-                    && remoteHint.isWineProtonFamily()
-                    && WineUtils.hasRuntimePayload(next);
+            boolean nestedHasRuntime = WineUtils.hasRuntimePayload(next);
             boolean nestedHasProfile = new File(next, PROFILE_NAME).isFile();
-            if (!nestedHasRuntime && !nestedHasProfile) break;
+            boolean nestedHasRecoverablePayload = ImportedContentHeuristics.hasRecoverablePayload(next, null, remoteHint, importDisplayName);
+            if (!nestedHasRuntime && !nestedHasProfile && !nestedHasRecoverablePayload) break;
             if (!promoteNestedDirectory(rootDir, next)) break;
             candidate = rootDir;
         }
@@ -2180,8 +2662,25 @@ public class ContentsManager {
         profile.wineBinPath = binPath;
         profile.wineLibPath = libPath;
         profile.winePrefixPack = prefixPackPath;
-        profile.runtimeModel = profile.getRuntimeModel();
+        classifyRuntimeProfileFromPayload(rootDir, profile);
         profile.fileList = new ArrayList<>();
+    }
+
+    private void classifyRuntimeProfileFromPayload(@Nullable File rootDir, @Nullable ContentProfile profile) {
+        classifyRuntimeProfileFromPayload(rootDir, profile, null, profile != null ? profile.artifactName : "");
+    }
+
+    private void classifyRuntimeProfileFromPayload(@Nullable File rootDir,
+                                                   @Nullable ContentProfile profile,
+                                                   @Nullable ContentProfile remoteHint,
+                                                   @Nullable String importDisplayName) {
+        if (rootDir == null || profile == null || !profile.isWineProtonFamily()) return;
+        String payloadModel = ImportedContentHeuristics.inferRuntimeModel(rootDir, profile, remoteHint, importDisplayName);
+        if (!payloadModel.isEmpty()) {
+            profile.runtimeModel = payloadModel;
+        } else {
+            profile.runtimeModel = profile.getRuntimeModel();
+        }
     }
 
     @Nullable
@@ -2249,14 +2748,19 @@ public class ContentsManager {
     @Nullable
     private ContentProfile repairImportedProfile(File rootDir,
                                                  @Nullable ContentProfile parsedProfile,
-                                                 @Nullable ContentProfile remoteHint) {
+                                                 @Nullable ContentProfile remoteHint,
+                                                 @Nullable String importDisplayName) {
         ContentProfile profile = parsedProfile != null ? parsedProfile : new ContentProfile();
-        ContentProfile.ContentType resolvedType = profile.type != null ? profile.type : remoteHint != null ? remoteHint.type : null;
+        ContentProfile.ContentType resolvedType = ImportedContentHeuristics.inferContentType(rootDir, parsedProfile, remoteHint, importDisplayName);
         if (resolvedType == null) return null;
 
         profile.type = resolvedType;
-        if ((profile.verName == null || profile.verName.trim().isEmpty()) && remoteHint != null) {
-            profile.verName = remoteHint.verName;
+        if (isBlank(profile.verName)) {
+            if (remoteHint != null && !isBlank(remoteHint.verName)) {
+                profile.verName = remoteHint.verName;
+            } else {
+                profile.verName = ImportedContentHeuristics.deriveVersionName(importDisplayName, resolvedType, deriveVersionNameFromUrl(profile.remoteUrl));
+            }
         }
         boolean preferRemoteVersionCode = parsedProfile == null
                 || (resolvedType != ContentProfile.ContentType.CONTENT_TYPE_WINE
@@ -2264,16 +2768,18 @@ public class ContentsManager {
         if (preferRemoteVersionCode && profile.verCode <= 0 && remoteHint != null && remoteHint.verCode > 0) {
             profile.verCode = remoteHint.verCode;
         }
+        if (profile.verCode <= 0) profile.verCode = 1;
         if ((profile.desc == null || profile.desc.trim().isEmpty()) && remoteHint != null) {
             profile.desc = remoteHint.desc;
         }
         if (profile.fileList == null) {
             profile.fileList = new ArrayList<>();
         }
+        classifyRuntimeProfileFromPayload(rootDir, profile, remoteHint, importDisplayName);
 
         if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-            repairWineFamilyProfile(rootDir, profile);
+            repairWineFamilyProfile(rootDir, profile, remoteHint, importDisplayName);
             if (isBlank(profile.wineBinPath) || isBlank(profile.wineLibPath) || isBlank(profile.winePrefixPack)) {
                 return null;
             }
@@ -2294,12 +2800,16 @@ public class ContentsManager {
         return profile;
     }
 
-    private void repairWineFamilyProfile(File rootDir, ContentProfile profile) {
+    private void repairWineFamilyProfile(File rootDir,
+                                         ContentProfile profile,
+                                         @Nullable ContentProfile remoteHint,
+                                         @Nullable String importDisplayName) {
         if (rootDir == null || profile == null || !profile.isWineProtonFamily()) return;
         if (isBlank(profile.wineBinPath) || isBlank(profile.wineLibPath) || isBlank(profile.winePrefixPack)
                 || !hasResolvedRuntimePayload(rootDir, profile)) {
             synthesizeWineFamilyProfile(rootDir, profile);
         }
+        classifyRuntimeProfileFromPayload(rootDir, profile, remoteHint, importDisplayName);
         if (profile.fileList == null) {
             profile.fileList = new ArrayList<>();
         }
@@ -2360,6 +2870,10 @@ public class ContentsManager {
                         "remote_ver_name", remoteHint != null ? remoteHint.verName : "-",
                         "detected_type", profile != null && profile.type != null ? profile.type.toString() : "-",
                         "detected_ver_name", profile != null ? profile.verName : "-",
+                        "detected_runtime_model", profile != null ? profile.getRuntimeModel() : "-",
+                        "runtime_payload_classifier", ImportedContentHeuristics.describeRuntimePayload(rootDir, profile, remoteHint,
+                                profile != null ? profile.artifactName : ""),
+                        "root_shape", summarizeRootShape(rootDir, 32),
                         "root_file_count", rootDir != null && rootDir.isDirectory() && rootDir.listFiles() != null ? rootDir.listFiles().length : -1,
                         "has_profile_json", rootDir != null && new File(rootDir, PROFILE_NAME).isFile(),
                         "has_runtime_payload", profile != null && profile.isWineProtonFamily() && hasResolvedRuntimePayload(rootDir, profile),
@@ -2414,6 +2928,31 @@ public class ContentsManager {
         );
     }
 
+    private void logRuntimeInstallRootResolution(@Nullable ContentProfile requestedProfile,
+                                                 @Nullable ContentProfile installedProfile,
+                                                 @Nullable File resolvedRoot,
+                                                 @Nullable File canonicalRoot,
+                                                 @NonNull String action) {
+        if (context == null || requestedProfile == null) return;
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "CONTENTS_RUNTIME_INSTALL_ROOT_RECONCILED",
+                null,
+                "contents",
+                "runtime_install_root_reconciled",
+                ForensicLogger.fields(
+                        "requested_ver_name", requestedProfile.verName == null ? "-" : requestedProfile.verName,
+                        "requested_identity", ContentProfileIdentity.describeProfile(requestedProfile),
+                        "installed_ver_name", installedProfile != null && installedProfile.verName != null ? installedProfile.verName : "-",
+                        "installed_identity", installedProfile != null ? ContentProfileIdentity.describeProfile(installedProfile) : "-",
+                        "resolved_root", resolvedRoot != null ? resolvedRoot.getAbsolutePath() : "-",
+                        "canonical_root", canonicalRoot != null ? canonicalRoot.getAbsolutePath() : "-",
+                        "action", action
+                )
+        );
+    }
+
     private void logRuntimeAliasAccepted(@Nullable ContentProfile profile,
                                          @Nullable ContentProfile remoteHint) {
         if (context == null || profile == null || remoteHint == null) return;
@@ -2435,6 +2974,15 @@ public class ContentsManager {
 
     private boolean isBlank(@Nullable String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    @NonNull
+    private String resolveImportDisplayName(@Nullable Uri uri) {
+        if (uri == null || context == null) return "";
+        String displayName = FileUtils.getUriFileName(context, uri);
+        if (displayName != null && !displayName.trim().isEmpty()) return displayName.trim();
+        String lastPathSegment = uri.getLastPathSegment();
+        return lastPathSegment == null ? "" : FileUtils.getName(lastPathSegment);
     }
 
     private List<ContentProfile.ContentFile> synthesizeFexCoreFiles(File rootDir) {
@@ -2602,6 +3150,25 @@ public class ContentsManager {
         String relative = filePath.substring(rootPath.length()).replace('\\', '/');
         while (relative.startsWith("/")) relative = relative.substring(1);
         return relative;
+    }
+
+    private static String normalizePath(@Nullable File file) {
+        return file != null ? file.getAbsolutePath() : "-";
+    }
+
+    private static String summarizeRootShape(@Nullable File rootDir, int limit) {
+        if (rootDir == null || !rootDir.isDirectory()) return "-";
+        File[] children = rootDir.listFiles();
+        if (children == null || children.length == 0) return "";
+        ArrayList<String> names = new ArrayList<>();
+        int max = Math.max(1, limit);
+        for (File child : children) {
+            if (child == null) continue;
+            names.add(child.getName() + (child.isDirectory() ? "/" : ""));
+            if (names.size() >= max) break;
+        }
+        if (children.length > names.size()) names.add("+" + (children.length - names.size()) + "_more");
+        return String.join(",", names);
     }
 
     private String resolveArchHint(ContentProfile profile) {

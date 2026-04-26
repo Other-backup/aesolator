@@ -64,6 +64,9 @@ public class PreloaderDialog {
         if (isShowing()) return;
         close();
         if (dialog == null) create();
+        if (!UiLifecycleGuard.canShowDialog(activity, "PreloaderDialog", "show")) {
+            return;
+        }
         TextView textView = dialog.findViewById(R.id.TextView);
         if (textView != null) {
             textView.setText(textResId);

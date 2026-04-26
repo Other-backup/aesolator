@@ -25,6 +25,24 @@ PFN_vkDestroyInstance destroyInstance;
 
 static void *vulkan_handle = NULL;
 
+static void preload_vendor_icd_deps(void) {
+    /*
+     * Some OEM Vulkan ICDs are loaded later by Android's Vulkan loader while
+     * still expecting OpenSSL symbols from an already-global dependency.
+     */
+    const char *candidates[] = {
+            "libcrypto.so",
+            NULL,
+    };
+
+    for (int i = 0; candidates[i]; i++) {
+        void *handle = dlopen(candidates[i], RTLD_GLOBAL | RTLD_NOW);
+        if (handle) {
+            printf("Preloaded Vulkan ICD dependency %s", candidates[i]);
+            return;
+        }
+    }
+}
 
 static char *get_native_library_dir(JNIEnv *env, jobject context) {
     char *native_libdir = NULL;
@@ -108,6 +126,7 @@ static char *get_library_name(JNIEnv *env, jobject context, const char *driver_n
 }
 
 static void init_original_vulkan() {
+    preload_vendor_icd_deps();
     vulkan_handle = dlopen("/system/lib64/libvulkan.so", RTLD_LOCAL | RTLD_NOW);
 }
 

@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 public class TarCompressorUtilsTest {
@@ -53,5 +54,22 @@ public class TarCompressorUtilsTest {
         assertEquals("nested/file.txt", TarCompressorUtils.stripTopLevelDirectory("package-1.0/nested/file.txt", "package-1.0/"));
         assertEquals("nested/file.txt", TarCompressorUtils.stripTopLevelDirectory("./package[1]/nested/file.txt", "package[1]"));
         assertEquals("other/file.txt", TarCompressorUtils.stripTopLevelDirectory("other/file.txt", "package-1.0"));
+    }
+
+    @Test
+    public void extractXzFilePathKeepsSafeTarContractWithNativeFallback() throws Exception {
+        File sourceRoot = Files.createTempDirectory("ae-xz-source").toFile();
+        File payload = new File(sourceRoot, "payload.txt");
+        Files.write(payload.toPath(), "native-xz-contract".getBytes(StandardCharsets.UTF_8));
+        File archive = File.createTempFile("ae-xz-archive", ".txz");
+        File destination = Files.createTempDirectory("ae-xz-destination").toFile();
+
+        TarCompressorUtils.compress(TarCompressorUtils.Type.XZ, payload, archive, 6);
+
+        assertTrue(TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, archive, destination));
+        assertEquals(
+                "native-xz-contract",
+                new String(Files.readAllBytes(new File(destination, "payload.txt").toPath()), StandardCharsets.UTF_8)
+        );
     }
 }

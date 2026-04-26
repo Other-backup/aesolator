@@ -68,6 +68,9 @@ public class DownloadProgressDialog {
         if (isShowing()) return;
         close();
         if (dialog == null) create();
+        if (!UiLifecycleGuard.canShowDialog(activity, "DownloadProgressDialog", "show")) {
+            return;
+        }
 
         if (textResId > 0) ((TextView)dialog.findViewById(R.id.TextView)).setText(textResId);
 

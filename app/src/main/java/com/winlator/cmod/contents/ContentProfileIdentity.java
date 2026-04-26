@@ -36,6 +36,14 @@ final class ContentProfileIdentity {
         return !isRemoteProfileIdentityMismatch(left, right);
     }
 
+    static boolean areRuntimePayloadCompatibleProfiles(@Nullable ContentProfile left, @Nullable ContentProfile right) {
+        if (left == null || right == null || left.type == null || right.type == null) return false;
+        if (!left.isWineProtonFamily() || !right.isWineProtonFamily()) return false;
+        if (!runtimeFamilyKindMatches(left, right)) return false;
+        if (!runtimeArchMatches(left, right)) return false;
+        return runtimeVersionMatches(left, right);
+    }
+
     static boolean isRuntimeAliasEquivalent(@Nullable ContentProfile left, @Nullable ContentProfile right) {
         if (left == null || right == null) return false;
         if (!left.isWineProtonFamily() || !right.isWineProtonFamily()) return false;
@@ -141,7 +149,7 @@ final class ContentProfileIdentity {
     private static boolean rollingBleedingEdgeAliasMatches(@Nullable ContentProfile concreteProfile,
                                                            @Nullable ContentProfile aliasProfile) {
         String concreteVersion = concreteProfile == null ? "" : normalizeRuntimeVersionToken(concreteProfile.verName);
-        if (!concreteVersion.matches("^[0-9]+(?:\\.[0-9]+)*\\.99-(arm64ec|arm64|x86_64|x86)$")) return false;
+        if (!concreteVersion.matches("^[0-9]+(?:\\.[0-9]+)*\\.99-(arm64ec|arm64|x86_64|x86)(?:-.+)?$")) return false;
         String aliasSurface = buildAliasSurface(aliasProfile);
         if (!aliasSurface.contains("bleeding-edge")) return false;
         String concreteArch = trailingArchToken(concreteVersion);
@@ -163,6 +171,11 @@ final class ContentProfileIdentity {
         return leftModel.isEmpty() || rightModel.isEmpty() || leftModel.equals(rightModel);
     }
 
+    private static boolean runtimeFamilyKindMatches(ContentProfile left, ContentProfile right) {
+        if (left.type == right.type) return true;
+        return left.isProtonLike() == right.isProtonLike();
+    }
+
     private static boolean runtimeArchMatches(ContentProfile left, ContentProfile right) {
         String leftArch = resolveRuntimeArchHint(left);
         String rightArch = resolveRuntimeArchHint(right);
@@ -179,10 +192,11 @@ final class ContentProfileIdentity {
     }
 
     private static String trailingArchToken(String normalizedVersion) {
-        if (normalizedVersion.endsWith("-arm64ec")) return "arm64ec";
-        if (normalizedVersion.endsWith("-x86_64")) return "x86_64";
-        if (normalizedVersion.endsWith("-arm64")) return "arm64";
-        if (normalizedVersion.endsWith("-x86")) return "x86";
+        String normalized = normalizedIdentityToken(normalizedVersion);
+        if (normalized.matches(".*-arm64ec(?:-.+)?$")) return "arm64ec";
+        if (normalized.matches(".*-x86_64(?:-.+)?$")) return "x86_64";
+        if (normalized.matches(".*-arm64(?:-.+)?$")) return "arm64";
+        if (normalized.matches(".*-x86(?:-.+)?$")) return "x86";
         return "";
     }
 

@@ -39,6 +39,7 @@ import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.LaunchSecurity;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerData;
@@ -314,10 +315,14 @@ public class MainActivity extends AppCompatActivity {
             showHomeDashboard(false);
             return;
         }
-        getSupportFragmentManager().beginTransaction()
+        UiLifecycleGuard.commit(
+                this,
+                getSupportFragmentManager().beginTransaction()
                 .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
-                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
-                .commit();
+                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment()),
+                "MainActivity",
+                "open_new_container_flow"
+        );
         View contentRoot = findViewById(android.R.id.content);
         if (contentRoot != null) {
             contentRoot.post(() -> {
@@ -348,15 +353,23 @@ public class MainActivity extends AppCompatActivity {
     private void show(Fragment fragment, boolean reverse) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         if (reverse) {
-            fragmentManager.beginTransaction()
+            UiLifecycleGuard.commit(
+                    this,
+                    fragmentManager.beginTransaction()
                     .setCustomAnimations(R.anim.slide_in_down, R.anim.slide_out_up)
-                    .replace(R.id.FLFragmentContainer, fragment)
-                    .commit();
+                    .replace(R.id.FLFragmentContainer, fragment),
+                    "MainActivity",
+                    "show_fragment_reverse"
+            );
         } else {
-            fragmentManager.beginTransaction()
+            UiLifecycleGuard.commit(
+                    this,
+                    fragmentManager.beginTransaction()
                     .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
-                    .replace(R.id.FLFragmentContainer, fragment)
-                    .commit();
+                    .replace(R.id.FLFragmentContainer, fragment),
+                    "MainActivity",
+                    "show_fragment_forward"
+            );
         }
 
         View contentRoot = findViewById(android.R.id.content);
@@ -590,10 +603,14 @@ public class MainActivity extends AppCompatActivity {
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
         Fragment replacement = createFreshInstanceForCurrentFragment(current);
         if (replacement != null) {
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.FLFragmentContainer, replacement)
-                    .commit();
+            UiLifecycleGuard.commit(
+                    this,
+                    getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.FLFragmentContainer, replacement),
+                    "MainActivity",
+                    "apply_theme_mode_live"
+            );
         }
 
         Runnable finishThemeApply = () -> {

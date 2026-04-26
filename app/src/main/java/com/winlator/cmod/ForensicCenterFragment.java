@@ -37,6 +37,7 @@ import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.ForensicIssueComposer;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.widget.LogView;
 
@@ -747,8 +748,7 @@ public class ForensicCenterFragment extends Fragment {
             final boolean finalSuccess = success;
             final int finalExitCode = exitCode;
             final String finalOutput = output;
-            if (!isAdded() || getActivity() == null) return;
-            requireActivity().runOnUiThread(() -> {
+            UiLifecycleGuard.runOnUiThread(this, () -> {
                 preloaderDialog.closeOnUiThread();
                 if (finalSuccess) {
                     String location = "/sdcard/Winlator/forensics/issue-bundles";
@@ -786,7 +786,7 @@ public class ForensicCenterFragment extends Fragment {
                             "capture_summary", ForensicConfig.buildCaptureSummary(context, snapshot)
                         )
                 );
-            });
+            }, "ForensicCenterFragment", "root_capture_result");
         });
     }
 
@@ -842,9 +842,8 @@ public class ForensicCenterFragment extends Fragment {
                         + "&body="
                         + Uri.encode(body);
 
-                if (!isAdded() || getActivity() == null) return;
                 String finalBody = body;
-                requireActivity().runOnUiThread(() -> {
+                UiLifecycleGuard.runOnUiThread(this, () -> {
                     preloaderDialog.closeOnUiThread();
                     Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     startActivity(browser);
@@ -862,10 +861,9 @@ public class ForensicCenterFragment extends Fragment {
                                     "issue_body_chars", finalBody.length()
                             )
                     );
-                });
+                }, "ForensicCenterFragment", "forensic_issue_prepared");
             } catch (Exception error) {
-                if (!isAdded() || getActivity() == null) return;
-                requireActivity().runOnUiThread(() -> {
+                UiLifecycleGuard.runOnUiThread(this, () -> {
                     preloaderDialog.closeOnUiThread();
                     AppUtils.showToast(context, R.string.diagnostics_forensic_report_failed);
                     ForensicLogger.logEvent(
@@ -877,7 +875,7 @@ public class ForensicCenterFragment extends Fragment {
                             "forensic_report_failed",
                             ForensicLogger.fields("error", String.valueOf(error.getMessage()))
                     );
-                });
+                }, "ForensicCenterFragment", "forensic_issue_failed");
             }
         });
     }

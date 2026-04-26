@@ -1,5 +1,6 @@
 package com.winlator.cmod.xserver;
 
+import android.graphics.Rect;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -366,6 +367,12 @@ public class Window extends XResource {
             window = window.parent;
         }
         return rootY;
+    }
+
+    public Rect getAbsoluteBounds() {
+        short rootX = getRootX();
+        short rootY = getRootY();
+        return new Rect(rootX, rootY, rootX + width, rootY + height);
     }
 
     public Window getAncestorWithEventMask(Bitmask eventMask) {

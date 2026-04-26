@@ -52,13 +52,21 @@ public abstract class ImageFsInstaller {
             {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
             {"libaero_android_sysvshm.so", "libandroid-sysvshm.so"},
             {"libaero_evshim.so", "libevshim.so"},
-            {"libdummyvk.so", "libdummyvk.so"}
+            {"libaero_fakeinput.so", "libfakeinput.so"},
+            {"libdummyvk.so", "libdummyvk.so"},
+            {"libc++_shared.so", "libc++_shared.so"}
     };
     private static final String[][] APP_NATIVE_ANDROID_HOST_LIBS = {
             {"libaero_redirect_bionic.so", "libredirect-bionic.so"},
             {"libaero_android_sysvshm.so", "libandroid-sysvshm.so"},
             {"libaero_evshim.so", "libevshim.so"},
-            {"libdummyvk.so", "libdummyvk.so"}
+            {"libdummyvk.so", "libdummyvk.so"},
+            {"libc++_shared.so", "libc++_shared.so"}
+    };
+    private static final String[] VULKAN_MANIFEST_DIRS = {
+            "usr/share/vulkan/icd.d",
+            "usr/share/vulkan/implicit_layer.d",
+            "usr/share/vulkan/explicit_layer.d"
     };
     private static final String ROOTFS_PRIMARY_BASE_URL = "https://downloads.gamenative.app/";
     private static final String ROOTFS_FALLBACK_BASE_URL = "https://pub-9fcd5294bd0d4b85a9d73615bf98f3b5.r2.dev/";
@@ -140,7 +148,11 @@ public abstract class ImageFsInstaller {
     public static boolean isInstallRequired(Context context, Container container, String requestedRuntimeModel) {
         ImageFs imageFs = ImageFs.find(context);
         String requestedVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
-        boolean variantMismatch = !imageFs.getVariant().isEmpty() && !requestedVariant.equalsIgnoreCase(imageFs.getVariant());
+        boolean universalGameNativeRootfs = imageFs.isGameNativeRootfs()
+                && GLIBC_IMAGEFS_ARCHIVE.equals(BIONIC_IMAGEFS_ARCHIVE);
+        boolean variantMismatch = !universalGameNativeRootfs
+                && !imageFs.getVariant().isEmpty()
+                && !requestedVariant.equalsIgnoreCase(imageFs.getVariant());
         return !imageFs.isValid()
                 || imageFs.getVersion() < LATEST_VERSION
                 || variantMismatch;
@@ -521,12 +533,17 @@ public abstract class ImageFsInstaller {
         chmodIfExists(new File(rootDir, "usr/lib/libredirect-bionic.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libandroid-sysvshm.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libevshim.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/libfakeinput.so"));
         chmodIfExists(new File(rootDir, "usr/lib/libdummyvk.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/libc++_shared.so"));
         chmodIfExists(new File(rootDir, "usr/lib/android-host/libredirect-bionic.so"));
         chmodIfExists(new File(rootDir, "usr/lib/android-host/libandroid-sysvshm.so"));
         chmodIfExists(new File(rootDir, "usr/lib/android-host/libevshim.so"));
         chmodIfExists(new File(rootDir, "usr/lib/android-host/libdummyvk.so"));
+        chmodIfExists(new File(rootDir, "usr/lib/android-host/libc++_shared.so"));
         chmodTree(new File(rootDir, "usr/lib/android-host"), 0755);
+        int removedVulkanResidue = sanitizeVulkanManifestResidue(context, rootDir);
+        logVulkanRuntimeClosure(context, ImageFs.find(rootDir), removedVulkanResidue);
         chmodIfExists(new File(rootDir, "generate_interfaces_file.exe"));
         chmodIfExists(new File(rootDir, "Steamless/Steamless.CLI.exe"));
         chmodIfExists(new File(rootDir, "opt/mono-gecko-offline/wine-mono-11.0.0-x86.msi"));
@@ -717,13 +734,109 @@ public abstract class ImageFsInstaller {
         chmodIfExists(new File(guestLibDir, "libredirect-bionic.so"));
         chmodIfExists(new File(guestLibDir, "libandroid-sysvshm.so"));
         chmodIfExists(new File(guestLibDir, "libevshim.so"));
+        chmodIfExists(new File(guestLibDir, "libfakeinput.so"));
         chmodIfExists(new File(guestLibDir, "libdummyvk.so"));
+        chmodIfExists(new File(guestLibDir, "libc++_shared.so"));
         File hostLibDir = imageFs.getAndroidHostLibDir();
         chmodIfExists(new File(hostLibDir, "libredirect-bionic.so"));
         chmodIfExists(new File(hostLibDir, "libandroid-sysvshm.so"));
         chmodIfExists(new File(hostLibDir, "libevshim.so"));
         chmodIfExists(new File(hostLibDir, "libdummyvk.so"));
+        chmodIfExists(new File(hostLibDir, "libc++_shared.so"));
+        int removedVulkanResidue = sanitizeVulkanManifestResidue(context, rootDir);
         ensureImageFsLibraryRunpathSanitized(imageFs);
+        logVulkanRuntimeClosure(context, imageFs, removedVulkanResidue);
+    }
+
+    private static int sanitizeVulkanManifestResidue(Context context, File rootDir) {
+        if (context == null || rootDir == null || !rootDir.isDirectory()) return 0;
+        int removed = 0;
+        for (String relativeDir : VULKAN_MANIFEST_DIRS) {
+            File manifestDir = new File(rootDir, relativeDir);
+            removed += deleteVulkanManifestResidue(manifestDir);
+        }
+        return removed;
+    }
+
+    private static int deleteVulkanManifestResidue(File directory) {
+        if (directory == null || !directory.isDirectory()) return 0;
+        int removed = 0;
+        File[] children = directory.listFiles();
+        if (children == null) return 0;
+        for (File child : children) {
+            if (child == null) continue;
+            if (child.isDirectory()) {
+                removed += deleteVulkanManifestResidue(child);
+                continue;
+            }
+            String name = child.getName();
+            if (name.startsWith("._") || ".DS_Store".equals(name)) {
+                if (FileUtils.delete(child)) removed++;
+            }
+        }
+        return removed;
+    }
+
+    private static int countVulkanManifestResidue(File rootDir) {
+        if (rootDir == null || !rootDir.isDirectory()) return 0;
+        int count = 0;
+        for (String relativeDir : VULKAN_MANIFEST_DIRS) {
+            count += countVulkanManifestResidueInDir(new File(rootDir, relativeDir));
+        }
+        return count;
+    }
+
+    private static int countVulkanManifestResidueInDir(File directory) {
+        if (directory == null || !directory.isDirectory()) return 0;
+        int count = 0;
+        File[] children = directory.listFiles();
+        if (children == null) return 0;
+        for (File child : children) {
+            if (child == null) continue;
+            if (child.isDirectory()) {
+                count += countVulkanManifestResidueInDir(child);
+                continue;
+            }
+            String name = child.getName();
+            if (name.startsWith("._") || ".DS_Store".equals(name)) count++;
+        }
+        return count;
+    }
+
+    private static void logVulkanRuntimeClosure(Context context, ImageFs imageFs, int removedVulkanResidue) {
+        if (context == null || imageFs == null || imageFs.getRootDir() == null) return;
+        File rootDir = imageFs.getRootDir();
+        File guestLibDir = imageFs.getLibDir();
+        File hostLibDir = imageFs.getAndroidHostLibDir();
+        File wrapperIcd = new File(rootDir, "usr/share/vulkan/icd.d/wrapper_icd.aarch64.json");
+        File wrapperLib = new File(guestLibDir, "libvulkan_wrapper.so");
+        File guestLibcxx = new File(guestLibDir, "libc++_shared.so");
+        File hostLibcxx = new File(hostLibDir, "libc++_shared.so");
+        String nativeLibDir = AppUtils.getNativeLibDir(context);
+        File nativeLibcxx = nativeLibDir == null || nativeLibDir.trim().isEmpty()
+                ? null
+                : new File(nativeLibDir, "libc++_shared.so");
+        int remainingVulkanResidue = countVulkanManifestResidue(rootDir);
+
+        ForensicLogger.logEvent(
+                context,
+                remainingVulkanResidue == 0 && (!wrapperLib.isFile() || guestLibcxx.isFile()) ? "info" : "warn",
+                "VULKAN_ROOTFS_RUNTIME_CLOSURE",
+                null,
+                "rootfs",
+                "vulkan_rootfs_runtime_closure",
+                ForensicLogger.fields(
+                        "wrapper_icd_present", wrapperIcd.isFile(),
+                        "wrapper_icd_path", wrapperIcd.getAbsolutePath(),
+                        "wrapper_lib_present", wrapperLib.isFile(),
+                        "wrapper_lib_path", wrapperLib.getAbsolutePath(),
+                        "guest_libcxx_present", guestLibcxx.isFile(),
+                        "host_libcxx_present", hostLibcxx.isFile(),
+                        "native_libcxx_present", nativeLibcxx != null && nativeLibcxx.isFile(),
+                        "removed_vulkan_manifest_residue", removedVulkanResidue,
+                        "remaining_vulkan_manifest_residue", remainingVulkanResidue
+                )
+        );
     }
 
     public static boolean extractSupportArchive(Context context, String archiveName, TarCompressorUtils.Type type, File outputDir) {

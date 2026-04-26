@@ -4,6 +4,7 @@ import android.util.Log;
 
 import androidx.annotation.Keep;
 
+import com.winlator.cmod.core.NativeLibraryLoader;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.Texture;
 import com.winlator.cmod.xconnector.Client;
@@ -24,7 +25,7 @@ public class VirGLRendererComponent extends EnvironmentComponent implements Conn
     private long sharedEGLContextPtr;
 
     static {
-        System.loadLibrary("virglbridge");
+        NativeLibraryLoader.ensureLoaded("virglbridge", "VirGLRendererComponent");
     }
 
     public VirGLRendererComponent(XServer xServer, UnixSocketConfig socketConfig) {

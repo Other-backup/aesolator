@@ -37,6 +37,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.widget.MultiSelectionComboBox;
 
 import java.util.ArrayList;
@@ -123,6 +124,9 @@ public class ContentDialog extends Dialog {
 
     @Override
     public void show() {
+        if (!UiLifecycleGuard.canShowDialog(getContext(), "ContentDialog", "show")) {
+            return;
+        }
         super.show();
         if (runtimeSurfaceMode) applyRuntimeSurfaceStyle();
         View dialogSurface = inflatedLayout != null ? inflatedLayout : contentView;

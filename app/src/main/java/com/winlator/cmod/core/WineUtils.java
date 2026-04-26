@@ -189,6 +189,29 @@ public abstract class WineUtils {
         return resolveExistingFile(runtimeRootDir, RUNTIME_PREFIX_PACK_CANDIDATES);
     }
 
+    public static boolean isRegistryFileValid(File regFile) {
+        if (regFile == null || !regFile.isFile() || regFile.length() < 24) return false;
+        String contents = FileUtils.readString(regFile);
+        if (contents == null) return false;
+
+        String normalized = contents.trim();
+        return normalized.startsWith("WINE REGISTRY Version");
+    }
+
+    public static boolean isPrefixValid(File containerDir) {
+        if (containerDir == null) return false;
+
+        File prefixDir = new File(containerDir, ".wine");
+        File systemRegFile = new File(prefixDir, "system.reg");
+        File userRegFile = new File(prefixDir, "user.reg");
+        File windowsDir = new File(prefixDir, "drive_c/windows");
+
+        return prefixDir.isDirectory()
+                && windowsDir.isDirectory()
+                && isRegistryFileValid(systemRegFile)
+                && isRegistryFileValid(userRegFile);
+    }
+
     public static String extractWindowsCommandPath(String command) {
         return parseWindowsCommand(command).commandPath;
     }
@@ -584,6 +607,48 @@ public abstract class WineUtils {
             String preferredGraphicsDriver = resolvePreferredGraphicsDriver(runtimeRootDir, wineInfo);
             if (!preferredGraphicsDriver.isEmpty()) {
                 ensureGraphicsDriverRegistry(rootDir, preferredGraphicsDriver);
+            }
+        }
+
+        copyWineDllsToContainer(rootDir, wineInfo);
+    }
+
+    private static void copyWineDllsToContainer(File rootDir, WineInfo wineInfo) {
+        if (rootDir == null || wineInfo == null || wineInfo.path == null || wineInfo.path.trim().isEmpty()) return;
+
+        File runtimeRootDir = new File(wineInfo.path);
+        File runtimeWineLibDir = resolveRuntimeWineLibDir(runtimeRootDir);
+        if (runtimeWineLibDir == null) return;
+
+        File wineSystem32Dir = new File(runtimeWineLibDir, wineInfo.usesAarch64WindowsTree() ? "aarch64-windows" : "x86_64-windows");
+        File wineSysWow64Dir = new File(runtimeWineLibDir, "i386-windows");
+        File prefixDir = resolveHostWinePrefixDir(rootDir);
+        File containerSystem32Dir = new File(prefixDir, "drive_c/windows/system32");
+        File containerSysWow64Dir = new File(prefixDir, "drive_c/windows/syswow64");
+
+        if (!containerSystem32Dir.isDirectory()) containerSystem32Dir.mkdirs();
+        if (wineInfo.isWin64() && !containerSysWow64Dir.isDirectory()) containerSysWow64Dir.mkdirs();
+
+        String[] names = {
+                "user32.dll",
+                "shell32.dll",
+                "winemenubuilder.exe",
+                "explorer.exe"
+        };
+
+        boolean win64 = wineInfo.isWin64();
+        for (String name : names) {
+            File src32 = new File(wineSysWow64Dir, name);
+            File dst32 = new File(win64 ? containerSysWow64Dir : containerSystem32Dir, name);
+            if (src32.isFile()) {
+                FileUtils.copy(src32, dst32);
+            }
+            if (!win64) continue;
+
+            File src64 = new File(wineSystem32Dir, name);
+            File dst64 = new File(containerSystem32Dir, name);
+            if (src64.isFile()) {
+                FileUtils.copy(src64, dst64);
             }
         }
     }

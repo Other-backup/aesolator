@@ -78,4 +78,104 @@ public class ContentProfileParserTest {
         assertEquals(1, profile.fileList.size());
         assertEquals("${bindir}/box64", profile.fileList.get(0).target);
     }
+
+    @Test
+    public void keepsRepairableRuntimeProfileWithoutExplicitPaths() {
+        String rawJson = "{\n"
+                + "  \"type\": \"Proton\",\n"
+                + "  \"versionName\": \"11.0-arm64ec\",\n"
+                + "  \"versionCode\": 1,\n"
+                + "  \"description\": \"Proton donor profile with runtime repair expected\"\n"
+                + "}";
+
+        ContentProfile profile = ContentProfileParser.parse(rawJson);
+
+        assertNotNull(profile);
+        assertEquals(ContentProfile.ContentType.CONTENT_TYPE_PROTON, profile.type);
+        assertEquals("11.0-arm64ec", profile.verName);
+    }
+
+    @Test
+    public void parsesRuntimeModelFromForeignRuntimeClassHints() {
+        String rawJson = "{\n"
+                + "  \"type\": \"Wine\",\n"
+                + "  \"versionName\": \"freewine-11.0-arm64ec\",\n"
+                + "  \"runtimeClassTarget\": \"bionic-native\",\n"
+                + "  \"wine\": {\n"
+                + "    \"binPath\": \"arm64-v8a/bin\",\n"
+                + "    \"libPath\": \"arm64-v8a/lib\",\n"
+                + "    \"prefixPack\": \"prefixPack.txz\"\n"
+                + "  }\n"
+                + "}";
+
+        ContentProfile profile = ContentProfileParser.parse(rawJson);
+
+        assertNotNull(profile);
+        assertEquals(ContentProfile.RUNTIME_MODEL_BIONIC, profile.getRuntimeModel());
+    }
+
+    @Test
+    public void bionicRuntimeMarkersOverrideGenericDonorGlibcLabels() {
+        String rawJson = "{\n"
+                + "  \"type\": \"Proton\",\n"
+                + "  \"versionName\": \"10.0.99-arm64ec-ntsync\",\n"
+                + "  \"runtimeModel\": \"GameNative glibc donor bionic-native arm64-v8a/bin\",\n"
+                + "  \"proton\": {\n"
+                + "    \"binPath\": \"arm64-v8a/bin\",\n"
+                + "    \"libPath\": \"arm64-v8a/lib\",\n"
+                + "    \"prefixPack\": \"prefixPack.txz\"\n"
+                + "  }\n"
+                + "}";
+
+        ContentProfile profile = ContentProfileParser.parse(rawJson);
+
+        assertNotNull(profile);
+        assertEquals(ContentProfile.RUNTIME_MODEL_BIONIC, profile.getRuntimeModel());
+    }
+
+    @Test
+    public void parsesForeignRuntimeProfileAliases() {
+        String rawJson = "{\n"
+                + "  \"componentType\": \"Proton\",\n"
+                + "  \"version\": \"proton-11-arm64ec\",\n"
+                + "  \"version_code\": \"20260425\",\n"
+                + "  \"summary\": \"foreign package schema\",\n"
+                + "  \"runtime\": {\n"
+                + "    \"runtime_model\": \"bionic-native\",\n"
+                + "    \"bin\": \"arm64-v8a/bin\",\n"
+                + "    \"libs\": \"arm64-v8a/lib\",\n"
+                + "    \"prefix_pack\": \"arm64-v8a/share/wine/prefixPack.txz\"\n"
+                + "  }\n"
+                + "}";
+
+        ContentProfile profile = ContentProfileParser.parse(rawJson);
+
+        assertNotNull(profile);
+        assertEquals(ContentProfile.ContentType.CONTENT_TYPE_PROTON, profile.type);
+        assertEquals("proton-11-arm64ec", profile.verName);
+        assertEquals(20260425, profile.verCode);
+        assertEquals("arm64-v8a/bin", profile.wineBinPath);
+        assertEquals("arm64-v8a/lib", profile.wineLibPath);
+        assertEquals("arm64-v8a/share/wine/prefixPack.txz", profile.winePrefixPack);
+        assertEquals(ContentProfile.RUNTIME_MODEL_BIONIC, profile.getRuntimeModel());
+    }
+
+    @Test
+    public void parsesForeignComponentFileAliases() {
+        String rawJson = "{\n"
+                + "  \"packageType\": \"Box64\",\n"
+                + "  \"version\": \"0.5.0\",\n"
+                + "  \"code\": 7,\n"
+                + "  \"installFiles\": [\n"
+                + "    {\"from\":\"payload/bin/box64\", \"destination\":\"${localbin}/box64\"}\n"
+                + "  ]\n"
+                + "}";
+
+        ContentProfile profile = ContentProfileParser.parse(rawJson);
+
+        assertNotNull(profile);
+        assertEquals(ContentProfile.ContentType.CONTENT_TYPE_BOX64, profile.type);
+        assertEquals("payload/bin/box64", profile.fileList.get(0).source);
+        assertEquals("${localbin}/box64", profile.fileList.get(0).target);
+    }
 }

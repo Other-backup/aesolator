@@ -6,6 +6,7 @@ import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xserver.events.Event;
+import com.winlator.cmod.xserver.extensions.XInput2Extension;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -117,6 +118,9 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
             xServer.cursorManager.removeOnResourceLifecycleListener(this);
             xServer.resourceIDs.free(resourceIDBase);
         }
+
+        XInput2Extension xInput2 = xServer.getExtension(XInput2Extension.MAJOR_OPCODE);
+        if (xInput2 != null) xInput2.onClientDisconnected(this);
     }
 
     public void generateSequenceNumber() {

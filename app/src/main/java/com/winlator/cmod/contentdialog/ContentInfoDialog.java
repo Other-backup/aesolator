@@ -19,6 +19,7 @@ import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentStateUi;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.ForensicLogger;
 
 import java.util.Collections;
 import java.util.List;
@@ -51,13 +52,29 @@ public class ContentInfoDialog extends ContentDialog {
         tvVersion.setText(profile.verName);
         tvVersionCode.setText(String.valueOf(profile.verCode));
         tvDescription.setText(profile.desc);
-        bindOptionalRow(findViewById(R.id.LLInfoStatus), tvStatus, ContentStateUi.getStatusLabel(context, manager, profile, true));
+        ContentsManager.InstalledProfileDiagnostics diagnostics = manager.resolveInstalledProfileDiagnostics(profile);
+        String statusText = ContentStateUi.getStatusLabel(context, manager, profile, true);
+        String statusSummary = manager.buildInstalledProfileUiSummary(diagnostics);
+        if (!statusSummary.isEmpty()) {
+            statusText = statusText + "\n" + statusSummary;
+        }
+        bindOptionalRow(findViewById(R.id.LLInfoStatus), tvStatus, statusText);
         bindOptionalRow(findViewById(R.id.LLInfoSource), tvSource, firstNonEmpty(profile.sourceLabel, profile.sourceRepo));
         bindOptionalRow(findViewById(R.id.LLInfoReleaseTag), tvReleaseTag, profile.releaseTag);
         bindOptionalRow(findViewById(R.id.LLInfoArtifact), tvArtifact, profile.artifactName);
         bindOptionalRow(findViewById(R.id.LLInfoChannel), tvChannel, formatChannel(profile.getChannel()));
         bindOptionalRow(findViewById(R.id.LLInfoPublishedAt), tvPublishedAt, profile.publishedAt);
         bindOptionalSection(findViewById(R.id.FLReleaseNotes), tvReleaseNotes, profile.releaseNotes);
+        if (diagnostics.state.isBroken()) {
+            ForensicLogger.warn(
+                    context,
+                    "CONTENTS_BROKEN_INSTALL_OBSERVED",
+                    null,
+                    "contents",
+                    "broken_install_observed",
+                    manager.buildInstalledProfileForensicFields(diagnostics)
+            );
+        }
 
         List<ContentProfile.ContentFile> files = profile.fileList == null ? Collections.emptyList() : profile.fileList;
         fileCount = files.size();
@@ -71,6 +88,7 @@ public class ContentInfoDialog extends ContentDialog {
     @Override
     public void show() {
         super.show();
+        if (!isShowing()) return;
         if (getWindow() != null) {
             getWindow().setBackgroundDrawable(new ColorDrawable(0));
             getWindow().setLayout(

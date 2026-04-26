@@ -30,6 +30,7 @@ set(WINLATORXR_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/winlatorxr.exports.map.tx
 set(AERO_REDIRECT_GLIBC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_glibc.exports.map.txt")
 set(AERO_REDIRECT_BIONIC_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_redirect_bionic.exports.map.txt")
 set(AERO_EVSHIM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_evshim.exports.map.txt")
+set(AERO_NATIVE_XZ_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/aero_native_xz.exports.map.txt")
 set(ANDROID_SYSVSHM_EXPORT_MAP "${CMAKE_CURRENT_SOURCE_DIR}/android_sysvshm.exports.map.txt")
 
 function(aero_disable_host_rpath target_name)
@@ -51,6 +52,7 @@ add_library(winlator SHARED
         winlator/gpu_helper.c
         winlator/gpu_image.c
         winlator/sysvshared_memory.c
+        winlator/process_lifecycle.c
         winlator/wine_registry_editor.c
         winlator/xconnector_epoll.c
         winlator/xinput_stream.c
@@ -154,6 +156,47 @@ target_link_libraries(aero_evshim
         log
         dl
 )
+
+add_library(aero_fakeinput SHARED
+        extras/fakeinput.cpp
+)
+
+target_compile_features(aero_fakeinput PRIVATE cxx_std_17)
+target_compile_options(aero_fakeinput PRIVATE -Wall -Wextra -fvisibility=hidden)
+aero_disable_host_rpath(aero_fakeinput)
+target_link_libraries(aero_fakeinput
+        log
+        dl
+)
+
+add_library(aero_native_xz SHARED
+        xz/native_xz_stream.c
+        xz/xz_embedded/xz_crc32.c
+        xz/xz_embedded/xz_crc64.c
+        xz/xz_embedded/xz_dec_bcj.c
+        xz/xz_embedded/xz_dec_lzma2.c
+        xz/xz_embedded/xz_dec_stream.c
+)
+
+target_include_directories(aero_native_xz PRIVATE
+        xz/xz_embedded
+)
+target_compile_definitions(aero_native_xz PRIVATE
+        XZ_USE_CRC64
+        XZ_DEC_X86
+        XZ_DEC_ARM
+        XZ_DEC_ARMTHUMB
+        XZ_DEC_ARM64
+        XZ_DEC_RISCV
+        XZ_DEC_POWERPC
+        XZ_DEC_IA64
+        XZ_DEC_SPARC
+)
+target_compile_options(aero_native_xz PRIVATE -Wall -Wextra)
+target_link_options(aero_native_xz PRIVATE
+        "LINKER:--version-script=${AERO_NATIVE_XZ_EXPORT_MAP}"
+)
+aero_disable_host_rpath(aero_native_xz)
 
 add_library(aero_android_sysvshm SHARED
         ../../../../android_sysvshm/android_sysvshm.c

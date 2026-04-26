@@ -5,14 +5,18 @@ import android.view.KeyEvent;
 import androidx.collection.ArraySet;
 
 import com.winlator.cmod.inputcontrols.ExternalController;
+import com.winlator.cmod.core.ForensicLogger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Locale;
 
 public class Keyboard {
     public static final byte KEYSYMS_PER_KEYCODE = 2;
     public static final short KEYS_COUNT = 248;
     public static final short MAX_KEYCODE = 255;
     public static final short MIN_KEYCODE = 8;
+    private static final HashSet<String> loggedIgnoredKeyRoutes = new HashSet<>();
     public final int[] keysyms = new int[KEYS_COUNT];
     private final Bitmask modifiersMask = new Bitmask();
     private final XKeycode[] keycodeMap = createKeycodeMap();
@@ -99,9 +103,9 @@ public class Keyboard {
         int action = event.getAction();
         int keyCode = event.getKeyCode();
 
-        // Patches: Crash on Asus Rog Phone 9 Pro with Game Genie active (This line should be deleted after the merge)
         if (keyCode < 0 || keyCode >= keycodeMap.length) {
-            return false; // Ignore unmapped key codes
+            logIgnoredKeyRoute(event, "invalid_keycode_index");
+            return false;
         }
 
         if (keyCode == KeyEvent.KEYCODE_TAB || keyCode == KeyEvent.KEYCODE_ESCAPE) {
@@ -114,7 +118,10 @@ public class Keyboard {
             }
         } else if (action == KeyEvent.ACTION_DOWN || action == KeyEvent.ACTION_UP) {
             XKeycode xKeycode = keycodeMap[keyCode];
-            if (xKeycode == null) return false;
+            if (xKeycode == null) {
+                logIgnoredKeyRoute(event, "unmapped_keycode");
+                return false;
+            }
 
             if (action == KeyEvent.ACTION_DOWN) {
                 boolean shiftPressed = event.isShiftPressed() || keyCode == KeyEvent.KEYCODE_AT || keyCode == KeyEvent.KEYCODE_STAR || keyCode == KeyEvent.KEYCODE_POUND || keyCode == KeyEvent.KEYCODE_PLUS;
@@ -126,6 +133,45 @@ public class Keyboard {
             }
         }
         return true;
+    }
+
+    private void logIgnoredKeyRoute(KeyEvent event, String reason) {
+        String fingerprint = buildIgnoredKeyRouteFingerprint(event, reason);
+        synchronized (loggedIgnoredKeyRoutes) {
+            if (!loggedIgnoredKeyRoutes.add(fingerprint)) return;
+        }
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "XSERVER_KEY_EVENT_IGNORED",
+                null,
+                "xserver_input",
+                "ignored_keyboard_route",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "key_code", event.getKeyCode(),
+                        "scan_code", event.getScanCode(),
+                        "device_id", event.getDeviceId(),
+                        "action", event.getAction(),
+                        "repeat_count", event.getRepeatCount(),
+                        "source", event.getSource(),
+                        "device_name", event.getDevice() != null ? event.getDevice().getName() : "-",
+                        "is_game_controller", event.getDevice() != null && ExternalController.isGameController(event.getDevice()),
+                        "unicode_char", event.getUnicodeChar()
+                )
+        );
+    }
+
+    private String buildIgnoredKeyRouteFingerprint(KeyEvent event, String reason) {
+        return String.format(
+                Locale.US,
+                "%s|%d|%d|%d|%d",
+                reason,
+                event.getDeviceId(),
+                event.getSource(),
+                event.getKeyCode(),
+                event.getScanCode()
+        );
     }
 
     private static XKeycode[] createKeycodeMap() {

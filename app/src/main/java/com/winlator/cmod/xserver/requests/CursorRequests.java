@@ -53,21 +53,24 @@ public abstract class CursorRequests {
         client.xServer.cursorManager.freeCursor(inputStream.readInt());
     }
 
-    public static void getPointerMaping(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
+    public static void getPointerMapping(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
         try (XStreamLock lock = outputStream.lock()) {
-            byte[] buttonsMap = {1, 2, 3};
-            byte n = (byte) buttonsMap.length;
+            byte[] buttonsMap = {1, 2, 3, 4, 5, 6, 7};
+            int n = buttonsMap.length;
             int padLen = -n & 3;
 
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
-            outputStream.writeByte(n);
+            outputStream.writeByte((byte)n);
             outputStream.writeShort(client.getSequenceNumber());
             outputStream.writeInt((n + padLen) / 4);
             outputStream.writePad(24);
 
-            for (byte b: buttonsMap)
-                outputStream.writeByte(b);
+            outputStream.write(buttonsMap);
             outputStream.writePad(padLen);
         }
+    }
+
+    public static void getPointerMaping(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
+        getPointerMapping(client, inputStream, outputStream);
     }
 }

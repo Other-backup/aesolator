@@ -107,6 +107,7 @@ import com.winlator.cmod.core.ThemeAssetPainter;
 import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
+import com.winlator.cmod.core.VulkanIcdManifestHelper;
 import com.winlator.cmod.core.VortekExtensionPolicy;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
@@ -797,7 +798,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         contentsManager = new ContentsManager(this);
         imageFs = ImageFs.find(this);
+        ImageFsInstaller.ensureAppNativeGuestLibs(this, imageFs);
         ImageFsInstaller.ensurePrefixPackToolkit(this, imageFs);
+        File devInputDir = new File(imageFs.getRootDir(), "dev/input");
+        if (devInputDir.exists() || devInputDir.mkdirs()) {
+            for (int i = 0; i < 4; i++) {
+                File eventFile = new File(devInputDir, "event" + i);
+                if (eventFile.exists() && !eventFile.delete()) {
+                    Log.w("XServerDisplayActivity", "Failed to delete stale fake input node " + eventFile.getAbsolutePath());
+                }
+                File jsFile = new File(devInputDir, "js" + i);
+                if (jsFile.exists() && !jsFile.delete()) {
+                    Log.w("XServerDisplayActivity", "Failed to delete stale fake joystick node " + jsFile.getAbsolutePath());
+                }
+            }
+        }
+        winHandler.setFakeInputPath(devInputDir.getAbsolutePath());
 
         String screenSize = Container.DEFAULT_SCREEN_SIZE;
         containerManager = new ContainerManager(this);
@@ -1500,9 +1516,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (profiles == null) continue;
             for (ContentProfile profile : profiles) {
                 if (profile == null || !profile.isWineProtonFamily()) continue;
-                if (!profile.isRuntimeModelCompatible(runtimeModel)) continue;
-                if (!ContentProfile.normalizeRuntimeModel(runtimeModel).isEmpty()
-                        && !ContentProfile.normalizeRuntimeModel(runtimeModel).equals(profile.getRuntimeModel())) {
+                String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
+                boolean runtimeModelMatches = profile.isRuntimeModelCompatible(runtimeModel)
+                        && (normalizedRuntimeModel.isEmpty() || normalizedRuntimeModel.equals(profile.getRuntimeModel()));
+                if (!runtimeModelMatches) {
+                    if (contentsManager.isInstalledProfileUsable(profile)) {
+                        best = pickPreferredLaunchRuntime(best, profile);
+                    }
                     continue;
                 }
                 best = pickPreferredLaunchRuntime(best, profile);
@@ -1740,12 +1760,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         ContentProfile candidate = contentsManager.getProfileByEntryName(canonicalEntry);
-        if (candidate != null && candidate.isWineProtonFamily() && candidate.isRuntimeModelCompatible(runtimeModel)) {
+        if (candidate != null
+                && candidate.isWineProtonFamily()
+                && (candidate.isRuntimeModelCompatible(runtimeModel) || contentsManager.isInstalledProfileUsable(candidate))) {
             return candidate;
         }
 
         candidate = contentsManager.getProfileByEntryName(wineVersion);
-        if (candidate != null && candidate.isWineProtonFamily() && candidate.isRuntimeModelCompatible(runtimeModel)) {
+        if (candidate != null
+                && candidate.isWineProtonFamily()
+                && (candidate.isRuntimeModelCompatible(runtimeModel) || contentsManager.isInstalledProfileUsable(candidate))) {
             return candidate;
         }
 
@@ -4856,6 +4880,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void setupWineSystemFiles() {
+        ensureWinePrefixReady();
         String appVersion = String.valueOf(AppUtils.getVersionCode(this));
         String imgVersion = String.valueOf(imageFs.getVersion());
         boolean containerDataChanged = false;
@@ -4864,8 +4889,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             applyGeneralPatches(container);
             container.putExtra("appVersion", appVersion);
             container.putExtra("imgVersion", imgVersion);
+            firstTimeBoot = true;
             containerDataChanged = true;
         }
+
+        ensureWinePrefixEssentialFiles();
 
         String dxwrapperMode = this.dxwrapper;
         String dxwrapperSignature = dxwrapperMode;
@@ -4929,6 +4957,180 @@ public class XServerDisplayActivity extends AppCompatActivity {
         extractInputDLLs();
 
         if (containerDataChanged) container.saveData();
+    }
+
+    private void ensureWinePrefixReady() {
+        if (container == null || wineInfo == null || containerManager == null) return;
+
+        File containerDir = container.getRootDir();
+        boolean prefixInvalid = !WineUtils.isPrefixValid(containerDir);
+        String storedPrefixArch = container.getExtra("wineprefixArch");
+        boolean archMismatch = !storedPrefixArch.isEmpty() && !storedPrefixArch.equalsIgnoreCase(wineInfo.getArch());
+        boolean prefixNeedsUpdate = "t".equalsIgnoreCase(container.getExtra("wineprefixNeedsUpdate"));
+
+        ForensicLogger.logEvent(
+                this,
+                prefixInvalid || archMismatch || prefixNeedsUpdate ? "warn" : "info",
+                "WINE_PREFIX_HEALTH_EVAL",
+                null,
+                "xserver",
+                "wine_prefix_health_evaluated",
+                ForensicLogger.fields(
+                        "container_id", container.id,
+                        "prefix_invalid", prefixInvalid,
+                        "arch_mismatch", archMismatch,
+                        "stored_arch", storedPrefixArch,
+                        "target_arch", wineInfo.getArch(),
+                        "prefix_needs_update", prefixNeedsUpdate
+                )
+        );
+
+        if (!prefixInvalid && !archMismatch && !prefixNeedsUpdate) {
+            if (storedPrefixArch.isEmpty()) {
+                container.putExtra("wineprefixArch", wineInfo.getArch());
+                container.putExtra("wineprefixNeedsUpdate", null);
+                container.saveData();
+            }
+            return;
+        }
+
+        String repairWineVersion = selectedRuntimeProfile != null
+                ? ContentsManager.getEntryName(selectedRuntimeProfile)
+                : resolveEffectiveLaunchWineVersion(resolveLaunchWineVersion(), effectiveRuntimeModel);
+        boolean repaired = containerManager.repairContainerWinePrefix(
+                container,
+                repairWineVersion,
+                contentsManager,
+                onExtractFileListener
+        );
+        ForensicLogger.logEvent(
+                this,
+                repaired ? "warn" : "error",
+                repaired ? "WINE_PREFIX_REPAIR_APPLIED" : "WINE_PREFIX_REPAIR_FAILED",
+                null,
+                "xserver",
+                repaired ? "wine_prefix_repair_applied" : "wine_prefix_repair_failed",
+                ForensicLogger.fields(
+                        "container_id", container.id,
+                        "prefix_invalid", prefixInvalid,
+                        "arch_mismatch", archMismatch,
+                        "stored_arch", storedPrefixArch,
+                        "target_arch", wineInfo.getArch(),
+                        "prefix_needs_update", prefixNeedsUpdate
+                )
+        );
+        if (repaired) {
+            firstTimeBoot = true;
+        }
+    }
+
+    private void ensureWinePrefixEssentialFiles() {
+        if (container == null || imageFs == null) return;
+        File containerWindowsDir = new File(container.getRootDir(), ".wine/drive_c/windows");
+        String[] essentialFiles = {"winhandler.exe", "wfm.exe"};
+        ArrayList<String> missingFiles = new ArrayList<>();
+        for (String filename : essentialFiles) {
+            if (!isUsableWineBridgeFile(new File(containerWindowsDir, filename))) {
+                missingFiles.add(filename);
+            }
+        }
+
+        ForensicLogger.logEvent(
+                this,
+                missingFiles.isEmpty() ? "info" : "warn",
+                missingFiles.isEmpty() ? "WINE_PREFIX_BRIDGE_FILES_READY" : "WINE_PREFIX_BRIDGE_FILES_INCOMPLETE",
+                null,
+                "xserver",
+                missingFiles.isEmpty() ? "wine_prefix_bridge_files_ready" : "wine_prefix_bridge_files_incomplete",
+                ForensicLogger.fields(
+                        "container_id", container.id,
+                        "windows_dir", containerWindowsDir.getAbsolutePath(),
+                        "missing_files", String.join(",", missingFiles)
+                )
+        );
+
+        if (missingFiles.isEmpty()) return;
+
+        File homeRoot = new File(imageFs.getRootDir(), "home");
+        File[] homeDirs = homeRoot.listFiles();
+        File sourceWindowsDir = null;
+        if (homeDirs != null) {
+            for (File dir : homeDirs) {
+                if (dir == null || !dir.isDirectory()) continue;
+                if (dir.getName().equals(ImageFs.USER)) continue;
+                if (container.getRootDir() != null && dir.getAbsolutePath().equals(container.getRootDir().getAbsolutePath())) continue;
+                File candidate = new File(dir, ".wine/drive_c/windows");
+                if (isUsableWineBridgeFile(new File(candidate, "winhandler.exe"))
+                        && isUsableWineBridgeFile(new File(candidate, "wfm.exe"))) {
+                    sourceWindowsDir = candidate;
+                    break;
+                }
+            }
+        }
+
+        containerWindowsDir.mkdirs();
+        ArrayList<String> restoredFromContainer = new ArrayList<>();
+        if (sourceWindowsDir != null) {
+            for (String filename : missingFiles) {
+                File source = new File(sourceWindowsDir, filename);
+                File dest = new File(containerWindowsDir, filename);
+                if (!isUsableWineBridgeFile(source)) continue;
+                FileUtils.copy(source, dest);
+                if (isUsableWineBridgeFile(dest)) {
+                    restoredFromContainer.add(filename);
+                }
+            }
+            ForensicLogger.logEvent(
+                    this,
+                    restoredFromContainer.isEmpty() ? "warn" : "info",
+                    "WINE_PREFIX_BRIDGE_FILES_RESTORED_FROM_CONTAINER",
+                    null,
+                    "xserver",
+                    "wine_prefix_bridge_files_restored_from_container",
+                    ForensicLogger.fields(
+                            "container_id", container.id,
+                            "source_windows_dir", sourceWindowsDir.getAbsolutePath(),
+                            "restored_files", String.join(",", restoredFromContainer),
+                            "requested_files", String.join(",", missingFiles)
+                    )
+            );
+        }
+
+        if (restoredFromContainer.size() == missingFiles.size()) return;
+
+        TarCompressorUtils.extract(
+                TarCompressorUtils.Type.ZSTD,
+                this,
+                "container_pattern_common.tzst",
+                imageFs.getRootDir(),
+                onExtractFileListener
+        );
+
+        ArrayList<String> readyFiles = new ArrayList<>();
+        for (String filename : essentialFiles) {
+            if (isUsableWineBridgeFile(new File(containerWindowsDir, filename))) {
+                readyFiles.add(filename);
+            }
+        }
+        boolean ready = readyFiles.size() == essentialFiles.length;
+        ForensicLogger.logEvent(
+                this,
+                ready ? "warn" : "error",
+                ready ? "WINE_PREFIX_BRIDGE_FILES_RESTORED_FROM_ARCHIVE" : "WINE_PREFIX_BRIDGE_FILES_RESTORE_FAILED",
+                null,
+                "xserver",
+                ready ? "wine_prefix_bridge_files_restored_from_archive" : "wine_prefix_bridge_files_restore_failed",
+                ForensicLogger.fields(
+                        "container_id", container.id,
+                        "windows_dir", containerWindowsDir.getAbsolutePath(),
+                        "ready_files", String.join(",", readyFiles),
+                        "requested_files", String.join(",", missingFiles)
+                )
+        );
+    }
+
+    private boolean isUsableWineBridgeFile(@Nullable File file) {
+        return file != null && file.isFile() && file.length() > 0;
     }
 
     private void setupXEnvironment() throws PackageManager.NameNotFoundException {
@@ -5148,6 +5350,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         // Start WinHandler before any guest launch so INIT cannot race a late UDP bind.
         winHandler.start();
+        winHandler.preAssignConnectedControllers();
 
         // Start all environment components (XServer, Audio, etc.)
         environment.startEnvironmentComponents();
@@ -7619,7 +7822,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     @Nullable
-    private File resolveWrapperIcdFile() {
+    private File resolveWrapperIcdSourceFile() {
         if (imageFs == null) return null;
         File runtimeShareDir = WineUtils.resolveRuntimeShareDir(new File(imageFs.getWinePath()));
         if (runtimeShareDir != null) {
@@ -7631,13 +7834,71 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return null;
     }
 
+    @Nullable
+    private File rewriteWrapperIcdForAndroidHost(@Nullable File sourceIcdFile) {
+        if (sourceIcdFile == null || !sourceIcdFile.isFile() || imageFs == null) return null;
+        String nativeLibDir = trimToEmpty(AppUtils.getNativeLibDir(this));
+        if (nativeLibDir.isEmpty()) return null;
+
+        File nativeWrapperLib = new File(nativeLibDir, "libvulkan_wrapper.so");
+        if (!nativeWrapperLib.isFile()) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "WRAPPER_ICD_ANDROID_HOST_REWRITE_MISSING_NATIVE_LIB",
+                    null,
+                    "graphics_provider",
+                    "wrapper_icd_android_host_rewrite_missing_native_lib",
+                    ForensicLogger.fields(
+                            "source_icd_path", sourceIcdFile.getAbsolutePath(),
+                            "native_wrapper_lib_path", nativeWrapperLib.getAbsolutePath()
+                    )
+            );
+            return null;
+        }
+
+        File icdDir = new File(imageFs.getShareDir(), "vulkan/icd.d");
+        if (!icdDir.isDirectory() && !icdDir.mkdirs()) return null;
+        File androidHostIcd = new File(icdDir, "wrapper_icd.android-host.aarch64.json");
+        try {
+            String rewrittenManifest = VulkanIcdManifestHelper.rewriteLibraryPath(
+                    FileUtils.readString(sourceIcdFile),
+                    nativeWrapperLib.getAbsolutePath(),
+                    null
+            );
+            if (!FileUtils.writeString(androidHostIcd, rewrittenManifest)) return null;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "WRAPPER_ICD_ANDROID_HOST_REWRITE_APPLIED",
+                    null,
+                    "graphics_provider",
+                    "wrapper_icd_android_host_rewrite_applied",
+                    ForensicLogger.fields(
+                            "source_icd_path", sourceIcdFile.getAbsolutePath(),
+                            "resolved_icd_path", androidHostIcd.getAbsolutePath(),
+                            "native_wrapper_lib_path", nativeWrapperLib.getAbsolutePath()
+                    )
+            );
+            return androidHostIcd.isFile() ? androidHostIcd : null;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to rewrite wrapper ICD for Android host", e);
+            return null;
+        }
+    }
+
+    @Nullable
+    private File resolveWrapperIcdFile() {
+        File sourceIcdFile = resolveWrapperIcdSourceFile();
+        if (sourceIcdFile == null) return null;
+        File androidHostIcd = rewriteWrapperIcdForAndroidHost(sourceIcdFile);
+        return androidHostIcd != null && androidHostIcd.isFile() ? androidHostIcd : sourceIcdFile;
+    }
+
     private int resolveWrapperIcdApiMinor(@Nullable File wrapperIcdFile) {
         if (wrapperIcdFile == null || !wrapperIcdFile.isFile()) return 0;
         try {
-            JSONObject root = new JSONObject(FileUtils.readString(wrapperIcdFile));
-            JSONObject icd = root.optJSONObject("ICD");
-            if (icd == null) return 0;
-            return getVulkanApiMinor(icd.optString("api_version", ""));
+            return VulkanIcdManifestHelper.readApiMinor(FileUtils.readString(wrapperIcdFile));
         } catch (Exception ignored) {
             return 0;
         }
@@ -7763,6 +8024,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 vulkanPrimaryProviderMissing ? "vulkan_primary_provider_missing" : "",
                 companionMissing ? "missing_companion_provider" : ""
         );
+        AdrenotoolsManager.DriverPackageInfo effectiveActiveInfo = activeInfo != null ? activeInfo : selectedInfo;
 
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_ENTRY", selectedDriverId);
         setOrClearEnv("AERO_GRAPHICS_LEGACY_REQUESTED_DRIVER", safeTrim(legacyGraphicsRequestedDriver));
@@ -7770,9 +8032,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv("AERO_GRAPHICS_LEGACY_POLICY", safeTrim(legacyGraphicsPolicy));
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_PACKAGE", selectedInfo == null ? "" : selectedInfo.name);
         setOrClearEnv("AERO_GRAPHICS_SELECTED_DRIVER_LANE", selectedInfo == null ? "" : selectedInfo.providerLane);
-        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", activeInfo == null ? "" : activeInfo.providerLane);
-        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", activeInfo == null ? "" : activeInfo.name);
-        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", activeInfo == null ? "" : activeInfo.driverVersion);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE", effectiveActiveInfo == null ? "" : effectiveActiveInfo.providerLane);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_PACKAGE", effectiveActiveInfo == null ? "" : effectiveActiveInfo.name);
+        setOrClearEnv("AERO_GRAPHICS_ACTIVE_PROVIDER_VERSION", effectiveActiveInfo == null ? "" : effectiveActiveInfo.driverVersion);
         setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_LANE", companionInfo == null ? "" : companionInfo.providerLane);
         setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_PACKAGE", companionInfo == null ? "" : companionInfo.name);
         setOrClearEnv("AERO_GRAPHICS_COMPANION_PROVIDER_VERSION", companionInfo == null ? "" : companionInfo.driverVersion);
@@ -7811,7 +8073,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "selected_driver_id", selectedDriverId,
                             "legacy_requested_driver", legacyGraphicsRequestedDriver,
                             "legacy_policy", legacyGraphicsPolicy,
-                            "active_provider_lane", activeInfo == null ? "" : activeInfo.providerLane,
+                            "active_provider_lane", effectiveActiveInfo == null ? "" : effectiveActiveInfo.providerLane,
                             "required_companion_lane", requiredCompanionLane,
                             "selected_provider_lane", selectedInfo == null ? "" : selectedInfo.providerLane,
                             "degrade_reason", routeDegradedReason
@@ -7831,10 +8093,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "legacy_requested_driver", legacyGraphicsRequestedDriver,
                         "legacy_policy", legacyGraphicsPolicy,
                         "selected_provider_lane", selectedInfo == null ? "" : selectedInfo.providerLane,
-                        "active_provider_lane", activeInfo == null ? "" : activeInfo.providerLane,
-                        "active_provider_package", activeInfo == null ? "" : activeInfo.name,
-                        "active_provider_version", activeInfo == null ? "" : activeInfo.driverVersion,
-                        "active_provider_route", activeInfo == null ? "" : activeInfo.driverRoute,
+                        "active_provider_lane", effectiveActiveInfo == null ? "" : effectiveActiveInfo.providerLane,
+                        "active_provider_package", effectiveActiveInfo == null ? "" : effectiveActiveInfo.name,
+                        "active_provider_version", effectiveActiveInfo == null ? "" : effectiveActiveInfo.driverVersion,
+                        "active_provider_route", effectiveActiveInfo == null ? "" : effectiveActiveInfo.driverRoute,
                         "companion_provider_lane", companionInfo == null ? "" : companionInfo.providerLane,
                         "companion_provider_package", companionInfo == null ? "" : companionInfo.name,
                         "opengl_overlay_active", openGlOverlayApplied ? "1" : "0",
@@ -9133,13 +9395,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-
-        // Handle the PlayStation or Xbox Home button to open the drawer
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE || event.getKeyCode() == KeyEvent.KEYCODE_HOME || event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_SELECT) {
-                boolean handled = inputControlsView.onKeyEvent(event) || (winHandler != null && winHandler.onKeyEvent(event)) && (xServer != null && xServer.keyboard.onKeyEvent(event));
-                return true;
-            }
+        if (isRuntimeDrawerShortcutEvent(event)) {
+            boolean handledByInputControls = inputControlsView != null && inputControlsView.onKeyEvent(event);
+            boolean handledByWinHandler = winHandler != null && winHandler.onKeyEvent(event);
+            boolean handledByXServerKeyboard = xServer != null && xServer.keyboard != null && xServer.keyboard.onKeyEvent(event);
+            boolean wasVisible = runtimeDrawerVisible;
+            showRuntimeDrawer();
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "RUNTIME_DRAWER_SHORTCUT_TRIGGERED",
+                    null,
+                    "xserver_input",
+                    "runtime_drawer_shortcut",
+                    ForensicLogger.fields(
+                            "key_code", event.getKeyCode(),
+                            "scan_code", event.getScanCode(),
+                            "device_id", event.getDeviceId(),
+                            "device_name", event.getDevice() != null ? event.getDevice().getName() : "-",
+                            "handled_by_input_controls", handledByInputControls,
+                            "handled_by_winhandler", handledByWinHandler,
+                            "handled_by_xserver_keyboard", handledByXServerKeyboard,
+                            "runtime_drawer_visible_before", wasVisible,
+                            "runtime_drawer_visible_after", runtimeDrawerVisible
+                    )
+            );
+            return true;
         }
 
         boolean handledByInputControls = inputControlsView != null && inputControlsView.onKeyEvent(event);
@@ -9148,6 +9429,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean handledBySuper = !ExternalController.isGameController(event.getDevice()) && super.dispatchKeyEvent(event);
 
         return handledByInputControls || handledByWinHandler || handledByXServerKeyboard || handledBySuper;
+    }
+
+    private boolean isRuntimeDrawerShortcutEvent(KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+        if (!ExternalController.isGameController(event.getDevice())) return false;
+        int keyCode = event.getKeyCode();
+        return keyCode == KeyEvent.KEYCODE_BUTTON_MODE
+                || keyCode == KeyEvent.KEYCODE_HOME
+                || keyCode == KeyEvent.KEYCODE_BUTTON_SELECT;
     }
 
     public InputControlsView getInputControlsView() {
@@ -9474,7 +9764,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         int wrapperApiMinor = resolveWrapperIcdApiMinor(wrapperIcdFile);
         boolean wrapperIcdAvailable = wrapperIcdFile != null && wrapperIcdFile.isFile();
         File validationLayerManifest = new File(imageFs.getShareDir(), "vulkan/explicit_layer.d/VkLayer_khronos_validation.json");
-        setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", wrapperIcdAvailable ? "wrapper-embedded" : "wrapper-missing");
+        String wrapperRuntimeSource = !wrapperIcdAvailable
+                ? "wrapper-missing"
+                : wrapperIcdFile.getName().contains(".android-host.")
+                ? "wrapper-host-native"
+                : "wrapper-embedded";
+        setOrClearEnv("AERO_VULKAN_RUNTIME_SOURCE", wrapperRuntimeSource);
         setOrClearEnv("AERO_VULKAN_WRAPPER_ICD", wrapperIcdAvailable ? wrapperIcdFile.getAbsolutePath() : "");
         setOrClearEnv("AERO_VULKAN_WRAPPER_API_MAX", wrapperApiMinor > 0 ? "1." + wrapperApiMinor : "");
         setOrClearEnv("AERO_VULKAN_API_MIN_AVAILABLE", "");
@@ -9693,7 +9988,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File windowsDir = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "drive_c/windows");
         File runtimeWineLibDir = WineUtils.resolveRuntimeWineLibDir(new File(imageFs.getWinePath()));
         if (runtimeWineLibDir == null) return;
-        File system32dlls = wineInfo.isArm64EC()
+        File system32dlls = wineInfo.usesAarch64WindowsTree()
                 ? new File(runtimeWineLibDir, "aarch64-windows")
                 : new File(runtimeWineLibDir, "x86_64-windows");
         File syswow64dlls = new File(runtimeWineLibDir, "i386-windows");
@@ -9998,7 +10293,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private String buildDesktopShellWinHandlerFallbackExecutable() {
-        return "wine explorer /desktop=shell," + xServer.screenInfo + " winhandler.exe \"wfm.exe\"";
+        String wfmCommand = resolveContainerShellExecutableCommand("wfm.exe");
+        return "wine explorer /desktop=shell," + xServer.screenInfo + " winhandler.exe \"" + wfmCommand + "\"";
     }
 
     private String getWineStartCommand() {
@@ -10044,6 +10340,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private String buildDesktopShellStartArgs(EnvVars envVars) {
         String shellExecutable = resolveDesktopShellExecutable();
+        String shellCommand = resolveContainerShellExecutableCommand(shellExecutable);
         desktopShellLaunchMode = shortcut == null && shouldUseDirectDesktopShellBootstrap()
                 ? DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER
                 : DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
@@ -10059,7 +10356,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     "desktop_shell_extra_exec_ignored",
                     ForensicLogger.fields(
                             "requested_shell", staleExtraExecArgs == null ? "" : staleExtraExecArgs,
-                            "resolved_shell", shellExecutable
+                            "resolved_shell", shellExecutable,
+                            "resolved_shell_command", shellCommand
                     )
             );
         }
@@ -10072,6 +10370,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "desktop_shell_route_selected",
                 ForensicLogger.fields(
                         "shell_executable", shellExecutable,
+                        "shell_command", shellCommand,
                         "desktop_shell_launch_mode", desktopShellLaunchMode,
                         "wfm_present", hasContainerShellExecutable("wfm.exe"),
                         "explorer_present", hasContainerShellExecutable("explorer.exe"),
@@ -10079,7 +10378,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "wine_version", container != null ? container.getWineVersion() : ""
                 )
         );
-        return "\"" + shellExecutable + "\"";
+        return "\"" + shellCommand + "\"";
     }
 
     private void configureDesktopShellRegistry() {
@@ -10198,6 +10497,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String resolveDesktopShellExecutable() {
         if (!shouldUseDirectDesktopShellBootstrap() && hasContainerShellExecutable("wfm.exe")) return "wfm.exe";
         return "explorer.exe";
+    }
+
+    private String resolveContainerShellExecutableCommand(String executableName) {
+        String dosPath = resolveContainerShellExecutableDosPath(executableName);
+        return dosPath.isEmpty() ? executableName : dosPath;
+    }
+
+    private String resolveContainerShellExecutableDosPath(String executableName) {
+        if (container == null || executableName == null || executableName.isEmpty()) return "";
+        File rootDir = container.getRootDir();
+        if (rootDir == null) return "";
+
+        File[] candidates = new File[] {
+                new File(rootDir, ".wine/drive_c/windows/" + executableName),
+                new File(rootDir, ".wine/drive_c/windows/system32/" + executableName),
+                new File(rootDir, ".wine/drive_c/windows/syswow64/" + executableName)
+        };
+        String[] dosCandidates = new String[] {
+                "C:\\windows\\" + executableName,
+                "C:\\windows\\system32\\" + executableName,
+                "C:\\windows\\syswow64\\" + executableName
+        };
+        for (int i = 0; i < candidates.length; i++) {
+            if (candidates[i].isFile()) return dosCandidates[i];
+        }
+        return "";
     }
 
     private boolean shouldUseDirectDesktopShellBootstrap() {

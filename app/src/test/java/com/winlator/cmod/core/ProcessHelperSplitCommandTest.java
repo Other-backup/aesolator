@@ -3,6 +3,8 @@ package com.winlator.cmod.core;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class ProcessHelperSplitCommandTest {
     @Test
@@ -32,5 +34,18 @@ public class ProcessHelperSplitCommandTest {
                 },
                 ProcessHelper.splitCommand("\"C:\\Program Files\\Tool\\tool.exe\" --flag \"quoted arg\"")
         );
+    }
+
+    @Test
+    public void parseProcStatHandlesProcessNamesWithSpacesAndParens() {
+        ProcessHelper.ProcessInfo info = ProcessHelper.parseProcStat(
+                "1234",
+                "1234 (wine server(arm64)) S 1200 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0"
+        );
+
+        assertNotNull(info);
+        assertEquals(1234, info.pid);
+        assertEquals(1200, info.ppid);
+        assertEquals("wine server(arm64)", info.name);
     }
 }

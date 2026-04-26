@@ -101,6 +101,8 @@ def aeAssetDir = new File(rootProject.projectDir, "app/src/main/assets")
 def aeGeneratedJniLibsDir = new File(buildDir, "generated/ae-jniLibs")
 def aeBundledArm64JniLibsDir = new File(rootProject.projectDir, "app/src/main/jniLibs/arm64-v8a")
 def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
+def aeTarExtractTool = new File(rootProject.projectDir, "tools/extract_tar_member.py")
+def aeVulkanWrapperArchive = new File(aeAssetDir, "graphics_driver/libvulkan_wrapper.tar.xz")
 def aeResolvedNdkVersion = "29.0.14206865"
 def aeRequiredRootfsAssets = [
         "imagefs_gamenative.txz",
@@ -266,11 +268,47 @@ tasks.register("prepareVirglWrapperJni") {
     }
 }
 
+tasks.register("prepareVulkanWrapperJni") {
+    File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
+    File outputFile = new File(outputDir, "libvulkan_wrapper.so")
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeTarExtractTool", aeTarExtractTool)
+    AeBuildHostSupport.registerOptionalFileInput(inputs, "aeVulkanWrapperArchive", aeVulkanWrapperArchive)
+    outputs.file(outputFile)
+    doLast {
+        if (!aeTarExtractTool.isFile()) {
+            throw new GradleException("Required extraction tool is missing: ${aeTarExtractTool}")
+        }
+        if (!aeVulkanWrapperArchive.isFile()) {
+            throw new GradleException("Required Vulkan wrapper archive is missing: ${aeVulkanWrapperArchive}")
+        }
+        outputDir.mkdirs()
+        List<String> command = [
+                "python3",
+                aeTarExtractTool.absolutePath,
+                "--archive",
+                aeVulkanWrapperArchive.absolutePath,
+                "--member",
+                "libvulkan_wrapper.so",
+                "--output",
+                outputFile.absolutePath
+        ]
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start()
+        process.inputStream.eachLine { line -> println(line) }
+        int exitCode = process.waitFor()
+        if (exitCode != 0) {
+            throw new GradleException("Vulkan wrapper JNI extraction failed with exit code ${exitCode}")
+        }
+    }
+}
+
 preBuild.dependsOn(verifyNoRetiredImageFsAssets)
 preBuild.dependsOn(verifyBundledImageFsAssets)
 preBuild.dependsOn(prepareEmbeddedWineAssets)
 preBuild.dependsOn(prepareRuntimeSharedJni)
 preBuild.dependsOn(prepareVirglWrapperJni)
+preBuild.dependsOn(prepareVulkanWrapperJni)
 
 def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "21"
 int aeroVersionCode

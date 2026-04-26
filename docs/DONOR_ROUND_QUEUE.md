@@ -1,6 +1,6 @@
 # Donor Round Queue (Strict Mode)
 
-Date: `2026-03-05`
+Date: `2026-04-26`
 
 Execution mode: `1 round = 1 donor` (sequential by default; owner override is allowed and must be documented).
 
@@ -49,6 +49,54 @@ Execution mode: `1 round = 1 donor` (sequential by default; owner override is al
 | 13 | `proqaz2-design/Frame-generation-` | `gate_hold` | mobile framegen mode/thermal lane integrated; closure deferred by owner override to next donor |
 | 14 | `optiscaler/OptiScaler` | `gate_hold` | FG source/output routing lane integrated; closure deferred by owner override to next donor |
 | 15 | `Eden-Android-9d2341eaea-standard.apk` | `closed` | Vulkan validation lane integrated; env-layer merge + VulkanSDK guard hardened; app-tree closure completed |
+| 16 | `AndreVto/proton-wine` | `pending` | Black Diamond runtime donor for Proton 11 ARM64EC, prefix-pack contract, Android-facing build scripts, and bootstrap parity |
+| 17 | `MaxsTechReview/WinNative` | `active` | app-side donor refreshed to `b4297a39ade7ca46e3505b2c26ceafa5f0f69146` on `2026-04-26`; runtime/input and renderer deltas under transfer |
+| 18 | `palazos/winlatorCmod` | `active` | app-side donor refreshed to `9a27d00aeaaed884624355539c0d352769d285d9`; controller/gamepad false-positive lane transferred and still under audit |
+
+## 2026-04-26 Ae.solator App-Donor Freshness Gate
+
+Scope correction:
+- Current implementation scope is `aesolator` only.
+- Wine/Proton source donors are FreeWine/runtime-source inputs and are excluded from this app-side freshness gate.
+- No `freewine11` or `wcp-runtime-lanes` source-root change is part of this gate.
+
+Fresh app-side donor refs:
+- `utkarshdalal/GameNative`: `cbea7f75f7bd5b1dd5f665148c91251cf4a89b39`, `2026-04-24T17:55:31+05:30`, `Feat/eos overlay utkarsh (#1286)`.
+- `MaxsTechReview/WinNative`: `b4297a39ade7ca46e3505b2c26ceafa5f0f69146`, `2026-04-26T00:37:03-05:00`, `fix: restore Range Button functionality in input controls (#287)`.
+- `palazos/winlatorCmod`: `9a27d00aeaaed884624355539c0d352769d285d9`, `2026-04-20T12:36:39-03:00`, `Drop Locale import from uinput-fpc filter`.
+- `EtchDroid`: `6873618e6683a47394c567857a293b863e405c8a`, `2026-04-19T23:24:51+02:00`, utility donor only.
+- `libaums`: `52167edc43ef6bc1f91bea8fba99dbba431caa84`, `2025-06-12T16:33:19+02:00`, USB utility donor only.
+
+Transferred in this app-side gate:
+- GameNative XInput2 raw motion/button event surface plus 7-button pointer mapping.
+- GameNative renderer post-process pipeline: offscreen scene buffer, render-scale effects, source texture filters, FSR1 EASU/RCAS, scaling mode, and vivid shader classes.
+- GameNative stale Wine process hard-kill prelaunch stage, merged with local native lifecycle reaper and forensic events.
+- WinNative `RANGE_BUTTON` binding exemption, generalized so unbound controls no longer steal touch events while range buttons remain dynamic.
+- GameNative X11 pointer-grab confinement and donor ClipCursor tolerance are merged into the local X server route.
+- palazos / Winlator-family controller hotplug stability is merged through local `FakeInputWriter.softRelease()` plus physical-device dedupe, while shutdown keeps hard cleanup.
+- WinNative `patchelf` native JNI rewrite surface is merged into the local `libpatchelf.so` owner instead of leaving Java-only ELF mutation logic.
+- Fresh user forensic profile-install failures are closed as a class:
+  foreign profile schema aliases, bionic-vs-glibc donor label precedence, and
+  `10.0.99-arm64ec-*` rolling/bleeding-edge capability suffix aliases now resolve through one identity path.
+- WCP/WCP.xz runtime-package intake is hardened as a class:
+  suffix-aware archive probing covers `.wcp`, `.wcp.xz`, `.wcp.zst`, `.txz`,
+  `.tzst`, raw `.tar`, and `.zip`; profile-less Wine/Proton payloads are
+  synthesized from root shape; bionic/glibc ownership is resolved from payload
+  sentinels plus ELF markers before canonical install-root binding.
+- Content-install forensics now records archive format, root shape, runtime
+  classifier scores/signals, and install-root diagnostics so user-submitted
+  logs can explain package recognition and broken-install state without a
+  local reproduction.
+- Decision ledger:
+  `docs/DONOR_ZERO_APP_LEDGER_2026-04-26.md`.
+
+Current verification:
+- `./gradlew :app:testDebugUnitTest --tests com.winlator.cmod.contents.ContentProfileParserTest --tests com.winlator.cmod.contents.ContentProfileIdentityTest --tests com.winlator.cmod.inputcontrols.InputDeviceHeuristicsTest --tests com.winlator.cmod.core.ProcessHelperSplitCommandTest --tests com.winlator.cmod.core.TarCompressorUtilsTest :app:assembleDebug --stacktrace --no-build-cache`
+- Result: `BUILD SUCCESSFUL` on `2026-04-26`.
+- Expanded package-intake gate:
+  `./gradlew :app:testDebugUnitTest --tests com.winlator.cmod.contents.ImportedContentHeuristicsTest --tests com.winlator.cmod.contents.ContentProfileParserTest --tests com.winlator.cmod.contents.ContentProfileIdentityTest --tests com.winlator.cmod.inputcontrols.InputDeviceHeuristicsTest --tests com.winlator.cmod.core.ProcessHelperSplitCommandTest --tests com.winlator.cmod.core.TarCompressorUtilsTest :app:assembleDebug --stacktrace --no-build-cache`
+- Expanded result: `BUILD SUCCESSFUL` on `2026-04-26`.
+- Local APK install: `adb -s 192.168.43.4:39057 install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`.
 
 ## R10-R14 Normalized Status (2026-03-13)
 
@@ -135,6 +183,13 @@ What was added to smooth the transition:
   - Round 1 transfer matrix is completed and remained in gate.
   - owner requested transition to Round 2 without additional rerun in this phase.
   - Round 1 state was frozen as `gate_hold`.
+- `2026-04-25`:
+  - Round 1 remains historically `gate_hold`, but under the Chapter 2 /
+    public-release / donor-rootfs contract it is now also the mandatory
+    re-open target after the next queued runtime donors.
+  - The reason is narrower than "redo GameNative":
+    current closure work is specifically rootfs/runtime/layout/public-release
+    parity against the live product, not a replay of the older soft-handoff.
 
 ## Round 2 Progress Snapshot
 
@@ -354,3 +409,66 @@ What was added to smooth the transition:
   - request/effective validation env split finalized (`AERO_VK_VALIDATION_REQUESTED` + effective layer signal).
 - `2026-03-06` closure:
   - Round 15 moved to `closed`.
+
+## Round 16 Progress Snapshot
+
+- `2026-04-25` pass 1:
+  - Round 16 re-opened under the Chapter 2 Black Diamond donor wall:
+    `AndreVto/proton-wine`, `MaxsTechReview/WinNative`,
+    `utkarshdalal/GameNative`, `palazos/winlatorCmod`.
+  - transferred the first reflected owner-class union into live source:
+    `controller contamination` + `content/runtime install forensic gap`.
+  - centralized controller classifier now rejects
+    `uinput-fpc` and `uinput-xiaomi` fingerprint/uinput impostors before slot
+    assignment and emits rejected-device forensic rows.
+  - centralized content/runtime diagnostics now surface
+    `expected/resolved/runtime roots`, `profile.json`, payload presence,
+    alias-resolution state, and broken-reason truth for `Broken install` and
+    related import/install failures.
+- `2026-04-25` state:
+  - Round 16 remains `active`.
+  - remaining frontier is no longer the blind app-side install/control fog;
+    it is the wider donor/source runtime wall still open in `freewine11` and
+    the next post-fix device proof wave.
+- `2026-04-26` native C/C++ pass:
+  - `MaxsTechReview/WinNative` Android-host native donor surface is now
+    active-source closed for transferable app-layer code:
+    - `process_lifecycle.c` accepted as an adapted `libwinlator.so` JNI owner
+      with `PR_SET_CHILD_SUBREAPER`, explicit windowed reaping, and Java
+      process-tree shutdown integration;
+    - `xz/native_xz_stream.c` plus embedded XZ decoder accepted as
+      `libaero_native_xz.so`, exposed through
+      `NativeXzInputStream`, and wired into file-backed `.txz/.wcp.xz`
+      extraction with Java decoder fallback for non-file streams;
+    - Vulkan OEM ICD dependency preload accepted into the local
+      Adrenotools-aware `vulkan.c` path rather than replacing the stronger
+      local driver-routing contract;
+    - `fakeinput` / `evshim` remain merged through the local
+      `aero_fakeinput` and `aero_evshim` library owners.
+  - `utkarshdalal/GameNative` native app-layer deltas are resolved by owner
+    class:
+    - `xconnectorpatch` accepted into local `xconnector_epoll.c` as
+      EINTR-safe socket/epoll/fd-ownership hardening;
+    - split `extras/gpu_image.c` and `extras/vulkan.c` are
+      `preserve-local` because local `winlator/gpu_image.c` and `vulkan.c`
+      already carry the stronger package namespace, fd/native-handle path,
+      Adrenotools guard, API-level Vulkan version handling, and OEM crypto
+      preload;
+    - `arraytools.c` is `reject-app-native` for this APK pass because it is a
+      decompiled generic container helper with no Java/JNI caller and unsafe
+      element-free ownership semantics for a shared app `.so`.
+  - `palazos/winlatorCmod` native app-layer deltas are resolved by owner
+    class:
+    - `fakeinput.cpp` is merged through the current `aero_fakeinput` owner,
+      which also carries poll/select/ppoll coverage and force-feedback routing;
+    - `winhandler.c` is `defer-guest-runtime-owner`, not an Android-host NDK
+      import: it is Windows guest code and belongs to the FreeWine/prefix
+      runtime lane if accepted.
+  - verification evidence:
+    - `./gradlew :app:testDebugUnitTest --tests com.winlator.cmod.core.TarCompressorUtilsTest --tests com.winlator.cmod.core.ProcessHelperSplitCommandTest --tests com.winlator.cmod.contents.ContentProfileParserTest --tests com.winlator.cmod.contents.ImportedContentHeuristicsTest --tests com.winlator.cmod.contents.RemoteFeedPayloadLoaderTest --tests com.winlator.cmod.inputcontrols.InputDeviceHeuristicsTest :app:assembleDebug --stacktrace --no-build-cache`
+      succeeded;
+    - emitted APK contains `libaero_native_xz.so`, `libwinlator.so`,
+      `libaero_fakeinput.so`, `libaero_evshim.so`, and
+      `libaero_android_sysvshm.so`;
+    - `llvm-readelf` shows `NativeXzInputStream` JNI exports plus
+      `xz_dec_catrun`, `xz_crc32`, and `xz_crc64` in `libaero_native_xz.so`.

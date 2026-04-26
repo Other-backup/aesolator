@@ -1,0 +1,6 @@
+{
+    global:
+        Java_com_winlator_cmod_core_NativeXzInputStream_*;
+    local:
+        *;
+};

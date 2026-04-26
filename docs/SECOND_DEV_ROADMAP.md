@@ -1,6 +1,6 @@
 # Second Developer Roadmap
 
-Updated: `2026-03-21`
+Updated: `2026-04-26`
 
 ## Mission
 
@@ -40,6 +40,44 @@ spans app/runtime/package/device surfaces.
   blocker, reason, scope impact, and explicit return point.
 
 ## Current Priorities
+
+### Active Black Diamond App-Donor Pass: Ae.solator Only
+
+Scope:
+- Work is currently limited to `aesolator`.
+- `freewine11`, Wine source donors, Proton source donors, and WCP packaging lanes are not part of this app-side pass.
+- Donor freshness is measured from Android/app donors that affect Ae.solator behavior directly.
+
+Freshness ledger:
+- `GameNative-app` is at `cbea7f75f7bd5b1dd5f665148c91251cf4a89b39`.
+- `WinNative-main-git` is at `b4297a39ade7ca46e3505b2c26ceafa5f0f69146`.
+- `palazos-winlatorCmod` is at `9a27d00aeaaed884624355539c0d352769d285d9`.
+- `EtchDroid` and `libaums` are refreshed as utility evidence only, not runtime-source donors.
+
+Closed in the current app-side batch:
+- XInput2 raw input extension from GameNative is integrated into the local X server path.
+- Renderer effects no longer recurse through `drawFrame()`; scene rendering, FBO targets, filter ownership, and render-scale effect hooks are split.
+- FSR1 EASU/RCAS, scaling mode, source texture filter, and vivid effect classes are present on the Ae.solator renderer surface.
+- Prelaunch stale Wine process cleanup now runs as a logged launch stage and uses the local native lifecycle reaper where available.
+- WinNative's 2026-04-26 range-button fix is applied as a generalized input-control binding guard.
+- X11 pointer-grab confinement is now represented in `GrabManager` and respected by pointer delta injection instead of being left as donor-only ClipCursor behavior.
+- Controller hotplug now has soft slot release, physical-device dedupe, and fingerprint/uinput impostor rejection in one input-device class.
+- `PatchElf` now routes through the native donor rewrite surface in local `libpatchelf.so`, preserving the local loader while adding real section rewrite ownership.
+- Foreign runtime profile parsing now accepts donor schema aliases and preserves bionic-native truth when donor labels also contain generic glibc/rootfs wording.
+- Rolling bleeding-edge runtime identity now accepts capability suffixes such as `10.0.99-arm64ec-ntsync`, matching the user forensic miss class.
+- WCP/WCP.xz package installation now uses a payload-first model:
+  suffix-aware archive probing handles zstd-tar, xz-tar, raw tar, and zip WCP
+  variants; profile-less Wine/Proton packages synthesize a safe profile; and
+  bionic/glibc runtime ownership is resolved from root layout plus ELF markers
+  before install-root naming.
+- Content-install logs now include archive format, root shape, runtime
+  classifier signals, and installed-profile diagnostics for foreign-device
+  package failures.
+
+Verification:
+- Final unified Gradle gate passed on `2026-04-26`.
+- Local debug APK install to `192.168.43.4:39057` passed with `adb install -r`.
+- CI/release dispatch is owned by `wcp-runtime-lanes` after the aesolator push.
 
 ### Active Closure Slice: Runtime Drawer / Prefix Pack / Route-Aware Profiles
 
@@ -1279,3 +1317,186 @@ Reflective result from the latest clean-session batch:
   It is the narrower follow-up class:
   final deterministic root lane plus cleanup of remaining Gradle 9
   deprecations.
+
+## 2026-04-25 Black Diamond donor + log frontier
+
+- Fresh active evidence set is now explicit and should stay the source of
+  truth for this batch:
+  `/storage/emulated/0/Download/forensics_2026-04-25_12-51-00.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_13-54-04.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_14-13-50.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_14-26-21.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_16-11-13.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_16-44-11.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_16-58-16.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_17-27-53.zip`,
+  `/storage/emulated/0/Download/forensics_2026-04-25_17-46-12.zip`,
+  `/storage/emulated/0/Download/logs.zip`,
+  and
+  `/storage/emulated/0/Winlator/forensics/exports/forensics_2026-04-25_18-38-57.jsonl`.
+- Closed in source during this pass:
+  `ContentProfile` / `ContentProfileIdentity` / `ContentsManager` now treat
+  runtime identity as a payload-compatible contract rather than a brittle
+  label match, which directly targets
+  `Broken install: Install directory missing` and
+  `Profile cannot be recognized` classes from the fresh user reports.
+- `ContentsFragment` now carries scoped remote-profile caches and refresh
+  generation guards, so stale feed responses cannot overwrite a newer active
+  scope and make artifact lists disappear from `Contents`.
+- `ImageFsInstaller` now treats the GameNative rootfs as a universal donor
+  base when the glibc/bionic archive payload is byte-identical, stages
+  `libc++_shared.so` into both guest and Android-host library closures, and
+  sanitizes AppleDouble / `.DS_Store` Vulkan manifest residue while emitting
+  `VULKAN_ROOTFS_RUNTIME_CLOSURE`.
+- `GuestProgramLauncherComponent` is now the central owner of the direct
+  ARM64EC Android-host library-path policy. `GlibcProgramLauncherComponent`
+  and `BionicProgramLauncherComponent` both route through the same
+  runtime-first / host-second / system-tail `LD_LIBRARY_PATH` sanitizer for
+  direct ARM64EC launch: runtime `lib*/wine/unix` segments are preserved, but
+  rootfs `usr/lib*` is stripped before Android-host and `/system` / `/apex`
+  paths are appended, which directly targets the fresh
+  `bad ELF magic` loader class.
+- `XServerDisplayActivity` now treats wrapper ICD routing as an Android-host
+  contract instead of a rootfs guess:
+  the app build embeds `libvulkan_wrapper.so` into `lib/arm64-v8a/`,
+  launch-time ICD resolution rewrites the wrapper manifest toward the
+  APK-native library path, emits
+  `WRAPPER_ICD_ANDROID_HOST_REWRITE_APPLIED`, and reports
+  `AERO_VULKAN_RUNTIME_SOURCE=wrapper-host-native` instead of pretending a
+  rootfs wrapper path is still authoritative.
+- `XServerDisplayActivity.applyGraphicsDriverPackages()` now keeps
+  `active_provider_*` telemetry coherent when the selected route falls back to
+  `System` or another selected package without a separate `activeInfo`
+  object, so `Contents` / route forensics stop collapsing that owner-class
+  into empty provider-lane strings.
+- `GuestProgramLauncherComponent.resolveInstalledContentProfile()` now routes
+  translator payload lookup through `findInstalledProfileByVersion()` before
+  the older exact-name path, so installed alias-compatible `FEXCore` /
+  `WOWBox64` / `Box64` packages stop surfacing as
+  `payload present but profile_found=false`.
+- That launcher-owner refactor was verified, not just written:
+  `./gradlew :app:testDebugUnitTest --tests com.winlator.cmod.core.AndroidBionicHostLdPathHelperTest --tests com.winlator.cmod.core.VulkanIcdManifestHelperTest --tests com.winlator.cmod.core.WineInfoTest :app:assembleDebug --stacktrace --no-build-cache`,
+  APK listing proof
+  `app/build/outputs/apk/debug/app-debug.apk -> lib/arm64-v8a/libvulkan_wrapper.so`,
+  and
+  the previous
+  `./gradlew :app:compileDebugJavaWithJavac --stacktrace --no-build-cache`
+  pass all succeeded on `2026-04-25`.
+
+### Active log owner-classes after the current source pass
+
+1. `runtime identity / install-root drift`
+   - Source-side resolver closure is now landed across
+     `ContentProfile` / `ContentProfileIdentity` / `ContentsManager` /
+     `WineInfo`.
+   - Older bundles still preserve the pre-fix symptom, so the remaining work
+     is not more speculative source churn; it is fresh post-fix device proof.
+2. `bionic runtime loader purity`
+   - Fresh external logs captured
+     `CANNOT LINK EXECUTABLE ... libc.so has bad ELF magic: 2f2a2047`
+     on a `runtime-bionic-proton-*` path.
+   - Central launcher precedence is now corrected in source; the remaining
+     gate is fresh runtime proof from a post-fix build/install.
+3. `wrapper payload freshness`
+   - Pre-fix bundles showed
+     `libvulkan_wrapper.so -> libc++_shared.so not found`,
+     invalid `._VkLayer_*` JSON residue, and `vkCreateInstance: Found no drivers`.
+   - Source-side closure for that class is now in tree:
+     APK-native wrapper payload is packaged and ICD routing is rewritten to the
+     host-native library. The remaining burden is fresh-device proof from a
+     post-fix install, not more speculative edits against stale bundles.
+4. `graphics provider coherence`
+   - Several bundles showed `graphics_driver=wrapper` with
+     `active_provider_lane=""` and `opengl_overlay_active=0` even when the
+     selected driver entry was a Turnip package.
+   - Empty active-provider telemetry is now narrowed in source by falling back
+     to the selected route object when a separate `activeInfo` was absent.
+     The remaining audit is fresh proof across `Contents`, rootfs overlays,
+     and route application.
+5. `translator dependency surfacing`
+   - `WOWBOX64_PAYLOAD_REFRESH` and `FEXCORE_PAYLOAD_REFRESH` frequently report
+     `payload_missing=true`; some cases legitimately degrade to embedded
+     payloads and some are real missing dependencies.
+   - Alias-compatible installed payload lookup is now narrowed in source, so
+     one false-negative class is removed.
+   - The remaining fix is stricter classification between
+     `payload genuinely missing` and `payload intentionally degraded to
+     embedded fallback`, with equally explicit forensics for both branches.
+
+### Donor execution order for the next Black Diamond passes
+
+1. `AndreVto/proton-wine`
+   - target: Proton-11 runtime metadata, prefix-pack contract, Android-facing
+     patches, build scripts, launcher/runtime assumptions, and any stronger
+     ARM64EC bootstrap logic.
+2. `MaxsTechReview/WinNative`
+   - target: runtime/xserver integration, wrapper/native routing, broader
+     forensics, and any stronger Android-host/X11 closure.
+3. `utkarshdalal/GameNative` re-open under the current Chapter 2 contract
+   - target: rootfs/runtime/layout/public-release parity rather than the older
+     soft-handoff gate snapshot.
+4. `palazos/winlatorCmod`
+   - target: controller/gamepad ownership, app management surfaces, and any
+     donor-side runtime/UI contracts that still beat local behavior.
+
+### Execution rule for this frontier
+
+- Donor work and log work are now one coupled roadmap, not separate queues.
+- Each donor pass must consume the freshest reflected log owner-classes first,
+  then apply donor logic against those live classes, not against an old paper
+  donor matrix.
+- No donor prestige bias:
+  stronger logic is accepted from any donor only when it closes a live owner
+  class or materially strengthens the product contract.
+
+### 2026-04-25 donor batch absorbed into source
+
+1. `palazos/winlatorCmod` -> `controller contamination`
+   - centralized controller classification now rejects fingerprint/uinput false
+     positives instead of letting them poison player slot assignment.
+   - donor-origin `uinput-fpc` exclusion was widened for the live HyperOS/MIUI
+     class to include `uinput-xiaomi`.
+   - app-side forensics now records rejected controller-like nodes with
+     descriptor/vendor/product/source mask and rejection reason.
+2. `GameNative + WinNative` -> `controller signature + install/runtime forensic broadening`
+   - raw source-mask controller detection was widened with explicit
+     gamepad-key / joystick-axis signals so real pads survive while
+     fingerprint sensors stop masquerading as player-one devices.
+   - runtime/content diagnostics now emit one centralized install-state payload:
+     expected install root, resolved install root, runtime root,
+     `profile.json` presence, payload presence, alias-resolution state, and
+     broken-reason truth.
+3. `AndreVto/proton-wine` -> `preserved closure evidence`
+   - current source tree already carries the Android/X11/sysvshm contract
+     surfaced from the Proton-11 donor line:
+     `libandroid-sysvshm`, `_NET_WM_PID`, `_NET_WM_HWND`,
+     `WINE_X11FORCEGLX`, and the X11-first desktop route stay source-owned.
+   - this batch therefore widened app/runtime forensics around that existing
+     closure instead of replaying stale source drift by hand.
+
+### 2026-04-26 native C/C++ donor frontier closure
+
+- `MaxsTechReview/WinNative` app-native transferable code is now absorbed or
+  explicitly resolved:
+  - process lifecycle is source-owned by `libwinlator.so` through
+    `process_lifecycle.c` and `ProcessHelper`;
+  - native XZ is source-owned by `libaero_native_xz.so` through
+    `NativeXzInputStream`, and file-backed `.txz/.wcp.xz` extraction now uses
+    the donor decoder before falling back to the existing Java decoder;
+  - Vulkan OEM ICD dependency preload is merged into the local Adrenotools
+    route instead of replacing it;
+  - fake input / evshim remain owned by local `aero_*` libraries.
+- `GameNative` native leftovers are resolved:
+  - `xconnectorpatch` is merged into `xconnector_epoll.c`;
+  - split GPU/Vulkan extras are weaker than local integrated owners and stay
+    `preserve-local`;
+  - `arraytools.c` is not imported into the APK because it has no app caller
+    and encodes container ownership as implicit frees.
+- `palazos/winlatorCmod` native leftovers are resolved:
+  - `fakeinput.cpp` is merged through local `aero_fakeinput`;
+  - `winhandler.c` is a Windows guest-runtime candidate, not an Android NDK
+    library, and remains assigned to the FreeWine/prefix owner lane.
+- Verification:
+  - native CMake builds `libaero_native_xz.so`;
+  - targeted unit tests plus `:app:assembleDebug` are green;
+  - APK proof confirms the native runtime libraries are packaged.

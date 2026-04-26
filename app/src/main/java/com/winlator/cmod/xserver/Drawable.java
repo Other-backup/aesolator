@@ -3,6 +3,7 @@ package com.winlator.cmod.xserver;
 import android.graphics.Bitmap;
 
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.WinlatorNative;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.Texture;
@@ -23,7 +24,7 @@ public class Drawable extends XResource {
     public final Object renderLock = new Object();
 
     static {
-        System.loadLibrary("winlator");
+        WinlatorNative.ensureLoaded("Drawable");
     }
 
     public Drawable(int id, int width, int height, Visual visual) {

@@ -8,6 +8,7 @@ import com.winlator.cmod.contentdialog.VortekConfigDialog;
 import com.winlator.cmod.contents.VortekVulkanDriverPackageManager;
 import com.winlator.cmod.core.GPUHelper;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.NativeLibraryLoader;
 import com.winlator.cmod.core.VortekExtensionPolicy;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.Texture;
@@ -47,7 +48,7 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
     private native void initVulkanWrapper(String nativeLibraryDir, String libvulkanPath);
 
     static {
-        System.loadLibrary("vortekrenderer");
+        NativeLibraryLoader.ensureLoaded("vortekrenderer", "VortekRendererComponent");
     }
 
     public static class Options {

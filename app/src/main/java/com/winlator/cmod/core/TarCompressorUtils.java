@@ -212,10 +212,27 @@ public abstract class TarCompressorUtils {
         if (source == null) return false;
         try {
             if (source.toString().startsWith("/")) {
-                return extract(type, new FileInputStream(source.toString()), destination, onExtractFileListener);
+                return extract(type, new File(source.toString()), destination, onExtractFileListener);
             } else {
                 return extract(type, context.getContentResolver().openInputStream(source), destination, onExtractFileListener);
             }
+        }
+        catch (FileNotFoundException e) {
+            return false;
+        }
+    }
+
+    public static boolean extractTar(Context context, Uri source, File destination) {
+        return extractTar(context, source, destination, null);
+    }
+
+    public static boolean extractTar(Context context, Uri source, File destination, OnExtractFileListener onExtractFileListener) {
+        if (source == null) return false;
+        try {
+            if (source.toString().startsWith("/")) {
+                return extractTar(new File(source.toString()), destination, onExtractFileListener);
+            }
+            return extractTar(context.getContentResolver().openInputStream(source), destination, onExtractFileListener);
         }
         catch (FileNotFoundException e) {
             return false;
@@ -229,15 +246,31 @@ public abstract class TarCompressorUtils {
     public static boolean extract(Type type, File source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null || !source.isFile()) return false;
         try {
-            return extract(type, new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE), destination, onExtractFileListener);
+            return extractFromCompressedFile(type, source, destination, onExtractFileListener);
         }
-        catch (FileNotFoundException e) {
+        catch (IOException e) {
+            logError("Failed to extract compressed archive file: " + source.getAbsolutePath(), e);
             return false;
         }
     }
 
     private static boolean extract(Type type, InputStream source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null) return false;
+        try {
+            return extractFromCompressedStream(getCompressorInputStream(type, source), destination, onExtractFileListener);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static boolean extractFromCompressedFile(Type type, File source, File destination, OnExtractFileListener onExtractFileListener) throws IOException {
+        return extractFromCompressedStream(getCompressorInputStream(type, source), destination, onExtractFileListener);
+    }
+
+    private static boolean extractFromCompressedStream(InputStream inStream, File destination, OnExtractFileListener onExtractFileListener) {
+        if (inStream == null) return false;
         File rootDir;
         try {
             rootDir = FileUtils.ensureCanonicalDirectory(destination);
@@ -246,8 +279,8 @@ public abstract class TarCompressorUtils {
             logError("Invalid extraction destination: " + destination, e);
             return false;
         }
-        try (InputStream inStream = getCompressorInputStream(type, source);
-             ArchiveInputStream tar = new TarArchiveInputStream(inStream)) {
+        try (InputStream ownedInput = inStream;
+             ArchiveInputStream tar = new TarArchiveInputStream(ownedInput)) {
             TarArchiveEntry entry;
             while ((entry = (TarArchiveEntry)tar.getNextEntry()) != null) {
                 if (!tar.canReadEntryData(entry)) continue;
@@ -272,6 +305,24 @@ public abstract class TarCompressorUtils {
         }
         else if (type == Type.ZSTD) {
             return new ZstdCompressorInputStream(source);
+        }
+        return null;
+    }
+
+    private static InputStream getCompressorInputStream(Type type, File source) throws IOException {
+        if (type == Type.XZ) {
+            if (NativeXzInputStream.isAvailable()) {
+                try {
+                    return new NativeXzInputStream(source);
+                }
+                catch (IOException e) {
+                    logError("Native XZ decoder failed; falling back to Java decoder: " + source.getAbsolutePath(), e);
+                }
+            }
+            return new XZCompressorInputStream(new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE));
+        }
+        else if (type == Type.ZSTD) {
+            return new ZstdCompressorInputStream(new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE));
         }
         return null;
     }
@@ -313,6 +364,16 @@ public abstract class TarCompressorUtils {
 
     public static boolean extractTar(File source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null || !source.isFile()) return false;
+        try {
+            return extractTar(new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE), destination, onExtractFileListener);
+        } catch (IOException e) {
+            Log.e("RestoreOp", "Failed to open tar file", e);
+            return false;
+        }
+    }
+
+    private static boolean extractTar(InputStream inputStream, File destination, OnExtractFileListener onExtractFileListener) {
+        if (inputStream == null) return false;
         File rootDir;
         try {
             rootDir = FileUtils.ensureCanonicalDirectory(destination);
@@ -321,7 +382,7 @@ public abstract class TarCompressorUtils {
             logError("Invalid tar extraction destination: " + destination, e);
             return false;
         }
-        try (InputStream inStream = new BufferedInputStream(new FileInputStream(source), StreamUtils.BUFFER_SIZE);
+        try (InputStream inStream = inputStream;
              TarArchiveInputStream tar = new TarArchiveInputStream(inStream)) {
             TarArchiveEntry entry;
             String topLevelDirectory = null;
@@ -361,7 +422,5 @@ public abstract class TarCompressorUtils {
 
 
 }
-
-
 
 

@@ -63,6 +63,7 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.ThemeAssetPainter;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.core.UpscalerProfileStore;
@@ -120,9 +121,11 @@ public class ContainerDetailFragment extends Fragment {
             "SDL_JOYSTICK_WGI=0",
             "SDL_XINPUT_ENABLED=1",
             "SDL_JOYSTICK_RAWINPUT=0",
-            "SDL_JOYSTICK_HIDAPI=1",
+            "SDL_JOYSTICK_HIDAPI=0",
             "SDL_DIRECTINPUT_ENABLED=0",
             "SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1",
+            "SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD=1",
+            "PROTON_ENABLE_HIDRAW=0",
             "SDL_HINT_FORCE_RAISEWINDOW=0",
             "SDL_ALLOW_TOPMOST=0",
             "SDL_MOUSE_FOCUS_CLICKTHROUGH=1"
@@ -257,7 +260,9 @@ public class ContainerDetailFragment extends Fragment {
             return;
         }
 
-        getParentFragmentManager().beginTransaction()
+        UiLifecycleGuard.commit(
+                requireActivity(),
+                getParentFragmentManager().beginTransaction()
                 .setCustomAnimations(
                         R.anim.slide_in_up,
                         R.anim.slide_out_down,
@@ -265,8 +270,10 @@ public class ContainerDetailFragment extends Fragment {
                         R.anim.slide_out_up
                 )
                 .addToBackStack(null)
-                .replace(R.id.FLFragmentContainer, new ContentsFragment())
-                .commit();
+                .replace(R.id.FLFragmentContainer, new ContentsFragment()),
+                "ContainerDetailFragment",
+                "open_contents_for_runtime_install"
+        );
     }
 
     private void refreshRuntimeSelectionIfNeeded(@NonNull View view) {
@@ -435,12 +442,14 @@ public class ContainerDetailFragment extends Fragment {
         btConfirm.setText(isEditMode() ? R.string.save : R.string.create);
         btCancel.setOnClickListener((v) -> {
             if (getParentFragmentManager().getBackStackEntryCount() > 0) {
-                getParentFragmentManager().popBackStack();
+                if (UiLifecycleGuard.popBackStack(this, "ContainerDetailFragment", "cancel_pop_backstack")) {
+                    return;
+                }
             } else if (getActivity() instanceof MainActivity) {
                 ((MainActivity) getActivity()).showHomeDashboard(true);
-            } else if (getActivity() != null) {
-                getActivity().onBackPressed();
+                return;
             }
+            UiLifecycleGuard.dispatchBackPress(this, "ContainerDetailFragment", "cancel_back");
         });
         btOpenContents.setOnClickListener((v) -> openContentsForRuntimeInstall());
         updateRuntimeSelectionUi(view);
@@ -801,7 +810,7 @@ public class ContainerDetailFragment extends Fragment {
                                 () -> AppUtils.restartApplication(context)
                         );
                     }
-                    getActivity().onBackPressed();
+                    UiLifecycleGuard.dispatchBackPress(this, "ContainerDetailFragment", "save_existing_container");
                 } else {
                     // Create new container with specified properties
                     JSONObject data = new JSONObject();
@@ -853,10 +862,7 @@ public class ContainerDetailFragment extends Fragment {
                         this.container = container;
                         syncPendingWallpaperToContainerIfNeeded(desktopTheme, container);
                         saveWineRegistryKeys(view);
-                        Activity activity = getActivity();
-                        if (activity != null) {
-                            activity.onBackPressed();
-                        }
+                        UiLifecycleGuard.dispatchBackPress(this, "ContainerDetailFragment", "create_container_async_complete");
                     });
                 }
             } catch (JSONException e) {

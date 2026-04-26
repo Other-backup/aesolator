@@ -18,44 +18,80 @@ final class ContentProfileParser {
         try {
             ContentProfile profile = new ContentProfile();
             JSONObject profileJSONObject = new JSONObject(rawJson);
-            String typeName = profileJSONObject.optString(
-                    ContentProfile.MARK_TYPE,
-                    profileJSONObject.optString("contentType", "")
+            String typeName = firstNonBlank(
+                    optString(profileJSONObject, ContentProfile.MARK_TYPE),
+                    optString(profileJSONObject, "contentType"),
+                    optString(profileJSONObject, "componentType"),
+                    optString(profileJSONObject, "packageType"),
+                    optString(profileJSONObject, "profileType"),
+                    optString(profileJSONObject, "category")
             );
+            if (typeName.isEmpty()) {
+                if (profileJSONObject.optJSONObject(ContentProfile.MARK_PROTON) != null) typeName = "Proton";
+                else if (profileJSONObject.optJSONObject(ContentProfile.MARK_WINE) != null) typeName = "Wine";
+            }
             ContentProfile.ContentType resolvedType = ContentProfile.ContentType.getTypeByName(typeName);
             if (resolvedType == null) return null;
 
             profile.type = resolvedType;
-            profile.verName = profileJSONObject.optString(
-                    ContentProfile.MARK_VERSION_NAME,
-                    profileJSONObject.optString("verName", profileJSONObject.optString("versionName", ""))
+            profile.verName = firstNonBlank(
+                    optString(profileJSONObject, ContentProfile.MARK_VERSION_NAME),
+                    optString(profileJSONObject, "verName"),
+                    optString(profileJSONObject, "version"),
+                    optString(profileJSONObject, "version_name"),
+                    optString(profileJSONObject, "version-name"),
+                    optString(profileJSONObject, "displayVersion"),
+                    optString(profileJSONObject, "buildVersion"),
+                    optString(profileJSONObject, "releaseName"),
+                    optString(profileJSONObject, "name")
             );
-            profile.verCode = parseOptionalInt(
-                    profileJSONObject.opt(ContentProfile.MARK_VERSION_CODE),
-                    parseOptionalInt(profileJSONObject.opt("verCode"), 0)
+            profile.verCode = firstOptionalInt(
+                    profileJSONObject,
+                    0,
+                    ContentProfile.MARK_VERSION_CODE,
+                    "verCode",
+                    "version_code",
+                    "code",
+                    "build"
             );
-            profile.desc = profileJSONObject.optString(ContentProfile.MARK_DESC, profileJSONObject.optString("name", ""));
-            profile.channel = profileJSONObject.optString(ContentProfile.MARK_CHANNEL, ContentProfile.CHANNEL_STABLE);
-            profile.delivery = profileJSONObject.optString(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_EMBEDDED);
-            profile.displayCategory = profileJSONObject.optString(ContentProfile.MARK_DISPLAY_CATEGORY, "");
-            profile.sourceRepo = profileJSONObject.optString(ContentProfile.MARK_SOURCE_REPO, "");
-            profile.sourceFeed = profileJSONObject.optString(ContentProfile.MARK_SOURCE_FEED, "");
-            profile.sourceLabel = profileJSONObject.optString(ContentProfile.MARK_SOURCE_LABEL, "");
-            profile.releaseTag = profileJSONObject.optString(ContentProfile.MARK_RELEASE_TAG, "");
-            profile.artifactName = profileJSONObject.optString(ContentProfile.MARK_ARTIFACT_NAME, "");
-            profile.publishedAt = profileJSONObject.optString(ContentProfile.MARK_PUBLISHED_AT, "");
-            profile.releaseNotes = profileJSONObject.optString(ContentProfile.MARK_RELEASE_NOTES, "");
+            profile.desc = firstNonBlank(
+                    optString(profileJSONObject, ContentProfile.MARK_DESC),
+                    optString(profileJSONObject, "desc"),
+                    optString(profileJSONObject, "summary"),
+                    optString(profileJSONObject, "title"),
+                    optString(profileJSONObject, "name")
+            );
+            profile.channel = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_CHANNEL), ContentProfile.CHANNEL_STABLE);
+            profile.delivery = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_DELIVERY), optString(profileJSONObject, "deliveryMode"), ContentProfile.DELIVERY_EMBEDDED);
+            profile.displayCategory = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_DISPLAY_CATEGORY), optString(profileJSONObject, "display_category"));
+            profile.sourceRepo = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_SOURCE_REPO), optString(profileJSONObject, "source_repo"), optString(profileJSONObject, "repo"), optString(profileJSONObject, "repository"));
+            profile.sourceFeed = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_SOURCE_FEED), optString(profileJSONObject, "source_feed"), optString(profileJSONObject, "feed"));
+            profile.sourceLabel = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_SOURCE_LABEL), optString(profileJSONObject, "source_label"), optString(profileJSONObject, "source"));
+            profile.releaseTag = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_RELEASE_TAG), optString(profileJSONObject, "release_tag"), optString(profileJSONObject, "tag"), optString(profileJSONObject, "tagName"));
+            profile.artifactName = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_ARTIFACT_NAME), optString(profileJSONObject, "artifact"), optString(profileJSONObject, "assetName"), optString(profileJSONObject, "fileName"));
+            profile.publishedAt = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_PUBLISHED_AT), optString(profileJSONObject, "published_at"), optString(profileJSONObject, "createdAt"), optString(profileJSONObject, "date"));
+            profile.releaseNotes = firstNonBlank(optString(profileJSONObject, ContentProfile.MARK_RELEASE_NOTES), optString(profileJSONObject, "release_notes"), optString(profileJSONObject, "notes"), optString(profileJSONObject, "changelog"));
             profile.runtimeModel = readRuntimeModelHint(profileJSONObject);
             profile.vulkanApiMin = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MIN, 0);
             profile.vulkanApiMax = profileJSONObject.optInt(ContentProfile.MARK_VULKAN_API_MAX, 0);
-            profile.remoteSha256 = normalizeSha256(profileJSONObject.optString(ContentProfile.MARK_SHA256, ""));
+            profile.remoteSha256 = normalizeSha256(firstNonBlank(
+                    optString(profileJSONObject, ContentProfile.MARK_SHA256),
+                    optString(profileJSONObject, "sha"),
+                    optString(profileJSONObject, "checksum"),
+                    optString(profileJSONObject, "digest")
+            ));
             profile.setInstalledLocally(true);
 
             List<ContentProfile.ContentFile> fileList = new ArrayList<>();
-            JSONArray fileJSONArray = profileJSONObject.optJSONArray(ContentProfile.MARK_FILE_LIST);
-            if (fileJSONArray == null) {
-                fileJSONArray = profileJSONObject.optJSONArray("fileList");
-            }
+            JSONArray fileJSONArray = firstArray(profileJSONObject,
+                    ContentProfile.MARK_FILE_LIST,
+                    "fileList",
+                    "installFiles",
+                    "installedFiles",
+                    "payloadFiles",
+                    "payloads",
+                    "artifacts"
+            );
             if (fileJSONArray != null) {
                 for (int i = 0; i < fileJSONArray.length(); i++) {
                     JSONObject contentFileJSONObject = fileJSONArray.optJSONObject(i);
@@ -65,13 +101,20 @@ final class ContentProfileParser {
                             contentFileJSONObject.optString(ContentProfile.MARK_FILE_SOURCE, ""),
                             contentFileJSONObject.optString("src", ""),
                             contentFileJSONObject.optString("sourcePath", ""),
-                            contentFileJSONObject.optString("path", "")
+                            contentFileJSONObject.optString("path", ""),
+                            contentFileJSONObject.optString("file", ""),
+                            contentFileJSONObject.optString("fileName", ""),
+                            contentFileJSONObject.optString("from", ""),
+                            contentFileJSONObject.optString("relativePath", "")
                     );
                     contentFile.target = firstNonBlank(
                             contentFileJSONObject.optString(ContentProfile.MARK_FILE_TARGET, ""),
                             contentFileJSONObject.optString("dst", ""),
                             contentFileJSONObject.optString("targetPath", ""),
-                            contentFileJSONObject.optString("target", "")
+                            contentFileJSONObject.optString("target", ""),
+                            contentFileJSONObject.optString("destination", ""),
+                            contentFileJSONObject.optString("installPath", ""),
+                            contentFileJSONObject.optString("to", "")
                     );
                     if (contentFile.source.isEmpty() || contentFile.target.isEmpty()) continue;
                     fileList.add(contentFile);
@@ -81,28 +124,52 @@ final class ContentProfileParser {
 
             if (resolvedType == ContentProfile.ContentType.CONTENT_TYPE_WINE
                     || resolvedType == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-                JSONObject runtimeJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_PROTON);
-                if (runtimeJSONObject == null) {
-                    runtimeJSONObject = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
-                }
+                JSONObject runtimeJSONObject = firstObject(profileJSONObject,
+                        ContentProfile.MARK_PROTON,
+                        ContentProfile.MARK_WINE,
+                        "runtime",
+                        "payload",
+                        "wineRuntime"
+                );
                 profile.wineLibPath = firstNonBlank(
                         runtimeJSONObject != null ? runtimeJSONObject.optString(ContentProfile.MARK_WINE_LIBPATH, "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("wineLibPath", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("lib", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("libs", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("libDir", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("libraryPath", "") : "",
                         profileJSONObject.optString(ContentProfile.MARK_WINE_LIBPATH, ""),
-                        profileJSONObject.optString("libPath", "")
+                        profileJSONObject.optString("wineLibPath", ""),
+                        profileJSONObject.optString("libPath", ""),
+                        profileJSONObject.optString("lib", ""),
+                        profileJSONObject.optString("libs", ""),
+                        profileJSONObject.optString("libDir", "")
                 );
                 profile.wineBinPath = firstNonBlank(
                         runtimeJSONObject != null ? runtimeJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("wineBinPath", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("bin", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("binDir", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("binaryPath", "") : "",
                         profileJSONObject.optString(ContentProfile.MARK_WINE_BINPATH, ""),
-                        profileJSONObject.optString("binPath", "")
+                        profileJSONObject.optString("wineBinPath", ""),
+                        profileJSONObject.optString("binPath", ""),
+                        profileJSONObject.optString("bin", ""),
+                        profileJSONObject.optString("binDir", ""),
+                        profileJSONObject.optString("bindir", "")
                 );
                 profile.winePrefixPack = firstNonBlank(
                         runtimeJSONObject != null ? runtimeJSONObject.optString(ContentProfile.MARK_WINE_PREFIX_PACK, "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("prefixPackPath", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("prefix_pack", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("prefix", "") : "",
+                        runtimeJSONObject != null ? runtimeJSONObject.optString("prefixArchive", "") : "",
                         profileJSONObject.optString(ContentProfile.MARK_WINE_PREFIX_PACK, ""),
-                        profileJSONObject.optString("prefixPack", "")
+                        profileJSONObject.optString("prefixPackPath", ""),
+                        profileJSONObject.optString("prefix_pack", ""),
+                        profileJSONObject.optString("prefix", ""),
+                        profileJSONObject.optString("prefixArchive", "")
                 );
-                if (profile.wineLibPath.isEmpty() && profile.wineBinPath.isEmpty() && profile.winePrefixPack.isEmpty()) {
-                    return null;
-                }
                 profile.runtimeModel = profile.getRuntimeModel();
             } else if (fileList.isEmpty()) {
                 return null;
@@ -114,23 +181,71 @@ final class ContentProfileParser {
     }
 
     private static String readRuntimeModelHint(JSONObject profileJSONObject) {
-        String explicit = ContentProfile.normalizeRuntimeModel(
-                profileJSONObject.optString(ContentProfile.MARK_RUNTIME_MODEL, "")
+        String explicit = firstNonBlank(
+                profileJSONObject.optString(ContentProfile.MARK_RUNTIME_MODEL, ""),
+                profileJSONObject.optString("runtime_model", ""),
+                profileJSONObject.optString("runtimeClass", ""),
+                profileJSONObject.optString("runtimeClassTarget", ""),
+                profileJSONObject.optString("runtimeClassDetected", ""),
+                profileJSONObject.optString("runtime", ""),
+                profileJSONObject.optString("targetRuntime", "")
         );
+        explicit = ContentProfile.normalizeRuntimeModel(explicit);
         if (!explicit.isEmpty()) return explicit;
 
-        JSONObject proton = profileJSONObject.optJSONObject(ContentProfile.MARK_PROTON);
+        JSONObject proton = firstObject(profileJSONObject, ContentProfile.MARK_PROTON, "runtime", "payload", "wineRuntime");
         if (proton != null) {
-            explicit = ContentProfile.normalizeRuntimeModel(proton.optString(ContentProfile.MARK_RUNTIME_MODEL, ""));
+            explicit = ContentProfile.normalizeRuntimeModel(firstNonBlank(
+                    proton.optString(ContentProfile.MARK_RUNTIME_MODEL, ""),
+                    proton.optString("runtime_model", ""),
+                    proton.optString("runtimeClass", ""),
+                    proton.optString("runtimeClassTarget", ""),
+                    proton.optString("runtimeClassDetected", ""),
+                    proton.optString("target", ""),
+                    proton.optString("model", "")
+            ));
             if (!explicit.isEmpty()) return explicit;
         }
 
         JSONObject wine = profileJSONObject.optJSONObject(ContentProfile.MARK_WINE);
         if (wine != null) {
-            explicit = ContentProfile.normalizeRuntimeModel(wine.optString(ContentProfile.MARK_RUNTIME_MODEL, ""));
+            explicit = ContentProfile.normalizeRuntimeModel(firstNonBlank(
+                    wine.optString(ContentProfile.MARK_RUNTIME_MODEL, ""),
+                    wine.optString("runtimeClassTarget", ""),
+                    wine.optString("runtimeClassDetected", ""),
+                    wine.optString("target", "")
+            ));
             if (!explicit.isEmpty()) return explicit;
         }
         return "";
+    }
+
+    private static JSONArray firstArray(JSONObject object, String... keys) {
+        if (object == null || keys == null) return null;
+        for (String key : keys) {
+            if (key == null || key.isEmpty()) continue;
+            JSONArray array = object.optJSONArray(key);
+            if (array != null) return array;
+        }
+        return null;
+    }
+
+    private static JSONObject firstObject(JSONObject object, String... keys) {
+        if (object == null || keys == null) return null;
+        for (String key : keys) {
+            if (key == null || key.isEmpty()) continue;
+            JSONObject nested = object.optJSONObject(key);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    private static String optString(JSONObject object, String key) {
+        if (object == null || key == null || key.isEmpty()) return "";
+        Object value = object.opt(key);
+        if (value == null || value == JSONObject.NULL) return "";
+        if (value instanceof JSONObject || value instanceof JSONArray) return "";
+        return value.toString();
     }
 
     private static int parseOptionalInt(Object value, int defaultValue) {
@@ -142,6 +257,15 @@ final class ContentProfileParser {
         } catch (Exception ignored) {
             return defaultValue;
         }
+    }
+
+    private static int firstOptionalInt(JSONObject object, int defaultValue, String... keys) {
+        if (object == null || keys == null) return defaultValue;
+        for (String key : keys) {
+            if (key == null || key.isEmpty() || !object.has(key)) continue;
+            return parseOptionalInt(object.opt(key), defaultValue);
+        }
+        return defaultValue;
     }
 
     private static String firstNonBlank(String... values) {

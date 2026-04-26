@@ -1,6 +1,7 @@
 package com.winlator.cmod;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.SharedPreferences;
@@ -39,6 +40,7 @@ import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.SpinnerAdapters;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.UiLifecycleGuard;
 import com.winlator.cmod.core.UpscalerProfileStore;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
@@ -977,12 +979,11 @@ public class AdrenotoolsFragment extends Fragment {
         new Thread(() -> {
             if (!isAdded()) return;
             List<ContentProfile> sourceProfiles = collectSourceProfiles(selectedLane, sourceMode);
-            if (!isAdded() || getActivity() == null) return;
-            requireActivity().runOnUiThread(() -> {
+            UiLifecycleGuard.runOnUiThread(this, () -> {
                 if (requestToken != graphicsFeedRefreshToken) return;
                 updateBranchSelector(sourceProfiles);
                 showGraphicsFeed(applyBranchFilter(sourceProfiles, branchMode));
-            });
+            }, "AdrenotoolsFragment", "refresh_graphics_feed");
         }).start();
     }
 
@@ -1922,6 +1923,7 @@ public class AdrenotoolsFragment extends Fragment {
     private void performRemoteInstall(ContentProfile requestedProfile) {
         if (!isAdded()) return;
         final String entryName = ContentsManager.getEntryName(requestedProfile);
+        final Context appContext = requireContext().getApplicationContext();
         installingEntries.add(entryName);
         refreshGraphicsFeed();
 
@@ -1929,7 +1931,7 @@ public class AdrenotoolsFragment extends Fragment {
         preloaderDialog.showOnUiThread(R.string.installing_content);
 
         new Thread(() -> {
-            File output = new File(requireContext().getCacheDir(), "graphics-feed-" + System.currentTimeMillis() + ".wcp");
+            File output = new File(appContext.getCacheDir(), "graphics-feed-" + System.currentTimeMillis() + ".wcp");
             boolean downloaded = Downloader.downloadFile(requestedProfile.remoteUrl, output);
             String expectedSha256 = normalizeSha256(requestedProfile.remoteSha256);
             String actualSha256 = "";
@@ -1946,8 +1948,7 @@ public class AdrenotoolsFragment extends Fragment {
             if (!downloaded) {
                 if (output.exists()) output.delete();
                 String finalActualSha = actualSha256;
-                if (!isAdded() || getActivity() == null) return;
-                requireActivity().runOnUiThread(() -> {
+                UiLifecycleGuard.runOnUiThread(this, () -> {
                     preloaderDialog.closeOnUiThread();
                     installingEntries.remove(entryName);
                     if (!expectedSha256.isEmpty() && !expectedSha256.equals(finalActualSha)) {
@@ -1956,7 +1957,7 @@ public class AdrenotoolsFragment extends Fragment {
                         ContentDialog.alert(getContext(), R.string.graphics_center_install_failed, null);
                     }
                     refreshGraphicsFeed();
-                });
+                }, "AdrenotoolsFragment", "remote_driver_download_result");
                 return;
             }
 
@@ -1983,7 +1984,7 @@ public class AdrenotoolsFragment extends Fragment {
             }
 
             final String finalInstalledDriverName = installedDriverName;
-            requireActivity().runOnUiThread(() -> {
+            UiLifecycleGuard.runOnUiThread(this, () -> {
                 preloaderDialog.closeOnUiThread();
                 installingEntries.remove(requestedEntry);
                 if (finalInstalledDriverName == null || finalInstalledDriverName.trim().isEmpty()) {
@@ -2007,7 +2008,7 @@ public class AdrenotoolsFragment extends Fragment {
                 }
                 refreshGraphicsCenterStatus();
                 refreshGraphicsFeed();
-            });
+            }, "AdrenotoolsFragment", "remote_driver_install_result");
 
             if (downloadedArchive.exists()) downloadedArchive.delete();
         });

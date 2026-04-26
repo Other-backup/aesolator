@@ -369,7 +369,7 @@ public abstract class FileUtils {
         try {
             Os.chmod(file.getAbsolutePath(), mode);
         }
-        catch (ErrnoException e) { /* best-effort path; keep surrounding flow intact. */ }
+        catch (ErrnoException | RuntimeException e) { /* best-effort path; keep surrounding flow intact. */ }
     }
 
     public static File createTempFile(File parent, String prefix) {
