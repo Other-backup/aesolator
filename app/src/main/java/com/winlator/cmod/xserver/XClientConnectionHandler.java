@@ -14,15 +14,22 @@ public class XClientConnectionHandler implements ConnectionHandler {
     @Override
     public void handleNewConnection(Client client) {
         client.createIOStreams();
-        client.setTag(new XClient(xServer, client.getInputStream(), client.getOutputStream()));
+        XClient xClient = new XClient(xServer, client.getInputStream(), client.getOutputStream());
+        client.setTag(xClient);
         ForensicLogger.logEvent(
                 ForensicLogger.getAppContext(),
-                "info",
-                "XSERVER_CLIENT_CONTEXT_CREATED",
+                xClient.hasValidResourceIdBase() ? "info" : "error",
+                xClient.hasValidResourceIdBase() ? "XSERVER_CLIENT_CONTEXT_CREATED" : "XSERVER_CLIENT_RESOURCE_EXHAUSTED",
                 null,
                 "xserver_protocol",
-                "xserver_client_context_created",
-                ForensicLogger.fields("client_fd", client.clientSocket != null ? client.clientSocket.fd : -1)
+                xClient.hasValidResourceIdBase() ? "xserver_client_context_created" : "xserver_client_resource_exhausted",
+                ForensicLogger.fields(
+                        "client_fd", client.clientSocket != null ? client.clientSocket.fd : -1,
+                        "resource_id_base", xClient.resourceIDBase,
+                        "resource_max_clients", xServer.resourceIDs.maxClients,
+                        "resource_allocated_count", xServer.resourceIDs.allocatedCount(),
+                        "resource_available_count", xServer.resourceIDs.availableCount()
+                )
         );
     }
 
@@ -38,7 +45,12 @@ public class XClientConnectionHandler implements ConnectionHandler {
                     null,
                     "xserver_protocol",
                     "xserver_client_context_released",
-                    ForensicLogger.fields("client_fd", client.clientSocket != null ? client.clientSocket.fd : -1)
+                    ForensicLogger.fields(
+                            "client_fd", client.clientSocket != null ? client.clientSocket.fd : -1,
+                            "resource_id_base", ((XClient)tag).resourceIDBase,
+                            "resource_allocated_count", xServer.resourceIDs.allocatedCount(),
+                            "resource_available_count", xServer.resourceIDs.availableCount()
+                    )
             );
         }
         else {

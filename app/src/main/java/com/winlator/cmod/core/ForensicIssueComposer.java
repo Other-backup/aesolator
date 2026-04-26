@@ -64,16 +64,19 @@ public final class ForensicIssueComposer {
         ForensicConfig.Snapshot config = ForensicConfig.load(context);
         Map<String, File> includedFiles = new LinkedHashMap<>();
 
-        File latestForensic = ForensicLogger.getLatestLogFile(context);
-        if (latestForensic != null && latestForensic.isFile()) {
-            File copied = new File(bundleDir, latestForensic.getName());
-            FileUtils.copy(latestForensic, copied);
-            includedFiles.put("forensic_jsonl", copied);
+        ArrayList<File> forensicLogs = ForensicLogger.getForensicLogFiles(context);
+        File latestForensic = forensicLogs.isEmpty() ? null : forensicLogs.get(0);
+        int forensicIndex = 0;
+        for (File forensicLog : forensicLogs) {
+            if (forensicLog == null || !forensicLog.isFile()) continue;
+            File copied = new File(bundleDir, String.format(Locale.US, "forensic_%02d_%s", forensicIndex, forensicLog.getName()));
+            FileUtils.copy(forensicLog, copied);
+            includedFiles.put("forensic_jsonl_" + forensicIndex, copied);
+            forensicIndex++;
         }
 
-        File logsDir = WinlatorLogUtils.getLogsDir(context);
         for (String prefix : RUNTIME_LOG_PREFIXES) {
-            File candidate = findLatestLogWithPrefix(logsDir, prefix);
+            File candidate = findLatestLogWithPrefix(WinlatorLogUtils.getCandidateLogsDirs(context), prefix);
             if (candidate == null) continue;
             File copied = new File(bundleDir, candidate.getName());
             FileUtils.copy(candidate, copied);
@@ -276,6 +279,17 @@ public final class ForensicIssueComposer {
         File latest = files[0];
         for (File file : files) {
             if (file.lastModified() > latest.lastModified()) latest = file;
+        }
+        return latest;
+    }
+
+    private static File findLatestLogWithPrefix(Iterable<File> dirs, String prefix) {
+        File latest = null;
+        if (dirs == null) return null;
+        for (File dir : dirs) {
+            File candidate = findLatestLogWithPrefix(dir, prefix);
+            if (candidate == null) continue;
+            if (latest == null || candidate.lastModified() > latest.lastModified()) latest = candidate;
         }
         return latest;
     }

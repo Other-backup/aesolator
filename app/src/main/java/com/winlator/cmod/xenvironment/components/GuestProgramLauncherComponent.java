@@ -1244,6 +1244,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 )
         );
 
+        final String submittedGuestExecutable = guestExecutable != null ? guestExecutable : "";
         return ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
             ForensicLogger.logEvent(
                     context,
@@ -1255,7 +1256,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                     ForensicLogger.fields(
                             "status", status,
                             "track_primary_pid", trackPrimaryPid,
-                            "guest_executable", guestExecutable != null ? guestExecutable : ""
+                            "guest_executable", submittedGuestExecutable,
+                            "command", command
                     )
             );
             if (trackPrimaryPid) {

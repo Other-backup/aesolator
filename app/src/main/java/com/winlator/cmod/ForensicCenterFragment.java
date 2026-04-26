@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.SpannableStringBuilder;
@@ -668,23 +667,9 @@ public class ForensicCenterFragment extends Fragment {
         Context context = getContext();
         if (context == null) return;
 
-        File outDir = new File(Environment.getExternalStorageDirectory(), "Winlator/forensics/exports");
-        if (!outDir.exists() && !outDir.mkdirs()) {
-            AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
-            return;
-        }
         String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
-        File outFile = new File(outDir, String.format(Locale.US, "forensics_%s.jsonl", ts));
-        String exportBody = tail == null ? "" : tail;
-        if (latestFile != null && latestFile.isFile()) {
-            try {
-                String fullLog = FileUtils.readString(latestFile);
-                if (fullLog != null && !fullLog.trim().isEmpty()) {
-                    exportBody = fullLog;
-                }
-            } catch (Exception ignored) {
-            }
-        }
+        File outFile = ForensicLogger.createExportFile(context, String.format(Locale.US, "forensics_%s.jsonl", ts));
+        String exportBody = ForensicLogger.buildExportBody(context, latestFile, tail);
         if (!FileUtils.writeString(outFile, exportBody)) {
             AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
             return;

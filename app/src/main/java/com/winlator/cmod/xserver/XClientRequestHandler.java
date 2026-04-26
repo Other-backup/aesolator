@@ -206,6 +206,27 @@ public class XClientRequestHandler implements RequestHandler {
         if (nameLength > 0) inputStream.readString8(nameLength);
         if (dataLength > 0) inputStream.readString8(dataLength);
 
+        if (!client.hasValidResourceIdBase()) {
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "error",
+                    "XSERVER_CLIENT_AUTH_REJECTED_RESOURCE_EXHAUSTED",
+                    null,
+                    "xserver_protocol",
+                    "x11_client_auth_rejected_resource_exhausted",
+                    ForensicLogger.fields(
+                            "client_fd", client.fd,
+                            "resource_id_base", client.resourceIDBase,
+                            "resource_max_clients", client.xServer.resourceIDs.maxClients,
+                            "resource_allocated_count", client.xServer.resourceIDs.allocatedCount(),
+                            "resource_available_count", client.xServer.resourceIDs.availableCount(),
+                            "byte_order", byteOrder == 66 ? "big_endian" : byteOrder == 108 ? "little_endian" : "unknown",
+                            "major_version", majorVersion
+                    )
+            );
+            throw new IOException("X11 client resource id space exhausted");
+        }
+
         try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
             sendServerInformation(client, outputStream);
         }

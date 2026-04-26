@@ -24,6 +24,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,11 +39,12 @@ public final class ForensicLogger {
         return thread;
     });
     private static final String SINK_EXTERNAL = "external";
+    private static final String SINK_APP_EXTERNAL = "app_external";
     private static final String SINK_APP_PRIVATE = "app_private";
     private static final ThreadLocal<SimpleDateFormat> TS_FORMAT = ThreadLocal.withInitial(
             () -> new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
     );
-    private static String currentFileSinkId = "";
+    private static final ArrayList<String> activeFileSinkKeys = new ArrayList<>();
     private static volatile Context appContext;
     private static volatile boolean crashHandlerInstalled = false;
 
@@ -233,7 +236,7 @@ public final class ForensicLogger {
     }
 
     public static File getForensicsDir(Context context) {
-        File dir = getExternalForensicsDir(context);
+        File dir = getWritableForensicsDir(context);
         if (!dir.exists()) dir.mkdirs();
         return dir;
     }
@@ -246,15 +249,70 @@ public final class ForensicLogger {
 
     public static File getCurrentLogFile(Context context) {
         String fileName = "forensics_" + DateFormat.format("yyyy-MM-dd", new Date()) + ".jsonl";
-        return new File(getForensicsDir(context), fileName);
+        return new File(getWritableForensicsDir(context), fileName);
     }
 
     public static File getLatestLogFile(Context context) {
-        File latest = getLatestJsonlInDir(getExternalForensicsDir(context));
-        File appPrivateLatest = getLatestJsonlInDir(getAppPrivateForensicsDir(context));
-        if (latest == null) return appPrivateLatest;
-        if (appPrivateLatest == null) return latest;
-        return appPrivateLatest.lastModified() > latest.lastModified() ? appPrivateLatest : latest;
+        ArrayList<File> files = getForensicLogFiles(context);
+        return files.isEmpty() ? null : files.get(0);
+    }
+
+    public static ArrayList<File> getForensicLogFiles(Context context) {
+        ArrayList<File> out = new ArrayList<>();
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        for (ForensicSink sink : getForensicSinks(context)) {
+            File[] files = sink.dir.listFiles((d, name) -> name.endsWith(".jsonl"));
+            if (files == null) continue;
+            for (File file : files) {
+                if (seen.add(file.getAbsolutePath())) out.add(file);
+            }
+        }
+        out.sort((left, right) -> Long.compare(right.lastModified(), left.lastModified()));
+        return out;
+    }
+
+    public static File createExportFile(Context context, String fileName) {
+        String safeName = fileName == null || fileName.trim().isEmpty()
+                ? "forensics_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".jsonl"
+                : fileName.trim();
+        for (ForensicSink sink : getForensicSinks(context)) {
+            File dir = new File(sink.dir, "exports");
+            if (!dir.exists() && !dir.mkdirs() && !dir.exists()) continue;
+            File out = new File(dir, safeName);
+            try (FileWriter ignored = new FileWriter(out, true)) {
+                return out;
+            }
+            catch (IOException ignored) {
+            }
+        }
+        return new File(getForensicsDir(context), safeName);
+    }
+
+    public static String buildExportBody(Context context, File preferredFile, String fallbackTail) {
+        ArrayList<File> files = getForensicLogFiles(context);
+        if (preferredFile != null && preferredFile.isFile()) {
+            String preferredPath = preferredFile.getAbsolutePath();
+            files.removeIf(file -> preferredPath.equals(file.getAbsolutePath()));
+            files.add(0, preferredFile);
+        }
+        if (files.isEmpty()) return fallbackTail == null ? "" : fallbackTail;
+
+        StringBuilder out = new StringBuilder();
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        for (File file : files) {
+            if (file == null || !file.isFile() || !seen.add(file.getAbsolutePath())) continue;
+            out.append(buildExportSourceLine(file)).append('\n');
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    out.append(line).append('\n');
+                }
+            }
+            catch (IOException e) {
+                out.append(buildExportReadErrorLine(file, e)).append('\n');
+            }
+        }
+        return out.toString().trim();
     }
 
     public static String describeLatestTrace(Context context) {
@@ -362,6 +420,41 @@ public final class ForensicLogger {
         return new File(WinlatorLogUtils.getLogsDir(context), "forensics");
     }
 
+    private static File getAppExternalForensicsDir(Context context) {
+        return new File(WinlatorLogUtils.getAppExternalLogsDir(context), "forensics");
+    }
+
+    private static File getWritableForensicsDir(Context context) {
+        for (ForensicSink sink : getForensicSinks(context)) {
+            File dir = sink.dir;
+            if (!dir.exists() && !dir.mkdirs() && !dir.exists()) continue;
+            File probe = new File(dir, ".probe");
+            try (FileWriter ignored = new FileWriter(probe, true)) {
+                if (probe.length() == 0) probe.delete();
+                return dir;
+            }
+            catch (IOException ignored) {
+            }
+        }
+        return getAppPrivateForensicsDir(context);
+    }
+
+    private static List<ForensicSink> getForensicSinks(Context context) {
+        ArrayList<ForensicSink> sinks = new ArrayList<>();
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        addForensicSink(sinks, seen, SINK_APP_EXTERNAL, getAppExternalForensicsDir(context));
+        addForensicSink(sinks, seen, SINK_EXTERNAL, getExternalForensicsDir(context));
+        addForensicSink(sinks, seen, SINK_APP_PRIVATE, getAppPrivateForensicsDir(context));
+        return sinks;
+    }
+
+    private static void addForensicSink(ArrayList<ForensicSink> sinks, LinkedHashSet<String> seen, String sinkId, File dir) {
+        if (dir == null) return;
+        String path = dir.getAbsolutePath();
+        if (!seen.add(path)) return;
+        sinks.add(new ForensicSink(sinkId, dir));
+    }
+
     private static File getCurrentLogFile(File dir) {
         String fileName = "forensics_" + DateFormat.format("yyyy-MM-dd", new Date()) + ".jsonl";
         return new File(dir, fileName);
@@ -378,22 +471,20 @@ public final class ForensicLogger {
     }
 
     private static void appendForensicLine(Context context, String line) {
-        IOException externalError = null;
-        File externalDir = getExternalForensicsDir(context);
-        try {
-            appendLineWithSink(context, getCurrentLogFile(externalDir), line, SINK_EXTERNAL, null);
-            return;
+        int writes = 0;
+        IOException firstError = null;
+        for (ForensicSink sink : getForensicSinks(context)) {
+            try {
+                appendLineWithSink(context, getCurrentLogFile(sink.dir), line, sink.sinkId, firstError);
+                writes++;
+            }
+            catch (IOException e) {
+                if (firstError == null) firstError = e;
+                Log.w(TAG, "Forensic sink unavailable: " + sink.sinkId + " " + sink.dir.getAbsolutePath(), e);
+            }
         }
-        catch (IOException e) {
-            externalError = e;
-            Log.w(TAG, "External forensic sink unavailable, trying app-private secondary sink", e);
-        }
-
-        try {
-            appendLineWithSink(context, getCurrentLogFile(getAppPrivateForensicsDir(context)), line, SINK_APP_PRIVATE, externalError);
-        }
-        catch (IOException e) {
-            Log.e(TAG, "Failed writing forensic jsonl to all sinks", e);
+        if (writes == 0) {
+            Log.e(TAG, "Failed writing forensic jsonl to all sinks", firstError);
         }
     }
 
@@ -503,9 +594,10 @@ public final class ForensicLogger {
         }
 
         String sinkSwitchLine = null;
-        if (!sinkId.equals(currentFileSinkId)) {
+        String sinkKey = sinkId + "|" + out.getAbsolutePath();
+        if (!activeFileSinkKeys.contains(sinkKey)) {
             sinkSwitchLine = buildSinkSwitchLine(context, out, sinkId, switchReason);
-            currentFileSinkId = sinkId;
+            activeFileSinkKeys.add(sinkKey);
         }
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(out, true))) {
@@ -523,12 +615,10 @@ public final class ForensicLogger {
         try {
             obj.put("ts", TS_FORMAT.get().format(new Date()));
             obj.put("event_id", "FORENSIC_SINK_SWITCH");
-            obj.put("severity", SINK_APP_PRIVATE.equals(sinkId) ? "warn" : "info");
+            obj.put("severity", "info");
             obj.put("trace_id", JSONObject.NULL);
             obj.put("stage", "forensics_file_sink");
-            obj.put("message", SINK_APP_PRIVATE.equals(sinkId)
-                    ? "Switched forensic file sink to app-private storage"
-                    : "Switched forensic file sink to external storage");
+            obj.put("message", "Forensic file sink active: " + describeSink(sinkId));
             obj.put("sink_id", sinkId);
             obj.put("sink_path", out.getAbsolutePath());
             obj.put("package_name", context != null ? context.getPackageName() : "");
@@ -541,11 +631,59 @@ public final class ForensicLogger {
             return null;
         }
 
-        if (SINK_APP_PRIVATE.equals(sinkId)) {
-            Log.w(TAG, "Forensic file sink switched to app-private: " + out.getAbsolutePath());
-        } else {
-            Log.i(TAG, "Forensic file sink switched to external: " + out.getAbsolutePath());
+        Log.i(TAG, "Forensic file sink active (" + sinkId + "): " + out.getAbsolutePath());
+        return obj.toString();
+    }
+
+    private static String describeSink(String sinkId) {
+        if (SINK_APP_EXTERNAL.equals(sinkId)) return "app-specific external storage";
+        if (SINK_APP_PRIVATE.equals(sinkId)) return "app-private storage";
+        return "public external storage";
+    }
+
+    private static String buildExportSourceLine(File file) {
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("ts", TS_FORMAT.get().format(new Date()));
+            obj.put("event_id", "FORENSIC_EXPORT_SOURCE");
+            obj.put("severity", "info");
+            obj.put("trace_id", JSONObject.NULL);
+            obj.put("stage", "forensics_export");
+            obj.put("message", "forensic_export_source");
+            obj.put("source_path", file.getAbsolutePath());
+            obj.put("source_size", file.length());
+            obj.put("source_last_modified", file.lastModified());
+        }
+        catch (JSONException ignored) {
         }
         return obj.toString();
+    }
+
+    private static String buildExportReadErrorLine(File file, IOException error) {
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("ts", TS_FORMAT.get().format(new Date()));
+            obj.put("event_id", "FORENSIC_EXPORT_SOURCE_READ_FAILED");
+            obj.put("severity", "warn");
+            obj.put("trace_id", JSONObject.NULL);
+            obj.put("stage", "forensics_export");
+            obj.put("message", "forensic_export_source_read_failed");
+            obj.put("source_path", file != null ? file.getAbsolutePath() : "");
+            obj.put("error_class", error.getClass().getName());
+            obj.put("error_detail", String.valueOf(error.getMessage()));
+        }
+        catch (JSONException ignored) {
+        }
+        return obj.toString();
+    }
+
+    private static final class ForensicSink {
+        final String sinkId;
+        final File dir;
+
+        ForensicSink(String sinkId, File dir) {
+            this.sinkId = sinkId;
+            this.dir = dir;
+        }
     }
 }

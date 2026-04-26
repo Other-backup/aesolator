@@ -23,11 +23,12 @@ public class XServer {
     public enum Lockable {WINDOW_MANAGER, PIXMAP_MANAGER, DRAWABLE_MANAGER, GRAPHIC_CONTEXT_MANAGER, INPUT_DEVICE, CURSOR_MANAGER, SHMSEGMENT_MANAGER}
     public static final short VERSION = 11;
     public static final String VENDOR_NAME = "Elbrus Technologies, LLC";
+    public static final int MAX_CLIENTS = 4096;
     public static final Charset LATIN1_CHARSET = Charset.forName("latin1");
     public final SparseArray<Extension> extensions = new SparseArray<>();
     public final ScreenInfo screenInfo;
     public final PixmapManager pixmapManager;
-    public final ResourceIDs resourceIDs = new ResourceIDs(128);
+    public final ResourceIDs resourceIDs = new ResourceIDs(MAX_CLIENTS);
     public final GraphicsContextManager graphicsContextManager = new GraphicsContextManager();
     public final SelectionManager selectionManager;
     public final DrawableManager drawableManager;

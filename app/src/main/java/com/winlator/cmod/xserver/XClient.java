@@ -20,6 +20,7 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
     private int requestLength;
     private byte requestData;
     private int initialLength;
+    private boolean resourcesFreed = false;
     private final XInputStream inputStream;
     private final XOutputStream outputStream;
     private final ArrayMap<Window, EventListener> eventListeners = new ArrayMap<>();
@@ -86,6 +87,8 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
 
     public void freeResources() {
         try (XLock lock = xServer.lockAll()) {
+            if (resourcesFreed) return;
+            resourcesFreed = true;
             for (int i = onDestroyListeners.size() - 1; i >= 0; i--) {
                 onDestroyListeners.get(i).call(this);
             }
@@ -121,6 +124,10 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
 
         XInput2Extension xInput2 = xServer.getExtension(XInput2Extension.MAJOR_OPCODE);
         if (xInput2 != null) xInput2.onClientDisconnected(this);
+    }
+
+    public boolean hasValidResourceIdBase() {
+        return xServer.resourceIDs.isValidBase(resourceIDBase);
     }
 
     public void generateSequenceNumber() {

@@ -13,11 +13,15 @@ import com.winlator.cmod.SettingsFragment;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 public abstract class WinlatorLogUtils {
     private static final String TAG = "WinlatorLogUtils";
     public static final String SINK_EXTERNAL = "external";
+    public static final String SINK_APP_EXTERNAL = "app_external";
     public static final String SINK_APP_PRIVATE = "app_private";
 
     public static final class LogFileTarget {
@@ -62,12 +66,50 @@ public abstract class WinlatorLogUtils {
         return logsDir;
     }
 
+    public static File getAppExternalLogsDir(Context context) {
+        Context appContext = context != null ? context.getApplicationContext() : null;
+        if (appContext == null) return new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "logs");
+        File externalFilesDir = appContext.getExternalFilesDir(null);
+        File logsDir = externalFilesDir != null
+                ? new File(externalFilesDir, "Winlator/logs")
+                : new File(appContext.getFilesDir(), "Winlator/logs");
+        if (!logsDir.exists()) {
+            logsDir.mkdirs();
+        }
+        return logsDir;
+    }
+
+    public static List<File> getCandidateLogsDirs(Context context) {
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        ArrayList<File> out = new ArrayList<>();
+        addCandidateLogDir(out, seen, getAppExternalLogsDir(context));
+        addCandidateLogDir(out, seen, getLogsDir(context));
+        addCandidateLogDir(out, seen, getAppPrivateLogsDir(context));
+        return out;
+    }
+
+    private static void addCandidateLogDir(ArrayList<File> out, LinkedHashSet<String> seen, File dir) {
+        if (dir == null) return;
+        String path = dir.getAbsolutePath();
+        if (!seen.add(path)) return;
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        out.add(dir);
+    }
+
     public static LogFileTarget createTimestampedLogTarget(Context context, String prefix) {
         String fileName = buildLogFileName(prefix);
+        File appExternalFile = new File(getAppExternalLogsDir(context), fileName);
+        IOException appExternalError = ensureWritableFile(appExternalFile);
+        if (appExternalError == null) {
+            return new LogFileTarget(appExternalFile, SINK_APP_EXTERNAL, false, null);
+        }
+
         File externalFile = new File(getLogsDir(context), fileName);
         IOException externalError = ensureWritableFile(externalFile);
         if (externalError == null) {
-            return new LogFileTarget(externalFile, SINK_EXTERNAL, false, null);
+            return new LogFileTarget(externalFile, SINK_EXTERNAL, true, appExternalError);
         }
 
         File appPrivateFile = new File(getAppPrivateLogsDir(context), fileName);
