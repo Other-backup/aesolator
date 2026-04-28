@@ -156,6 +156,29 @@ def aeUseLlvm22Native = (
                 ?: aeBuildEnv["AEO_USE_LLVM22_NATIVE"]
                 ?: "true"
 ).toString().toBoolean()
+def aeLlvm22NativeOutputPaths = [
+        "OpenXR-SDK/src/loader/libopenxr_loader.so",
+        "adrenotools/libadrenotools.so",
+        "adrenotools/src/hook/libfile_redirect_hook.so",
+        "adrenotools/src/hook/libgsl_alloc_hook.so",
+        "adrenotools/src/hook/libhook_impl.so",
+        "adrenotools/src/hook/libmain_hook.so",
+        "gladiorenderer/libgladiorenderer.so",
+        "libaero_android_sysvshm.so",
+        "libaero_evshim.so",
+        "libaero_fakeinput.so",
+        "libaero_native_xz.so",
+        "libaero_redirect_bionic.so",
+        "libaero_redirect_glibc.so",
+        "libwinlator.so",
+        "libwinlatorxr.so",
+        "patchelf/libpatchelf.so",
+        "proot/libproot-loader.so",
+        "proot/libproot.so",
+        "virglrenderer/libvirglbridge.so",
+        "vortekrenderer/libvortekrenderer.so"
+]
+def aeLlvm22GeneratedOutputNames = aeLlvm22NativeOutputPaths.collect { path -> new File(path).name }.toSet()
 def aeBundledProton11AssetPath = "contents/runtime/proton11/proton-wine-11-arm64ec.wcp.xz"
 def aeBundledProton11LocalPath = (
         project.findProperty("ae.proton11.localWcp")
@@ -465,33 +488,25 @@ tasks.register("buildNativeLlvm22") {
         AeBuildHostSupport.runCommand(["cmake", "--build", aeLlvm22NativeBuildDir.absolutePath, "--", "-j8"], null, false, buildLog)
 
         outputDir.mkdirs()
-        [
-                "OpenXR-SDK/src/loader/libopenxr_loader.so",
-                "adrenotools/libadrenotools.so",
-                "adrenotools/src/hook/libfile_redirect_hook.so",
-                "adrenotools/src/hook/libgsl_alloc_hook.so",
-                "adrenotools/src/hook/libhook_impl.so",
-                "adrenotools/src/hook/libmain_hook.so",
-                "gladiorenderer/libgladiorenderer.so",
-                "libaero_android_sysvshm.so",
-                "libaero_evshim.so",
-                "libaero_fakeinput.so",
-                "libaero_native_xz.so",
-                "libaero_redirect_bionic.so",
-                "libaero_redirect_glibc.so",
-                "libwinlator.so",
-                "libwinlatorxr.so",
-                "patchelf/libpatchelf.so",
-                "proot/libproot-loader.so",
-                "proot/libproot.so",
-                "virglrenderer/libvirglbridge.so",
-                "vortekrenderer/libvortekrenderer.so"
-        ].each { relativePath ->
+        aeLlvm22NativeOutputPaths.each { relativePath ->
             File source = new File(aeLlvm22NativeBuildDir, relativePath)
             if (!source.isFile()) {
                 throw new GradleException("LLVM 22.1.1 native output is missing: ${source}")
             }
             Files.copy(source.toPath(), new File(outputDir, source.name).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+tasks.register("cleanLlvm22GeneratedJniWhenDisabled") {
+    onlyIf { !aeUseLlvm22Native }
+    doLast {
+        File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
+        aeLlvm22GeneratedOutputNames.each { fileName ->
+            File generated = new File(outputDir, fileName)
+            if (generated.exists() && !generated.delete()) {
+                throw new GradleException("Unable to remove stale LLVM22 generated JNI output: ${generated}")
+            }
         }
     }
 }
@@ -503,6 +518,7 @@ preBuild.dependsOn(prepareBundledProton11Asset)
 preBuild.dependsOn(prepareRuntimeSharedJni)
 preBuild.dependsOn(prepareVirglWrapperJni)
 preBuild.dependsOn(prepareVulkanWrapperJni)
+preBuild.dependsOn(cleanLlvm22GeneratedJniWhenDisabled)
 preBuild.dependsOn(buildNativeLlvm22)
 
 def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "21"

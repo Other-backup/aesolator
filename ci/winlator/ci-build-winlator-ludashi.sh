@@ -21,6 +21,13 @@ DOC_REPORT="${WINLATOR_ANALYSIS_REPORT:-${ROOT_DIR}/docs/WINLATOR_LUDASHI_REFLEC
 : "${AEO_ROOTFS_GAMENATIVE_URL:=https://downloads.gamenative.app/imagefs_gamenative.txz}"
 : "${AEO_ROOTFS_PATCHES_URL:=https://downloads.gamenative.app/imagefs_patches_gamenative.tzst}"
 
+if [[ "${AEO_BUILD_FRESH_GRAPHICS}" != "1" ]]; then
+  : "${AEO_USE_LLVM22_NATIVE:=0}"
+else
+  : "${AEO_USE_LLVM22_NATIVE:=1}"
+fi
+export AEO_USE_LLVM22_NATIVE
+
 export AEROSO_APP_APPLICATION_ID AEROSO_APP_LABEL AEROSO_APP_RELEASE_VARIANT
 
 log() { printf '[winlator-ci] %s\n' "$*"; }

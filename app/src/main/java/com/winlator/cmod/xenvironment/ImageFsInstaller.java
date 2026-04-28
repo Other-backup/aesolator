@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.MessageDigest;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,8 +45,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class ImageFsInstaller {
     public static final byte LATEST_VERSION = 27;
-    private static final String GLIBC_IMAGEFS_ARCHIVE = "imagefs_gamenative.txz";
-    private static final String BIONIC_IMAGEFS_ARCHIVE = GLIBC_IMAGEFS_ARCHIVE;
+    private static final String GLIBC_IMAGEFS_ARCHIVE = "imagefs-glibc2.39-r0.tzst";
+    private static final String BIONIC_IMAGEFS_ARCHIVE = "imagefs_gamenative.txz";
     private static final String GLIBC_PATCH_ARCHIVE = "imagefs_patches_gamenative.tzst";
     private static final String EXTRAS_ARCHIVE = "extras.tzst";
     private static final String BIONIC_HOST_SUPPORT_ARCHIVE = "bionic_host_support.tzst";
@@ -144,6 +145,10 @@ public abstract class ImageFsInstaller {
     };
     private static final String ROOTFS_PRIMARY_BASE_URL = "https://downloads.gamenative.app/";
     private static final String ROOTFS_FALLBACK_BASE_URL = "https://pub-9fcd5294bd0d4b85a9d73615bf98f3b5.r2.dev/";
+    private static final String GLIBC_IMAGEFS_SOURCE_URL =
+            "https://github.com/Waim908/rootfs-winlator/releases/download/rootfs-glibc2.39-r0/imagefs-glibc2.39-r0.tzst";
+    private static final String GLIBC_IMAGEFS_SHA256 =
+            "9868bb7233720d65e7fd33c472b412668b198baa00a71f618e7e71e40d3f8290";
     private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 15000;
     private static final int DOWNLOAD_READ_TIMEOUT_MS = 30000;
     private static final int DOWNLOAD_BUFFER_SIZE = 64 * 1024;
@@ -240,12 +245,16 @@ public abstract class ImageFsInstaller {
         String requestedVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
         boolean universalGameNativeRootfs = imageFs.isGameNativeRootfs()
                 && GLIBC_IMAGEFS_ARCHIVE.equals(BIONIC_IMAGEFS_ARCHIVE);
+        boolean glibcRootfsRequired = Container.GLIBC.equalsIgnoreCase(requestedVariant)
+                && imageFs.isGameNativeRootfs()
+                && !GLIBC_IMAGEFS_ARCHIVE.equals(BIONIC_IMAGEFS_ARCHIVE);
         boolean variantMismatch = !universalGameNativeRootfs
                 && !imageFs.getVariant().isEmpty()
                 && !requestedVariant.equalsIgnoreCase(imageFs.getVariant());
         return !imageFs.isValid()
                 || imageFs.getVersion() < LATEST_VERSION
-                || variantMismatch;
+                || variantMismatch
+                || glibcRootfsRequired;
     }
 
     private static String[] getBundledWineEntries(Context context, String containerVariant) {
@@ -264,6 +273,7 @@ public abstract class ImageFsInstaller {
 
     private static String resolveInstalledRootfsProvider(String archiveName) {
         String normalized = archiveName == null ? "" : archiveName.trim().toLowerCase(Locale.US);
+        if (GLIBC_IMAGEFS_ARCHIVE.equals(archiveName)) return ImageFs.ROOTFS_PROVIDER_WAIM;
         if (normalized.contains("gamenative")) return ImageFs.ROOTFS_PROVIDER_GAMENATIVE;
         if (normalized.contains("waim")) return ImageFs.ROOTFS_PROVIDER_WAIM;
         if (normalized.contains("moze")) return ImageFs.ROOTFS_PROVIDER_MOZE;
@@ -708,6 +718,27 @@ public abstract class ImageFsInstaller {
                 || GLIBC_PATCH_ARCHIVE.equals(archiveName);
     }
 
+    private static String[] resolveRemoteArchiveUrls(String archiveName) {
+        if (GLIBC_IMAGEFS_ARCHIVE.equals(archiveName)) {
+            return new String[] {GLIBC_IMAGEFS_SOURCE_URL};
+        }
+        return new String[] {
+                ROOTFS_PRIMARY_BASE_URL + archiveName,
+                ROOTFS_FALLBACK_BASE_URL + archiveName
+        };
+    }
+
+    private static String resolveRemoteArchiveSha256(String archiveName) {
+        return GLIBC_IMAGEFS_ARCHIVE.equals(archiveName) ? GLIBC_IMAGEFS_SHA256 : "";
+    }
+
+    private static TarCompressorUtils.Type resolveArchiveType(String archiveName) {
+        String normalized = archiveName == null ? "" : archiveName.trim().toLowerCase(Locale.US);
+        return normalized.endsWith(".tzst") || normalized.endsWith(".zst") || normalized.endsWith(".tar.zst")
+                ? TarCompressorUtils.Type.ZSTD
+                : TarCompressorUtils.Type.XZ;
+    }
+
     private static File resolveDownloadedArchive(ImageFs imageFs, String archiveName) {
         return new File(imageFs.getFilesDir(), archiveName);
     }
@@ -725,13 +756,16 @@ public abstract class ImageFsInstaller {
 
         File destination = resolveDownloadedArchive(imageFs, archiveName);
         destination.getParentFile().mkdirs();
-        if (downloadFile(ROOTFS_PRIMARY_BASE_URL + archiveName, destination, onProgress, progressStart, progressSpan)) {
-            return true;
-        }
-
-        Log.w("ImageFsInstaller", "Primary download failed for " + archiveName + ", retrying with secondary path");
-        if (downloadFile(ROOTFS_FALLBACK_BASE_URL + archiveName, destination, onProgress, progressStart, progressSpan)) {
-            return true;
+        String[] urls = resolveRemoteArchiveUrls(archiveName);
+        for (int i = 0; i < urls.length; i++) {
+            String url = urls[i];
+            if (i > 0) {
+                Log.w("ImageFsInstaller", "Download failed for " + archiveName + ", retrying with secondary path");
+            }
+            if (downloadFile(url, destination, onProgress, progressStart, progressSpan)
+                    && verifyDownloadedArchive(archiveName, destination)) {
+                return true;
+            }
         }
 
         safeDelete(destination);
@@ -854,6 +888,35 @@ public abstract class ImageFsInstaller {
         }
     }
 
+    private static boolean verifyDownloadedArchive(String archiveName, File archive) {
+        String expected = resolveRemoteArchiveSha256(archiveName);
+        if (expected.isEmpty()) return true;
+        String actual = sha256(archive);
+        if (expected.equalsIgnoreCase(actual)) return true;
+        Log.e("ImageFsInstaller", "Archive sha256 mismatch for " + archiveName + ": expected=" + expected + " actual=" + actual);
+        safeDelete(archive);
+        return false;
+    }
+
+    private static String sha256(File file) {
+        if (file == null || !file.isFile()) return "";
+        try (InputStream input = new FileInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[DOWNLOAD_BUFFER_SIZE];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                if (read > 0) digest.update(buffer, 0, read);
+            }
+            byte[] bytes = digest.digest();
+            StringBuilder out = new StringBuilder(bytes.length * 2);
+            for (byte value : bytes) out.append(String.format(Locale.US, "%02x", value & 0xff));
+            return out.toString();
+        } catch (Exception e) {
+            Log.e("ImageFsInstaller", "Unable to compute archive sha256 for " + file, e);
+            return "";
+        }
+    }
+
     private static boolean ensureArchiveAvailable(
             Context context,
             ImageFs imageFs,
@@ -864,14 +927,14 @@ public abstract class ImageFsInstaller {
     ) {
         if (assetExists(context, archiveName)) return true;
         File downloaded = resolveDownloadedArchive(imageFs, archiveName);
-        if (downloaded.isFile() && downloaded.length() > 0L) return true;
+        if (downloaded.isFile() && downloaded.length() > 0L && verifyDownloadedArchive(archiveName, downloaded)) return true;
         return fetchArchiveWithFallback(imageFs, archiveName, onProgress, progressStart, progressSpan);
     }
 
     private static boolean isArchiveAvailable(Context context, ImageFs imageFs, String archiveName) {
         if (assetExists(context, archiveName)) return true;
         File downloaded = resolveDownloadedArchive(imageFs, archiveName);
-        return downloaded.isFile() && downloaded.length() > 0L;
+        return downloaded.isFile() && downloaded.length() > 0L && verifyDownloadedArchive(archiveName, downloaded);
     }
 
     private static boolean prefetchVariantRuntimeSupportIfMissing(
@@ -1560,9 +1623,15 @@ public abstract class ImageFsInstaller {
 
     private static Future<Boolean> installFromAssetsFuture(final Context context, AssetManager assetManager,
                                                            Container container, Callback<Integer> onProgress) {
+        return installFromAssetsFuture(context, assetManager, container, null, onProgress);
+    }
+
+    private static Future<Boolean> installFromAssetsFuture(final Context context, AssetManager assetManager,
+                                                           Container container, String requestedRuntimeModel,
+                                                           Callback<Integer> onProgress) {
         ImageFs imageFs = ImageFs.find(context);
         final File rootDir = imageFs.getRootDir();
-        final String containerVariant = resolveInstallVariant(imageFs, container);
+        final String containerVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
 
         if (context instanceof MainActivity) {
             SettingsFragment.resetEmulatorsVersion((MainActivity) context);
@@ -1576,8 +1645,7 @@ public abstract class ImageFsInstaller {
                     ? GLIBC_IMAGEFS_ARCHIVE
                     : BIONIC_IMAGEFS_ARCHIVE;
             boolean downloadedBaseThisPass = false;
-            if (!assetExists(context, preferredArchive)
-                    && !resolveDownloadedArchive(imageFs, preferredArchive).isFile()
+            if (!isArchiveAvailable(context, imageFs, preferredArchive)
                     && isRemoteDeliverableArchive(preferredArchive)) {
                 downloadedBaseThisPass = fetchArchiveWithFallback(imageFs, preferredArchive, onProgress, 0, 35);
                 if (downloadedBaseThisPass) {
@@ -1585,7 +1653,7 @@ public abstract class ImageFsInstaller {
                 }
             }
 
-            if (!assetExists(context, imagefsArchive) && !resolveDownloadedArchive(imageFs, imagefsArchive).isFile()) {
+            if (!isArchiveAvailable(context, imageFs, imagefsArchive)) {
                 String remoteCandidate = Container.GLIBC.equalsIgnoreCase(containerVariant)
                         ? GLIBC_IMAGEFS_ARCHIVE
                         : BIONIC_IMAGEFS_ARCHIVE;
@@ -1614,7 +1682,7 @@ public abstract class ImageFsInstaller {
             if (assetExists(context, imagefsArchive)) {
                 useAssetArchive = true;
                 contentLength = (long) (FileUtils.getSize(context, imagefsArchive) * (100.0f / compressionRatio));
-            } else if (downloaded.isFile()) {
+            } else if (downloaded.isFile() && verifyDownloadedArchive(imagefsArchive, downloaded)) {
                 useAssetArchive = false;
                 contentLength = (long) (downloaded.length() * (100.0f / compressionRatio));
             } else {
@@ -1625,8 +1693,25 @@ public abstract class ImageFsInstaller {
             AtomicLong totalSizeRef = new AtomicLong();
             int extractProgressStart = downloadedSupportThisPass ? 45 : (downloadedBaseThisPass ? 35 : 0);
             int extractProgressSpan = Math.max(1, 100 - extractProgressStart);
+            TarCompressorUtils.Type imagefsArchiveType = resolveArchiveType(imagefsArchive);
+            ForensicLogger.logEvent(
+                    context,
+                    "info",
+                    "ROOTFS_IMAGEFS_ARCHIVE_SELECTED",
+                    null,
+                    "rootfs",
+                    "rootfs_imagefs_archive_selected",
+                    ForensicLogger.fields(
+                            "variant", containerVariant,
+                            "archive", imagefsArchive,
+                            "archive_type", imagefsArchiveType.name().toLowerCase(Locale.US),
+                            "source", useAssetArchive ? "asset" : "download",
+                            "provider", resolveInstalledRootfsProvider(imagefsArchive),
+                            "expected_sha256", resolveRemoteArchiveSha256(imagefsArchive)
+                    )
+            );
             boolean success = useAssetArchive
-                    ? TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, imagefsArchive, rootDir, (file, size) -> {
+                    ? TarCompressorUtils.extract(imagefsArchiveType, context, imagefsArchive, rootDir, (file, size) -> {
                         if (size > 0 && onProgress != null && contentLength > 0) {
                             long totalSize = totalSizeRef.addAndGet(size);
                             int progress = extractProgressStart + (int) (((float) totalSize / contentLength) * extractProgressSpan);
@@ -1634,7 +1719,7 @@ public abstract class ImageFsInstaller {
                         }
                         return file;
                     })
-                    : TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, downloaded, rootDir, (file, size) -> {
+                    : TarCompressorUtils.extract(imagefsArchiveType, downloaded, rootDir, (file, size) -> {
                         if (size > 0 && onProgress != null && contentLength > 0) {
                             long totalSize = totalSizeRef.addAndGet(size);
                             int progress = extractProgressStart + (int) (((float) totalSize / contentLength) * extractProgressSpan);
@@ -1704,7 +1789,7 @@ public abstract class ImageFsInstaller {
                                                         Callback<Integer> onProgress) {
         ImageFs imageFs = ImageFs.find(context);
         if (isInstallRequired(context, container, requestedRuntimeModel)) {
-            return installFromAssetsFuture(context, assetManager, container, onProgress);
+            return installFromAssetsFuture(context, assetManager, container, requestedRuntimeModel, onProgress);
         }
         return Executors.newSingleThreadExecutor().submit(() -> true);
     }
