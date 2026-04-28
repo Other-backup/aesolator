@@ -9,6 +9,7 @@ import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
 import com.winlator.cmod.xserver.errors.XRequestError;
+import com.winlator.cmod.xserver.errors.BadLength;
 import com.winlator.cmod.xserver.extensions.Extension;
 import com.winlator.cmod.xserver.requests.AtomRequests;
 import com.winlator.cmod.xserver.requests.CursorRequests;
@@ -29,6 +30,7 @@ public class XClientRequestHandler implements RequestHandler {
     public static final byte RESPONSE_CODE_ERROR = 0;
     public static final byte RESPONSE_CODE_SUCCESS = 1;
     public static final int MAX_REQUEST_LENGTH = 65535;
+    public static final int MAX_BIG_REQUEST_BYTES = 16 * 1024 * 1024;
 
     private static abstract class ClientOpcodes {
         private static final byte CREATE_WINDOW = 1;
@@ -270,12 +272,23 @@ public class XClientRequestHandler implements RequestHandler {
             return false;
         }
         else requestLength = inputStream.readInt() * 4 - 8;
+        if (requestLength < 0 || requestLength > MAX_BIG_REQUEST_BYTES) {
+            client.generateSequenceNumber();
+            client.setRequestData(requestData);
+            client.setRequestLength(0);
+            BadLength error = new BadLength(requestLength);
+            logProtocolError(client, opcode, requestLength, error);
+            error.sendError(client, opcode);
+            throw new IOException("X11 request length exceeded guarded maximum: " + requestLength);
+        }
         if (inputStream.available() < requestLength) return false;
 
         client.generateSequenceNumber();
         client.setRequestData(requestData);
         client.setRequestLength(requestLength);
-        logProtocolMilestone(client, opcode, requestLength, inputStream.available());
+        int availableAfterHeader = inputStream.available();
+        logProtocolRequest(client, opcode, requestData, requestLength, availableAfterHeader);
+        logProtocolMilestone(client, opcode, requestLength, availableAfterHeader);
 
         try {
             switch (opcode) {
@@ -560,11 +573,17 @@ public class XClientRequestHandler implements RequestHandler {
                 default:
                     if (opcode < 0) {
                         Extension extension = client.xServer.extensions.get(opcode);
+                        logExtensionRequest(client, opcode, requestData, requestLength, extension);
                         if (extension != null) extension.handleRequest(client, inputStream, outputStream);
+                        else {
+                            logUnsupportedOpcode(client, opcode, requestLength);
+                            client.skipRequest();
+                        }
                     }
                     else {
                         Log.d("XClientRequestHandler", "Unsupported opcode " + opcode);
                         logUnsupportedOpcode(client, opcode, requestLength);
+                        client.skipRequest();
                     }
                     break;
             }
@@ -576,6 +595,53 @@ public class XClientRequestHandler implements RequestHandler {
         }
 
         return true;
+    }
+
+    private static void logProtocolRequest(XClient client, byte opcode, byte requestData, int requestLength, int availableAfterHeader) {
+        String opcodeName = describeCoreOpcode(opcode);
+        boolean extensionOpcode = opcode < 0;
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_PROTOCOL_REQUEST",
+                null,
+                "xserver_protocol",
+                "x11_protocol_request",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "opcode", Byte.toUnsignedInt(opcode),
+                        "opcode_name", opcodeName != null ? opcodeName : extensionOpcode ? "Extension" : "Unknown",
+                        "request_data", Byte.toUnsignedInt(requestData),
+                        "is_extension_opcode", extensionOpcode ? "1" : "0",
+                        "request_length", requestLength,
+                        "available_after_header", availableAfterHeader
+                )
+        );
+    }
+
+    private static void logExtensionRequest(XClient client, byte opcode, byte requestData, int requestLength, Extension extension) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                extension == null ? "warn" : "info",
+                "XSERVER_EXTENSION_REQUEST",
+                null,
+                "xserver_extensions",
+                "x11_extension_request",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "major_opcode", Byte.toUnsignedInt(opcode),
+                        "minor_opcode", Byte.toUnsignedInt(requestData),
+                        "extension_name", extension != null ? extension.getName() : null,
+                        "known_extension", extension != null ? "1" : "0",
+                        "first_event_id", extension != null ? Byte.toUnsignedInt(extension.getFirstEventId()) : null,
+                        "first_error_id", extension != null ? Byte.toUnsignedInt(extension.getFirstErrorId()) : null,
+                        "request_length", requestLength
+                )
+        );
     }
 
     private static void logProtocolMilestone(XClient client, byte opcode, int requestLength, int availableAfterHeader) {
@@ -598,6 +664,133 @@ public class XClientRequestHandler implements RequestHandler {
                         "available_after_header", availableAfterHeader
                 )
         );
+    }
+
+    static String describeCoreOpcode(byte opcode) {
+        switch (opcode) {
+            case ClientOpcodes.CREATE_WINDOW:
+                return "CreateWindow";
+            case ClientOpcodes.CHANGE_WINDOW_ATTRIBUTES:
+                return "ChangeWindowAttributes";
+            case ClientOpcodes.GET_WINDOW_ATTRIBUTES:
+                return "GetWindowAttributes";
+            case ClientOpcodes.DESTROY_WINDOW:
+                return "DestroyWindow";
+            case ClientOpcodes.DESTROY_SUB_WINDOWS:
+                return "DestroySubwindows";
+            case ClientOpcodes.REPARENT_WINDOW:
+                return "ReparentWindow";
+            case ClientOpcodes.MAP_WINDOW:
+                return "MapWindow";
+            case ClientOpcodes.MAP_SUB_WINDOWS:
+                return "MapSubwindows";
+            case ClientOpcodes.UNMAP_WINDOW:
+                return "UnmapWindow";
+            case ClientOpcodes.CONFIGURE_WINDOW:
+                return "ConfigureWindow";
+            case ClientOpcodes.GET_GEOMETRY:
+                return "GetGeometry";
+            case ClientOpcodes.QUERY_TREE:
+                return "QueryTree";
+            case ClientOpcodes.INTERN_ATOM:
+                return "InternAtom";
+            case ClientOpcodes.GET_ATOM_NAME:
+                return "GetAtomName";
+            case ClientOpcodes.CHANGE_PROPERTY:
+                return "ChangeProperty";
+            case ClientOpcodes.DELETE_PROPERTY:
+                return "DeleteProperty";
+            case ClientOpcodes.GET_PROPERTY:
+                return "GetProperty";
+            case ClientOpcodes.SET_SELECTION_OWNER:
+                return "SetSelectionOwner";
+            case ClientOpcodes.GET_SELECTION_OWNER:
+                return "GetSelectionOwner";
+            case ClientOpcodes.SEND_EVENT:
+                return "SendEvent";
+            case ClientOpcodes.GRAB_POINTER:
+                return "GrabPointer";
+            case ClientOpcodes.UNGRAB_POINTER:
+                return "UngrabPointer";
+            case 36:
+                return "GrabServer";
+            case 37:
+                return "UngrabServer";
+            case ClientOpcodes.QUERY_POINTER:
+                return "QueryPointer";
+            case ClientOpcodes.TRANSLATE_COORDINATES:
+                return "TranslateCoordinates";
+            case ClientOpcodes.WARP_POINTER:
+                return "WarpPointer";
+            case ClientOpcodes.SET_INPUT_FOCUS:
+                return "SetInputFocus";
+            case ClientOpcodes.GET_INPUT_FOCUS:
+                return "GetInputFocus";
+            case ClientOpcodes.QUERY_KEYMAP:
+                return "QueryKeymap";
+            case ClientOpcodes.OPEN_FONT:
+                return "OpenFont";
+            case ClientOpcodes.LIST_FONTS:
+                return "ListFonts";
+            case ClientOpcodes.CREATE_PIXMAP:
+                return "CreatePixmap";
+            case ClientOpcodes.FREE_PIXMAP:
+                return "FreePixmap";
+            case ClientOpcodes.CREATE_GC:
+                return "CreateGC";
+            case ClientOpcodes.CHANGE_GC:
+                return "ChangeGC";
+            case ClientOpcodes.COPY_GC:
+                return "CopyGC";
+            case ClientOpcodes.SET_CLIP_RECTANGLES:
+                return "SetClipRectangles";
+            case ClientOpcodes.FREE_GC:
+                return "FreeGC";
+            case ClientOpcodes.COPY_AREA:
+                return "CopyArea";
+            case ClientOpcodes.POLY_LINE:
+                return "PolyLine";
+            case ClientOpcodes.POLY_SEGMENT:
+                return "PolySegment";
+            case ClientOpcodes.POLY_RECTANGLE:
+                return "PolyRectangle";
+            case ClientOpcodes.POLY_FILL_RECTANGLE:
+                return "PolyFillRectangle";
+            case ClientOpcodes.PUT_IMAGE:
+                return "PutImage";
+            case ClientOpcodes.GET_IMAGE:
+                return "GetImage";
+            case ClientOpcodes.CREATE_COLORMAP:
+                return "CreateColormap";
+            case ClientOpcodes.FREE_COLORMAP:
+                return "FreeColormap";
+            case ClientOpcodes.CREATE_CURSOR:
+                return "CreateCursor";
+            case ClientOpcodes.CREATE_GLYPH_CURSOR:
+                return "CreateGlyphCursor";
+            case ClientOpcodes.FREE_CURSOR:
+                return "FreeCursor";
+            case ClientOpcodes.QUERY_EXTENSION:
+                return "QueryExtension";
+            case ClientOpcodes.GET_KEYBOARD_MAPPING:
+                return "GetKeyboardMapping";
+            case ClientOpcodes.BELL:
+                return "Bell";
+            case ClientOpcodes.SET_SCREEN_SAVER:
+                return "SetScreenSaver";
+            case ClientOpcodes.GET_SCREEN_SAVER:
+                return "GetScreenSaver";
+            case ClientOpcodes.FORCE_SCREEN_SAVER:
+                return "ForceScreenSaver";
+            case ClientOpcodes.GET_POINTER_MAPPING:
+                return "GetPointerMapping";
+            case ClientOpcodes.GET_MODIFIER_MAPPING:
+                return "GetModifierMapping";
+            case ClientOpcodes.NO_OPERATION:
+                return "NoOperation";
+            default:
+                return null;
+        }
     }
 
     private static String describeMilestoneOpcode(byte opcode) {
@@ -665,9 +858,10 @@ public class XClientRequestHandler implements RequestHandler {
     }
 
     private static void logProtocolError(XClient client, byte opcode, int requestLength, XRequestError error) {
+        String severity = protocolErrorSeverity(error);
         ForensicLogger.logEvent(
                 ForensicLogger.getAppContext(),
-                "warn",
+                severity,
                 "XSERVER_PROTOCOL_ERROR",
                 null,
                 "xserver_protocol",
@@ -680,8 +874,19 @@ public class XClientRequestHandler implements RequestHandler {
                         "request_length", requestLength,
                         "error_class", error.getClass().getName(),
                         "error_code", Byte.toUnsignedInt(error.getCode()),
-                        "error_data", error.getData()
+                        "error_data", error.getData(),
+                        "handled_by_xserver", "info".equals(severity) ? "1" : "0"
                 )
         );
+    }
+
+    private static String protocolErrorSeverity(XRequestError error) {
+        if (error == null) return "warn";
+        String name = error.getClass().getSimpleName();
+        if ("BadWindow".equals(name) || "BadDrawable".equals(name) || "BadIdChoice".equals(name)
+                || "BadValue".equals(name) || "BadSHMSegment".equals(name)) {
+            return "info";
+        }
+        return "warn";
     }
 }

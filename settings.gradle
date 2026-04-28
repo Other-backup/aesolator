@@ -28,4 +28,10 @@ dependencyResolutionManagement {
 
 rootProject.name = "Winlator"
 include ':app'
-include ':ubuntufs'
+def aeEnableUbuntuFsFeature = (
+        (gradle.startParameter.projectProperties["ae.enableUbuntuFsFeature"] ?: "") == "true" ||
+                (System.getenv("AEO_ENABLE_UBUNTUFS_FEATURE") ?: "") == "1"
+)
+if (aeEnableUbuntuFsFeature) {
+    include ':ubuntufs'
+}

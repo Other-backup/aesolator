@@ -264,16 +264,22 @@ public abstract class WindowRequests {
                 outputStream.writeShort(sequenceNumber);
                 outputStream.writeInt(0);
                 outputStream.writeInt(property.type);
-                outputStream.writeInt(0);
+                outputStream.writeInt(property.byteLength());
                 outputStream.writeInt(0);
                 outputStream.writePad(12);
             }
             else {
                 byte[] data = property.data.array();
-                int offset = longOffset * 4;
-                int length = Math.min(data.length - offset, longLength * 4);
-                if (length < 0) throw new BadValue(longOffset);
-                bytesAfter = data.length - (offset + length);
+                long offset = Integer.toUnsignedLong(longOffset) * 4L;
+                long requestedLength = Integer.toUnsignedLong(longLength) * 4L;
+                if (offset > data.length) throw new BadValue(longOffset);
+                int readOffset = (int) offset;
+                int length = (int)Math.min(data.length - offset, requestedLength);
+                bytesAfter = data.length - (readOffset + length);
+
+                if (longOffset < 0 || longLength < 0) {
+                    logUnsignedGetPropertyCompat(client, atom, type, property, longOffset, longLength, readOffset, length, bytesAfter);
+                }
 
                 outputStream.writeByte(RESPONSE_CODE_SUCCESS);
                 outputStream.writeByte(property.format.value);
@@ -283,7 +289,7 @@ public abstract class WindowRequests {
                 outputStream.writeInt(bytesAfter);
                 outputStream.writeInt(length / (property.format.value / 8));
                 outputStream.writePad(12);
-                outputStream.write(data, offset, length);
+                outputStream.write(data, readOffset, length);
                 if ((-length & 3) > 0) outputStream.writePad(-length & 3);
             }
         }
@@ -291,6 +297,42 @@ public abstract class WindowRequests {
         if (delete && property != null && bytesAfter == 0) {
             window.removeProperty(atom);
         }
+    }
+
+    private static void logUnsignedGetPropertyCompat(XClient client,
+                                                     int atom,
+                                                     int requestedType,
+                                                     Property property,
+                                                     int rawLongOffset,
+                                                     int rawLongLength,
+                                                     int readOffset,
+                                                     int readLength,
+                                                     int bytesAfter) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_GET_PROPERTY_UNSIGNED_CARD32_COMPAT",
+                null,
+                "xserver_protocol",
+                "x11_get_property_unsigned_card32_compat",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "property_atom", atom,
+                        "property_name", Atom.getName(atom),
+                        "requested_type", requestedType,
+                        "actual_type", property != null ? property.type : 0,
+                        "actual_type_name", property != null ? Atom.getName(property.type) : "",
+                        "raw_long_offset", rawLongOffset,
+                        "raw_long_length", rawLongLength,
+                        "unsigned_long_offset", Integer.toUnsignedLong(rawLongOffset),
+                        "unsigned_long_length", Integer.toUnsignedLong(rawLongLength),
+                        "read_offset", readOffset,
+                        "read_length", readLength,
+                        "bytes_after", bytesAfter
+                )
+        );
     }
 
     public static void queryPointer(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {

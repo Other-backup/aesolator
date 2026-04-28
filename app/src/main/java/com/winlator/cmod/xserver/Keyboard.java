@@ -13,11 +13,11 @@ import java.util.Locale;
 
 public class Keyboard {
     public static final byte KEYSYMS_PER_KEYCODE = 2;
-    public static final short KEYS_COUNT = 248;
-    public static final short MAX_KEYCODE = 255;
     public static final short MIN_KEYCODE = 8;
+    public static final short MAX_KEYCODE = 119;
+    public static final short KEYS_COUNT = (short)(MAX_KEYCODE - MIN_KEYCODE + 1);
     private static final HashSet<String> loggedIgnoredKeyRoutes = new HashSet<>();
-    public final int[] keysyms = new int[KEYS_COUNT];
+    public final int[] keysyms = new int[KEYS_COUNT * KEYSYMS_PER_KEYCODE];
     private final Bitmask modifiersMask = new Bitmask();
     private final XKeycode[] keycodeMap = createKeycodeMap();
     private final ArraySet<Byte> pressedKeys = new ArraySet<>();
@@ -39,13 +39,21 @@ public class Keyboard {
     }
 
     public void setKeysyms(byte keycode, int minKeysym, int majKeysym) {
-        int index = keycode - 8;
+        int index = Byte.toUnsignedInt(keycode) - MIN_KEYCODE;
+        if (index < 0 || index >= KEYS_COUNT) return;
         keysyms[index*KEYSYMS_PER_KEYCODE+0] = minKeysym;
         keysyms[index*KEYSYMS_PER_KEYCODE+1] = majKeysym;
     }
 
+    public int getKeysym(int keycode, int level) {
+        int index = keycode - MIN_KEYCODE;
+        if (index < 0 || index >= KEYS_COUNT || level < 0 || level >= KEYSYMS_PER_KEYCODE) return 0;
+        return keysyms[index * KEYSYMS_PER_KEYCODE + level];
+    }
+
     public boolean hasKeysym(byte keycode, int keysym) {
-        int index = keycode - 8;
+        int index = Byte.toUnsignedInt(keycode) - MIN_KEYCODE;
+        if (index < 0 || index >= KEYS_COUNT) return false;
         return keysyms[index*KEYSYMS_PER_KEYCODE+0] == keysym || keysyms[index*KEYSYMS_PER_KEYCODE+1] == keysym;
     }
 

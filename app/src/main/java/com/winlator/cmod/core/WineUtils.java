@@ -11,6 +11,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -28,6 +29,46 @@ public abstract class WineUtils {
             "regedit.exe",
             "start.exe"
     };
+
+    public static String buildExplorerDesktopShellCommand(String screenInfo, String payloadCommand) {
+        String geometry = screenInfo == null ? "" : screenInfo.trim();
+        if (geometry.isEmpty()) throw new IllegalArgumentException("desktop shell geometry is required");
+
+        String payload = payloadCommand == null ? "" : payloadCommand.trim();
+        if (payload.isEmpty()) payload = buildExplorerDesktopShellPayload("explorer.exe");
+        return "wine explorer /desktop=shell," + geometry + " " + payload;
+    }
+
+    public static String buildExplorerDesktopShellPayload(String executableName) {
+        return "\"" + canonicalDesktopShellExecutableName(executableName, "explorer.exe") + "\"";
+    }
+
+    public static String buildWinHandlerDesktopShellPayload(String handlerExecutable, String shellExecutable) {
+        return canonicalDesktopShellExecutableName(handlerExecutable, "winhandler.exe")
+                + " \""
+                + canonicalDesktopShellExecutableName(shellExecutable, "wfm.exe")
+                + "\"";
+    }
+
+    public static String canonicalDesktopShellExecutableName(String executableName, String fallbackName) {
+        String fallback = fallbackName == null || fallbackName.trim().isEmpty()
+                ? "explorer.exe"
+                : fallbackName.trim();
+        String normalized = executableName == null ? "" : executableName.trim();
+        if (normalized.length() >= 2 && normalized.startsWith("\"") && normalized.endsWith("\"")) {
+            normalized = normalized.substring(1, normalized.length() - 1).trim();
+        }
+        if (normalized.isEmpty()) return fallback;
+
+        int windowsSeparator = normalized.lastIndexOf('\\');
+        int unixSeparator = normalized.lastIndexOf('/');
+        int separator = Math.max(windowsSeparator, unixSeparator);
+        if (separator >= 0 && separator + 1 < normalized.length()) {
+            normalized = normalized.substring(separator + 1).trim();
+        }
+        return normalized.isEmpty() ? fallback : normalized;
+    }
+
     public static final class WindowsLaunchTarget {
         public final String rawCommand;
         public final String commandPath;
@@ -92,6 +133,97 @@ public abstract class WineUtils {
         }
     }
 
+    public static final class RuntimeAbiContract {
+        public final boolean required;
+        public final boolean complete;
+        public final String arch;
+        public final String runtimeModel;
+        public final String reason;
+        public final String missing;
+        public final String runtimeRootPath;
+        public final String wineBinaryPath;
+        public final String wineUnixDirPath;
+        public final String wineWindowsDirPath;
+        public final String glibcLoaderPath;
+        public final String glibcLibcPath;
+        public final String glibcLoaderRejectedPath;
+        public final String glibcLibcRejectedPath;
+
+        private RuntimeAbiContract(
+                boolean required,
+                boolean complete,
+                String arch,
+                String runtimeModel,
+                String reason,
+                String missing,
+                String runtimeRootPath,
+                String wineBinaryPath,
+                String wineUnixDirPath,
+                String wineWindowsDirPath,
+                String glibcLoaderPath,
+                String glibcLibcPath,
+                String glibcLoaderRejectedPath,
+                String glibcLibcRejectedPath
+        ) {
+            this.required = required;
+            this.complete = complete;
+            this.arch = arch;
+            this.runtimeModel = runtimeModel;
+            this.reason = reason;
+            this.missing = missing;
+            this.runtimeRootPath = runtimeRootPath;
+            this.wineBinaryPath = wineBinaryPath;
+            this.wineUnixDirPath = wineUnixDirPath;
+            this.wineWindowsDirPath = wineWindowsDirPath;
+            this.glibcLoaderPath = glibcLoaderPath;
+            this.glibcLibcPath = glibcLibcPath;
+            this.glibcLoaderRejectedPath = glibcLoaderRejectedPath;
+            this.glibcLibcRejectedPath = glibcLibcRejectedPath;
+        }
+    }
+
+    private static final class ExpectedElfAbi {
+        final int elfClass;
+        final int machine;
+
+        ExpectedElfAbi(int elfClass, int machine) {
+            this.elfClass = elfClass;
+            this.machine = machine;
+        }
+    }
+
+    private static final class ElfHeader {
+        final boolean valid;
+        final int elfClass;
+        final int machine;
+        final String reason;
+
+        private ElfHeader(boolean valid, int elfClass, int machine, String reason) {
+            this.valid = valid;
+            this.elfClass = elfClass;
+            this.machine = machine;
+            this.reason = reason;
+        }
+
+        static ElfHeader invalid(String reason) {
+            return new ElfHeader(false, -1, -1, reason);
+        }
+
+        static ElfHeader valid(int elfClass, int machine) {
+            return new ElfHeader(true, elfClass, machine, "");
+        }
+    }
+
+    private static final class AbiFileResolution {
+        final File file;
+        final String rejected;
+
+        AbiFileResolution(File file, String rejected) {
+            this.file = file;
+            this.rejected = rejected == null ? "" : rejected;
+        }
+    }
+
     private static final String[] RUNTIME_BIN_DIR_CANDIDATES = {
             "bin",
             "arm64-v8a/bin"
@@ -99,6 +231,56 @@ public abstract class WineUtils {
     private static final String[] RUNTIME_LIB_DIR_CANDIDATES = {
             "lib",
             "arm64-v8a/lib"
+    };
+    private static final String[] RUNTIME_WINE_UNIX_DIR_CANDIDATES = {
+            "aarch64-unix",
+            "x86_64-unix",
+            "i386-unix"
+    };
+    private static final String[] RUNTIME_WINE_WINDOWS_DIR_CANDIDATES = {
+            "aarch64-windows",
+            "x86_64-windows",
+            "i386-windows"
+    };
+    private static final String[] RUNTIME_X86_64_GLIBC_LOADER_CANDIDATES = {
+            "usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+            "lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+            "lib64/ld-linux-x86-64.so.2",
+            "lib/ld-linux-x86-64.so.2"
+    };
+    private static final String[] RUNTIME_X86_64_GLIBC_LIBC_CANDIDATES = {
+            "usr/lib/x86_64-linux-gnu/libc.so.6",
+            "lib/x86_64-linux-gnu/libc.so.6",
+            "lib64/libc.so.6",
+            "lib/libc.so.6"
+    };
+    private static final String[] RUNTIME_X86_GLIBC_LOADER_CANDIDATES = {
+            "usr/lib/i386-linux-gnu/ld-linux.so.2",
+            "usr/lib/i686-linux-gnu/ld-linux.so.2",
+            "lib/i386-linux-gnu/ld-linux.so.2",
+            "lib/i686-linux-gnu/ld-linux.so.2",
+            "lib/ld-linux.so.2"
+    };
+    private static final String[] RUNTIME_X86_GLIBC_LIBC_CANDIDATES = {
+            "usr/lib/i386-linux-gnu/libc.so.6",
+            "usr/lib/i686-linux-gnu/libc.so.6",
+            "lib/i386-linux-gnu/libc.so.6",
+            "lib/i686-linux-gnu/libc.so.6",
+            "lib/libc.so.6"
+    };
+    private static final String[] RUNTIME_AARCH64_GLIBC_LOADER_CANDIDATES = {
+            "usr/lib/ld-linux-aarch64.so.1",
+            "usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+            "lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+            "lib64/ld-linux-aarch64.so.1",
+            "lib/ld-linux-aarch64.so.1"
+    };
+    private static final String[] RUNTIME_AARCH64_GLIBC_LIBC_CANDIDATES = {
+            "usr/lib/libc.so.6",
+            "usr/lib/aarch64-linux-gnu/libc.so.6",
+            "lib/aarch64-linux-gnu/libc.so.6",
+            "lib64/libc.so.6",
+            "lib/libc.so.6"
     };
     private static final String[] RUNTIME_SHARE_DIR_CANDIDATES = {
             "share",
@@ -134,6 +316,15 @@ public abstract class WineUtils {
             "(?:^|\\s)(?:[^\\s\"']*[/\\\\])?wine(?:64)?\\s+(.+)$",
             Pattern.CASE_INSENSITIVE
     );
+    private static final int ELF_HEADER_MACHINE_OFFSET = 18;
+    private static final int ELF_HEADER_MIN_BYTES = 20;
+    private static final int ELFCLASS32 = 1;
+    private static final int ELFCLASS64 = 2;
+    private static final int ELFDATA2LSB = 1;
+    private static final int ELFDATA2MSB = 2;
+    private static final int EM_386 = 3;
+    private static final int EM_X86_64 = 62;
+    private static final int EM_AARCH64 = 183;
 
     public static File resolveHostWinePrefixDir(File rootDir) {
         if (rootDir == null) return new File("/nonexistent");
@@ -179,10 +370,307 @@ public abstract class WineUtils {
     }
 
     public static File resolveRuntimeWineUnixDir(File runtimeRootDir) {
+        File[] wineUnixDirs = resolveRuntimeWineUnixDirs(runtimeRootDir);
+        return wineUnixDirs.length > 0 ? wineUnixDirs[0] : null;
+    }
+
+    public static File resolveRuntimeWineUnixDir(File runtimeRootDir, WineInfo wineInfo) {
         File wineLibDir = resolveRuntimeWineLibDir(runtimeRootDir);
         if (wineLibDir == null) return null;
-        File wineUnixDir = new File(wineLibDir, "aarch64-unix");
-        return wineUnixDir.isDirectory() ? wineUnixDir : null;
+
+        String preferredName = getRuntimeWineUnixDirName(wineInfo);
+        if (preferredName != null) {
+            File preferredDir = new File(wineLibDir, preferredName);
+            if (preferredDir.isDirectory()) return preferredDir;
+        }
+
+        return resolveRuntimeWineUnixDir(runtimeRootDir);
+    }
+
+    public static File resolveRuntimeWineWindowsDir(File runtimeRootDir, WineInfo wineInfo) {
+        File wineLibDir = resolveRuntimeWineLibDir(runtimeRootDir);
+        if (wineLibDir == null) return null;
+
+        String preferredName = getRuntimeWineWindowsDirName(wineInfo);
+        if (preferredName != null) {
+            File preferredDir = new File(wineLibDir, preferredName);
+            if (preferredDir.isDirectory()) return preferredDir;
+        }
+
+        File[] wineWindowsDirs = resolveRuntimeWineWindowsDirs(runtimeRootDir);
+        return wineWindowsDirs.length > 0 ? wineWindowsDirs[0] : null;
+    }
+
+    public static File[] resolveRuntimeWineUnixDirs(File runtimeRootDir) {
+        File wineLibDir = resolveRuntimeWineLibDir(runtimeRootDir);
+        if (wineLibDir == null) return new File[0];
+
+        File[] resolved = new File[RUNTIME_WINE_UNIX_DIR_CANDIDATES.length];
+        int count = 0;
+        for (String name : RUNTIME_WINE_UNIX_DIR_CANDIDATES) {
+            File wineUnixDir = new File(wineLibDir, name);
+            if (wineUnixDir.isDirectory()) {
+                resolved[count++] = wineUnixDir;
+            }
+        }
+        if (count == resolved.length) return resolved;
+
+        File[] compact = new File[count];
+        System.arraycopy(resolved, 0, compact, 0, count);
+        return compact;
+    }
+
+    public static File[] resolveRuntimeWineWindowsDirs(File runtimeRootDir) {
+        File wineLibDir = resolveRuntimeWineLibDir(runtimeRootDir);
+        if (wineLibDir == null) return new File[0];
+
+        File[] resolved = new File[RUNTIME_WINE_WINDOWS_DIR_CANDIDATES.length];
+        int count = 0;
+        for (String name : RUNTIME_WINE_WINDOWS_DIR_CANDIDATES) {
+            File wineWindowsDir = new File(wineLibDir, name);
+            if (wineWindowsDir.isDirectory()) {
+                resolved[count++] = wineWindowsDir;
+            }
+        }
+        if (count == resolved.length) return resolved;
+
+        File[] compact = new File[count];
+        System.arraycopy(resolved, 0, compact, 0, count);
+        return compact;
+    }
+
+    private static String getRuntimeWineUnixDirName(WineInfo wineInfo) {
+        if (wineInfo == null || wineInfo.getArch() == null) return null;
+        switch (wineInfo.getArch().trim().toLowerCase(Locale.ROOT)) {
+            case "x86_64":
+                return "x86_64-unix";
+            case "x86":
+                return "i386-unix";
+            case "arm64":
+            case "arm64ec":
+                return "aarch64-unix";
+            default:
+                return null;
+        }
+    }
+
+    private static String getRuntimeWineWindowsDirName(WineInfo wineInfo) {
+        if (wineInfo == null || wineInfo.getArch() == null) return null;
+        switch (wineInfo.getArch().trim().toLowerCase(Locale.ROOT)) {
+            case "x86_64":
+                return "x86_64-windows";
+            case "x86":
+                return "i386-windows";
+            case "arm64":
+            case "arm64ec":
+                return "aarch64-windows";
+            default:
+                return null;
+        }
+    }
+
+    public static RuntimeAbiContract validateRuntimeAbiContract(
+            File imageFsRootDir,
+            File runtimeRootDir,
+            WineInfo wineInfo,
+            String runtimeModel
+    ) {
+        String normalizedRuntimeModel = runtimeModel == null ? "" : runtimeModel.trim().toLowerCase(Locale.ROOT);
+        String arch = wineInfo != null && wineInfo.getArch() != null
+                ? wineInfo.getArch().trim().toLowerCase(Locale.ROOT)
+                : "";
+        File wineBinary = resolveRuntimeWineBinary(runtimeRootDir);
+        File wineUnixDir = resolveRuntimeWineUnixDir(runtimeRootDir, wineInfo);
+        File wineWindowsDir = resolveRuntimeWineWindowsDir(runtimeRootDir, wineInfo);
+        boolean glibcRuntime = "glibc".equals(normalizedRuntimeModel);
+        boolean glibcAbiRequired = glibcRuntime
+                && ("x86_64".equals(arch)
+                || "x86".equals(arch)
+                || "arm64".equals(arch)
+                || "arm64ec".equals(arch));
+
+        String missing = "";
+        if (wineBinary == null || !wineBinary.isFile()) missing = appendMissing(missing, "wine_binary");
+        if (wineUnixDir == null || !wineUnixDir.isDirectory()) missing = appendMissing(missing, "wine_unix_dir:" + nullToEmpty(getRuntimeWineUnixDirName(wineInfo)));
+        if (wineWindowsDir == null || !wineWindowsDir.isDirectory()) missing = appendMissing(missing, "wine_windows_dir:" + nullToEmpty(getRuntimeWineWindowsDirName(wineInfo)));
+
+        File glibcLoader = null;
+        File glibcLibc = null;
+        AbiFileResolution glibcLoaderResolution = new AbiFileResolution(null, "");
+        AbiFileResolution glibcLibcResolution = new AbiFileResolution(null, "");
+        if (glibcAbiRequired) {
+            glibcLoaderResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, true);
+            glibcLibcResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, false);
+            glibcLoader = glibcLoaderResolution.file;
+            glibcLibc = glibcLibcResolution.file;
+            if (glibcLoader == null || !glibcLoader.isFile()) missing = appendMissing(missing, arch + "_glibc_loader");
+            if (glibcLibc == null || !glibcLibc.isFile()) missing = appendMissing(missing, arch + "_glibc_libc");
+        }
+
+        boolean required = glibcAbiRequired
+                || wineBinary != null
+                || wineUnixDir != null
+                || wineWindowsDir != null;
+        boolean complete = missing.isEmpty();
+        String reason = complete
+                ? "runtime_abi_contract_satisfied"
+                : "runtime_abi_contract_missing_" + missing.replace(',', '_');
+        return new RuntimeAbiContract(
+                required,
+                complete,
+                arch,
+                normalizedRuntimeModel,
+                reason,
+                missing,
+                runtimeRootDir != null ? runtimeRootDir.getAbsolutePath() : "",
+                wineBinary != null ? wineBinary.getAbsolutePath() : "",
+                wineUnixDir != null ? wineUnixDir.getAbsolutePath() : "",
+                wineWindowsDir != null ? wineWindowsDir.getAbsolutePath() : "",
+                glibcLoader != null ? glibcLoader.getAbsolutePath() : "",
+                glibcLibc != null ? glibcLibc.getAbsolutePath() : "",
+                glibcLoaderResolution.rejected,
+                glibcLibcResolution.rejected
+        );
+    }
+
+    private static AbiFileResolution resolveGlibcAbiFile(File imageFsRootDir, File runtimeRootDir, String arch, boolean loader) {
+        String[] candidates;
+        switch (arch == null ? "" : arch) {
+            case "x86_64":
+                candidates = loader ? RUNTIME_X86_64_GLIBC_LOADER_CANDIDATES : RUNTIME_X86_64_GLIBC_LIBC_CANDIDATES;
+                break;
+            case "x86":
+                candidates = loader ? RUNTIME_X86_GLIBC_LOADER_CANDIDATES : RUNTIME_X86_GLIBC_LIBC_CANDIDATES;
+                break;
+            case "arm64":
+            case "arm64ec":
+                candidates = loader ? RUNTIME_AARCH64_GLIBC_LOADER_CANDIDATES : RUNTIME_AARCH64_GLIBC_LIBC_CANDIDATES;
+                break;
+            default:
+                return new AbiFileResolution(null, "");
+        }
+
+        ExpectedElfAbi expectedAbi = expectedGlibcElfAbi(arch);
+        AbiFileResolution runtimeFound = resolveExistingRelativeAbiFile(runtimeRootDir, candidates, expectedAbi);
+        if (runtimeFound.file != null) return runtimeFound;
+
+        AbiFileResolution imageFound = resolveExistingRelativeAbiFile(imageFsRootDir, candidates, expectedAbi);
+        return new AbiFileResolution(
+                imageFound.file,
+                appendRejected(runtimeFound.rejected, imageFound.rejected)
+        );
+    }
+
+    private static ExpectedElfAbi expectedGlibcElfAbi(String arch) {
+        switch (arch == null ? "" : arch) {
+            case "x86_64":
+                return new ExpectedElfAbi(ELFCLASS64, EM_X86_64);
+            case "x86":
+                return new ExpectedElfAbi(ELFCLASS32, EM_386);
+            case "arm64":
+            case "arm64ec":
+                return new ExpectedElfAbi(ELFCLASS64, EM_AARCH64);
+            default:
+                return null;
+        }
+    }
+
+    private static AbiFileResolution resolveExistingRelativeAbiFile(File rootDir, String[] relativePaths, ExpectedElfAbi expectedAbi) {
+        if (rootDir == null || relativePaths == null) return new AbiFileResolution(null, "");
+
+        String rejected = "";
+        for (String relativePath : relativePaths) {
+            File candidate = new File(rootDir, relativePath);
+            if (!candidate.isFile()) continue;
+
+            String mismatch = describeElfAbiMismatch(candidate, expectedAbi);
+            if (mismatch.isEmpty()) {
+                return new AbiFileResolution(candidate, rejected);
+            }
+            rejected = appendRejected(rejected, mismatch);
+        }
+        return new AbiFileResolution(null, rejected);
+    }
+
+    private static String describeElfAbiMismatch(File candidate, ExpectedElfAbi expectedAbi) {
+        if (expectedAbi == null) return "";
+
+        ElfHeader header = readElfHeader(candidate);
+        String path = candidate == null ? "" : candidate.getAbsolutePath();
+        if (!header.valid) {
+            return path + ":invalid_elf:" + header.reason;
+        }
+        if (header.elfClass == expectedAbi.elfClass && header.machine == expectedAbi.machine) {
+            return "";
+        }
+        return path
+                + ":class=" + header.elfClass
+                + ":machine=" + header.machine
+                + ":expectedClass=" + expectedAbi.elfClass
+                + ":expectedMachine=" + expectedAbi.machine;
+    }
+
+    private static ElfHeader readElfHeader(File file) {
+        if (file == null || !file.isFile()) return ElfHeader.invalid("missing_file");
+
+        byte[] header = new byte[ELF_HEADER_MIN_BYTES];
+        int total = 0;
+        try (FileInputStream input = new FileInputStream(file)) {
+            while (total < header.length) {
+                int read = input.read(header, total, header.length - total);
+                if (read < 0) break;
+                total += read;
+            }
+        }
+        catch (IOException e) {
+            return ElfHeader.invalid("read_failed");
+        }
+
+        if (total < ELF_HEADER_MIN_BYTES) return ElfHeader.invalid("short_header");
+        if ((header[0] & 0xff) != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F') {
+            return ElfHeader.invalid("bad_magic");
+        }
+
+        int elfClass = header[4] & 0xff;
+        int dataEncoding = header[5] & 0xff;
+        int machineLow = header[ELF_HEADER_MACHINE_OFFSET] & 0xff;
+        int machineHigh = header[ELF_HEADER_MACHINE_OFFSET + 1] & 0xff;
+        int machine;
+        if (dataEncoding == ELFDATA2LSB) {
+            machine = machineLow | (machineHigh << 8);
+        }
+        else if (dataEncoding == ELFDATA2MSB) {
+            machine = (machineLow << 8) | machineHigh;
+        }
+        else {
+            return ElfHeader.invalid("unsupported_data_encoding:" + dataEncoding);
+        }
+        return ElfHeader.valid(elfClass, machine);
+    }
+
+    private static File resolveExistingRelativeFile(File rootDir, String[] relativePaths) {
+        if (rootDir == null || relativePaths == null) return null;
+        for (String relativePath : relativePaths) {
+            File candidate = new File(rootDir, relativePath);
+            if (candidate.isFile()) return candidate;
+        }
+        return null;
+    }
+
+    private static String appendMissing(String current, String value) {
+        if (value == null || value.trim().isEmpty()) return current == null ? "" : current;
+        if (current == null || current.isEmpty()) return value;
+        return current + "," + value;
+    }
+
+    private static String appendRejected(String current, String value) {
+        if (value == null || value.trim().isEmpty()) return current == null ? "" : current;
+        if (current == null || current.isEmpty()) return value;
+        return current + ";" + value;
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     public static File resolveRuntimeWineBinary(File runtimeRootDir) {

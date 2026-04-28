@@ -409,7 +409,17 @@ public class ContentsManager {
     }
 
     public void syncContents() {
-        repairInstalledRuntimeOverlaysForCurrentThread();
+        syncContents(true);
+    }
+
+    public void syncContentsForLaunch() {
+        syncContents(false);
+    }
+
+    private void syncContents(boolean repairRuntimeOverlays) {
+        if (repairRuntimeOverlays) {
+            repairInstalledRuntimeOverlaysForCurrentThread();
+        }
         clearRuntimeResolutionCaches();
         profilesMap = new HashMap<>();
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
@@ -1068,12 +1078,42 @@ public class ContentsManager {
                     : new InstalledProfileState(false, false, "not_installed");
         }
         if (!profile.isWineProtonFamily()) {
+            repairPayloadProfileForRoot(installDir, profile, "installed_state");
+            File profileJson = new File(installDir, PROFILE_NAME);
+            if (!profileJson.isFile() && hasUsablePayloadProfile(installDir, profile)) {
+                boolean written = writeProfileSnapshot(installDir, profile);
+                logPayloadProfileRepair(
+                        installDir,
+                        profile,
+                        "installed_state_missing_profile_json",
+                        written ? "profile_snapshot_written" : "profile_snapshot_write_failed",
+                        profile.fileList != null ? profile.fileList.size() : 0,
+                        profile.fileList != null ? profile.fileList.size() : 0
+                );
+            }
+            if (!hasUsablePayloadProfile(installDir, profile)) {
+                return new InstalledProfileState(true, false, "missing_payload_files");
+            }
             return new InstalledProfileState(true, true, "");
         }
 
         File profileJson = new File(installDir, PROFILE_NAME);
         if (!profileJson.isFile()) {
-            return new InstalledProfileState(true, false, "missing_profile_json");
+            repairWineFamilyProfile(installDir, profile, profile, profile.artifactName);
+            if (hasResolvedRuntimePayload(installDir, profile)) {
+                boolean written = writeProfileSnapshot(installDir, profile);
+                logPayloadProfileRepair(
+                        installDir,
+                        profile,
+                        "installed_runtime_missing_profile_json",
+                        written ? "runtime_profile_snapshot_written" : "runtime_profile_snapshot_write_failed",
+                        0,
+                        profile.fileList != null ? profile.fileList.size() : 0
+                );
+            }
+            if (!profileJson.isFile()) {
+                return new InstalledProfileState(true, false, "missing_profile_json");
+            }
         }
 
         File runtimeRoot = resolveWineRuntimeRoot(installDir, profile);
@@ -1338,6 +1378,8 @@ public class ContentsManager {
         normalizeWineLibraryStructure(installPath, profile);
         rebindWineFamilyProfilePaths(installPath, profile);
         sanitizeWineRuntimeRunpath(installPath, profile);
+        sanitizeWineRuntimeElfInterpreters(installPath, profile);
+        relocateWineRuntimeImageFsPaths(installPath, profile);
 
         File binDir = WineUtils.resolveRuntimeBinDir(installPath);
         if (binDir != null && binDir.isDirectory()) {
@@ -1521,45 +1563,46 @@ public class ContentsManager {
     }
 
     private void createDirTemplateMap() {
-        if (dirTemplateMap == null) {
-            dirTemplateMap = new HashMap<>();
-            ImageFs imageFs = ImageFs.find(context);
-            String imagefsPath = imageFs.getRootDir().getAbsolutePath();
-            String drivecPath = imageFs.getWinePrefixDir().getAbsolutePath() + "/drive_c";
-            dirTemplateMap.put("${libdir}", imagefsPath + "/usr/lib");
-            dirTemplateMap.put("${system32}", drivecPath + "/windows/system32");
-            dirTemplateMap.put("${syswow64}", drivecPath + "/windows/syswow64");
-            dirTemplateMap.put("${localbin}", imagefsPath + "/usr/local/bin");
-            dirTemplateMap.put("${bindir}", imagefsPath + "/usr/bin");
-            dirTemplateMap.put("${sharedir}", imagefsPath + "/usr/share");
+        dirTemplateMap = new HashMap<>();
+        ImageFs imageFs = ImageFs.find(context);
+        File rootDir = imageFs.getRootDir();
+        String imagefsPath = rootDir.getAbsolutePath();
+        File driveCRoot = WineUtils.resolveHostWineDriveCRoot(rootDir);
+        if (!driveCRoot.isDirectory()) {
+            driveCRoot = new File(imageFs.getWinePrefixDir(), "drive_c");
         }
+        String drivecPath = driveCRoot.getAbsolutePath();
+        dirTemplateMap.put("${libdir}", imagefsPath + "/usr/lib");
+        dirTemplateMap.put("${system32}", drivecPath + "/windows/system32");
+        dirTemplateMap.put("${syswow64}", drivecPath + "/windows/syswow64");
+        dirTemplateMap.put("${localbin}", imagefsPath + "/usr/local/bin");
+        dirTemplateMap.put("${bindir}", imagefsPath + "/usr/bin");
+        dirTemplateMap.put("${sharedir}", imagefsPath + "/usr/share");
     }
 
     private void createTrustedFilesMap() {
-        if (trustedFilesMap == null) {
-            trustedFilesMap = new HashMap<>();
-            for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
-                List<String> pathList = new ArrayList<>();
-                trustedFilesMap.put(type, pathList);
+        trustedFilesMap = new HashMap<>();
+        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
+            List<String> pathList = new ArrayList<>();
+            trustedFilesMap.put(type, pathList);
 
-                String[] paths = switch (type) {
-                    case CONTENT_TYPE_DXVK -> DXVK_TRUST_FILES;
-                    case CONTENT_TYPE_VKD3D -> VKD3D_TRUST_FILES;
-                    case CONTENT_TYPE_DGVOODOO -> DGVOODOO_TRUST_FILES;
-                    case CONTENT_TYPE_BOX64 -> BOX64_TRUST_FILES;
-                    case CONTENT_TYPE_WOWBOX64 -> WOWBOX64_TRUST_FILES;
-                    case CONTENT_TYPE_FEXCORE -> FEXCORE_TRUST_FILES;
-                    default -> new String[0];
-                };
-                for (String path : paths)
-                    pathList.add(Paths.get(getPathFromTemplate(path)).toAbsolutePath().normalize().toString());
-            }
+            String[] paths = switch (type) {
+                case CONTENT_TYPE_DXVK -> DXVK_TRUST_FILES;
+                case CONTENT_TYPE_VKD3D -> VKD3D_TRUST_FILES;
+                case CONTENT_TYPE_DGVOODOO -> DGVOODOO_TRUST_FILES;
+                case CONTENT_TYPE_BOX64 -> BOX64_TRUST_FILES;
+                case CONTENT_TYPE_WOWBOX64 -> WOWBOX64_TRUST_FILES;
+                case CONTENT_TYPE_FEXCORE -> FEXCORE_TRUST_FILES;
+                default -> new String[0];
+            };
+            for (String path : paths)
+                pathList.add(Paths.get(getPathFromTemplate(path)).toAbsolutePath().normalize().toString());
         }
     }
 
     private String getPathFromTemplate(String path) {
         createDirTemplateMap();
-        String realPath = path;
+        String realPath = path == null ? "" : path;
         for (String key : dirTemplateMap.keySet()) {
             realPath = realPath.replace(key, dirTemplateMap.get(key));
         }
@@ -1774,6 +1817,34 @@ public class ContentsManager {
         return findInstalledProfileByVersion(type, versionName, requireUsable) != null;
     }
 
+    @Nullable
+    public ContentProfile findBestInstalledProfile(ContentProfile.ContentType type,
+                                                   @Nullable String requestedRuntimeModel,
+                                                   @Nullable String requestedArch,
+                                                   boolean requireUsable) {
+        if (type == null) return null;
+        List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
+        if (profiles == null) return null;
+        String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedRuntimeModel);
+        String normalizedArch = requestedArch == null ? "" : requestedArch.trim().toLowerCase(Locale.US);
+
+        ContentProfile bestStrict = null;
+        ContentProfile bestCompatible = null;
+        for (ContentProfile profile : profiles) {
+            if (profile == null) continue;
+            if (!matchesInstalledRequirement(profile, requireUsable)) continue;
+            boolean runtimeCompatible = normalizedRuntimeModel.isEmpty()
+                    || profile.isRuntimeModelCompatible(normalizedRuntimeModel);
+            boolean archCompatible = normalizedArch.isEmpty() || profile.matchesArchitectureFilter(normalizedArch);
+            if (runtimeCompatible && archCompatible) {
+                bestStrict = pickPreferredVersionCandidate(bestStrict, profile);
+            } else if (runtimeCompatible || archCompatible) {
+                bestCompatible = pickPreferredVersionCandidate(bestCompatible, profile);
+            }
+        }
+        return bestStrict != null ? bestStrict : bestCompatible;
+    }
+
     public int countInstalledProfiles(ContentProfile.ContentType type, boolean requireUsable) {
         List<ContentProfile> profiles = profilesMap != null ? profilesMap.get(type) : null;
         if (profiles == null) return 0;
@@ -1924,24 +1995,127 @@ public class ContentsManager {
     }
 
     public boolean applyContent(ContentProfile profile) {
+        if (profile == null || profile.type == null) return false;
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
-                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON
-                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             return true;
         }
+        File installDir = resolveInstalledInstallDir(profile, false);
+        if (installDir == null) installDir = getInstallDir(context, profile);
 
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_DGVOODOO) {
+            boolean ready = installDir != null && installDir.isDirectory() && hasUsablePayloadProfile(installDir, profile);
+            ForensicLogger.logEvent(
+                    context,
+                    ready ? "info" : "warn",
+                    "CONTENTS_PAYLOAD_APPLY_RESULT",
+                    null,
+                    "contents",
+                    ready ? "payload_apply_package_managed" : "payload_apply_package_missing",
+                    ForensicLogger.fields(
+                            "type", profile.type.toString(),
+                            "ver_name", profile.verName == null ? "" : profile.verName,
+                            "ver_code", profile.verCode,
+                            "install_root", normalizePath(installDir)
+                    )
+            );
+            return ready;
+        }
+
+        repairPayloadProfileForRoot(installDir, profile, "apply");
+
+        if (profile.fileList == null || profile.fileList.isEmpty()) {
+            ForensicLogger.logEvent(
+                    context,
+                    "warn",
+                    "CONTENTS_PAYLOAD_APPLY_RESULT",
+                    null,
+                    "contents",
+                    "payload_apply_empty_file_list",
+                    ForensicLogger.fields(
+                            "type", profile.type != null ? profile.type.toString() : "-",
+                            "ver_name", profile.verName == null ? "" : profile.verName,
+                            "ver_code", profile.verCode,
+                            "install_root", normalizePath(installDir)
+                    )
+            );
+            return false;
+        }
+
+        String installRootPath = installDir != null ? installDir.getAbsolutePath() : "";
+        String imagefsPath = ImageFs.find(context).getRootDir().getAbsolutePath();
+        int copiedCount = 0;
+        int missingSourceCount = 0;
+        int failedCount = 0;
+        int guardFailedCount = 0;
+        ArrayList<String> samples = new ArrayList<>();
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
-            File targetFile = new File(getPathFromTemplate(contentFile.target));
-            File sourceFile = new File(getInstallDir(context, profile), contentFile.source);
+            if (contentFile == null || isBlank(contentFile.source) || isBlank(contentFile.target)) {
+                guardFailedCount++;
+                addPayloadApplySample(samples, "blank_mapping");
+                continue;
+            }
 
-            targetFile.delete();
-            FileUtils.copy(sourceFile, targetFile);
+            String normalizedSource = normalizeRelativePath(contentFile.source);
+            File sourceFile = new File(installDir, normalizedSource);
+            File targetFile = new File(getPathFromTemplate(contentFile.target));
+            if (installRootPath.isEmpty()
+                    || !isSubPath(installRootPath, sourceFile.getAbsolutePath())
+                    || !isTrustedInstallTarget(profile, contentFile.target, imagefsPath)) {
+                guardFailedCount++;
+                addPayloadApplySample(samples, "guard_failed:" + normalizedSource + "->" + contentFile.target);
+                continue;
+            }
+
+            boolean copied = false;
+            if (!sourceFile.isFile()) {
+                missingSourceCount++;
+                addPayloadApplySample(samples, "missing_source:" + normalizedSource);
+            } else {
+                targetFile.delete();
+                copied = FileUtils.copy(sourceFile, targetFile)
+                        && targetFile.isFile()
+                        && targetFile.length() == sourceFile.length();
+                if (!copied) {
+                    failedCount++;
+                    addPayloadApplySample(samples, "copy_failed:" + normalizedSource + "->" + contentFile.target);
+                } else {
+                    copiedCount++;
+                }
+            }
 
             if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
                 FileUtils.chmod(targetFile, 0771);
             }
         }
-        return true;
+        boolean success = missingSourceCount == 0 && failedCount == 0 && guardFailedCount == 0;
+        ForensicLogger.logEvent(
+                context,
+                success ? "info" : "warn",
+                "CONTENTS_PAYLOAD_APPLY_RESULT",
+                null,
+                "contents",
+                success ? "payload_apply_complete" : "payload_apply_incomplete",
+                ForensicLogger.fields(
+                        "type", profile.type != null ? profile.type.toString() : "-",
+                        "ver_name", profile.verName == null ? "" : profile.verName,
+                        "ver_code", profile.verCode,
+                        "install_root", normalizePath(installDir),
+                        "file_count", profile.fileList.size(),
+                        "copied", copiedCount,
+                        "missing_source", missingSourceCount,
+                        "guard_failed", guardFailedCount,
+                        "failed", failedCount,
+                        "sample_count", samples.size(),
+                        "samples", String.join(" | ", samples)
+                )
+        );
+        return success;
+    }
+
+    private void addPayloadApplySample(ArrayList<String> samples, String sample) {
+        if (samples == null || sample == null || sample.trim().isEmpty()) return;
+        if (samples.size() < 12) samples.add(sample);
     }
 
     private String readRemoteUrl(JSONObject object) {
@@ -2369,6 +2543,38 @@ public class ContentsManager {
         }
     }
 
+    private void sanitizeWineRuntimeElfInterpreters(File installPath, ContentProfile profile) {
+        if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
+        ImageFs imageFs = ImageFs.find(context);
+        WineRuntimeElfInterpreterSanitizer.Result result =
+                WineRuntimeElfInterpreterSanitizer.sanitizeWineRuntime(installPath, profile, imageFs);
+        if (result.hasSignal()) {
+            Log.i("ContentsManager", "Wine runtime ELF interpreter sanitize: " + result.toSummary());
+            WineRuntimeElfInterpreterSanitizer.logResult(
+                    context,
+                    "CONTENTS_RUNTIME_ELF_INTERPRETER_REBIND",
+                    result,
+                    resolveWineRuntimeRoot(installPath, profile)
+            );
+        }
+    }
+
+    private void relocateWineRuntimeImageFsPaths(File installPath, ContentProfile profile) {
+        if (installPath == null || profile == null || !profile.isWineProtonFamily()) return;
+        ImageFs imageFs = ImageFs.find(context);
+        ImageFsPathRelocator.Result result =
+                ImageFsPathRelocator.relocateWineRuntime(installPath, profile, imageFs);
+        if (result.hasSignal()) {
+            Log.i("ContentsManager", "Wine runtime imagefs path relocate: " + result.toSummary());
+            ImageFsPathRelocator.logResult(
+                    context,
+                    "CONTENTS_RUNTIME_IMAGEFS_PATH_RELOCATE",
+                    result,
+                    resolveWineRuntimeRoot(installPath, profile)
+            );
+        }
+    }
+
     private void pruneSupersededWineRuntimeInstalls(File sharedRuntimeDir) {
         if (sharedRuntimeDir == null || !sharedRuntimeDir.isDirectory()) return;
 
@@ -2703,7 +2909,7 @@ public class ContentsManager {
             case CONTENT_TYPE_DXVK -> profile.fileList = synthesizeDxvkFiles(rootDir);
             case CONTENT_TYPE_VKD3D -> profile.fileList = synthesizeVkd3dFiles(rootDir);
             case CONTENT_TYPE_DGVOODOO -> profile.fileList = synthesizeDgVoodooFiles(rootDir);
-            case CONTENT_TYPE_BOX64 -> profile.fileList = synthesizeSingleFile(rootDir, "box64", "${localbin}/box64");
+            case CONTENT_TYPE_BOX64 -> profile.fileList = synthesizeBox64Files(rootDir);
             case CONTENT_TYPE_WOWBOX64 -> profile.fileList = synthesizeWowBox64Files(rootDir);
             case CONTENT_TYPE_FEXCORE -> profile.fileList = synthesizeFexCoreFiles(rootDir);
             case CONTENT_TYPE_WINE, CONTENT_TYPE_PROTON -> synthesizeWineFamilyProfile(rootDir, profile);
@@ -3015,25 +3221,125 @@ public class ContentsManager {
                                                                 ContentProfile.ContentType type,
                                                                 @Nullable List<ContentProfile.ContentFile> currentFiles) {
         LinkedHashMap<String, ContentProfile.ContentFile> filesByTarget = new LinkedHashMap<>();
-        addExistingContentFiles(rootDir, currentFiles, filesByTarget);
-        addExistingContentFiles(rootDir, synthesizeFilesForType(rootDir, type), filesByTarget);
+        addExistingContentFiles(rootDir, type, currentFiles, filesByTarget);
+        addExistingContentFiles(rootDir, type, synthesizeFilesForType(rootDir, type), filesByTarget);
         return new ArrayList<>(filesByTarget.values());
     }
 
+    private boolean hasUsablePayloadProfile(@Nullable File rootDir, @Nullable ContentProfile profile) {
+        if (rootDir == null || profile == null || profile.type == null || !rootDir.isDirectory()) return false;
+        if (profile.isWineProtonFamily()) return hasResolvedRuntimePayload(rootDir, profile);
+        if (hasExistingUsablePayloadFiles(rootDir, profile.type, profile.fileList)) return true;
+        List<ContentProfile.ContentFile> repaired = repairContentFiles(rootDir, profile.type, profile.fileList);
+        return repaired != null && !repaired.isEmpty();
+    }
+
+    private boolean hasExistingUsablePayloadFiles(@Nullable File rootDir,
+                                                  @Nullable ContentProfile.ContentType type,
+                                                  @Nullable List<ContentProfile.ContentFile> currentFiles) {
+        if (rootDir == null || type == null || currentFiles == null || currentFiles.isEmpty()) return false;
+        for (ContentProfile.ContentFile currentFile : currentFiles) {
+            if (currentFile == null || isBlank(currentFile.source) || isBlank(currentFile.target)) continue;
+            String normalizedSource = normalizeRelativePath(currentFile.source);
+            File sourceFile = new File(rootDir, normalizedSource);
+            if (!sourceFile.isFile() || !isSubPath(rootDir.getAbsolutePath(), sourceFile.getAbsolutePath())) continue;
+            if (isTrustedPayloadTarget(type, currentFile.target)) return true;
+        }
+        return false;
+    }
+
+    private boolean repairPayloadProfileForRoot(@Nullable File rootDir,
+                                                @Nullable ContentProfile profile,
+                                                @NonNull String reason) {
+        if (rootDir == null || profile == null || profile.type == null || profile.isWineProtonFamily()) return false;
+        if (!rootDir.isDirectory()) {
+            logPayloadProfileRepair(rootDir, profile, reason, "missing_root", 0, profile.fileList != null ? profile.fileList.size() : 0);
+            return false;
+        }
+
+        int beforeCount = profile.fileList != null ? profile.fileList.size() : 0;
+        String beforeSignature = payloadFileListSignature(profile.fileList);
+        List<ContentProfile.ContentFile> repaired = repairContentFiles(rootDir, profile.type, profile.fileList);
+        int afterCount = repaired != null ? repaired.size() : 0;
+        if (afterCount <= 0) {
+            logPayloadProfileRepair(rootDir, profile, reason, "empty_repair", beforeCount, afterCount);
+            return false;
+        }
+
+        profile.fileList = repaired;
+        String afterSignature = payloadFileListSignature(repaired);
+        if (!beforeSignature.equals(afterSignature)) {
+            boolean written = writeProfileSnapshot(rootDir, profile);
+            installedProfileStateByKey.remove(buildInstalledProfileStateKey(profile));
+            logPayloadProfileRepair(rootDir, profile, reason, written ? "profile_repaired" : "write_failed", beforeCount, afterCount);
+            return written;
+        }
+        return true;
+    }
+
+    private void logPayloadProfileRepair(@Nullable File rootDir,
+                                         @Nullable ContentProfile profile,
+                                         @NonNull String reason,
+                                         @NonNull String status,
+                                         int beforeCount,
+                                         int afterCount) {
+        if (context == null || profile == null) return;
+        ForensicLogger.logEvent(
+                context,
+                status.endsWith("failed") || status.startsWith("empty") || status.startsWith("missing") ? "warn" : "info",
+                "CONTENTS_PAYLOAD_PROFILE_REPAIR",
+                null,
+                "contents",
+                status,
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "type", profile.type != null ? profile.type.toString() : "-",
+                        "ver_name", profile.verName == null ? "" : profile.verName,
+                        "ver_code", profile.verCode,
+                        "install_root", normalizePath(rootDir),
+                        "before_file_count", beforeCount,
+                        "after_file_count", afterCount,
+                        "root_shape", summarizeRootShape(rootDir, 24)
+                )
+        );
+    }
+
+    private String payloadFileListSignature(@Nullable List<ContentProfile.ContentFile> files) {
+        if (files == null || files.isEmpty()) return "";
+        ArrayList<String> rows = new ArrayList<>();
+        for (ContentProfile.ContentFile file : files) {
+            if (file == null) continue;
+            rows.add(normalizeRelativePath(file.source) + "->" + (file.target == null ? "" : file.target.trim()));
+        }
+        rows.sort(String::compareTo);
+        return String.join("\n", rows);
+    }
+
     private void addExistingContentFiles(File rootDir,
+                                         ContentProfile.ContentType type,
                                          @Nullable List<ContentProfile.ContentFile> candidates,
                                          Map<String, ContentProfile.ContentFile> filesByTarget) {
         if (rootDir == null || candidates == null || filesByTarget == null) return;
         for (ContentProfile.ContentFile candidate : candidates) {
             if (candidate == null || isBlank(candidate.source) || isBlank(candidate.target)) continue;
-            File sourceFile = new File(rootDir, candidate.source);
-            if (!sourceFile.isFile()) continue;
+            String normalizedSource = normalizeRelativePath(candidate.source);
+            File sourceFile = new File(rootDir, normalizedSource);
+            if (!sourceFile.isFile() || !isSubPath(rootDir.getAbsolutePath(), sourceFile.getAbsolutePath())) continue;
+            if (!isTrustedPayloadTarget(type, candidate.target)) continue;
             if (filesByTarget.containsKey(candidate.target)) continue;
             ContentProfile.ContentFile normalized = new ContentProfile.ContentFile();
-            normalized.source = normalizeRelativePath(candidate.source);
+            normalized.source = normalizedSource;
             normalized.target = candidate.target.trim();
             filesByTarget.put(normalized.target, normalized);
         }
+    }
+
+    private boolean isTrustedPayloadTarget(@Nullable ContentProfile.ContentType type, @Nullable String target) {
+        if (type == null || isBlank(target)) return false;
+        ContentProfile probe = new ContentProfile();
+        probe.type = type;
+        String imagefsPath = ImageFs.find(context).getRootDir().getAbsolutePath();
+        return isTrustedInstallTarget(probe, target, imagefsPath);
     }
 
     private List<ContentProfile.ContentFile> synthesizeFilesForType(File rootDir, ContentProfile.ContentType type) {
@@ -3042,7 +3348,7 @@ public class ContentsManager {
             case CONTENT_TYPE_DXVK -> synthesizeDxvkFiles(rootDir);
             case CONTENT_TYPE_VKD3D -> synthesizeVkd3dFiles(rootDir);
             case CONTENT_TYPE_DGVOODOO -> synthesizeDgVoodooFiles(rootDir);
-            case CONTENT_TYPE_BOX64 -> synthesizeSingleFile(rootDir, "box64", "${localbin}/box64");
+            case CONTENT_TYPE_BOX64 -> synthesizeBox64Files(rootDir);
             case CONTENT_TYPE_WOWBOX64 -> synthesizeWowBox64Files(rootDir);
             case CONTENT_TYPE_FEXCORE -> synthesizeFexCoreFiles(rootDir);
             default -> new ArrayList<>();
@@ -3207,6 +3513,19 @@ public class ContentsManager {
         item.source = relative;
         item.target = targetPath;
         files.add(item);
+        return files;
+    }
+
+    private List<ContentProfile.ContentFile> synthesizeBox64Files(File rootDir) {
+        ArrayList<ContentProfile.ContentFile> files = new ArrayList<>();
+        String relative = findRelativeFile(rootDir, "box64");
+        if (relative == null) return files;
+        for (String target : BOX64_TRUST_FILES) {
+            ContentProfile.ContentFile item = new ContentProfile.ContentFile();
+            item.source = relative;
+            item.target = target;
+            files.add(item);
+        }
         return files;
     }
 

@@ -215,6 +215,7 @@ public abstract class MSLink {
         String lnkFilePath = lnkFile.getPath();
         String filePath = StringUtils.escapeFileDOSPath(parseFilePath(lnkFile));
         ImageFs imageFs = ImageFs.find(context);
+        String winePrefix = WineUtils.resolveHostWinePrefixDir(imageFs.getRootDir()).getAbsolutePath();
 
         File desktopFile = new File(lnkFilePath.substring(0, lnkFilePath.lastIndexOf(".")) + ".desktop");
         try {
@@ -222,7 +223,7 @@ public abstract class MSLink {
             PrintWriter pw = new PrintWriter(fos);
             pw.write("[Desktop Entry]\n");
             pw.write("Name=" + lnkFile.getName().substring(0, lnkFile.getName().lastIndexOf(".")) + "\n");
-            pw.write("Exec=env WINEPREFIX=" + "\"" + imageFs.wineprefix + "\"" + " wine " + filePath + "\n");
+            pw.write("Exec=env WINEPREFIX=" + "\"" + winePrefix + "\"" + " wine " + filePath + "\n");
             pw.write("Type=Application\n");
             pw.write("StartupNotify=True\n");
             pw.close();

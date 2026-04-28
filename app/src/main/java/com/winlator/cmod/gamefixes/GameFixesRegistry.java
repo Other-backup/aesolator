@@ -383,7 +383,10 @@ public final class GameFixesRegistry {
                 Container container,
                 @Nullable Shortcut shortcut
         ) {
-            File systemRegFile = new File(ImageFs.find(context).getWinePrefixDir(), "system.reg");
+            File rootDir = container != null && container.getRootDir() != null
+                    ? container.getRootDir()
+                    : ImageFs.find(context).getRootDir();
+            File systemRegFile = new File(WineUtils.resolveHostWinePrefixDir(rootDir), "system.reg");
             if (!systemRegFile.isFile()) {
                 Log.w(TAG, "system.reg not found at " + systemRegFile.getAbsolutePath());
                 return false;

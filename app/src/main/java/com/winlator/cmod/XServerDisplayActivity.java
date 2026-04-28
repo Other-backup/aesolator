@@ -24,6 +24,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
@@ -319,11 +320,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private volatile String lastTrackedApplicationWindowClassName = "";
     private final Set<View> desktopGestureExclusionTrackedViews =
             Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Map<View, String> desktopGestureExclusionLastState = new IdentityHashMap<>();
     private boolean bootstrapFirstDrawObserved = false;
 
     // Inside the XServerDisplayActivity class
     private SensorManager sensorManager;
     private Sensor gyroSensor;
+    private HandlerThread gyroHandlerThread;
+    private Handler gyroHandler;
+    private boolean gyroListenerRegistered = false;
     private ExternalController controller;
 
     // Playtime stats tracking
@@ -383,6 +388,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String debugAutoInstallPrefixPackTarget = "";
     private boolean forensicModeLaunch = false;
     private String forensicTraceId = "";
+    private boolean forensicTraceGenerated = false;
     private String forensicRouteSource = "";
     private static final long DEBUG_PREFIXPACK_FALLBACK_INITIAL_DELAY_MS = 6500L;
     private static final long DEBUG_PREFIXPACK_FALLBACK_RETRY_MS = 900L;
@@ -620,6 +626,80 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     };
 
+    private void initializeGyroSensor() {
+        if (sensorManager == null) {
+            sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        }
+        if (sensorManager != null && gyroSensor == null) {
+            gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        }
+    }
+
+    private void registerGyroListenerIfEnabled(String reason) {
+        if (!preferences.getBoolean("gyro_enabled", true)) {
+            unregisterGyroListenerIfNeeded(reason + "_disabled");
+            return;
+        }
+        initializeGyroSensor();
+        if (sensorManager == null || gyroSensor == null) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_GYRO_SENSOR_UNAVAILABLE",
+                    null,
+                    "xserver",
+                    "gyro_sensor_unavailable",
+                    ForensicLogger.fields("reason", reason)
+            );
+            return;
+        }
+        if (gyroListenerRegistered) return;
+        if (gyroHandlerThread == null || !gyroHandlerThread.isAlive()) {
+            gyroHandlerThread = new HandlerThread("XServerGyro");
+            gyroHandlerThread.start();
+            gyroHandler = new Handler(gyroHandlerThread.getLooper());
+        }
+        gyroListenerRegistered = sensorManager.registerListener(
+                gyroListener,
+                gyroSensor,
+                SensorManager.SENSOR_DELAY_GAME,
+                gyroHandler
+        );
+        ForensicLogger.logEvent(
+                this,
+                gyroListenerRegistered ? "info" : "warn",
+                gyroListenerRegistered ? "XSERVER_GYRO_REGISTERED" : "XSERVER_GYRO_REGISTER_FAILED",
+                null,
+                "xserver",
+                gyroListenerRegistered ? "gyro_listener_registered" : "gyro_listener_register_failed",
+                ForensicLogger.fields("reason", reason, "handler_thread", "XServerGyro")
+        );
+    }
+
+    private void unregisterGyroListenerIfNeeded(String reason) {
+        if (sensorManager == null || !gyroListenerRegistered) return;
+        sensorManager.unregisterListener(gyroListener);
+        gyroListenerRegistered = false;
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_GYRO_UNREGISTERED",
+                null,
+                "xserver",
+                "gyro_listener_unregistered",
+                ForensicLogger.fields("reason", reason)
+        );
+    }
+
+    private void shutdownGyroThread() {
+        unregisterGyroListenerIfNeeded("shutdown");
+        if (gyroHandlerThread != null) {
+            gyroHandlerThread.quitSafely();
+            gyroHandlerThread = null;
+            gyroHandler = null;
+        }
+    }
+
     private float pickHighestRefreshRate() {
         android.view.Display display = getWindowManager().getDefaultDisplay();
         android.view.Display.Mode[] modes = display.getSupportedModes();
@@ -689,9 +769,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         Intent launchIntent = getIntent();
-        forensicModeLaunch = launchIntent != null && launchIntent.getBooleanExtra("forensic_mode", false);
-        forensicTraceId = launchIntent != null ? safeTrim(launchIntent.getStringExtra("forensic_trace_id")) : "";
-        forensicRouteSource = launchIntent != null ? safeTrim(launchIntent.getStringExtra("forensic_route_source")) : "";
+        refreshForensicTrace(launchIntent);
         boolean debugBuild = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         boolean hasExplicitProbeTarget = launchIntent != null
                 && launchIntent.hasExtra("aeso_debug_probe_tap_x")
@@ -755,6 +833,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             "app_id", resolveIntentLaunchAppId(launchIntent),
                             "launch_route_token", resolveIntentLaunchRouteToken(launchIntent),
                             "forensic_mode", forensicModeLaunch,
+                            "forensic_trace_generated", forensicTraceGenerated,
                             "forensic_route_source", forensicRouteSource,
                             "debug_start_probe_armed", debugStartProbeArmed
                     )
@@ -803,16 +882,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
 
 
-        // Initialize SensorManager
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-
-        boolean gyroEnabled = preferences.getBoolean("gyro_enabled", true);
-
-        if (gyroEnabled) {
-            // Register the sensor event listener
-            sensorManager.registerListener(gyroListener, gyroSensor, SensorManager.SENSOR_DELAY_GAME);
-        }
+        initializeGyroSensor();
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_GYRO_REGISTRATION_DEFERRED",
+                null,
+                "xserver",
+                "gyro_registration_deferred_until_ui_bootstrap",
+                ForensicLogger.fields(
+                        "gyro_enabled", preferences.getBoolean("gyro_enabled", true),
+                        "gyro_sensor_present", gyroSensor != null
+                )
+        );
 
 
 
@@ -846,8 +928,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         contentsManager = new ContentsManager(this);
         imageFs = ImageFs.find(this);
-        ImageFsInstaller.ensureAppNativeGuestLibs(this, imageFs);
-        ImageFsInstaller.ensurePrefixPackToolkit(this, imageFs);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "XSERVER_EARLY_ROOTFS_BRIDGE_DEFERRED",
+                null,
+                "xserver",
+                "rootfs_payload_prepare_deferred_to_bootstrap_executor",
+                ForensicLogger.fields("imagefs_root", imageFs.getRootDir().getAbsolutePath())
+        );
         File devInputDir = new File(imageFs.getRootDir(), "dev/input");
         if (devInputDir.exists() || devInputDir.mkdirs()) {
             for (int i = 0; i < 4; i++) {
@@ -951,7 +1040,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return;
         }
 
-        contentsManager.syncContents();
+        contentsManager.syncContentsForLaunch();
         effectiveRuntimeModel = resolveLaunchRuntimeModel(requestedWineVersion);
         wineVersion = resolveEffectiveLaunchWineVersion(requestedWineVersion, effectiveRuntimeModel);
         if (ensureSelectedRuntimeReady(wineVersion, effectiveRuntimeModel)) {
@@ -1307,6 +1396,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             );
             try {
                 setupUI();
+                registerGyroListenerIfEnabled("bootstrap_ui_ready");
                 logBootstrapCheckpoint(
                         "XSERVER_BOOTSTRAP_UI_READY",
                         "bootstrap_ui_ready",
@@ -1569,9 +1659,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 boolean runtimeModelMatches = profile.isRuntimeModelCompatible(runtimeModel)
                         && (normalizedRuntimeModel.isEmpty() || normalizedRuntimeModel.equals(profile.getRuntimeModel()));
                 if (!runtimeModelMatches) {
-                    if (contentsManager.isInstalledProfileUsable(profile)) {
-                        best = pickPreferredLaunchRuntime(best, profile);
-                    }
                     continue;
                 }
                 best = pickPreferredLaunchRuntime(best, profile);
@@ -2221,6 +2308,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         boolean launchTargetChanged = hasLaunchTargetChanged(intent);
         setIntent(intent);
+        refreshForensicTrace(intent);
         logBootstrapCheckpoint(
                 "XSERVER_NEW_INTENT_RECEIVED",
                 "xserver_activity_received_new_intent",
@@ -2228,6 +2316,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "shortcut_path", intent != null ? intent.getStringExtra("shortcut_path") : "",
                 "app_id", resolveIntentLaunchAppId(intent),
                 "launch_route_token", resolveIntentLaunchRouteToken(intent),
+                "forensic_trace_generated", forensicTraceGenerated,
+                "forensic_route_source", forensicRouteSource,
                 "activity_has_focus", hasWindowFocus(),
                 "guest_bootstrap_submitted", guestBootstrapSubmitted,
                 "launch_target_changed", launchTargetChanged
@@ -2261,11 +2351,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
         cancelDeferredDesktopRuntimePause("resume");
         AppUtils.hideSystemUI(this);
         refreshDesktopGestureExclusion();
-        boolean gyroEnabled = preferences.getBoolean("gyro_enabled", true);
-
-        if (gyroEnabled) {
-            // Re-register the sensor listener when the activity is resumed
-            sensorManager.registerListener(gyroListener, gyroSensor, SensorManager.SENSOR_DELAY_GAME);
+        if (bootstrapFirstDrawObserved || guestBootstrapSubmitted) {
+            registerGyroListenerIfEnabled("activity_resume");
+        } else {
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "XSERVER_GYRO_RESUME_REGISTRATION_DEFERRED",
+                    null,
+                    "xserver",
+                    "gyro_resume_registration_deferred_until_bootstrap",
+                    ForensicLogger.fields(
+                            "first_draw_observed", bootstrapFirstDrawObserved,
+                            "guest_bootstrap_submitted", guestBootstrapSubmitted
+                    )
+            );
         }
 
         if (environment != null) {
@@ -2281,12 +2381,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     public void onPause() {
         super.onPause();
-        boolean gyroEnabled = preferences.getBoolean("gyro_enabled", true);
-
-        if (gyroEnabled) {
-            // Unregister the sensor listener when the activity is paused
-            sensorManager.unregisterListener(gyroListener);
-        }
+        unregisterGyroListenerIfNeeded("activity_pause");
 
         boolean enteringPictureInPicture = isInPictureInPictureMode();
         pauseXServerViewSurface("activity_pause");
@@ -2459,7 +2554,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             savePlaytimeData();
             handler.removeCallbacks(savePlaytimeRunnable);
             if (midiHandler != null) midiHandler.stop();
-            if (sensorManager != null) sensorManager.unregisterListener(gyroListener);
+            shutdownGyroThread();
             if (winHandler != null) winHandler.stop();
             if (environment != null) environment.stopEnvironmentComponents();
             ProcessHelper.terminateAllWineProcesses();
@@ -2571,6 +2666,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         restoreTemporaryOverrideIfNeeded("activity_destroy");
+        shutdownGyroThread();
+        ForensicLogger.clearActiveTraceId(forensicTraceIdOrNull());
         super.onDestroy();
     }
 
@@ -2812,7 +2909,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (value.isEmpty()) return;
         ForensicLogger.logEvent(
                 this,
-                "warn",
+                "info",
                 "NOEXEC_DOS_DRIVE_DETECTED",
                 null,
                 "xserver",
@@ -4644,6 +4741,34 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 markGuestVisualReady("desktop_shell_visual_proof", null, proof);
                 return;
             }
+            if (processProof && shouldAcceptNonvisualDesktopShellProcessProof(proof, winHandlerReady, requireWinHandler, trackedWindowCount)) {
+                ForensicLogger.logEvent(
+                        this,
+                        "info",
+                        "XSERVER_BOOTSTRAP_PRELOADER_FALLBACK_EXEC",
+                        null,
+                        "xserver",
+                        "preloader_closed_on_desktop_shell_process_proof",
+                        ForensicLogger.fields(
+                                "attempt", attempt + 1,
+                                "shell_launcher_present", proof.shellLauncherPresent,
+                                "shell_process_present", proof.explorerProcessPresent,
+                                "winhandler_process_present", proof.winHandlerProcessPresent,
+                                "wfm_process_present", proof.wfmProcessPresent,
+                                "wineboot_process_present", proof.winebootProcessPresent,
+                                "wineserver_present", proof.wineserverPresent,
+                                "bootstrap_elapsed_ms", proof.bootstrapElapsedMs,
+                                "desktop_shell_launch_mode", desktopShellLaunchMode,
+                                "require_winhandler", requireWinHandler,
+                                "winhandler_ready", winHandlerReady,
+                                "tracked_window_count", trackedWindowCount,
+                                "process_proof", true,
+                                "nonvisual_process_proof_accepted", true
+                        )
+                );
+                markGuestVisualReady("desktop_shell_process_proof", null, proof);
+                return;
+            }
             if (attempt + 1 < DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS) {
                 if (attempt == 0 || attempt + 1 == DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS / 2) {
                     if (trackedWindowCount == 0) {
@@ -4732,6 +4857,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     )
             );
         }, Math.max(200L, delayMs));
+    }
+
+    private boolean shouldAcceptNonvisualDesktopShellProcessProof(
+            DesktopShellBootstrapProof proof,
+            boolean winHandlerReady,
+            boolean requireWinHandler,
+            int trackedWindowCount
+    ) {
+        // Process liveness is diagnostic only. Black-screen closure requires
+        // an X11 window that reached the tracked visual frontier.
+        return false;
     }
 
     private boolean shouldAttemptDesktopShellWinHandlerFallback(DesktopShellBootstrapProof proof, int trackedWindowCount) {
@@ -4838,19 +4974,40 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (entry == null) continue;
             String commandLine = readProcCmdline(Integer.parseInt(entry)).toLowerCase(Locale.US);
             if (commandLine.isEmpty()) continue;
+            String processImage = firstProcImage(commandLine);
             if (commandLine.contains("explorer /desktop=shell")
                     || commandLine.contains("explorer.exe /desktop=shell")) {
                 proof.shellLauncherPresent = true;
             }
-            if (commandLine.contains("explorer.exe")) proof.explorerProcessPresent = true;
-            if (commandLine.contains("winhandler.exe")) proof.winHandlerProcessPresent = true;
-            if (commandLine.contains("wfm.exe") && !commandLine.contains("winhandler.exe")) {
-                proof.wfmProcessPresent = true;
+            if (procImageMatches(processImage, "explorer.exe")) proof.explorerProcessPresent = true;
+            if (procImageMatches(processImage, "winhandler.exe")) proof.winHandlerProcessPresent = true;
+            if (procImageMatches(processImage, "wfm.exe")) proof.wfmProcessPresent = true;
+            if (procImageMatches(processImage, "wineboot.exe")) proof.winebootProcessPresent = true;
+            if (procImageMatches(processImage, "wineserver") || commandLine.equals("wineserver")) {
+                proof.wineserverPresent = true;
             }
-            if (commandLine.contains("wineboot.exe")) proof.winebootProcessPresent = true;
-            if (commandLine.contains("wineserver")) proof.wineserverPresent = true;
         }
         return proof;
+    }
+
+    private String firstProcImage(String commandLine) {
+        if (commandLine == null) return "";
+        String normalized = commandLine.trim();
+        if (normalized.isEmpty()) return "";
+        int firstSpace = normalized.indexOf(' ');
+        String image = firstSpace >= 0 ? normalized.substring(0, firstSpace) : normalized;
+        if (image.startsWith("\"") && image.endsWith("\"") && image.length() > 1) {
+            image = image.substring(1, image.length() - 1);
+        }
+        return image.replace('/', '\\');
+    }
+
+    private boolean procImageMatches(String processImage, String executableName) {
+        if (processImage == null || executableName == null) return false;
+        String image = processImage.trim().toLowerCase(Locale.US);
+        String executable = executableName.trim().toLowerCase(Locale.US);
+        if (image.isEmpty() || executable.isEmpty()) return false;
+        return image.equals(executable) || image.endsWith("\\" + executable);
     }
 
     private boolean isTrackedVisualWindow(@Nullable Window window) {
@@ -5216,7 +5373,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void ensureWinePrefixEssentialFiles() {
         if (container == null || imageFs == null) return;
-        File containerWindowsDir = new File(container.getRootDir(), ".wine/drive_c/windows");
+        File containerWindowsDir = new File(WineUtils.resolveHostWineDriveCRoot(container.getRootDir()), "windows");
         String[] essentialFiles = {"winhandler.exe", "wfm.exe"};
         ArrayList<String> missingFiles = new ArrayList<>();
         for (String filename : essentialFiles) {
@@ -5329,6 +5486,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         // Clear any temporary directory
         String rootPath = imageFs.getRootDir().getPath();
+        ImageFsInstaller.ensureRootfsLaunchLayout(this, imageFs);
         FileUtils.clear(imageFs.getTmpDir());
 
         int bindingPathCount = 0;
@@ -5380,8 +5538,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 configureDesktopShellRegistry();
             }
             String guestExecutable = buildGuestExecutable();
-            boolean desktopShellLaunch = shortcut == null
-                    && guestExecutable.toLowerCase(java.util.Locale.ROOT).contains("/desktop=shell");
+            boolean desktopShellLaunch = shortcut == null && isDesktopShellGuestExecutable(guestExecutable);
             desktopShellBootstrapActive = desktopShellLaunch;
             if (desktopShellBootstrapActive) {
                 if (desktopShellBootstrapStartedAtMs == 0L) {
@@ -5656,6 +5813,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             // miss on high-density phones.
             touchpadView.setGestureRuntimeTuning(260, 20, 100, 350);
             touchpadView.setStrictGestureFsmOverride(false);
+            xServerView.requestLifecycleRender("desktop_input_model_ready");
             ForensicLogger.logEvent(
                     this,
                     "info",
@@ -5685,8 +5843,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void applyDesktopGestureExclusion(View targetView) {
         if (targetView == null || shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
 
-        targetView.post(() -> updateDesktopGestureExclusionRects(targetView));
         if (desktopGestureExclusionTrackedViews.add(targetView)) {
+            targetView.post(() -> updateDesktopGestureExclusionRects(targetView));
             targetView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
                     updateDesktopGestureExclusionRects(targetView));
         }
@@ -5723,14 +5881,38 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void updateDesktopGestureExclusionRects(View targetView) {
         if (targetView == null || shortcut != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        if (targetView.getWindowToken() == null || !targetView.isAttachedToWindow()) return;
 
         int width = targetView.getWidth();
         int height = targetView.getHeight();
         if (width <= 0 || height <= 0) return;
 
+        String stateKey = System.identityHashCode(targetView.getWindowToken()) + ":" + width + "x" + height;
+        if (stateKey.equals(desktopGestureExclusionLastState.get(targetView))) return;
+
         ArrayList<Rect> exclusionRects = new ArrayList<>();
         exclusionRects.add(new Rect(0, 0, width, height));
-        targetView.setSystemGestureExclusionRects(exclusionRects);
+        try {
+            targetView.setSystemGestureExclusionRects(exclusionRects);
+            desktopGestureExclusionLastState.put(targetView, stateKey);
+        }
+        catch (RuntimeException error) {
+            ForensicLogger.error(
+                    this,
+                    "DESKTOP_GESTURE_EXCLUSION_FAILED",
+                    null,
+                    "xserver",
+                    "desktop_gesture_exclusion_failed",
+                    error,
+                    ForensicLogger.fields(
+                            "view_width", width,
+                            "view_height", height,
+                            "window_token_present", targetView.getWindowToken() != null,
+                            "attached_to_window", targetView.isAttachedToWindow()
+                    )
+            );
+            return;
+        }
 
         ForensicLogger.logEvent(
                 this,
@@ -6841,7 +7023,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         mergedEnv.putAll(envVars);
 
         mergedEnv.put("LC_ALL", lc_all);
-        mergedEnv.put("WINEPREFIX", imageFs.wineprefix);
+        mergedEnv.put("WINEPREFIX", WineUtils.resolveHostWinePrefixDir(imageFs.getRootDir()).getAbsolutePath());
 
         if (container != null) {
             mergedEnv.putAll(container.getEnvVars());
@@ -7200,6 +7382,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return forensicTraceId == null || forensicTraceId.trim().isEmpty()
                 ? null
                 : forensicTraceId.trim();
+    }
+
+    private void refreshForensicTrace(@Nullable Intent intent) {
+        forensicModeLaunch = intent != null && intent.getBooleanExtra("forensic_mode", false);
+        String explicitTraceId = intent != null ? safeTrim(intent.getStringExtra("forensic_trace_id")) : "";
+        forensicTraceGenerated = explicitTraceId.isEmpty();
+        forensicTraceId = forensicTraceGenerated ? ForensicLogger.newTraceId() : explicitTraceId;
+        forensicRouteSource = intent != null ? safeTrim(intent.getStringExtra("forensic_route_source")) : "";
+        ForensicLogger.setActiveTraceId(forensicTraceIdOrNull());
     }
 
     private void prearmDesktopShellBootstrapIfNeeded(String source) {
@@ -8063,6 +8254,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File icdDir = new File(imageFs.getShareDir(), "vulkan/icd.d");
         File androidHostIcd = new File(icdDir, "wrapper_icd.android-host.aarch64.json");
+        ensureAndroidHostWrapperDependencyClosure(new File(nativeLibDir), imageFs.getAndroidHostLibDir());
         String missingDependencies = collectAndroidHostWrapperMissingDependencies(new File(nativeLibDir), imageFs.getAndroidHostLibDir());
         if (!missingDependencies.isEmpty()) {
             if (androidHostIcd.isFile()) FileUtils.delete(androidHostIcd);
@@ -8110,6 +8302,54 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.w(TAG, "Failed to rewrite wrapper ICD for Android host", e);
             return null;
+        }
+    }
+
+    private void ensureAndroidHostWrapperDependencyClosure(File nativeLibDir, File hostLibDir) {
+        if (imageFs == null || hostLibDir == null) return;
+        File guestLibDir = imageFs.getLibDir();
+        if (!hostLibDir.isDirectory()) hostLibDir.mkdirs();
+
+        int copied = 0;
+        int stillMissing = 0;
+        ArrayList<String> samples = new ArrayList<>();
+        for (String dependency : ANDROID_HOST_WRAPPER_REQUIRED_LIBS) {
+            if (dependency == null || dependency.trim().isEmpty()) continue;
+            if (hasAndroidHostWrapperDependency(dependency, nativeLibDir, hostLibDir)) continue;
+
+            File source = new File(guestLibDir, dependency);
+            File target = new File(hostLibDir, dependency);
+            if (source.isFile()
+                    && FileUtils.copy(source, target)
+                    && target.isFile()
+                    && target.length() == source.length()) {
+                FileUtils.chmod(target, 0755);
+                copied++;
+                addSample(samples, "copied:" + dependency);
+            } else {
+                stillMissing++;
+                addSample(samples, "missing:" + dependency);
+            }
+        }
+
+        if (copied > 0 || stillMissing > 0) {
+            ForensicLogger.logEvent(
+                    this,
+                    stillMissing == 0 ? "info" : "warn",
+                    "WRAPPER_ANDROID_HOST_DEPENDENCY_CLOSURE",
+                    null,
+                    "graphics_provider",
+                    stillMissing == 0 ? "wrapper_android_host_dependency_closure_ready" : "wrapper_android_host_dependency_closure_incomplete",
+                    ForensicLogger.fields(
+                            "native_lib_dir", nativeLibDir != null ? nativeLibDir.getAbsolutePath() : "",
+                            "guest_lib_dir", guestLibDir.getAbsolutePath(),
+                            "host_lib_dir", hostLibDir.getAbsolutePath(),
+                            "copied", copied,
+                            "still_missing", stillMissing,
+                            "sample_count", samples.size(),
+                            "samples", String.join(" | ", samples)
+                    )
+            );
         }
     }
 
@@ -8534,7 +8774,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         TarCompressorUtils.Type.ZSTD,
                         this,
                         "graphics_driver/zink_dlls.tzst",
-                        new File(imageFs.getWinePrefixDir(), "drive_c/windows")
+                        new File(WineUtils.resolveHostWineDriveCRoot(rootDir), "windows")
                 );
             }
         }
@@ -9712,13 +9952,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             restoreOriginalDllFiles(new String[]{ "ddraw.dll", "d3dimm.dll" });
 
             Log.d(TAG, "Finished extraction of DXVK wrapper files, version: " + dxwrapper);
+            boolean routeReady = dxvkReady && ("None".equalsIgnoreCase(vkd3dWrapper) || vkd3dReady);
             ForensicLogger.logEvent(
                     this,
-                    "info",
+                    routeReady ? "info" : "warn",
                     "DXWRAPPER_RUNTIME_STAGE_READY",
                     null,
                     "dxwrapper",
-                    "dxvk_runtime_stage_ready",
+                    routeReady ? "dxvk_runtime_stage_ready" : "dxvk_runtime_stage_incomplete",
                     ForensicLogger.fields(
                             "dxwrapper", dxwrapper,
                             "dxvk_wrapper", dxvkWrapper,
@@ -9874,8 +10115,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
         if (dxvkProfile != null) {
             Log.d(TAG, "Applying user-defined DXVK content profile: " + dxvkWrapper);
-            contentsManager.applyContent(dxvkProfile);
-            return true;
+            boolean applied = contentsManager.applyContent(dxvkProfile);
+            boolean verified = applied && verifyWindowsPayloadStage(
+                    "dxvk",
+                    dxvkWrapper,
+                    windowsDir,
+                    "d3d10.dll",
+                    "d3d10_1.dll",
+                    "d3d10core.dll",
+                    "d3d11.dll",
+                    "dxgi.dll"
+            );
+            if (verified) return true;
         }
 
         Log.d(TAG, "Extracting secondary DXVK .tzst archive: " + dxvkWrapper);
@@ -9892,7 +10143,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             Log.d(TAG, "Extracting d8vk as part of DXVK version " + dxvkWrapper);
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/d8vk-" + DefaultVersion.D8VK + ".tzst", windowsDir, onExtractFileListener);
         }
-        return true;
+        return verifyWindowsPayloadStage(
+                "dxvk",
+                dxvkWrapper,
+                windowsDir,
+                "d3d10.dll",
+                "d3d10_1.dll",
+                "d3d10core.dll",
+                "d3d11.dll",
+                "dxgi.dll"
+        );
     }
 
     private boolean stageVkd3dCompanionPayload(String vkd3dWrapper, File windowsDir) {
@@ -9906,18 +10166,76 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
         if (vkd3dProfile != null) {
             Log.d(TAG, "Applying user-defined VKD3D content profile: " + vkd3dWrapper);
-            contentsManager.applyContent(vkd3dProfile);
-            return true;
+            boolean applied = contentsManager.applyContent(vkd3dProfile);
+            boolean verified = applied && verifyWindowsPayloadStage(
+                    "vkd3d",
+                    vkd3dWrapper,
+                    windowsDir,
+                    "d3d12.dll",
+                    "d3d12core.dll"
+            );
+            if (verified) return true;
         }
 
         Log.d(TAG, "Extracting secondary VKD3D .tzst archive: " + vkd3dWrapper);
-        return TarCompressorUtils.extract(
+        boolean extracted = TarCompressorUtils.extract(
                 TarCompressorUtils.Type.ZSTD,
                 this,
                 "dxwrapper/vkd3d-" + vkd3dWrapper + ".tzst",
                 windowsDir,
                 onExtractFileListener
         );
+        return extracted && verifyWindowsPayloadStage(
+                "vkd3d",
+                vkd3dWrapper,
+                windowsDir,
+                "d3d12.dll",
+                "d3d12core.dll"
+        );
+    }
+
+    private boolean verifyWindowsPayloadStage(String owner, String version, File windowsDir, String... dllNames) {
+        File system32Dir = new File(windowsDir, "system32");
+        File syswow64Dir = new File(windowsDir, "syswow64");
+        boolean checkSysWow64 = syswow64Dir.isDirectory();
+        ArrayList<String> missing = new ArrayList<>();
+        int checked = 0;
+
+        for (String dllName : dllNames) {
+            if (dllName == null || dllName.trim().isEmpty()) continue;
+            checked++;
+            File system32Dll = new File(system32Dir, dllName);
+            if (!system32Dll.isFile() || system32Dll.length() == 0L) {
+                addSample(missing, "system32/" + dllName);
+            }
+            if (checkSysWow64) {
+                checked++;
+                File syswow64Dll = new File(syswow64Dir, dllName);
+                if (!syswow64Dll.isFile() || syswow64Dll.length() == 0L) {
+                    addSample(missing, "syswow64/" + dllName);
+                }
+            }
+        }
+
+        boolean ready = missing.isEmpty();
+        ForensicLogger.logEvent(
+                this,
+                ready ? "info" : "warn",
+                "DXWRAPPER_PAYLOAD_STAGE_VERIFY",
+                null,
+                "dxwrapper",
+                ready ? "dxwrapper_payload_stage_verified" : "dxwrapper_payload_stage_missing_files",
+                ForensicLogger.fields(
+                        "owner", owner == null ? "" : owner,
+                        "version", version == null ? "" : version,
+                        "windows_dir", windowsDir != null ? windowsDir.getAbsolutePath() : "",
+                        "checked", checked,
+                        "syswow64_checked", checkSysWow64 ? "1" : "0",
+                        "missing_count", missing.size(),
+                        "missing", String.join(",", missing)
+                )
+        );
+        return ready;
     }
 
     private String resolveDgVoodooOutputApi(boolean forceD3d11, boolean dxvkReady, boolean vkd3dReady) {
@@ -10296,15 +10614,60 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File syswow64dlls = new File(runtimeWineLibDir, "i386-windows");
 
 
+        int restored = 0;
+        int missingSource = 0;
+        int failed = 0;
+        ArrayList<String> samples = new ArrayList<>();
         for (String dll : dlls) {
             File srcFile = new File(system32dlls, dll);
             File dstFile = new File(windowsDir, "system32/" + dll);
-            FileUtils.copy(srcFile, dstFile);
+            if (copyRuntimeDllWithVerification(srcFile, dstFile)) restored++;
+            else {
+                if (!srcFile.isFile()) missingSource++;
+                else failed++;
+                addSample(samples, "system32/" + dll);
+            }
             srcFile = new File(syswow64dlls, dll);
             dstFile = new File(windowsDir, "syswow64/" + dll);
-            FileUtils.copy(srcFile, dstFile);
+            if (copyRuntimeDllWithVerification(srcFile, dstFile)) restored++;
+            else {
+                if (!srcFile.isFile()) missingSource++;
+                else failed++;
+                addSample(samples, "syswow64/" + dll);
+            }
         }
+
+        ForensicLogger.logEvent(
+                this,
+                missingSource == 0 && failed == 0 ? "info" : "warn",
+                "DXWRAPPER_ORIGINAL_DLL_RESTORE",
+                null,
+                "dxwrapper",
+                missingSource == 0 && failed == 0 ? "original_dll_restore_complete" : "original_dll_restore_incomplete",
+                ForensicLogger.fields(
+                        "runtime_wine_lib_dir", runtimeWineLibDir.getAbsolutePath(),
+                        "windows_dir", windowsDir.getAbsolutePath(),
+                        "requested", dlls != null ? dlls.length : 0,
+                        "restored", restored,
+                        "missing_source", missingSource,
+                        "failed", failed,
+                        "sample_count", samples.size(),
+                        "samples", String.join(" | ", samples)
+                )
+        );
    }
+
+    private boolean copyRuntimeDllWithVerification(File sourceFile, File targetFile) {
+        if (sourceFile == null || targetFile == null || !sourceFile.isFile()) return false;
+        return FileUtils.copy(sourceFile, targetFile)
+                && targetFile.isFile()
+                && targetFile.length() == sourceFile.length();
+    }
+
+    private void addSample(ArrayList<String> samples, String sample) {
+        if (samples == null || sample == null || sample.trim().isEmpty()) return;
+        if (samples.size() < 12) samples.add(sample);
+    }
 
     @Nullable
     private WineUtils.WindowsLaunchTarget resolveEffectiveShortcutLaunchTarget() {
@@ -10582,21 +10945,64 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private String buildGuestExecutable() {
-        if (shortcut == null && shouldUseDirectDesktopShellBootstrap()) {
-            desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER;
-            return buildDirectDesktopShellGuestExecutable(getOverrideEnvVars());
+        if (shortcut == null) {
+            if (shouldUseDirectDesktopShellBootstrap()) {
+                desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER;
+                return buildDirectDesktopShellGuestExecutable(getOverrideEnvVars());
+            }
+            if (shouldUseWinHandlerDesktopShellBootstrap()) {
+                desktopShellLaunchMode = DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
+                return buildDesktopShellWinHandlerGuestExecutable();
+            }
         }
-        return "wine explorer /desktop=shell," + xServer.screenInfo + " " + getWineStartCommand();
+        return buildExplorerHostedDesktopShellGuestExecutable(getWineStartCommand());
     }
 
     private String buildDirectDesktopShellGuestExecutable(EnvVars envVars) {
         String shellExecutable = buildDesktopShellStartArgs(envVars);
-        return "wine explorer /desktop=shell," + xServer.screenInfo + " " + shellExecutable;
+        return buildExplorerHostedDesktopShellGuestExecutable(shellExecutable);
+    }
+
+    private String buildDesktopShellWinHandlerGuestExecutable() {
+        String resolvedHandlerCommand = resolveContainerShellExecutableCommand("winhandler.exe");
+        String resolvedShellCommand = resolveContainerShellExecutableCommand("wfm.exe");
+        String handlerCommand = WineUtils.canonicalDesktopShellExecutableName(resolvedHandlerCommand, "winhandler.exe");
+        String shellCommand = WineUtils.canonicalDesktopShellExecutableName(resolvedShellCommand, "wfm.exe");
+        String bridgeCommand = buildWinHandlerShellCommand(handlerCommand, shellCommand);
+        String guestExecutable = buildExplorerHostedDesktopShellGuestExecutable(bridgeCommand);
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "DESKTOP_SHELL_ROUTE_SELECTED",
+                null,
+                "xserver",
+                "desktop_shell_route_selected",
+                ForensicLogger.fields(
+                        "shell_executable", "wfm.exe",
+                        "shell_command", shellCommand,
+                        "resolved_shell_command", resolvedShellCommand,
+                        "handler_command", handlerCommand,
+                        "resolved_handler_command", resolvedHandlerCommand,
+                        "desktop_shell_launch_mode", desktopShellLaunchMode,
+                        "wfm_present", hasContainerShellExecutable("wfm.exe"),
+                        "explorer_present", hasContainerShellExecutable("explorer.exe"),
+                        "container_variant", container != null ? container.getContainerVariant() : "",
+                        "wine_version", container != null ? container.getWineVersion() : "",
+                        "desktop_hosted", true,
+                        "donor_compat_route", "explorer /desktop=shell winhandler.exe \"wfm.exe\"",
+                        "execution_route", "wine_explorer_desktop_winhandler_bridge",
+                        "guest_executable", guestExecutable
+                )
+        );
+        return guestExecutable;
+    }
+
+    private String buildExplorerHostedDesktopShellGuestExecutable(String payloadCommand) {
+        return WineUtils.buildExplorerDesktopShellCommand(String.valueOf(xServer.screenInfo), payloadCommand);
     }
 
     private String buildDesktopShellWinHandlerFallbackExecutable() {
-        String wfmCommand = resolveContainerShellExecutableCommand("wfm.exe");
-        return "wine explorer /desktop=shell," + xServer.screenInfo + " winhandler.exe \"" + wfmCommand + "\"";
+        return buildDesktopShellWinHandlerGuestExecutable();
     }
 
     private String getWineStartCommand() {
@@ -10642,7 +11048,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private String buildDesktopShellStartArgs(EnvVars envVars) {
         String shellExecutable = resolveDesktopShellExecutable();
-        String shellCommand = resolveContainerShellExecutableCommand(shellExecutable);
+        String resolvedShellCommand = resolveContainerShellExecutableCommand(shellExecutable);
+        String shellCommand = WineUtils.canonicalDesktopShellExecutableName(resolvedShellCommand, shellExecutable);
         desktopShellLaunchMode = shortcut == null && shouldUseDirectDesktopShellBootstrap()
                 ? DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER
                 : DESKTOP_SHELL_LAUNCH_MODE_WINHANDLER;
@@ -10659,7 +11066,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     ForensicLogger.fields(
                             "requested_shell", staleExtraExecArgs == null ? "" : staleExtraExecArgs,
                             "resolved_shell", shellExecutable,
-                            "resolved_shell_command", shellCommand
+                            "resolved_shell_command", resolvedShellCommand,
+                            "desktop_payload_shell_command", shellCommand
                     )
             );
         }
@@ -10673,6 +11081,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ForensicLogger.fields(
                         "shell_executable", shellExecutable,
                         "shell_command", shellCommand,
+                        "resolved_shell_command", resolvedShellCommand,
                         "desktop_shell_launch_mode", desktopShellLaunchMode,
                         "wfm_present", hasContainerShellExecutable("wfm.exe"),
                         "explorer_present", hasContainerShellExecutable("explorer.exe"),
@@ -10680,7 +11089,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "wine_version", container != null ? container.getWineVersion() : ""
                 )
         );
-        return "\"" + shellCommand + "\"";
+        return WineUtils.buildExplorerDesktopShellPayload(shellCommand);
     }
 
     private void configureDesktopShellRegistry() {
@@ -10814,11 +11223,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (container == null || executableName == null || executableName.isEmpty()) return "";
         File rootDir = container.getRootDir();
         if (rootDir == null) return "";
+        File windowsDir = new File(WineUtils.resolveHostWineDriveCRoot(rootDir), "windows");
 
         File[] candidates = new File[] {
-                new File(rootDir, ".wine/drive_c/windows/" + executableName),
-                new File(rootDir, ".wine/drive_c/windows/system32/" + executableName),
-                new File(rootDir, ".wine/drive_c/windows/syswow64/" + executableName)
+                new File(windowsDir, executableName),
+                new File(windowsDir, "system32/" + executableName),
+                new File(windowsDir, "syswow64/" + executableName)
         };
         String[] dosCandidates = new String[] {
                 "C:\\windows\\" + executableName,
@@ -10838,6 +11248,36 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return Container.BIONIC.equalsIgnoreCase(container.getContainerVariant());
     }
 
+    private boolean shouldUseWinHandlerDesktopShellBootstrap() {
+        return shortcut == null
+                && container != null
+                && wineInfo != null
+                && wineInfo.isArm64EC()
+                && hasContainerShellExecutable("winhandler.exe")
+                && hasContainerShellExecutable("wfm.exe");
+    }
+
+    private boolean isDesktopShellGuestExecutable(String guestExecutable) {
+        if (guestExecutable == null) return false;
+        String lowered = guestExecutable.trim().toLowerCase(Locale.ROOT);
+        if (lowered.isEmpty()) return false;
+        if (lowered.contains("explorer /desktop=shell")
+                || lowered.contains("explorer.exe /desktop=shell")) {
+            return true;
+        }
+        return lowered.startsWith("wine winhandler.exe")
+                || lowered.startsWith("wine \"winhandler.exe\"")
+                || lowered.startsWith("wine c:\\windows\\winhandler.exe")
+                || lowered.startsWith("wine \"c:\\windows\\winhandler.exe\"")
+                || lowered.contains(" winhandler.exe \"wfm.exe\"")
+                || lowered.contains("\\winhandler.exe\" \"")
+                || lowered.contains("\\winhandler.exe ");
+    }
+
+    private String buildWinHandlerShellCommand(String handlerExecutable, String shellExecutable) {
+        return WineUtils.buildWinHandlerDesktopShellPayload(handlerExecutable, shellExecutable);
+    }
+
     private boolean desktopShellRequiresWinHandler() {
         return !DESKTOP_SHELL_LAUNCH_MODE_DIRECT_EXPLORER.equals(desktopShellLaunchMode);
     }
@@ -10846,11 +11286,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (container == null || executableName == null || executableName.isEmpty()) return false;
         File rootDir = container.getRootDir();
         if (rootDir == null) return false;
+        File windowsDir = new File(WineUtils.resolveHostWineDriveCRoot(rootDir), "windows");
 
         File[] candidates = new File[] {
-                new File(rootDir, ".wine/drive_c/windows/" + executableName),
-                new File(rootDir, ".wine/drive_c/windows/system32/" + executableName),
-                new File(rootDir, ".wine/drive_c/windows/syswow64/" + executableName)
+                new File(windowsDir, executableName),
+                new File(windowsDir, "system32/" + executableName),
+                new File(windowsDir, "syswow64/" + executableName)
         };
         for (File candidate : candidates) {
             if (candidate.isFile()) return true;

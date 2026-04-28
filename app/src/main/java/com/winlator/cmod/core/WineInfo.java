@@ -242,7 +242,7 @@ public class WineInfo implements Parcelable {
 
     private static String resolveOptRuntimePath(ImageFs imageFs, String runtimeToken) {
         if (imageFs == null || runtimeToken == null || runtimeToken.trim().isEmpty()) return "";
-        File candidate = WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "/opt/" + runtimeToken.trim()));
+        File candidate = WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "opt/" + runtimeToken.trim()));
         return candidate != null && WineUtils.hasRuntimePayload(candidate) ? candidate.getPath() : "";
     }
 

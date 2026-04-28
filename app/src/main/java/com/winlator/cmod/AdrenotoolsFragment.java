@@ -977,7 +977,9 @@ public class AdrenotoolsFragment extends Fragment {
         rvGraphicsFeed.setVisibility(View.VISIBLE);
 
         new Thread(() -> {
-            if (!isAdded()) return;
+            Context refreshContext = getContext();
+            if (refreshContext == null) refreshContext = ForensicLogger.getAppContext();
+            if (refreshContext == null) return;
             List<ContentProfile> sourceProfiles = collectSourceProfiles(selectedLane, sourceMode);
             UiLifecycleGuard.runOnUiThread(this, () -> {
                 if (requestToken != graphicsFeedRefreshToken) return;
@@ -1698,13 +1700,24 @@ public class AdrenotoolsFragment extends Fragment {
     private String resolveGraphicsSourceLabel(String sourceKey) {
         if (sourceKey == null || sourceKey.trim().isEmpty()) return "";
         return switch (sourceKey.trim().toLowerCase(Locale.US)) {
-            case GRAPHICS_SOURCE_AE_ARCHIVE -> getString(R.string.graphics_feed_source_ae_archive);
-            case GRAPHICS_SOURCE_STEVENMXZ -> getString(R.string.graphics_feed_source_stevenmxz);
-            case GRAPHICS_SOURCE_GAMENATIVE -> getString(R.string.graphics_feed_source_gamenative);
-            case GRAPHICS_SOURCE_WHITEBELYASH -> getString(R.string.graphics_feed_source_whitebelyash);
-            case GRAPHICS_SOURCE_MRPURPLE -> getString(R.string.graphics_feed_source_mrpurple);
+            case GRAPHICS_SOURCE_AE_ARCHIVE -> getStringOrFallback(R.string.graphics_feed_source_ae_archive, "Ae.solator archive");
+            case GRAPHICS_SOURCE_STEVENMXZ -> getStringOrFallback(R.string.graphics_feed_source_stevenmxz, "StevenMXZ");
+            case GRAPHICS_SOURCE_GAMENATIVE -> getStringOrFallback(R.string.graphics_feed_source_gamenative, "GameNative");
+            case GRAPHICS_SOURCE_WHITEBELYASH -> getStringOrFallback(R.string.graphics_feed_source_whitebelyash, "WhiteBelyash");
+            case GRAPHICS_SOURCE_MRPURPLE -> getStringOrFallback(R.string.graphics_feed_source_mrpurple, "MrPurple");
             default -> toTitleCase(sourceKey.replace('-', ' ').replace('_', ' '));
         };
+    }
+
+    private String getStringOrFallback(int resId, String fallback) {
+        Context context = getContext();
+        if (context == null) context = ForensicLogger.getAppContext();
+        if (context == null) return fallback;
+        try {
+            return context.getString(resId);
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private String resolveGraphicsBranchKey(ContentProfile profile) {

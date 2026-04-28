@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -67,6 +68,10 @@ public abstract class ImageFsInstaller {
             {"libadrenotools.so", "libadrenotools.so"},
             {"libnativewindow.so", "libnativewindow.so"},
             {"libc++_shared.so", "libc++_shared.so"}
+    };
+    private static final String[][] APP_NATIVE_GUEST_TOOLS = {
+            {"libproot.so", "usr/bin/proot"},
+            {"libproot-loader.so", "usr/lib/proot-loader.so"}
     };
     private static final String[] ANDROID_VULKAN_STUB_SYSTEM_LIBS = {
             "libcutils.so",
@@ -144,6 +149,22 @@ public abstract class ImageFsInstaller {
     private static final int DOWNLOAD_BUFFER_SIZE = 64 * 1024;
     private static final String IMAGEFS_LIB_RUNPATH_MARKER = ".elf_runpath_sanitizer_version";
     private static final String IMAGEFS_LIB_RUNPATH_MARKER_VERSION = "2";
+    private static final String[][] ROOTFS_CANONICAL_LINKS = {
+            {"etc", "usr/etc"},
+            {"bin", "usr/bin"},
+            {"lib", "usr/lib"},
+            {"lib64", "usr/lib"},
+            {"var", "usr/var"},
+            {"share", "usr/share"}
+    };
+    private static final String[] ROOTFS_CANONICAL_DIRECTORIES = {
+            "tmp",
+            "usr",
+            "home",
+            "opt",
+            "dev",
+            "storage"
+    };
     private static final String PREFIX_PACK_ASSET_ROOT = "prefixpack";
     private static final String PREFIX_PACK_VERSION_ASSET = PREFIX_PACK_ASSET_ROOT + "/VERSION";
     private static final String PREFIX_PACK_CATALOG_ASSET = PREFIX_PACK_ASSET_ROOT + "/catalog.tsv";
@@ -268,9 +289,24 @@ public abstract class ImageFsInstaller {
     }
 
     private static void ensureSymlinkOrDirectory(String linkTarget, File linkFile, int mode) {
-        if (linkFile == null || linkFile.exists()) return;
+        if (linkFile == null) return;
+        if (isSelfReferentialSymlink(linkFile)) {
+            linkFile.delete();
+        }
+        if (linkFile.exists() && !Files.isSymbolicLink(linkFile.toPath())) return;
+        if (Files.isSymbolicLink(linkFile.toPath())) {
+            String currentTarget = FileUtils.readSymlink(linkFile);
+            if (sameSymlinkTarget(linkFile, linkTarget, currentTarget)) return;
+            linkFile.delete();
+        }
+        if (isSelfTarget(linkFile, linkTarget)) {
+            ensureDirectory(linkFile, mode);
+            return;
+        }
+        File parent = linkFile.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
         FileUtils.symlink(linkTarget, linkFile.getAbsolutePath());
-        if (!linkFile.exists()) ensureDirectory(linkFile, mode);
+        if (!linkFile.exists() && !Files.isSymbolicLink(linkFile.toPath())) ensureDirectory(linkFile, mode);
     }
 
     private static void ensureHybridRootfsLayout(ImageFs imageFs, File rootDir) {
@@ -284,8 +320,8 @@ public abstract class ImageFsInstaller {
         ensureDirectory(imageFs.getLocalBinDir(), 0771);
         ensureDirectory(imageFs.getAndroidHostLibDir(), 0771);
 
-        File canonicalWine = new File(rootDir, "/opt/wine");
-        File mainWineVersionDir = new File(rootDir, "/opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
+        File canonicalWine = new File(rootDir, "opt/wine");
+        File mainWineVersionDir = new File(rootDir, "opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
         if (!canonicalWine.exists() && mainWineVersionDir.isDirectory()) {
             FileUtils.symlink(mainWineVersionDir.getAbsolutePath(), canonicalWine.getAbsolutePath());
         }
@@ -296,6 +332,373 @@ public abstract class ImageFsInstaller {
             FileUtils.symlink(localBinBox64.getAbsolutePath(), bindirBox64.getAbsolutePath());
         } else if (bindirBox64.isFile() && !localBinBox64.exists()) {
             FileUtils.symlink(bindirBox64.getAbsolutePath(), localBinBox64.getAbsolutePath());
+        }
+    }
+
+    public static void ensureRootfsLaunchLayout(Context context, ImageFs imageFs) {
+        if (imageFs == null) return;
+        File rootDir = imageFs.getRootDir();
+        if (rootDir == null || !rootDir.isDirectory()) return;
+
+        int repaired = 0;
+        int failed = 0;
+        ArrayList<String> repairedPaths = new ArrayList<>();
+        ArrayList<String> failedPaths = new ArrayList<>();
+
+        for (String name : ROOTFS_CANONICAL_DIRECTORIES) {
+            RepairResult result = ensureRootfsDirectory(context, rootDir, name);
+            if (result.repaired) {
+                repaired++;
+                repairedPaths.add(result.summary);
+            }
+            if (result.failed) {
+                failed++;
+                failedPaths.add(result.summary);
+            }
+        }
+
+        for (String[] spec : ROOTFS_CANONICAL_LINKS) {
+            if (spec == null || spec.length < 2) continue;
+            RepairResult result = ensureRootfsAliasLink(context, rootDir, spec[0], spec[1]);
+            if (result.repaired) {
+                repaired++;
+                repairedPaths.add(result.summary);
+            }
+            if (result.failed) {
+                failed++;
+                failedPaths.add(result.summary);
+            }
+        }
+
+        ensureDirectory(new File(rootDir, "usr"), 0771);
+        ensureSymlinkOrDirectory("../tmp", new File(rootDir, "usr/tmp"), 0771);
+        ensureWinePrefixPrivatePermissions(context, imageFs);
+
+        ForensicLogger.logEvent(
+                context,
+                failed == 0 ? "info" : "warn",
+                "ROOTFS_LAUNCH_LAYOUT_CLOSURE",
+                null,
+                "rootfs",
+                failed == 0 ? "rootfs_launch_layout_ready" : "rootfs_launch_layout_incomplete",
+                ForensicLogger.fields(
+                        "root_dir", rootDir.getAbsolutePath(),
+                        "repaired_count", repaired,
+                        "failed_count", failed,
+                        "repaired", summarizeStrings(repairedPaths, 16),
+                        "failed", summarizeStrings(failedPaths, 16),
+                        "layout", imageFs.getRootfsLayout(),
+                        "provider", imageFs.getRootfsProvider()
+                )
+        );
+    }
+
+    public static void ensureWinePrefixPrivatePermissions(Context context, ImageFs imageFs) {
+        if (imageFs == null) return;
+        ensureWinePrefixPrivatePermissions(context, imageFs.getRootDir(), imageFs.getHomeDir());
+    }
+
+    public static void ensureWinePrefixPrivatePermissions(Context context, File rootDir) {
+        ensureWinePrefixPrivatePermissions(context, rootDir, null);
+    }
+
+    private static void ensureWinePrefixPrivatePermissions(Context context, File rootDir, File activeHomeDir) {
+        if (rootDir == null || !rootDir.isDirectory()) return;
+
+        ArrayList<File> prefixes = collectWinePrefixes(rootDir, activeHomeDir);
+        int privateDirs = 0;
+        int privateFiles = 0;
+        int failed = 0;
+        ArrayList<String> touched = new ArrayList<>();
+        ArrayList<String> failures = new ArrayList<>();
+
+        for (File prefix : prefixes) {
+            PermissionRepair repair = ensureWinePrefixPrivate(prefix);
+            privateDirs += repair.directories;
+            privateFiles += repair.files;
+            failed += repair.failures;
+            if (repair.changed) touched.add(prefix.getPath());
+            if (!repair.failureSummary.isEmpty()) failures.add(repair.failureSummary);
+        }
+
+        ForensicLogger.logEvent(
+                context,
+                failed == 0 ? "info" : "warn",
+                "WINEPREFIX_PRIVACY_CLOSURE",
+                null,
+                "rootfs",
+                failed == 0 ? "wineprefix_privacy_ready" : "wineprefix_privacy_incomplete",
+                ForensicLogger.fields(
+                        "root_dir", rootDir.getAbsolutePath(),
+                        "prefix_count", prefixes.size(),
+                        "private_dir_count", privateDirs,
+                        "private_file_count", privateFiles,
+                        "failed_count", failed,
+                        "touched", summarizeStrings(touched, 12),
+                        "failed", summarizeStrings(failures, 12)
+                )
+        );
+    }
+
+    private static ArrayList<File> collectWinePrefixes(File rootDir, File activeHomeDir) {
+        ArrayList<File> result = new ArrayList<>();
+        ArrayList<String> seen = new ArrayList<>();
+        addWinePrefixCandidate(result, seen, new File(rootDir, ".wine"));
+        if (activeHomeDir != null) addWinePrefixCandidate(result, seen, new File(activeHomeDir, ".wine"));
+
+        File homeRoot = new File(rootDir, "home");
+        File[] homes = homeRoot.listFiles();
+        if (homes != null) {
+            for (File home : homes) {
+                if (home == null) continue;
+                String name = home.getName();
+                if (ImageFs.USER.equals(name) || name.startsWith(ImageFs.USER + "-")) {
+                    addWinePrefixCandidate(result, seen, new File(home, ".wine"));
+                }
+            }
+        }
+        return result;
+    }
+
+    private static void addWinePrefixCandidate(ArrayList<File> result, ArrayList<String> seen, File prefix) {
+        if (prefix == null || !prefix.exists() || !prefix.isDirectory()) return;
+        String key;
+        try {
+            key = prefix.getCanonicalPath();
+        } catch (Exception ignored) {
+            key = prefix.getAbsolutePath();
+        }
+        if (seen.contains(key)) return;
+        seen.add(key);
+        result.add(prefix);
+    }
+
+    private static PermissionRepair ensureWinePrefixPrivate(File prefix) {
+        PermissionRepair repair = new PermissionRepair();
+        if (prefix == null || !prefix.isDirectory()) return repair;
+
+        repair.merge(chmodPrivateDirectory(prefix.getParentFile(), 0700));
+        repair.merge(chmodPrivateDirectory(prefix, 0700));
+        repair.merge(chmodPrivateTree(new File(prefix, ".wineserver")));
+        repair.merge(chmodPrivateFile(new File(prefix, ".update-timestamp"), 0600));
+        return repair;
+    }
+
+    private static PermissionRepair chmodPrivateTree(File file) {
+        PermissionRepair repair = new PermissionRepair();
+        if (file == null || !file.exists()) return repair;
+        if (Files.isSymbolicLink(file.toPath())) return repair;
+
+        if (file.isDirectory()) {
+            repair.merge(chmodPrivateDirectory(file, 0700));
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) repair.merge(chmodPrivateTree(child));
+            }
+            return repair;
+        }
+        return chmodPrivateFile(file, 0600);
+    }
+
+    private static PermissionRepair chmodPrivateDirectory(File directory, int mode) {
+        PermissionRepair repair = new PermissionRepair();
+        if (directory == null || !directory.exists()) return repair;
+        if (!directory.isDirectory() || Files.isSymbolicLink(directory.toPath())) return repair;
+        try {
+            FileUtils.chmod(directory, mode);
+            repair.directories++;
+            repair.changed = true;
+        } catch (Throwable error) {
+            repair.failures++;
+            repair.failureSummary = directory.getPath() + ":" + error.getClass().getSimpleName();
+        }
+        return repair;
+    }
+
+    private static PermissionRepair chmodPrivateFile(File file, int mode) {
+        PermissionRepair repair = new PermissionRepair();
+        if (file == null || !file.exists()) return repair;
+        if (!file.isFile() || Files.isSymbolicLink(file.toPath())) return repair;
+        try {
+            FileUtils.chmod(file, mode);
+            repair.files++;
+            repair.changed = true;
+        } catch (Throwable error) {
+            repair.failures++;
+            repair.failureSummary = file.getPath() + ":" + error.getClass().getSimpleName();
+        }
+        return repair;
+    }
+
+    private static RepairResult ensureRootfsDirectory(Context context, File rootDir, String name) {
+        File directory = new File(rootDir, name);
+        boolean symlink = Files.isSymbolicLink(directory.toPath());
+        boolean existed = directory.exists() || symlink;
+        String linkTarget = symlink ? FileUtils.readSymlink(directory) : "";
+        try {
+            if (symlink || (directory.exists() && !directory.isDirectory())) {
+                if (!directory.delete()) {
+                    logRootfsAliasRepair(context, false, directory, name, linkTarget, "delete_failed");
+                    return RepairResult.failed(name + ":delete_failed");
+                }
+            }
+            if (!directory.exists() && !directory.mkdirs() && !directory.isDirectory()) {
+                logRootfsAliasRepair(context, false, directory, name, linkTarget, "mkdirs_failed");
+                return RepairResult.failed(name + ":mkdirs_failed");
+            }
+            FileUtils.chmod(directory, 0771);
+            if (symlink || !existed) {
+                String action = symlink ? "replaced_symlink_with_directory" : "created_directory";
+                logRootfsAliasRepair(context, true, directory, name, linkTarget, action);
+                return RepairResult.repaired(name + ":" + action);
+            }
+            return RepairResult.clean();
+        } catch (Throwable error) {
+            logRootfsAliasRepair(context, false, directory, name, linkTarget, error.getClass().getSimpleName());
+            return RepairResult.failed(name + ":" + error.getClass().getSimpleName());
+        }
+    }
+
+    private static RepairResult ensureRootfsAliasLink(Context context, File rootDir, String name, String targetRelativePath) {
+        File link = new File(rootDir, name);
+        File target = new File(rootDir, targetRelativePath);
+        ensureDirectory(target, 0771);
+
+        boolean symlink = Files.isSymbolicLink(link.toPath());
+        boolean existed = link.exists() || symlink;
+        String linkTarget = symlink ? FileUtils.readSymlink(link) : "";
+        try {
+            if (symlink && sameSymlinkTarget(link, targetRelativePath, linkTarget) && !isSelfReferentialSymlink(link)) {
+                return RepairResult.clean();
+            }
+            if (link.exists() && link.isDirectory() && !symlink) {
+                return RepairResult.clean();
+            }
+            if (existed && !link.delete()) {
+                logRootfsAliasRepair(context, false, link, name, linkTarget, "delete_failed");
+                return RepairResult.failed(name + ":delete_failed");
+            }
+
+            File parent = link.getParentFile();
+            if (parent != null && !parent.exists()) parent.mkdirs();
+            if (!FileUtils.symlink(targetRelativePath, link.getAbsolutePath())) {
+                ensureDirectory(link, 0771);
+                if (!link.isDirectory()) {
+                    logRootfsAliasRepair(context, false, link, name, linkTarget, "symlink_and_directory_fallback_failed");
+                    return RepairResult.failed(name + ":symlink_failed");
+                }
+            }
+
+            String action = symlink
+                    ? "normalized_symlink"
+                    : (existed ? "replaced_non_directory_with_symlink" : "created_symlink");
+            logRootfsAliasRepair(context, true, link, name, linkTarget, action + "->" + targetRelativePath);
+            return RepairResult.repaired(name + ":" + action);
+        } catch (Throwable error) {
+            logRootfsAliasRepair(context, false, link, name, linkTarget, error.getClass().getSimpleName());
+            return RepairResult.failed(name + ":" + error.getClass().getSimpleName());
+        }
+    }
+
+    private static boolean isSelfReferentialSymlink(File link) {
+        if (link == null || !Files.isSymbolicLink(link.toPath())) return false;
+        return isSelfTarget(link, FileUtils.readSymlink(link));
+    }
+
+    private static boolean isSelfTarget(File link, String linkTarget) {
+        if (link == null || linkTarget == null || linkTarget.trim().isEmpty()) return false;
+        File targetFile = new File(linkTarget);
+        File resolved = targetFile.isAbsolute()
+                ? targetFile
+                : new File(link.getParentFile(), linkTarget);
+        return link.getAbsolutePath().equals(resolved.getAbsolutePath());
+    }
+
+    private static boolean sameSymlinkTarget(File link, String expectedTarget, String actualTarget) {
+        if (expectedTarget == null || actualTarget == null) return false;
+        if (expectedTarget.equals(actualTarget)) return true;
+        if (link == null || isSelfTarget(link, actualTarget)) return false;
+        try {
+            File expected = new File(expectedTarget);
+            if (!expected.isAbsolute()) expected = new File(link.getParentFile(), expectedTarget);
+            File actual = new File(actualTarget);
+            if (!actual.isAbsolute()) actual = new File(link.getParentFile(), actualTarget);
+            return expected.getCanonicalPath().equals(actual.getCanonicalPath());
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static void logRootfsAliasRepair(Context context, boolean success, File path, String alias,
+                                             String previousTarget, String action) {
+        ForensicLogger.logEvent(
+                context,
+                success ? "info" : "warn",
+                success ? "ROOTFS_ALIAS_REPAIRED" : "ROOTFS_ALIAS_REPAIR_FAILED",
+                null,
+                "rootfs",
+                "rootfs_alias_repair",
+                ForensicLogger.fields(
+                        "path", path != null ? path.getAbsolutePath() : "",
+                        "alias", alias != null ? alias : "",
+                        "previous_target", previousTarget != null ? previousTarget : "",
+                        "action", action != null ? action : ""
+                )
+        );
+    }
+
+    private static String summarizeStrings(List<String> values, int limit) {
+        if (values == null || values.isEmpty() || limit <= 0) return "";
+        ArrayList<String> out = new ArrayList<>();
+        for (String value : values) {
+            if (value == null || value.trim().isEmpty()) continue;
+            out.add(value.trim());
+            if (out.size() >= limit) break;
+        }
+        return String.join(" | ", out);
+    }
+
+    private static final class RepairResult {
+        final boolean repaired;
+        final boolean failed;
+        final String summary;
+
+        private RepairResult(boolean repaired, boolean failed, String summary) {
+            this.repaired = repaired;
+            this.failed = failed;
+            this.summary = summary == null ? "" : summary;
+        }
+
+        static RepairResult clean() {
+            return new RepairResult(false, false, "");
+        }
+
+        static RepairResult repaired(String summary) {
+            return new RepairResult(true, false, summary);
+        }
+
+        static RepairResult failed(String summary) {
+            return new RepairResult(false, true, summary);
+        }
+    }
+
+    private static final class PermissionRepair {
+        int directories;
+        int files;
+        int failures;
+        boolean changed;
+        String failureSummary = "";
+
+        void merge(PermissionRepair other) {
+            if (other == null) return;
+            directories += other.directories;
+            files += other.files;
+            failures += other.failures;
+            changed = changed || other.changed;
+            if (!other.failureSummary.isEmpty()) {
+                if (!failureSummary.isEmpty()) failureSummary += " | ";
+                failureSummary += other.failureSummary;
+            }
         }
     }
 
@@ -491,7 +894,7 @@ public abstract class ImageFsInstaller {
         File rootDir = ImageFs.find(context).getRootDir();
         for (String version : versions) {
             if (!assetExists(context, version + ".txz")) continue;
-            File outFile = new File(rootDir, "/opt/" + version);
+            File outFile = new File(rootDir, "opt/" + version);
             outFile.mkdirs();
             TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, version + ".txz", outFile);
         }
@@ -504,7 +907,7 @@ public abstract class ImageFsInstaller {
         for (String version : versions) {
             File downloaded = new File(imageFs.getFilesDir(), version + ".txz");
             if (!downloaded.isFile()) continue;
-            File outFile = new File(rootDir, "/opt/" + version);
+            File outFile = new File(rootDir, "opt/" + version);
             outFile.mkdirs();
             TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, downloaded, outFile);
         }
@@ -553,10 +956,7 @@ public abstract class ImageFsInstaller {
             if (!source.isFile()) continue;
 
             File destination = new File(guestLibDir, destinationName);
-            boolean needsCopy = !destination.isFile() || !FileUtils.contentEquals(source, destination);
-            if (needsCopy) {
-                FileUtils.copy(source, destination);
-            }
+            copyIfStale(source, destination);
             chmodIfExists(destination);
         }
 
@@ -569,10 +969,20 @@ public abstract class ImageFsInstaller {
             if (!source.isFile()) continue;
 
             File destination = new File(androidHostLibDir, destinationName);
-            boolean needsCopy = !destination.isFile() || !FileUtils.contentEquals(source, destination);
-            if (needsCopy) {
-                FileUtils.copy(source, destination);
-            }
+            copyIfStale(source, destination);
+            chmodIfExists(destination);
+        }
+
+        for (String[] toolSpec : APP_NATIVE_GUEST_TOOLS) {
+            if (toolSpec == null || toolSpec.length < 2) continue;
+
+            File source = new File(nativeLibRoot, toolSpec[0]);
+            if (!source.isFile()) continue;
+
+            File destination = new File(rootDir, toolSpec[1]);
+            File parent = destination.getParentFile();
+            if (parent != null) ensureDirectory(parent, 0771);
+            copyIfStale(source, destination);
             chmodIfExists(destination);
         }
 
@@ -586,6 +996,7 @@ public abstract class ImageFsInstaller {
 
     private static void ensureAndroidVulkanStubClosure(Context context, File rootDir) {
         if (context == null || rootDir == null || !rootDir.isDirectory()) return;
+        long startedAt = System.currentTimeMillis();
         ArrayList<File> stubDirs = resolveAndroidVulkanStubDirs(rootDir);
         StringBuilder stubDirList = new StringBuilder();
         StringBuilder missingByDir = new StringBuilder();
@@ -609,8 +1020,11 @@ public abstract class ImageFsInstaller {
                 missingByDir.length() == 0 ? "android_vulkan_stub_closure_ready" : "android_vulkan_stub_closure_incomplete",
                 ForensicLogger.fields(
                         "stub_dirs", stubDirList.toString(),
+                        "stub_dir_count", stubDirs.size(),
                         "required_libs", String.join(",", ANDROID_VULKAN_STUB_REQUIRED_LIBS),
-                        "missing_by_dir", missingByDir.toString()
+                        "missing_by_dir", missingByDir.toString(),
+                        "chmod_scope", "required_stub_files_only",
+                        "elapsed_ms", System.currentTimeMillis() - startedAt
                 )
         );
     }
@@ -652,8 +1066,17 @@ public abstract class ImageFsInstaller {
                     nativeLibRoot == null ? null : new File(nativeLibRoot, libraryName)
             );
         }
-        chmodTree(stubDir, 0755);
+        chmodAndroidVulkanStubFiles(stubDir);
         return collectMissingFiles(stubDir, ANDROID_VULKAN_STUB_REQUIRED_LIBS);
+    }
+
+    private static void chmodAndroidVulkanStubFiles(File stubDir) {
+        if (stubDir == null || !stubDir.isDirectory()) return;
+        FileUtils.chmod(stubDir, 0755);
+        for (String libraryName : ANDROID_VULKAN_STUB_REQUIRED_LIBS) {
+            if (libraryName == null || libraryName.trim().isEmpty()) continue;
+            chmodIfExists(new File(stubDir, libraryName));
+        }
     }
 
     private static ArrayList<File> resolveAndroidVulkanStubDirs(File rootDir) {
@@ -700,13 +1123,30 @@ public abstract class ImageFsInstaller {
             File source = resolveRegularFile(candidate);
             if (source == null || !source.isFile()) continue;
             File destination = new File(destinationDir, destinationName);
-            if (!destination.isFile() || !FileUtils.contentEquals(source, destination)) {
-                FileUtils.copy(source, destination);
-            }
+            copyIfStale(source, destination);
             chmodIfExists(destination);
             return destination.isFile();
         }
         return false;
+    }
+
+    private static boolean needsCopyFromSource(File source, File destination) {
+        if (source == null || destination == null || !source.isFile()) return false;
+        if (!destination.isFile()) return true;
+        if (source.length() != destination.length()) return true;
+        long sourceModified = source.lastModified();
+        long destinationModified = destination.lastModified();
+        return sourceModified > 0L && destinationModified > 0L && destinationModified < sourceModified;
+    }
+
+    private static void copyIfStale(File source, File destination) {
+        if (source == null || destination == null || !source.isFile()) return;
+        if (!needsCopyFromSource(source, destination)) return;
+        File parent = destination.getParentFile();
+        if (parent != null) ensureDirectory(parent, 0771);
+        FileUtils.copy(source, destination);
+        long sourceModified = source.lastModified();
+        if (sourceModified > 0L && destination.isFile()) destination.setLastModified(sourceModified);
     }
 
     private static File resolveRegularFile(File candidate) {

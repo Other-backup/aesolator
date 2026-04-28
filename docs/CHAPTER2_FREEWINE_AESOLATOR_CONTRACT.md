@@ -169,8 +169,8 @@ is missing.
 11. Even on the direct `explorer.exe` route, the command form must stay
     canonical:
     `wine explorer /desktop=shell,<geometry> "explorer.exe"`.
-    Drifting to `wine explorer.exe /desktop=...` reopens black-screen
-    bootstrap faults.
+    Drifting to `wine explorer.exe /desktop=...` or passing a resolved
+    `C:\windows\explorer.exe` payload reopens black-screen bootstrap faults.
 12. Desktop-shell bootstrap must not mark the session visually ready from
     process proof alone when `tracked_window_count=0` and `WinHandler` is not
     required. In that state, the app must keep waiting for mapped-window proof
@@ -179,11 +179,27 @@ is missing.
     the launched guest command must stay inside the canonical desktop host:
     `wine explorer /desktop=shell,<geometry> winhandler.exe "wfm.exe"`.
     Bare `wfm.exe` or bare `wine winhandler.exe "wfm.exe"` can leave
-    `winHandlerReady` permanently false.
+    `winHandlerReady` permanently false. The bridge payload must also remain
+    bare `winhandler.exe "wfm.exe"`, not resolved `C:\windows\...` paths.
 14. For arm64ec desktop-shell bootstrap, requested `fexcore` stays the
     preferred route when both FEX translator DLLs are present; `wowbox64` is
     only a payload-missing fallback.
-15. On the `Chapter 2` ARM64EC tool/package line, PE output and
+15. On the app-owned XServer path, XInput2 cannot be advertised as an isolated
+    extension. The XServer must also expose `Generic Event Extension` GE 1.0,
+    answer `GEQueryVersion`, and suppress long XI2 GenericEvents until the
+    client has negotiated XGE. XKB, XInput2, and XGE request/reply milestones
+    are part of the required forensic trace for desktop-shell no-window
+    bootstrap analysis. During black-screen waves, authenticated X11 dispatch
+    must be fully trace-visible: one `XSERVER_PROTOCOL_REQUEST` per core
+    request, one `XSERVER_EXTENSION_REQUEST` per extension dispatch, and
+    minor-opcode request/reply/skip rows from XKB/XInput2/XGE handlers. A
+    handled request that can change the desktop-shell frontier must not remain
+    silent in JSONL. The current product XKB contract is intentionally a
+    trace-visible core-keyboard fallback: `UseExtension` must return
+    `supported=0` until XKB map replies are proven by a full libX11/Wine
+    consumption validator. Leaving Wine parked after `XKEYBOARD GetMap` with
+    `tracked_window_count=0` is an XKB contract regression, not visual proof.
+16. On the `Chapter 2` ARM64EC tool/package line, PE output and
     import-library lookup must keep the real target identity:
     `arm64ec-windows` artifacts resolve through `arm64ec-windows`, not through
     `aarch64-windows`.
@@ -192,7 +208,7 @@ is missing.
     `aarch64-windows` path.
     Unix-host lookup for `ARM64EC` remains `aarch64-linux-gnu`; do not collapse
     those two contracts back into one generic `aarch64` path helper.
-16. On the same ARM64X / `aarch64-windows` PE line, malformed import directory
+17. On the same ARM64X / `aarch64-windows` PE line, malformed import directory
     names are an emitted import-library class owned by `tools/winebuild/import.c`,
     not a runtime loader quirk.
     Keep the import-lib section layout aligned with the LLVM/COFF contract:
@@ -200,7 +216,7 @@ is missing.
     alignment, and `.idata$6` at 2-byte alignment.
     Measure closure from emitted PE truth with `llvm-readobj --coff-imports`
     instead of per-module runtime workarounds or address-ledger churn.
-17. On the same pure `aarch64-windows` consumer-shim line, current identity
+18. On the same pure `aarch64-windows` consumer-shim line, current identity
     helpers are one central owner class in
     `include/wine/arm64_current_identity_import_shims.inc`, not a per-module
     address-fix terrace.
@@ -233,6 +249,12 @@ is missing.
 - If fallback is required, the bridge path must launch
   `wine explorer /desktop=shell,<geometry> winhandler.exe "wfm.exe"` so that
   the Java-side `WinHandler` can become ready on the intended shell desktop.
+  Resolved `C:\windows\...` paths are evidence-only; they must not replace the
+  bare hosted payload command.
+- XServer extension forensics must show coherent XKB/XInput/XGE ownership:
+  `Generic Event Extension` is present when `XInputExtension` is present,
+  GE 1.0 `QueryVersion` is handled, and long XI2 GenericEvents are gated by
+  the per-client XGE negotiation state.
 - The Java-side `WinHandler` UDP bridge must be started before guest-launch
   submission and must emit visible forensic events for bind/init/failure on
   ports `7947/7946`; a silent bind failure is a bootstrap defect.

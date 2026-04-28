@@ -17,6 +17,7 @@ import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.util.Arrays;
 
@@ -421,6 +422,7 @@ public class ContainerManager {
             FileUtils.delete(dstDir);
             return;
         }
+        ImageFsInstaller.ensureWinePrefixPrivatePermissions(context, dstDir);
 
         Container dstContainer = new Container(id, this);
         dstContainer.setRootDir(dstDir);
@@ -698,6 +700,7 @@ public class ContainerManager {
             }
         }
 
+        if (result) ImageFsInstaller.ensureWinePrefixPrivatePermissions(context, containerDir);
         return result;
     }
 

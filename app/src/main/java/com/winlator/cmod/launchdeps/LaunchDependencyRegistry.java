@@ -76,7 +76,7 @@ public final class LaunchDependencyRegistry {
         LaunchDependencyContext dependencyContext = new LaunchDependencyContext(context, contentsManager);
         long syncStartedAt = SystemClock.elapsedRealtime();
         log(context, "LAUNCH_DEP_CONTEXT_SYNC_START", traceId, "contents_sync", appId, null, -1L);
-        contentsManager.syncContents();
+        contentsManager.syncContentsForLaunch();
         log(
                 context,
                 "LAUNCH_DEP_CONTEXT_SYNC_DONE",

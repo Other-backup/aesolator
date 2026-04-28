@@ -61,6 +61,16 @@ public class PatchElf {
         return saveElf(elfFile);
     }
 
+    public String getInterpreter() {
+        if (elfInstancePtr == 0) return "";
+        String interpreter = getInterpreter(elfInstancePtr);
+        return interpreter != null ? interpreter : "";
+    }
+
+    public boolean setInterpreter(@NonNull String interpreter) {
+        return elfInstancePtr != 0 && setInterpreter(elfInstancePtr, interpreter);
+    }
+
     private native long createElfObject(String path);
     private native boolean destroyElfObject(long objectPtr);
     private native boolean isChanged(long objectPtr);

@@ -1,5 +1,6 @@
 package com.winlator.cmod.xenvironment.components;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.sysvshm.SysVSHMConnectionHandler;
 import com.winlator.cmod.sysvshm.SysVSHMRequestHandler;
 import com.winlator.cmod.sysvshm.SysVSharedMemory;
@@ -24,10 +25,16 @@ public class SysVSharedMemoryComponent extends EnvironmentComponent {
     public void start() {
         if (connector != null) return;
         sysVSharedMemory = new SysVSharedMemory();
-        connector = new XConnectorEpoll(socketConfig, new SysVSHMConnectionHandler(sysVSharedMemory), new SysVSHMRequestHandler());
-        connector.start();
-
         xServer.setSHMSegmentManager(new SHMSegmentManager(sysVSharedMemory));
+        try {
+            connector = new XConnectorEpoll(socketConfig, new SysVSHMConnectionHandler(sysVSharedMemory), new SysVSHMRequestHandler());
+            connector.start();
+            logSysvshmEvent("SYSVSHM_CONNECTOR_READY", "sysvshm_connector_ready", null);
+        }
+        catch (RuntimeException error) {
+            connector = null;
+            logSysvshmEvent("SYSVSHM_CONNECTOR_UNAVAILABLE", "sysvshm_connector_unavailable", error);
+        }
     }
 
     @Override
@@ -37,6 +44,43 @@ public class SysVSharedMemoryComponent extends EnvironmentComponent {
             connector = null;
         }
 
-        sysVSharedMemory.deleteAll();
+        if (sysVSharedMemory != null) {
+            sysVSharedMemory.deleteAll();
+            sysVSharedMemory = null;
+        }
+    }
+
+    private void logSysvshmEvent(String eventId, String message, Throwable error) {
+        if (error == null) {
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "info",
+                    eventId,
+                    null,
+                    "sysvshm",
+                    message,
+                    ForensicLogger.fields(
+                            "socket_path", socketConfig != null ? socketConfig.path : "",
+                            "socket_namespace", socketConfig != null && socketConfig.abstractNamespace ? "abstract" : "pathname",
+                            "shm_manager_ready", xServer.getSHMSegmentManager() != null
+                    )
+            );
+            return;
+        }
+
+        ForensicLogger.error(
+                ForensicLogger.getAppContext(),
+                eventId,
+                null,
+                "sysvshm",
+                message,
+                error,
+                ForensicLogger.fields(
+                        "socket_path", socketConfig != null ? socketConfig.path : "",
+                        "socket_namespace", socketConfig != null && socketConfig.abstractNamespace ? "abstract" : "pathname",
+                        "shm_manager_ready", xServer.getSHMSegmentManager() != null,
+                        "degraded_mode", "mit_shm_requests_return_bad_segment_without_host_crash"
+                )
+        );
     }
 }

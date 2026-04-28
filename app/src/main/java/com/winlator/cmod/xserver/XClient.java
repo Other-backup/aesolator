@@ -122,7 +122,7 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
             xServer.resourceIDs.free(resourceIDBase);
         }
 
-        XInput2Extension xInput2 = xServer.getExtension(XInput2Extension.MAJOR_OPCODE);
+        XInput2Extension xInput2 = xServer.getExtension(XInput2Extension.MAJOR_OPCODE, XInput2Extension.class);
         if (xInput2 != null) xInput2.onClientDisconnected(this);
     }
 

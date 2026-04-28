@@ -86,10 +86,56 @@ public class Property {
     }
 
     public int getInt(int index) {
+        if (index < 0 || data == null || data.capacity() < (index + 1) * 4) return 0;
         return data.getInt(index * 4);
     }
 
     public long getLong(int index) {
+        if (index < 0 || data == null) return 0L;
+        int offset = index * 8;
+        if (data.capacity() >= offset + 8) {
+            return data.getLong(offset);
+        }
+        int intOffset = index * 4;
+        if (data.capacity() >= intOffset + 4) {
+            return Integer.toUnsignedLong(data.getInt(intOffset));
+        }
+        return 0L;
+    }
+
+    public int byteLength() {
+        return data != null ? data.capacity() : 0;
+    }
+
+    public boolean isEmpty() {
+        return byteLength() == 0;
+    }
+
+    public long getLongOrDefault(int index, long defaultValue) {
+        if (index < 0 || data == null) return defaultValue;
+        int offset = index * 8;
+        if (data.capacity() >= offset + 8) return data.getLong(offset);
+        int intOffset = index * 4;
+        if (data.capacity() >= intOffset + 4) return Integer.toUnsignedLong(data.getInt(intOffset));
+        return defaultValue;
+    }
+
+    public int getIntOrDefault(int index, int defaultValue) {
+        if (index < 0 || data == null || data.capacity() < (index + 1) * 4) return defaultValue;
+        return data.getInt(index * 4);
+    }
+
+    public byte getByteOrDefault(int index, byte defaultValue) {
+        if (index < 0 || data == null || data.capacity() <= index) return defaultValue;
+        return data.get(index);
+    }
+
+    public short getShortOrDefault(int index, short defaultValue) {
+        if (index < 0 || data == null || data.capacity() < (index + 1) * 2) return defaultValue;
+        return data.getShort(index * 2);
+    }
+
+    public long getStrictLong(int index) {
         return data.getLong(index * 8);
     }
 

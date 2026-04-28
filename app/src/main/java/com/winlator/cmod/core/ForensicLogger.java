@@ -47,6 +47,7 @@ public final class ForensicLogger {
     private static final ArrayList<String> activeFileSinkKeys = new ArrayList<>();
     private static volatile Context appContext;
     private static volatile boolean crashHandlerInstalled = false;
+    private static volatile String activeTraceId = "";
 
     private ForensicLogger() {}
 
@@ -58,6 +59,23 @@ public final class ForensicLogger {
 
     public static Context getAppContext() {
         return appContext;
+    }
+
+    public static void setActiveTraceId(String traceId) {
+        activeTraceId = normalizeTraceId(traceId);
+    }
+
+    public static void clearActiveTraceId(String expectedTraceId) {
+        String expected = normalizeTraceId(expectedTraceId);
+        String current = activeTraceId;
+        if (expected.isEmpty() || expected.equals(current)) {
+            activeTraceId = "";
+        }
+    }
+
+    public static String getActiveTraceId() {
+        String traceId = activeTraceId;
+        return traceId == null || traceId.isEmpty() ? null : traceId;
     }
 
     public static void installCrashHandler(Context context) {
@@ -170,10 +188,11 @@ public final class ForensicLogger {
     private static String buildEventLine(String severity, String eventId, String traceId, String stage, String message, JSONObject fields) {
         JSONObject obj = new JSONObject();
         try {
+            String resolvedTraceId = resolveTraceId(traceId);
             obj.put("ts", TS_FORMAT.get().format(new Date()));
             obj.put("event_id", sanitize(eventId));
             obj.put("severity", sanitize(severity));
-            obj.put("trace_id", traceId == null ? JSONObject.NULL : traceId);
+            obj.put("trace_id", resolvedTraceId == null ? JSONObject.NULL : resolvedTraceId);
             obj.put("stage", stage == null ? JSONObject.NULL : stage);
             obj.put("message", message == null ? "" : message);
 
@@ -193,6 +212,17 @@ public final class ForensicLogger {
             return null;
         }
         return obj.toString();
+    }
+
+    private static String resolveTraceId(String traceId) {
+        String explicitTraceId = normalizeTraceId(traceId);
+        if (!explicitTraceId.isEmpty()) return explicitTraceId;
+        String current = activeTraceId;
+        return current == null || current.isEmpty() ? null : current;
+    }
+
+    private static String normalizeTraceId(String traceId) {
+        return traceId == null ? "" : traceId.trim();
     }
 
     public static JSONObject fields(Object... keyValues) {

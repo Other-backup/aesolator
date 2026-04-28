@@ -18,7 +18,7 @@ import com.winlator.cmod.xserver.errors.XRequestError;
 import java.io.IOException;
 
 public class XComposite implements Extension {
-    public static final byte MAJOR_OPCODE = -105;
+    public static final byte MAJOR_OPCODE = -107;
     public static final byte MAJOR_VERSION = 0;
     public static final byte MINOR_VERSION = 1;
     private static final String TAG_REDIRECT_PARENT = "compositeRedirectParent";

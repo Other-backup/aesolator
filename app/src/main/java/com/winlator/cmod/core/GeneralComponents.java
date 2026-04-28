@@ -64,7 +64,7 @@ public abstract class GeneralComponents {
             ImageFs imageFs = ImageFs.find(context);
             File rootDir = imageFs.getRootDir();
             return switch (this) {
-                case DXVK, VKD3D, WINED3D -> new File(imageFs.getWinePrefixDir(), "drive_c/windows");
+                case DXVK, VKD3D, WINED3D -> new File(WineUtils.resolveHostWineDriveCRoot(rootDir), "windows");
                 case SOUNDFONT -> {
                     File destination = new File(context.getCacheDir(), "soundfont");
                     if (!destination.isDirectory()) destination.mkdirs();
@@ -99,7 +99,7 @@ public abstract class GeneralComponents {
     }
 
     public static File getComponentDir(Type type, Context context) {
-        File file = new File(context.getFilesDir(), "/installed_components/" + type.lowerName());
+        File file = new File(context.getFilesDir(), "installed_components/" + type.lowerName());
         if (!file.isDirectory()) file.mkdirs();
         return file;
     }

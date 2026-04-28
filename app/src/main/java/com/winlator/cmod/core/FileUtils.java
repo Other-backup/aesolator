@@ -28,7 +28,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -200,29 +199,28 @@ public abstract class FileUtils {
             if (callback != null) callback.call(dstFile);
 
             String[] filenames = srcFile.list();
+            boolean failed = false;
             if (filenames != null) {
                 for (String filename : filenames) {
                     if (!copy(new File(srcFile, filename), new File(dstFile, filename), callback)) {
                         Log.e(TAG, "Failed to copy directory: " + srcFile.getAbsolutePath());
-                        // Continue copying other files even if one fails
+                        failed = true;
                     }
                 }
             }
+            if (failed) return false;
         } else {
             File parent = dstFile.getParentFile();
             if (!srcFile.exists() || (parent != null && !parent.exists() && !parent.mkdirs())) return false;
 
-            try (FileChannel inChannel = (new FileInputStream(srcFile)).getChannel();
-                 FileChannel outChannel = (new FileOutputStream(dstFile)).getChannel()) {
-                inChannel.transferTo(0, inChannel.size(), outChannel);
-
+            try {
+                copyFileContents(srcFile, dstFile);
                 if (callback != null) callback.call(dstFile);
                 return dstFile.exists();
             } catch (IOException e) {
                 e.printStackTrace();
                 Log.e(TAG, "Failed to copy file: " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath(), e);
-                // Log error but don't return false, so we skip this file and continue with others
-                return true;
+                return false;
             }
         }
         return true;
@@ -251,10 +249,8 @@ public abstract class FileUtils {
                 File parent = dstFile.getParentFile();
                 if (!sourceFile.exists() || (parent != null && !parent.exists() && !parent.mkdirs())) return false;
 
-                try (FileChannel inChannel = (new FileInputStream(sourceFile)).getChannel();
-                     FileChannel outChannel = (new FileOutputStream(dstFile)).getChannel()) {
-                    inChannel.transferTo(0, inChannel.size(), outChannel);
-
+                try {
+                    copyFileContents(sourceFile, dstFile);
                     if (callback != null) callback.call(dstFile);
                     return dstFile.exists();
                 } catch (IOException e) {
@@ -269,14 +265,9 @@ public abstract class FileUtils {
             }
             Uri srcUri = (Uri) src;
             try (InputStream inputStream = context.getContentResolver().openInputStream(srcUri);
-                 OutputStream outputStream = new FileOutputStream(dstFile)) {
-                byte[] buffer = new byte[1024];
-                int length;
-
-                while ((length = inputStream.read(buffer)) > 0) {
-                    outputStream.write(buffer, 0, length);
-                }
-
+                 OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dstFile), StreamUtils.BUFFER_SIZE)) {
+                if (inputStream == null) return false;
+                StreamUtils.copy(inputStream, outputStream);
                 if (callback != null) callback.call(dstFile);
                 return true;
             } catch (Exception e) {
@@ -287,6 +278,13 @@ public abstract class FileUtils {
 
         // Return false if src is neither File nor Uri
         return false;
+    }
+
+    private static void copyFileContents(File srcFile, File dstFile) throws IOException {
+        try (InputStream inputStream = new BufferedInputStream(new FileInputStream(srcFile), StreamUtils.BUFFER_SIZE);
+             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dstFile), StreamUtils.BUFFER_SIZE)) {
+            StreamUtils.copy(inputStream, outputStream);
+        }
     }
 
 
@@ -320,13 +318,12 @@ public abstract class FileUtils {
     }
 
     public static boolean copy(Context context, Uri uri, File dest) {
+        File parent = dest != null ? dest.getParentFile() : null;
+        if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
-             OutputStream outputStream = new FileOutputStream(dest)) {
-            byte[] buffer = new byte[1024];
-            int length;
-
-            while ((length = inputStream.read(buffer)) > 0)
-                outputStream.write(buffer, 0, length);
+             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dest), StreamUtils.BUFFER_SIZE)) {
+            if (inputStream == null) return false;
+            StreamUtils.copy(inputStream, outputStream);
         } catch (Exception e) {
             e.printStackTrace();
             return false;

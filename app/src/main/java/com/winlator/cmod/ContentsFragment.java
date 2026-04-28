@@ -1495,9 +1495,11 @@ public class ContentsFragment extends Fragment {
         String payload = result != null ? result.payload : "";
         String failureClass = result != null ? result.failureClass : "no_result";
         boolean hasPayload = result != null && result.hasPayload();
+        boolean expectedEmptyFeed = isExpectedEmptyRemoteFeed(selectedSourceMode, url, result);
+        boolean archiveFallbackAvailable = SOURCE_MODE_ARCHIVE.equals(sourceModeValue);
         ForensicLogger.logEvent(
                 getContext(),
-                hasPayload ? "info" : "warn",
+                hasPayload || expectedEmptyFeed || archiveFallbackAvailable ? "info" : "warn",
                 hasPayload ? "CONTENTS_FEED_PROBE_OK" : "CONTENTS_FEED_PROBE_FAIL",
                 null,
                 "contents",
@@ -1515,6 +1517,17 @@ public class ContentsFragment extends Fragment {
                         "payload_sha256", payload == null || payload.isEmpty() ? "-" : ForensicLogger.sha256Hex(payload)
                 )
         );
+    }
+
+    private boolean isExpectedEmptyRemoteFeed(@Nullable String selectedSourceMode,
+                                              @Nullable String requestedUrl,
+                                              @Nullable RemoteFeedPayloadLoader.FeedLoadResult result) {
+        if (result == null || result.hasPayload()) return false;
+        String failureClass = result.failureClass == null ? "" : result.failureClass.trim();
+        String url = requestedUrl == null ? "" : requestedUrl.trim().toLowerCase(Locale.US);
+        if ("empty_payload".equals(failureClass) && url.contains("&page=")) return true;
+        if (SOURCE_MODE_COMMUNITY.equals(selectedSourceMode) && "empty_payload".equals(failureClass)) return true;
+        return false;
     }
 
     @Nullable

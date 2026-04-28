@@ -41,9 +41,9 @@ public class ImageFs {
     }
 
     private static File resolveMainWineDir(File rootDir) {
-        File donorStyleDir = new File(rootDir, "/opt/wine");
+        File donorStyleDir = new File(rootDir, "opt/wine");
         if (donorStyleDir.isDirectory()) return donorStyleDir;
-        return new File(rootDir, "/opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
+        return new File(rootDir, "opt/" + WineInfo.MAIN_WINE_VERSION.identifier());
     }
 
     public static ImageFs find(Context context) {
@@ -276,11 +276,11 @@ public class ImageFs {
     }
 
     public File getOptDir() {
-        return new File(rootDir, "/opt");
+        return new File(rootDir, "opt");
     }
 
     public File getInstalledWineDir() {
-        return new File(rootDir, "/opt/installed-wine");
+        return new File(rootDir, "opt/installed-wine");
     }
 
     public File getMainWineDir() {
@@ -288,7 +288,7 @@ public class ImageFs {
     }
 
     public File getTmpDir() {
-        File canonicalTmpDir = new File(rootDir, "/tmp");
+        File canonicalTmpDir = new File(rootDir, "tmp");
         if (canonicalTmpDir.exists() || isGameNativeRootfs()) {
             return canonicalTmpDir;
         }
@@ -296,53 +296,53 @@ public class ImageFs {
     }
 
     public File getCompatTmpDir() {
-        return new File(rootDir, "/usr/tmp");
+        return new File(rootDir, "usr/tmp");
     }
 
     public File getLibDir() {
-        return new File(rootDir, "/usr/lib");
+        return new File(rootDir, "usr/lib");
     }
 
     public File getAndroidHostLibDir() {
-        return new File(rootDir, "/usr/lib/android-host");
+        return new File(rootDir, "usr/lib/android-host");
     }
 
     public File getLib32Dir() {
-        return new File(rootDir, "/usr/lib/arm-linux-gnueabihf");
+        return new File(rootDir, "usr/lib/arm-linux-gnueabihf");
     }
 
     public File getLib64Dir() {
-        return new File(rootDir, "/usr/lib");
+        return new File(rootDir, "usr/lib");
     }
 
-    public File getBinDir() { return new File(rootDir, "/usr/bin"); }
+    public File getBinDir() { return new File(rootDir, "usr/bin"); }
 
     public File getLocalBinDir() {
-        return new File(rootDir, "/usr/local/bin");
+        return new File(rootDir, "usr/local/bin");
     }
 
     public File getGlibcBinDir() {
-        return new File(rootDir, "/usr/glibc/bin");
+        return new File(rootDir, "usr/glibc/bin");
     }
 
     public File getGlibc32Dir() {
-        return new File(rootDir, "/usr/lib/arm-linux-gnueabihf");
+        return new File(rootDir, "usr/lib/arm-linux-gnueabihf");
     }
 
     public File getGlibc64Dir() {
-        return new File(rootDir, "/usr/lib");
+        return new File(rootDir, "usr/lib");
     }
 
     public File getShareDir() {
-        return new File(rootDir, "/usr/share");
+        return new File(rootDir, "usr/share");
     }
 
     public File getEtcDir() {
-        return new File(rootDir, "/usr/etc");
+        return new File(rootDir, "usr/etc");
     }
 
     public File getStorageDir() {
-        return new File(rootDir, "/storage");
+        return new File(rootDir, "storage");
     }
 
     public File getFilesDir() {

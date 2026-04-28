@@ -284,7 +284,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (profile != null) return profile;
         profile = contentsManager.findProfileByVersion(type, versionName, true);
         if (profile != null) return profile;
-        return contentsManager.findProfileByVersion(type, versionName, false);
+        profile = contentsManager.findProfileByVersion(type, versionName, false);
+        if (profile != null) return profile;
+
+        String runtimeModel = environment != null && environment.getImageFs() != null
+                ? environment.getImageFs().getRuntimeLibcModel()
+                : "";
+        String requestedArch = wineInfo != null ? wineInfo.getArch() : "";
+        return contentsManager.findBestInstalledProfile(type, runtimeModel, requestedArch, true);
     }
 
     private String resolveEmbeddedBox64Archive(Context context, ImageFs imageFs, String box64Version) {
@@ -324,8 +331,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Log.d("GuestProgramLauncherComponent", "box64Version: " + box64Version);
 
         File rootDir = imageFs.getRootDir();
-        File box64Binary = new File(rootDir, "/usr/bin/box64");
-        File localBox64Binary = new File(rootDir, "/usr/local/bin/box64");
+        File box64Binary = new File(rootDir, "usr/bin/box64");
+        File localBox64Binary = new File(rootDir, "usr/local/bin/box64");
         boolean payloadMissing = needsFileRefresh(box64Binary, localBox64Binary);
 
         if (payloadMissing || !box64Version.equals(container.getExtra("box64Version"))) {
@@ -346,9 +353,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "embedded_archive", embeddedArchive
                     )
             );
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
+            boolean appliedProfile = profile != null && contentsManager.applyContent(profile);
+            if (!appliedProfile)
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, embeddedArchive, rootDir);
             container.putExtra("box64Version", box64Version);
             container.saveData();
@@ -366,7 +372,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     protected void extractEmulatorsDlls() {;
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
-        File system32dir = new File(imageFs.getWinePrefixDir(), "drive_c/windows/system32");
+        File system32dir = resolveArm64EcSystem32Dir(imageFs);
         boolean containerDataChanged = false;
 
         String wowbox64Version = normalizeVersion(container.getBox64Version(), DefaultVersion.WOWBOX64);
@@ -397,9 +403,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
                     )
             );
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
+            boolean appliedProfile = profile != null && contentsManager.applyContent(profile);
+            if (!appliedProfile)
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, environment.getContext(), "wowbox64/wowbox64-" + wowbox64Version + ".tzst", system32dir);
             container.putExtra("box64Version", wowbox64Version);
             containerDataChanged = true;
@@ -424,9 +429,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : ""
                     )
             );
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
+            boolean appliedProfile = profile != null && contentsManager.applyContent(profile);
+            if (!appliedProfile)
                 TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, environment.getContext(), "fexcore/fexcore-" + fexcoreVersion + ".tzst", system32dir);
             container.putExtra("fexcoreVersion", fexcoreVersion);
             containerDataChanged = true;
@@ -531,6 +535,24 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 failLaunchPreparation(environment.getContext(), traceId, appId, "Failed to prepare Wine runtime launch");
                 return;
             }
+            if (pid == -1) {
+                Log.e("GuestProgramLauncherComponent", "Guest runtime process failed to start for " + appId);
+                logLaunchStageEvent(
+                        environment.getContext(),
+                        "error",
+                        "LAUNCH_STAGE_FAILED",
+                        traceId,
+                        "exec_guest_program",
+                        appId,
+                        SystemClock.elapsedRealtime() - execStartedAt,
+                        null,
+                        "pid", pid,
+                        "failure_reason", "exec_guest_program_returned_negative_pid"
+                );
+                AppUtils.showToast(environment.getContext(), "Failed to start Wine runtime process");
+                if (terminationCallback != null) terminationCallback.call(-1);
+                return;
+            }
             logLaunchStageEvent(
                     environment.getContext(),
                     "info",
@@ -542,11 +564,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                     null,
                     "pid", pid
             );
-            if (pid == -1) {
-                Log.e("GuestProgramLauncherComponent", "Guest runtime process failed to start for " + appId);
-                AppUtils.showToast(environment.getContext(), "Failed to start Wine runtime process");
-                if (terminationCallback != null) terminationCallback.call(-1);
-            }
         }
     }
 
@@ -612,12 +629,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             segments.add(usrLocalBin.getPath());
         }
 
-        File glibcBin = new File(rootDir, "/usr/glibc/bin");
+        File glibcBin = new File(rootDir, "usr/glibc/bin");
         if (glibcBin.exists() && glibcBin.isDirectory()) {
             segments.add(glibcBin.getPath());
         }
 
-        File usrBin = new File(rootDir, "/usr/bin");
+        File usrBin = new File(rootDir, "usr/bin");
         if (usrBin.exists() && usrBin.isDirectory()) {
             segments.add(usrBin.getPath());
         }
@@ -642,7 +659,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (!launchEnv.has("transient")) launchEnv.put("transient", runtimeTmpPath);
         if (!launchEnv.has("TMP")) launchEnv.put("TMP", runtimeTmpPath);
 
-        boolean hasGlibcBin = new File(rootDir, "/usr/glibc/bin").isDirectory();
+        boolean hasGlibcBin = new File(rootDir, "usr/glibc/bin").isDirectory();
         launchEnv.put("AERO_RUNTIME_BOOTSTRAP_MODEL", "contents_contract");
         launchEnv.put("AERO_RUNTIME_COMPONENT_MODEL", "wcp_contents");
         launchEnv.put("AERO_RUNTIME_MOBOX_PATH_COMPAT", hasGlibcBin ? "1" : "0");
@@ -759,7 +776,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (shortcut != null || guestExecutable == null) return false;
         String lowered = guestExecutable.toLowerCase(Locale.ROOT);
         return lowered.contains("explorer /desktop=shell")
-                || lowered.contains("explorer.exe /desktop=shell");
+                || lowered.contains("explorer.exe /desktop=shell")
+                || lowered.startsWith("wine winhandler.exe")
+                || lowered.startsWith("wine \"winhandler.exe\"")
+                || lowered.startsWith("wine c:\\windows\\winhandler.exe")
+                || lowered.startsWith("wine \"c:\\windows\\winhandler.exe\"")
+                || lowered.contains(" winhandler.exe \"wfm.exe\"")
+                || lowered.contains("\\winhandler.exe\" \"")
+                || lowered.contains("\\winhandler.exe ");
     }
 
     private String resolveRequestedEmulator() {
@@ -771,8 +795,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     }
 
     protected File getArm64EcSystem32Dir(ImageFs imageFs) {
+        return resolveArm64EcSystem32Dir(imageFs);
+    }
+
+    protected File resolveArm64EcSystem32Dir(ImageFs imageFs) {
         if (imageFs == null) return null;
-        return new File(imageFs.wineprefix, "drive_c/windows/system32");
+        return new File(WineUtils.resolveHostWineDriveCRoot(imageFs.getRootDir()), "windows/system32");
     }
 
     protected boolean hasWowbox64Payload(ImageFs imageFs) {
@@ -946,6 +974,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         File rootDir = imageFs.getRootDir();
         String appId = resolveLaunchAppId();
         String stageTraceId = resolveForensicTraceIdHint();
+        if (!runLaunchStage(context, stageTraceId, appId, "ensure_rootfs_launch_layout",
+                () -> ImageFsInstaller.ensureRootfsLaunchLayout(context, imageFs))) {
+            return -1;
+        }
         if (!runLaunchStage(context, stageTraceId, appId, "ensure_bionic_host_support",
                 () -> ImageFsInstaller.ensureBionicHostSupport(context, imageFs))) {
             return -1;
@@ -1013,7 +1045,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         File runtimeBinDir = runtimeLayout.binDir;
         File runtimeLibDir = runtimeLayout.libDir;
         File runtimeWineLibDir = runtimeLayout.wineLibDir;
-        File runtimeWineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRootDir);
+        File runtimeWineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRootDir, wineInfo);
         if (runtimeBinDir == null || runtimeLibDir == null || runtimeWineLibDir == null || runtimeWineUnixDir == null) {
             Log.e(
                     "GuestProgramLauncherComponent",
@@ -1023,6 +1055,23 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             + " wineLib=" + (runtimeWineLibDir != null)
                             + " wineUnix=" + (runtimeWineUnixDir != null)
             );
+            logLaunchStageEvent(
+                    context,
+                    "error",
+                    "RUNTIME_LAYOUT_INCOMPLETE",
+                    stageTraceId,
+                    "runtime_layout_contract",
+                    appId,
+                    -1L,
+                    null,
+                    "runtime_root", wineRootPath,
+                    "runtime_model", getLauncherModel(imageFs),
+                    "wine_arch", wineInfo != null ? wineInfo.getArch() : "",
+                    "bin_present", runtimeBinDir != null,
+                    "lib_present", runtimeLibDir != null,
+                    "wine_lib_present", runtimeWineLibDir != null,
+                    "wine_unix_present", runtimeWineUnixDir != null
+            );
             return -1;
         }
         String wineBinPath = runtimeBinDir.getPath();
@@ -1031,6 +1080,56 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         String wineUnixPath = runtimeWineUnixDir.getPath();
         String wineDllPath = runtimeWineLibDir.getPath();
         repairRuntimeExecutablePermissions(context, runtimeBinDir);
+        String launcherModel = getLauncherModel(imageFs);
+        WineUtils.RuntimeAbiContract abiContract = WineUtils.validateRuntimeAbiContract(
+                rootDir,
+                runtimeRootDir,
+                wineInfo,
+                launcherModel
+        );
+        File runtimeWineWindowsDir = WineUtils.resolveRuntimeWineWindowsDir(runtimeRootDir, wineInfo);
+        logLaunchStageEvent(
+                context,
+                abiContract.complete ? "info" : "error",
+                abiContract.complete ? "RUNTIME_ABI_CONTRACT_OK" : "RUNTIME_ABI_CONTRACT_FAILED",
+                stageTraceId,
+                "runtime_abi_contract",
+                appId,
+                -1L,
+                null,
+                "runtime_root", abiContract.runtimeRootPath,
+                "runtime_model", abiContract.runtimeModel,
+                "wine_arch", abiContract.arch,
+                "required", abiContract.required,
+                "complete", abiContract.complete,
+                "reason", abiContract.reason,
+                "missing", abiContract.missing,
+                "wine_binary", abiContract.wineBinaryPath,
+                "wine_unix_dir", abiContract.wineUnixDirPath,
+                "wine_windows_dir", abiContract.wineWindowsDirPath,
+                "glibc_loader", abiContract.glibcLoaderPath,
+                "glibc_libc", abiContract.glibcLibcPath,
+                "glibc_loader_rejected", abiContract.glibcLoaderRejectedPath,
+                "glibc_libc_rejected", abiContract.glibcLibcRejectedPath
+        );
+        if (!abiContract.complete) {
+            return -1;
+        }
+        if (ContentProfile.RUNTIME_MODEL_GLIBC.equalsIgnoreCase(launcherModel)) {
+            applyGlibcActiveWineOverlay(context, imageFs, runtimeRootDir, runtimeWineLibDir, stageTraceId, appId);
+            logLaunchStageEvent(
+                    context,
+                    "info",
+                    "GLIBC_LAUNCH_BROAD_REPAIR_DEFERRED",
+                    stageTraceId,
+                    "glibc_launch_broad_repair_deferred",
+                    appId,
+                    -1L,
+                    null,
+                    "runtime_root", runtimeRootDir.getAbsolutePath(),
+                    "reason", "install_and_content_sync_own_imagefs_path_and_elf_interpreter_repair"
+            );
+        }
 
         // Setting up essential environment variables for Wine
         launchEnv.put("HOME", imageFs.home_path);
@@ -1041,7 +1140,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "LD_LIBRARY_PATH",
                 wineLibPath + ":" + wineLib64Path + ":" + wineUnixPath + ":" + rootDir.getPath() + "/usr/lib" + ":" + rootDir.getPath() + "/usr/lib64" + ":" + "/system/lib64"
         );
-        String wineDllSearchPath = buildRuntimeWineDllPath(wineDllPath, wineUnixPath);
+        String wineDllSearchPath = buildRuntimeWineDllPath(wineDllPath, wineUnixPath, wineInfo);
         launchEnv.put("WINEDLLPATH", wineDllSearchPath);
         launchEnv.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
         launchEnv.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
@@ -1069,6 +1168,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         launchEnv.put("SSL_CERT_DIR", rootDir.getPath() + "/usr/etc/tls/certs");
         launchEnv.put("WINE_X11FORCEGLX", "1");
         launchEnv.put("WINE_GST_NO_GL", "1");
+        applySmartphoneWineDriverContract(context, launchEnv, desktopShellBootstrap, launcherModel);
         launchEnv.put("SteamGameId", "0");
         launchEnv.put("PROTON_AUDIO_CONVERT", "0");
         launchEnv.put("PROTON_VIDEO_CONVERT", "0");
@@ -1099,7 +1199,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "winedllpath_head", summarizePathHead(wineDllSearchPath, 8),
                 "contains_unix_path", wineDllSearchPath.contains(wineUnixPath),
                 "winex11_unix_present", new File(wineUnixPath, "winex11.so").isFile(),
-                "winex11_pe_present", new File(wineDllPath + "/aarch64-windows", "winex11.drv").isFile()
+                "wine_windows_path", runtimeWineWindowsDir != null ? runtimeWineWindowsDir.getPath() : "",
+                "contains_windows_path", runtimeWineWindowsDir != null && wineDllSearchPath.contains(runtimeWineWindowsDir.getPath()),
+                "winex11_pe_present", runtimeWineWindowsDir != null && new File(runtimeWineWindowsDir, "winex11.drv").isFile()
         );
 
 
@@ -1222,7 +1324,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         final String forensicTraceId = resolvedForensicTraceId;
 
         // **Maybe remove this: Set execute permissions for box64 if necessary (Glibc/Proot artifact)
-        File box64File = new File(rootDir, "/usr/bin/box64");
+        File box64File = new File(rootDir, "usr/bin/box64");
         if (box64File.exists()) {
             FileUtils.chmod(box64File, 0755);
         }
@@ -1248,7 +1350,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
             ForensicLogger.logEvent(
                     context,
-                    status == 0 ? "info" : "warn",
+                    resolveLaunchExitSeverity(status, trackPrimaryPid, desktopShellBootstrap),
                     "LAUNCH_EXEC_EXIT",
                     forensicTraceId,
                     "guest_program_launcher",
@@ -1270,6 +1372,76 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 activeTerminationCallback.call(status);
             }
         });
+    }
+
+    private String resolveLaunchExitSeverity(int status, boolean trackPrimaryPid, boolean desktopShellBootstrap) {
+        if (status == 0) return "info";
+        if ((status == 137 || status == 143) && (trackPrimaryPid || desktopShellBootstrap)) return "info";
+        return "warn";
+    }
+
+    private void applySmartphoneWineDriverContract(Context context, EnvVars launchEnv,
+                                                   boolean desktopShellBootstrap, String launcherModel) {
+        if (launchEnv == null) return;
+        String previous = launchEnv.get("WINEDLLOVERRIDES");
+        String merged = forceDisabledWineDrivers(previous, "winewayland.drv", "winemac.drv");
+        launchEnv.put("WINEDLLOVERRIDES", merged);
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "SMARTPHONE_WINE_DRIVER_CONTRACT_APPLIED",
+                null,
+                "guest_program_launcher",
+                "smartphone_wine_driver_contract_applied",
+                ForensicLogger.fields(
+                        "runtime_model", launcherModel == null ? "" : launcherModel,
+                        "desktop_shell_bootstrap", desktopShellBootstrap,
+                        "driver_priority", "x11",
+                        "disabled_drivers", "winewayland.drv,winemac.drv",
+                        "winedlloverrides_before", previous,
+                        "winedlloverrides", merged,
+                        "reason", "current_android_host_contract_ships_x11_engine_not_wayland_or_mac"
+                )
+        );
+    }
+
+    private String forceDisabledWineDrivers(String existing, String... driverNames) {
+        StringBuilder result = new StringBuilder();
+        for (String driverName : driverNames) {
+            String normalizedDriver = driverName == null ? "" : driverName.trim().toLowerCase(Locale.ROOT);
+            if (normalizedDriver.isEmpty()) continue;
+            if (result.length() > 0) result.append(',');
+            result.append(normalizedDriver);
+        }
+        if (result.length() > 0) result.append("=d");
+
+        String normalizedExisting = existing == null ? "" : existing.trim();
+        if (!normalizedExisting.isEmpty()) {
+            for (String clause : normalizedExisting.split(";")) {
+                String normalizedClause = clause == null ? "" : clause.trim();
+                if (normalizedClause.isEmpty()) continue;
+                if (isWineDriverOverrideClause(normalizedClause, driverNames)) continue;
+                if (result.length() > 0) result.append(';');
+                result.append(normalizedClause);
+            }
+        }
+        return result.toString();
+    }
+
+    private boolean isWineDriverOverrideClause(String clause, String... driverNames) {
+        if (clause == null) return false;
+        String normalizedClause = clause.toLowerCase(Locale.ROOT);
+        int equals = normalizedClause.indexOf('=');
+        String names = equals >= 0 ? normalizedClause.substring(0, equals) : normalizedClause;
+        for (String part : names.split(",")) {
+            String normalizedPart = part == null ? "" : part.trim();
+            if (normalizedPart.isEmpty()) continue;
+            for (String driverName : driverNames) {
+                String normalizedDriver = driverName == null ? "" : driverName.trim().toLowerCase(Locale.ROOT);
+                if (normalizedPart.equals(normalizedDriver)) return true;
+            }
+        }
+        return false;
     }
 
     protected void addBox64EnvVars(EnvVars envVars, boolean enableLogs) {
@@ -1369,8 +1541,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                                              String traceId, String appId, String effectiveEmulator,
                                              boolean desktopShellBootstrap) {
         if (imageFs == null || launchEnv == null) return;
+        String launcherModel = ContentProfile.normalizeRuntimeModel(getLauncherModel(imageFs));
+        boolean glibcLauncher = ContentProfile.RUNTIME_MODEL_GLIBC.equals(launcherModel);
         File runtimeRoot = new File(imageFs.getWinePath());
-        File wineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRoot);
+        File wineUnixDir = WineUtils.resolveRuntimeWineUnixDir(runtimeRoot, wineInfo);
         File hostLibDir = imageFs.getAndroidHostLibDir();
         File eglStubDir = new File(hostLibDir, "wine-x11-egl-stub");
         File redirectLib = new File(hostLibDir, "libredirect-bionic.so");
@@ -1382,12 +1556,13 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         logLaunchStageEvent(
                 context,
                 "info",
-                "ANDROID_BIONIC_HOST_FINAL_ENV_APPLIED",
+                glibcLauncher ? "GLIBC_GUEST_FINAL_ENV_APPLIED" : "ANDROID_BIONIC_HOST_FINAL_ENV_APPLIED",
                 traceId,
-                "android_bionic_host_final_env",
+                glibcLauncher ? "glibc_guest_final_env" : "android_bionic_host_final_env",
                 appId,
                 -1L,
                 null,
+                "runtime_model", launcherModel,
                 "effective_emulator", effectiveEmulator,
                 "desktop_shell_bootstrap", desktopShellBootstrap,
                 "runtime_root", runtimeRoot.getPath(),
@@ -1398,6 +1573,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "host_libxext_present", new File(hostLibDir, "libXext.so").isFile(),
                 "host_sysvshm_present", new File(hostLibDir, "libandroid-sysvshm.so").isFile(),
                 "display", launchEnv.get("DISPLAY"),
+                "winedlloverrides", launchEnv.get("WINEDLLOVERRIDES"),
                 "android_sysvshm_server", launchEnv.get("ANDROID_SYSVSHM_SERVER"),
                 "wine_x11forceglx", launchEnv.get("WINE_X11FORCEGLX"),
                 "wine_use_egl", launchEnv.get("WINE_USE_EGL"),
@@ -1411,8 +1587,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "absolute_x11_socket_present", new File(UnixSocketConfig.XSERVER_PATH).exists(),
                 "rooted_x11_socket_path", rootedX11Socket != null ? rootedX11Socket.getPath() : "",
                 "rooted_x11_socket_present", rootedX11Socket != null && rootedX11Socket.exists(),
-                "x11_socket_namespaces", "pathname,abstract",
-                "x11_transport_contract", "DISPLAY=:0 with rooted pathname socket plus Linux abstract /tmp/.X11-unix/X0 fallback",
+                "x11_socket_namespaces", "pathname,abstract,donor-abstract-aliases",
+                "x11_transport_contract", "DISPLAY=:0 with rooted tmp/usr-tmp pathname sockets plus Linux abstract aliases for Winlator/GameNative/Termux XCB paths",
                 "rooted_sysvshm_socket_path", rootedSysvShmSocket != null ? rootedSysvShmSocket.getPath() : "",
                 "rooted_sysvshm_socket_present", rootedSysvShmSocket != null && rootedSysvShmSocket.exists(),
                 "ld_library_path_head", summarizePathHead(ldLibraryPath, 8),
@@ -1469,7 +1645,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         logLaunchStageEvent(
                 context,
-                "warn",
+                "info",
                 "DESKTOP_SHELL_X11_BOOTSTRAP_VULKAN_ISOLATED",
                 traceId,
                 "desktop_shell_x11_bootstrap_vulkan_isolated",
@@ -1520,13 +1696,130 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         );
     }
 
-    protected static String buildRuntimeWineDllPath(String wineDllPath, String wineUnixPath) {
+    protected static String buildRuntimeWineDllPath(String wineDllPath, String wineUnixPath, WineInfo wineInfo) {
         LinkedHashSet<String> paths = new LinkedHashSet<>();
-        appendLdLibraryPath(paths, wineDllPath + "/aarch64-windows");
-        appendLdLibraryPath(paths, wineDllPath + "/i386-windows");
+        String system32Tree = wineInfo != null && wineInfo.usesAarch64WindowsTree()
+                ? "aarch64-windows"
+                : "x86_64-windows";
+        appendLdLibraryPath(paths, wineDllPath + "/" + system32Tree);
+        if (wineInfo == null || wineInfo.isWin64()) {
+            appendLdLibraryPath(paths, wineDllPath + "/i386-windows");
+        }
         appendLdLibraryPath(paths, wineDllPath);
         appendLdLibraryPath(paths, wineUnixPath);
         return String.join(":", paths);
+    }
+
+    private void applyGlibcActiveWineOverlay(Context context, ImageFs imageFs, File runtimeRootDir,
+                                             File runtimeWineLibDir, String traceId, String appId) {
+        File rootDir = imageFs != null ? imageFs.getRootDir() : null;
+        File usrLibDir = rootDir != null ? new File(rootDir, "usr/lib") : null;
+        File activeWineDir = usrLibDir != null ? new File(usrLibDir, "wine") : null;
+        File markerFile = usrLibDir != null ? new File(usrLibDir, ".aeso_active_wine_overlay") : null;
+        boolean sourceReady = runtimeWineLibDir != null && runtimeWineLibDir.isDirectory();
+        boolean usrLibReady = usrLibDir != null && (usrLibDir.isDirectory() || usrLibDir.mkdirs());
+        String desiredTarget = sourceReady ? runtimeWineLibDir.getAbsolutePath() : "";
+        boolean activePathPresentBefore = pathExistsOrSymlink(activeWineDir);
+        boolean wasSymlink = activeWineDir != null && FileUtils.isSymlink(activeWineDir);
+        String previousTarget = wasSymlink ? FileUtils.readSymlink(activeWineDir) : "";
+        boolean alreadyActive = wasSymlink && desiredTarget.equals(previousTarget);
+        boolean replaced = false;
+        boolean created = false;
+        boolean blocked = false;
+        String errorDetail = "";
+
+        if (sourceReady && usrLibReady && activeWineDir != null) {
+            try {
+                if (alreadyActive) {
+                    writeGlibcActiveWineOverlayMarker(markerFile, runtimeRootDir, runtimeWineLibDir);
+                } else {
+                    if (pathExistsOrSymlink(activeWineDir)) {
+                        if (wasSymlink || isManagedGlibcActiveWineOverlay(activeWineDir, markerFile)) {
+                            replaced = FileUtils.delete(activeWineDir);
+                            if (!replaced && pathExistsOrSymlink(activeWineDir)) {
+                                throw new IOException("unable_to_remove_previous_active_wine_overlay");
+                            }
+                        } else if (activeWineDir.isDirectory() && FileUtils.isEmpty(activeWineDir)) {
+                            replaced = FileUtils.delete(activeWineDir);
+                        } else {
+                            blocked = true;
+                            errorDetail = "preserve_unmanaged_usr_lib_wine";
+                        }
+                    }
+
+                    if (!blocked && !pathExistsOrSymlink(activeWineDir)) {
+                        created = FileUtils.symlink(runtimeWineLibDir, activeWineDir);
+                        if (!created) {
+                            errorDetail = "symlink_create_failed";
+                        } else {
+                            writeGlibcActiveWineOverlayMarker(markerFile, runtimeRootDir, runtimeWineLibDir);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                blocked = true;
+                errorDetail = e.getClass().getSimpleName() + ":" + String.valueOf(e.getMessage());
+            }
+        } else if (!sourceReady) {
+            errorDetail = "runtime_wine_lib_missing";
+        } else if (!usrLibReady) {
+            errorDetail = "usr_lib_unavailable";
+        }
+
+        boolean activeSymlink = activeWineDir != null && FileUtils.isSymlink(activeWineDir);
+        String activeTarget = activeSymlink ? FileUtils.readSymlink(activeWineDir) : "";
+        boolean activeMatchesRuntime = activeSymlink && desiredTarget.equals(activeTarget);
+        logLaunchStageEvent(
+                context,
+                activeMatchesRuntime && !blocked ? "info" : "warn",
+                "GLIBC_ACTIVE_WINE_OVERLAY_APPLIED",
+                traceId,
+                "glibc_active_wine_overlay",
+                appId,
+                -1L,
+                null,
+                "source_ready", sourceReady,
+                "usr_lib_ready", usrLibReady,
+                "runtime_root", runtimeRootDir != null ? runtimeRootDir.getAbsolutePath() : "",
+                "runtime_wine_lib", desiredTarget,
+                "active_wine_path", activeWineDir != null ? activeWineDir.getAbsolutePath() : "",
+                "active_path_present_before", activePathPresentBefore,
+                "was_symlink", wasSymlink,
+                "previous_target", previousTarget,
+                "already_active", alreadyActive,
+                "replaced", replaced,
+                "created", created,
+                "active_symlink", activeSymlink,
+                "active_target", activeTarget,
+                "active_matches_runtime", activeMatchesRuntime,
+                "blocked", blocked,
+                "error_detail", errorDetail
+        );
+    }
+
+    private boolean isManagedGlibcActiveWineOverlay(File activeWineDir, File markerFile) {
+        if (activeWineDir == null || markerFile == null || !markerFile.isFile()) return false;
+        String marker = FileUtils.readString(markerFile);
+        return marker != null
+                && marker.contains("managed_by=aesolator")
+                && marker.contains("active_wine_path=" + activeWineDir.getAbsolutePath());
+    }
+
+    private void writeGlibcActiveWineOverlayMarker(File markerFile, File runtimeRootDir, File runtimeWineLibDir) {
+        if (markerFile == null || runtimeRootDir == null || runtimeWineLibDir == null) return;
+        FileUtils.writeString(
+                markerFile,
+                "managed_by=aesolator\n"
+                        + "contract=glibc_active_wine_overlay\n"
+                        + "active_wine_path=" + new File(markerFile.getParentFile(), "wine").getAbsolutePath() + "\n"
+                        + "runtime_root=" + runtimeRootDir.getAbsolutePath() + "\n"
+                        + "runtime_wine_lib=" + runtimeWineLibDir.getAbsolutePath() + "\n"
+        );
+        FileUtils.chmod(markerFile, 0644);
+    }
+
+    private static boolean pathExistsOrSymlink(File path) {
+        return path != null && (path.exists() || FileUtils.isSymlink(path));
     }
 
     private static boolean containsPathSegment(String pathValue, String expectedSegment) {

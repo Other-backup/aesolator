@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class XInputStream {
+    private static final int MAX_BUFFER_CAPACITY = 16 * 1024 * 1024;
     private ByteBuffer activeBuffer;
     private ByteBuffer buffer;
     public final ClientSocket clientSocket;
@@ -49,9 +50,14 @@ public class XInputStream {
         return clientSocket.getAncillaryFd();
     }
 
-    private void growInputBufferIfNecessary() {
+    private void growInputBufferIfNecessary() throws IOException {
         if (buffer.position() == buffer.capacity()) {
-            ByteBuffer newBuffer = ByteBuffer.allocateDirect(buffer.capacity() * 2).order(buffer.order());
+            int currentCapacity = buffer.capacity();
+            if (currentCapacity >= MAX_BUFFER_CAPACITY) {
+                throw new IOException("X11 input buffer exceeded " + MAX_BUFFER_CAPACITY + " bytes");
+            }
+            int nextCapacity = Math.min(currentCapacity * 2, MAX_BUFFER_CAPACITY);
+            ByteBuffer newBuffer = ByteBuffer.allocateDirect(nextCapacity).order(buffer.order());
             buffer.rewind();
             newBuffer.put(buffer);
             buffer = newBuffer;

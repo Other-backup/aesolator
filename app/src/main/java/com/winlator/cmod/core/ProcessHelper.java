@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +27,8 @@ public abstract class ProcessHelper {
     private static final byte SIGSTOP = 19;
     private static final byte SIGTERM = 15;
     private static final byte SIGKILL = 9;
+    private static final int DEBUG_STREAM_READ_BUFFER_CHARS = 4096;
+    private static final int DEBUG_STREAM_MAX_LINE_CHARS = 16 * 1024;
     private static volatile boolean nativeLifecycleLoadAttempted = false;
     private static volatile boolean nativeLifecycleAvailable = false;
 
@@ -211,9 +214,10 @@ public abstract class ProcessHelper {
         boolean forensicMode = isForensicModeEnv(envp);
         int callbackCount = getDebugCallbackCount();
         boolean nativeLifecycleReady = ensureNativeLifecycleAvailable();
+        String[] splitCommand = new String[0];
         try {
             Log.d("ProcessHelper", "Splitting command: " + command);
-            String[] splitCommand = splitCommand(command);
+            splitCommand = splitCommand(command);
             Log.d("ProcessHelper", "Split command result: " + Arrays.toString(splitCommand));
             Log.d("ProcessHelper", "Starting process...");
             ProcessBuilder pb = new ProcessBuilder(splitCommand);
@@ -276,8 +280,42 @@ public abstract class ProcessHelper {
         }
         catch (Exception e) {
             Log.e("ProcessHelper", "Error executing command: " + command, e);
+            File executableFile = resolveExecutableForensics(splitCommand, workingDir);
+            File executableParent = executableFile != null ? executableFile.getParentFile() : null;
+            ForensicLogger.logEvent(
+                    ForensicLogger.getAppContext(),
+                    "error",
+                    "PROCESS_EXEC_FAILED",
+                    null,
+                    "process_helper",
+                    "process_exec_failed",
+                    ForensicLogger.fields(
+                            "command", command,
+                            "split_command_head", splitCommand.length > 0 ? splitCommand[0] : "",
+                            "working_dir", workingDir != null ? workingDir.getAbsolutePath() : "",
+                            "executable_path", executableFile != null ? executableFile.getAbsolutePath() : "",
+                            "executable_exists", executableFile != null && executableFile.exists(),
+                            "executable_is_file", executableFile != null && executableFile.isFile(),
+                            "executable_can_execute", executableFile != null && executableFile.canExecute(),
+                            "executable_length", executableFile != null && executableFile.isFile() ? executableFile.length() : -1L,
+                            "executable_parent_exists", executableParent != null && executableParent.isDirectory(),
+                            "exception_class", e.getClass().getName(),
+                            "exception_detail", String.valueOf(e.getMessage()),
+                            "forensic_mode", forensicMode ? "1" : "0",
+                            "env_hash", hashEnvp(envp)
+                    )
+            );
         }
         return pid;
+    }
+
+    private static File resolveExecutableForensics(String[] splitCommand, File workingDir) {
+        if (splitCommand == null || splitCommand.length == 0 || splitCommand[0] == null || splitCommand[0].trim().isEmpty()) {
+            return null;
+        }
+        File executable = new File(splitCommand[0].trim());
+        if (executable.isAbsolute()) return executable;
+        return workingDir != null ? new File(workingDir, splitCommand[0].trim()) : executable;
     }
 
     private static boolean isForensicModeEnv(String[] envp) {
@@ -307,21 +345,49 @@ public abstract class ProcessHelper {
 
     private static void createDebugThread(final InputStream inputStream) {
         Executors.newSingleThreadExecutor().execute(() -> {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (PRINT_DEBUG) System.out.println(line);
-                    synchronized (debugCallbacks) {
-                        if (!debugCallbacks.isEmpty()) {
-                            for (Callback<String> callback : debugCallbacks) callback.call(line);
+            try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+                char[] readBuffer = new char[DEBUG_STREAM_READ_BUFFER_CHARS];
+                StringBuilder lineBuffer = new StringBuilder(Math.min(DEBUG_STREAM_READ_BUFFER_CHARS, DEBUG_STREAM_MAX_LINE_CHARS));
+                boolean discardingOversizeLine = false;
+                int charsRead;
+                while ((charsRead = reader.read(readBuffer)) != -1) {
+                    for (int i = 0; i < charsRead; i++) {
+                        char ch = readBuffer[i];
+                        if (ch == '\r') continue;
+                        if (ch == '\n') {
+                            if (!discardingOversizeLine) emitDebugLine(lineBuffer.toString());
+                            lineBuffer.setLength(0);
+                            discardingOversizeLine = false;
+                            continue;
                         }
+                        if (discardingOversizeLine) continue;
+                        if (lineBuffer.length() >= DEBUG_STREAM_MAX_LINE_CHARS) {
+                            lineBuffer.append(" [truncated:debug_stream_line_exceeded_").append(DEBUG_STREAM_MAX_LINE_CHARS).append("_chars]");
+                            emitDebugLine(lineBuffer.toString());
+                            lineBuffer.setLength(0);
+                            discardingOversizeLine = true;
+                            continue;
+                        }
+                        lineBuffer.append(ch);
                     }
+                }
+                if (!discardingOversizeLine && lineBuffer.length() > 0) {
+                    emitDebugLine(lineBuffer.toString());
                 }
             }
             catch (IOException e) {
                 Log.e("ProcessHelper", "Error in debug thread", e);
             }
         });
+    }
+
+    private static void emitDebugLine(String line) {
+        if (PRINT_DEBUG) System.out.println(line);
+        synchronized (debugCallbacks) {
+            if (!debugCallbacks.isEmpty()) {
+                for (Callback<String> callback : debugCallbacks) callback.call(line);
+            }
+        }
     }
 
     private static void createWaitForThread(java.lang.Process process, final Callback<Integer> terminationCallback) {

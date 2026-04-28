@@ -59,6 +59,9 @@ public class WinHandler {
     private static final int BRING_TO_FRONT_NAME_BYTES = SEND_PACKET_SIZE - 1 - Integer.BYTES - Long.BYTES;
     private static final int MAX_CONTROLLERS = 4;
     private static final int OSC_DEVICE_ID = -1;
+    private static final Object VIBRATION_SOCKET_LOCK = new Object();
+    private static WinHandler activeVibrationOwner;
+    private static LocalServerSocket activeVibrationServer;
 
     public static final byte FLAG_DINPUT_MAPPER_STANDARD = 0x01;
     public static final byte FLAG_DINPUT_MAPPER_XINPUT = 0x02;
@@ -138,6 +141,7 @@ public class WinHandler {
     private String fakeInputBasePath;
     private LocalServerSocket vibrationServer;
     private volatile boolean vibrationRunning = false;
+    private volatile boolean vibrationSuperseded = false;
     private boolean globalVibrationEnabled = true;
     private int fallbackSlot = -1;
 
@@ -460,13 +464,7 @@ public class WinHandler {
             socket.close();
             socket = null;
         }
-        if (vibrationServer != null) {
-            try {
-                vibrationServer.close();
-            } catch (IOException ignored) {
-            }
-            vibrationServer = null;
-        }
+        closeVibrationListener("stop");
         vibrationRunning = false;
         closeFakeInputWriter();
         gamepadClients.clear();
@@ -1238,9 +1236,15 @@ public class WinHandler {
     private void startVibrationListener() {
         if (vibrationRunning || fakeInputBasePath == null || fakeInputBasePath.isEmpty()) return;
         vibrationRunning = true;
+        vibrationSuperseded = false;
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
+                claimVibrationSocketOwnership();
                 vibrationServer = new LocalServerSocket("winlator_vibration");
+                synchronized (VIBRATION_SOCKET_LOCK) {
+                    activeVibrationOwner = this;
+                    activeVibrationServer = vibrationServer;
+                }
                 while (vibrationRunning) {
                     LocalSocket client = vibrationServer.accept();
                     try (InputStream input = client.getInputStream()) {
@@ -1265,7 +1269,7 @@ public class WinHandler {
                     }
                 }
             } catch (IOException e) {
-                if (vibrationRunning) {
+                if (vibrationRunning && !vibrationSuperseded) {
                     Log.e(TAG, "Vibration listener error", e);
                     ForensicLogger.error(
                             activity,
@@ -1276,11 +1280,71 @@ public class WinHandler {
                             e,
                             ForensicLogger.fields(
                                     "fake_input_path", fakeInputBasePath
-                            )
+                        )
                     );
                 }
+            } finally {
+                releaseVibrationSocketOwnership();
             }
         });
+    }
+
+    private void claimVibrationSocketOwnership() {
+        synchronized (VIBRATION_SOCKET_LOCK) {
+            if (activeVibrationOwner != null && activeVibrationOwner != this) {
+                activeVibrationOwner.vibrationSuperseded = true;
+                activeVibrationOwner.vibrationRunning = false;
+                LocalServerSocket previousServer = activeVibrationServer;
+                if (previousServer != null) {
+                    try {
+                        previousServer.close();
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
+            activeVibrationOwner = this;
+            activeVibrationServer = null;
+        }
+    }
+
+    private void releaseVibrationSocketOwnership() {
+        synchronized (VIBRATION_SOCKET_LOCK) {
+            if (activeVibrationOwner == this) {
+                activeVibrationOwner = null;
+                activeVibrationServer = null;
+            }
+        }
+        vibrationServer = null;
+        vibrationRunning = false;
+    }
+
+    private void closeVibrationListener(String reason) {
+        vibrationRunning = false;
+        synchronized (VIBRATION_SOCKET_LOCK) {
+            if (activeVibrationOwner == this) {
+                activeVibrationOwner = null;
+                activeVibrationServer = null;
+            }
+        }
+        if (vibrationServer != null) {
+            try {
+                vibrationServer.close();
+            } catch (IOException ignored) {
+            }
+            vibrationServer = null;
+        }
+        ForensicLogger.logEvent(
+                activity,
+                "info",
+                "WINHANDLER_VIBRATION_LISTENER_CLOSED",
+                null,
+                "input",
+                "winhandler_vibration_listener_closed",
+                ForensicLogger.fields(
+                        "reason", reason,
+                        "fake_input_path", fakeInputBasePath == null ? "" : fakeInputBasePath
+                )
+        );
     }
 
     private void triggerVibration(int strong, int weak, int durationMs, int slot) {

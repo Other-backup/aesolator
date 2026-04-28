@@ -174,6 +174,12 @@ public class ContentProfile {
                 || runtimeHint.contains("ubuntu")) {
             return RUNTIME_MODEL_GLIBC;
         }
+        if (type == ContentType.CONTENT_TYPE_BOX64
+                && (runtimeHint.contains("hybrid-native")
+                || runtimeHint.contains("(native)")
+                || runtimeHint.matches("(^|.*[\\s_-])native([\\s_-].*|$)"))) {
+            return RUNTIME_MODEL_GLIBC;
+        }
         return "";
     }
 

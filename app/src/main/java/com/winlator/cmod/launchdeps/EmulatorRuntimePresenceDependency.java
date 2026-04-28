@@ -12,6 +12,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
@@ -80,8 +81,8 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
         ImageFs imageFs = ImageFs.find(context);
         File imageFsRoot = imageFs.getRootDir();
         File winePrefixDir = container != null && container.getRootDir() != null
-                ? new File(container.getRootDir(), ".wine")
-                : imageFs.getWinePrefixDir();
+                ? WineUtils.resolveHostWinePrefixDir(container.getRootDir())
+                : WineUtils.resolveHostWinePrefixDir(imageFsRoot);
 
         if (wineInfo.isArm64EC()) {
             String wowbox64Version = resolveBox64Version(container, shortcut, true);

@@ -1,6 +1,7 @@
 package com.winlator.cmod.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -118,6 +119,128 @@ public class WineUtilsTest {
     }
 
     @Test
+    public void resolveRuntimeWineUnixDirSupportsX8664GlibcLayout() throws Exception {
+        File runtimeRoot = Files.createTempDirectory("wineutils-x8664-unix").toFile();
+        File wineUnixDir = new File(runtimeRoot, "lib/wine/x86_64-unix");
+        assertTrue("x86_64 wine unix dir created", wineUnixDir.mkdirs());
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+
+        assertEquals(wineUnixDir.getAbsolutePath(), WineUtils.resolveRuntimeWineUnixDir(runtimeRoot).getAbsolutePath());
+        assertEquals(wineUnixDir.getAbsolutePath(), WineUtils.resolveRuntimeWineUnixDir(runtimeRoot, wineInfo).getAbsolutePath());
+    }
+
+    @Test
+    public void resolveRuntimeWineUnixDirPrefersWineArchWhenMultipleUnixDirsExist() throws Exception {
+        File runtimeRoot = Files.createTempDirectory("wineutils-arch-unix").toFile();
+        File armUnixDir = new File(runtimeRoot, "lib/wine/aarch64-unix");
+        File x64UnixDir = new File(runtimeRoot, "lib/wine/x86_64-unix");
+        assertTrue("aarch64 wine unix dir created", armUnixDir.mkdirs());
+        assertTrue("x86_64 wine unix dir created", x64UnixDir.mkdirs());
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+
+        assertEquals(armUnixDir.getAbsolutePath(), WineUtils.resolveRuntimeWineUnixDir(runtimeRoot).getAbsolutePath());
+        assertEquals(x64UnixDir.getAbsolutePath(), WineUtils.resolveRuntimeWineUnixDir(runtimeRoot, wineInfo).getAbsolutePath());
+    }
+
+    @Test
+    public void resolveRuntimeWineWindowsDirPrefersWineArchWhenMultipleWindowsDirsExist() throws Exception {
+        File runtimeRoot = Files.createTempDirectory("wineutils-arch-windows").toFile();
+        File armWindowsDir = new File(runtimeRoot, "lib/wine/aarch64-windows");
+        File x64WindowsDir = new File(runtimeRoot, "lib/wine/x86_64-windows");
+        assertTrue("aarch64 windows dir created", armWindowsDir.mkdirs());
+        assertTrue("x86_64 windows dir created", x64WindowsDir.mkdirs());
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+
+        assertEquals(x64WindowsDir.getAbsolutePath(), WineUtils.resolveRuntimeWineWindowsDir(runtimeRoot, wineInfo).getAbsolutePath());
+    }
+
+    @Test
+    public void validateRuntimeAbiContractFailsX8664GlibcWithoutGuestLibc() throws Exception {
+        File imageRoot = Files.createTempDirectory("wineutils-image-root").toFile();
+        File runtimeRoot = Files.createTempDirectory("wineutils-x8664-abi-missing").toFile();
+        assertTrue("runtime bin created", new File(runtimeRoot, "bin").mkdirs());
+        assertTrue("runtime wine binary created", new File(runtimeRoot, "bin/wine").createNewFile());
+        assertTrue("runtime x86_64 unix created", new File(runtimeRoot, "lib/wine/x86_64-unix").mkdirs());
+        assertTrue("runtime x86_64 windows created", new File(runtimeRoot, "lib/wine/x86_64-windows").mkdirs());
+        assertTrue("runtime prefix pack created", new File(runtimeRoot, "prefixPack.txz").createNewFile());
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+        WineUtils.RuntimeAbiContract contract = WineUtils.validateRuntimeAbiContract(
+                imageRoot,
+                runtimeRoot,
+                wineInfo,
+                "glibc"
+        );
+
+        assertFalse("x86_64 glibc ABI should be incomplete without loader/libc", contract.complete);
+        assertTrue("missing x86_64 loader recorded", contract.missing.contains("x86_64_glibc_loader"));
+        assertTrue("missing x86_64 libc recorded", contract.missing.contains("x86_64_glibc_libc"));
+    }
+
+    @Test
+    public void validateRuntimeAbiContractAcceptsX8664GlibcWithImageRootAbi() throws Exception {
+        File imageRoot = Files.createTempDirectory("wineutils-image-root-x64").toFile();
+        File runtimeRoot = Files.createTempDirectory("wineutils-x8664-abi-ok").toFile();
+        assertTrue("runtime bin created", new File(runtimeRoot, "bin").mkdirs());
+        assertTrue("runtime wine binary created", new File(runtimeRoot, "bin/wine").createNewFile());
+        assertTrue("runtime x86_64 unix created", new File(runtimeRoot, "lib/wine/x86_64-unix").mkdirs());
+        assertTrue("runtime x86_64 windows created", new File(runtimeRoot, "lib/wine/x86_64-windows").mkdirs());
+        assertTrue("runtime prefix pack created", new File(runtimeRoot, "prefixPack.txz").createNewFile());
+        File abiDir = new File(imageRoot, "usr/lib/x86_64-linux-gnu");
+        assertTrue("image root x86_64 abi dir created", abiDir.mkdirs());
+        writeElfHeader(new File(abiDir, "ld-linux-x86-64.so.2"), 2, 62);
+        writeElfHeader(new File(abiDir, "libc.so.6"), 2, 62);
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+        WineUtils.RuntimeAbiContract contract = WineUtils.validateRuntimeAbiContract(
+                imageRoot,
+                runtimeRoot,
+                wineInfo,
+                "glibc"
+        );
+
+        assertTrue("x86_64 glibc ABI should be complete when image root carries loader/libc", contract.complete);
+        assertEquals("", contract.missing);
+    }
+
+    @Test
+    public void validateRuntimeAbiContractRejectsWrongArchGlibcCandidates() throws Exception {
+        File imageRoot = Files.createTempDirectory("wineutils-image-root-wrong-arch").toFile();
+        File runtimeRoot = Files.createTempDirectory("wineutils-x8664-abi-wrong-arch").toFile();
+        assertTrue("runtime bin created", new File(runtimeRoot, "bin").mkdirs());
+        writeElfHeader(new File(runtimeRoot, "bin/wine"), 2, 62);
+        assertTrue("runtime x86_64 unix created", new File(runtimeRoot, "lib/wine/x86_64-unix").mkdirs());
+        assertTrue("runtime x86_64 windows created", new File(runtimeRoot, "lib/wine/x86_64-windows").mkdirs());
+        assertTrue("runtime prefix pack created", new File(runtimeRoot, "prefixPack.txz").createNewFile());
+        assertTrue("image root lib64 created", new File(imageRoot, "lib64").mkdirs());
+        writeElfHeader(new File(imageRoot, "lib64/ld-linux-x86-64.so.2"), 2, 183);
+        writeElfHeader(new File(imageRoot, "lib64/libc.so.6"), 2, 183);
+
+        WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
+        WineUtils.RuntimeAbiContract contract = WineUtils.validateRuntimeAbiContract(
+                imageRoot,
+                runtimeRoot,
+                wineInfo,
+                "glibc"
+        );
+
+        assertFalse("x86_64 glibc ABI should reject aarch64 ELF files", contract.complete);
+        assertTrue("wrong-arch loader remains missing", contract.missing.contains("x86_64_glibc_loader"));
+        assertTrue("wrong-arch libc remains missing", contract.missing.contains("x86_64_glibc_libc"));
+        assertEquals("", contract.glibcLoaderPath);
+        assertEquals("", contract.glibcLibcPath);
+        assertTrue("loader rejection records observed and expected machine",
+                contract.glibcLoaderRejectedPath.contains("machine=183")
+                        && contract.glibcLoaderRejectedPath.contains("expectedMachine=62"));
+        assertTrue("libc rejection records observed and expected machine",
+                contract.glibcLibcRejectedPath.contains("machine=183")
+                        && contract.glibcLibcRejectedPath.contains("expectedMachine=62"));
+    }
+
+    @Test
     public void resolveCanonicalRuntimeRootPrefersPackageRootOverAbiSubdirs() throws Exception {
         File runtimeRoot = Files.createTempDirectory("wineutils-canonical-root").toFile();
         File abiRoot = new File(runtimeRoot, "arm64-v8a");
@@ -154,6 +277,48 @@ public class WineUtilsTest {
         assertEquals(new File(runtimeRoot, "lib").getAbsolutePath(), layout.libDir.getAbsolutePath());
         assertEquals(rootWineLibDir.getAbsolutePath(), layout.wineLibDir.getAbsolutePath());
         assertEquals(rootPrefixPack.getAbsolutePath(), layout.prefixPack.getAbsolutePath());
+    }
+
+    @Test
+    public void buildExplorerDesktopShellCommandKeepsCanonicalDirectRoute() {
+        assertEquals(
+                "wine explorer /desktop=shell,1280x720 \"explorer.exe\"",
+                WineUtils.buildExplorerDesktopShellCommand("1280x720", "\"explorer.exe\"")
+        );
+    }
+
+    @Test
+    public void buildExplorerDesktopShellCommandHostsWinHandlerBridgeInsideDesktop() {
+        assertEquals(
+                "wine explorer /desktop=shell,1280x720 winhandler.exe \"wfm.exe\"",
+                WineUtils.buildExplorerDesktopShellCommand(
+                        "1280x720",
+                        WineUtils.buildWinHandlerDesktopShellPayload("C:\\windows\\winhandler.exe", "C:\\windows\\wfm.exe")
+                )
+        );
+    }
+
+    @Test
+    public void canonicalDesktopShellExecutableNameStripsResolvedDosPath() {
+        assertEquals(
+                "explorer.exe",
+                WineUtils.canonicalDesktopShellExecutableName("\"C:\\windows\\explorer.exe\"", "wfm.exe")
+        );
+        assertEquals(
+                "wfm.exe",
+                WineUtils.canonicalDesktopShellExecutableName("C:\\windows\\system32\\wfm.exe", "explorer.exe")
+        );
+    }
+
+    @Test
+    public void buildExplorerDesktopShellCommandRejectsMissingGeometry() {
+        try {
+            WineUtils.buildExplorerDesktopShellCommand(" ", "\"explorer.exe\"");
+        } catch (IllegalArgumentException e) {
+            assertEquals("desktop shell geometry is required", e.getMessage());
+            return;
+        }
+        throw new AssertionError("missing desktop shell geometry should fail");
     }
 
     @Test
@@ -240,5 +405,21 @@ public class WineUtilsTest {
 
         assertEquals(executable.getAbsolutePath(), target.hostTargetFile.getAbsolutePath());
         assertEquals(executable.getParentFile().getAbsolutePath(), target.hostTargetDir.getAbsolutePath());
+    }
+
+    private static void writeElfHeader(File file, int elfClass, int machine) throws Exception {
+        assertTrue("ELF parent created", file.getParentFile().mkdirs() || file.getParentFile().isDirectory());
+        byte[] header = new byte[20];
+        header[0] = 0x7f;
+        header[1] = 'E';
+        header[2] = 'L';
+        header[3] = 'F';
+        header[4] = (byte) elfClass;
+        header[5] = 1;
+        header[6] = 1;
+        header[16] = 3;
+        header[18] = (byte) (machine & 0xff);
+        header[19] = (byte) ((machine >> 8) & 0xff);
+        Files.write(file.toPath(), header);
     }
 }

@@ -8,9 +8,13 @@ import com.winlator.cmod.xserver.XClientConnectionHandler;
 import com.winlator.cmod.xserver.XClientRequestHandler;
 import com.winlator.cmod.xserver.XServer;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+
 public class XServerComponent extends EnvironmentComponent {
     private XConnectorEpoll connector;
-    private XConnectorEpoll abstractConnector;
+    private final ArrayList<XConnectorEpoll> aliasConnectors = new ArrayList<>();
     private final XServer xServer;
     private final UnixSocketConfig socketConfig;
 
@@ -25,24 +29,16 @@ public class XServerComponent extends EnvironmentComponent {
         connector = createConnector(socketConfig);
         connector.start();
         if (shouldExposeAbstractX11Socket(socketConfig)) {
-            try {
-                abstractConnector = createConnector(UnixSocketConfig.createAbstractSocket(UnixSocketConfig.XSERVER_PATH));
-                abstractConnector.start();
-                logXServerTransport("XSERVER_ABSTRACT_TRANSPORT_READY", "x11_abstract_transport_ready", null);
-            }
-            catch (RuntimeException e) {
-                abstractConnector = null;
-                logXServerTransport("XSERVER_ABSTRACT_TRANSPORT_UNAVAILABLE", "x11_abstract_transport_unavailable", e);
-            }
+            startX11AliasConnectors();
         }
     }
 
     @Override
     public void stop() {
-        if (abstractConnector != null) {
-            abstractConnector.stop();
-            abstractConnector = null;
+        for (int i = aliasConnectors.size() - 1; i >= 0; i--) {
+            aliasConnectors.get(i).stop();
         }
+        aliasConnectors.clear();
         if (connector != null) {
             connector.stop();
             connector = null;
@@ -61,6 +57,78 @@ public class XServerComponent extends EnvironmentComponent {
         return newConnector;
     }
 
+    private void startX11AliasConnectors() {
+        for (UnixSocketConfig aliasConfig : buildX11AliasSocketConfigs()) {
+            try {
+                XConnectorEpoll aliasConnector = createConnector(aliasConfig);
+                aliasConnector.start();
+                aliasConnectors.add(aliasConnector);
+                logXServerTransport(
+                        aliasConfig.abstractNamespace
+                                ? "XSERVER_ABSTRACT_TRANSPORT_READY"
+                                : "XSERVER_PATH_ALIAS_TRANSPORT_READY",
+                        aliasConfig.abstractNamespace
+                                ? "x11_abstract_transport_ready"
+                                : "x11_path_alias_transport_ready",
+                        aliasConfig,
+                        null
+                );
+            }
+            catch (RuntimeException e) {
+                logXServerTransport(
+                        aliasConfig.abstractNamespace
+                                ? "XSERVER_ABSTRACT_TRANSPORT_UNAVAILABLE"
+                                : "XSERVER_PATH_ALIAS_TRANSPORT_UNAVAILABLE",
+                        aliasConfig.abstractNamespace
+                                ? "x11_abstract_transport_unavailable"
+                                : "x11_path_alias_transport_unavailable",
+                        aliasConfig,
+                        e
+                );
+            }
+        }
+    }
+
+    private ArrayList<UnixSocketConfig> buildX11AliasSocketConfigs() {
+        ArrayList<UnixSocketConfig> result = new ArrayList<>();
+        if (socketConfig == null || socketConfig.path == null) return result;
+
+        String rootPath = resolveRootPathFromX11Socket(socketConfig.path);
+        LinkedHashSet<String> abstractPaths = new LinkedHashSet<>();
+        abstractPaths.add(UnixSocketConfig.XSERVER_PATH);
+        abstractPaths.add(socketConfig.path);
+        if (rootPath != null && !rootPath.isEmpty()) {
+            String rootedUsrTmp = rootPath + "/usr/tmp/.X11-unix/X0";
+            if (!socketConfig.path.equals(rootedUsrTmp)) {
+                result.add(UnixSocketConfig.createSocket(rootPath, "/usr/tmp/.X11-unix/X0"));
+            }
+            abstractPaths.add(rootedUsrTmp);
+        }
+
+        abstractPaths.add("/data/data/com.winlator/files/imagefs/usr/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/user/0/com.winlator/files/imagefs/usr/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/data/com.winlator/files/rootfs/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/user/0/com.winlator/files/rootfs/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/data/app.gamenative/files/imagefs/usr/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/user/0/app.gamenative/files/imagefs/usr/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/data/com.termux/files/usr/tmp/.X11-unix/X0");
+        abstractPaths.add("/data/user/0/com.termux/files/usr/tmp/.X11-unix/X0");
+
+        for (String abstractPath : abstractPaths) {
+            if (abstractPath == null || abstractPath.trim().isEmpty()) continue;
+            result.add(UnixSocketConfig.createAbstractSocket(abstractPath));
+        }
+        return result;
+    }
+
+    private static String resolveRootPathFromX11Socket(String path) {
+        if (path == null) return "";
+        String normalized = path.trim();
+        String suffix = UnixSocketConfig.XSERVER_PATH;
+        if (!normalized.endsWith(suffix)) return "";
+        return normalized.substring(0, normalized.length() - suffix.length());
+    }
+
     private static boolean shouldExposeAbstractX11Socket(UnixSocketConfig config) {
         return config != null
                 && !config.abstractNamespace
@@ -69,6 +137,13 @@ public class XServerComponent extends EnvironmentComponent {
     }
 
     private static void logXServerTransport(String eventId, String message, Throwable error) {
+        logXServerTransport(eventId, message, UnixSocketConfig.createAbstractSocket(UnixSocketConfig.XSERVER_PATH), error);
+    }
+
+    private static void logXServerTransport(String eventId, String message, UnixSocketConfig config, Throwable error) {
+        String socketPath = config != null ? config.path : "";
+        String socketNamespace = config != null && config.abstractNamespace ? "abstract" : "pathname";
+        boolean socketExists = !socketPath.isEmpty() && new File(socketPath).exists();
         if (error == null) {
             ForensicLogger.logEvent(
                     ForensicLogger.getAppContext(),
@@ -79,7 +154,11 @@ public class XServerComponent extends EnvironmentComponent {
                     message,
                     ForensicLogger.fields(
                             "pathname_socket", UnixSocketConfig.XSERVER_PATH,
-                            "abstract_socket", UnixSocketConfig.XSERVER_PATH
+                            "abstract_socket", UnixSocketConfig.XSERVER_PATH,
+                            "socket_path", socketPath,
+                            "socket_namespace", socketNamespace,
+                            "socket_exists", socketExists,
+                            "contract", "x11_accepts_root_tmp_usr_tmp_and_known_donor_xcb_abstract_aliases"
                     )
             );
         }
@@ -93,7 +172,11 @@ public class XServerComponent extends EnvironmentComponent {
                     error,
                     ForensicLogger.fields(
                             "pathname_socket", UnixSocketConfig.XSERVER_PATH,
-                            "abstract_socket", UnixSocketConfig.XSERVER_PATH
+                            "abstract_socket", UnixSocketConfig.XSERVER_PATH,
+                            "socket_path", socketPath,
+                            "socket_namespace", socketNamespace,
+                            "socket_exists", socketExists,
+                            "contract", "x11_accepts_root_tmp_usr_tmp_and_known_donor_xcb_abstract_aliases"
                     )
             );
         }

@@ -4,16 +4,22 @@ import android.graphics.Rect;
 import android.util.SparseArray;
 
 import com.winlator.cmod.core.CursorLocker;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.extensions.BigReqExtension;
 import com.winlator.cmod.xserver.extensions.DRI3Extension;
 import com.winlator.cmod.xserver.extensions.Extension;
-import com.winlator.cmod.xserver.extensions.MITSHMExtension;
+import com.winlator.cmod.xserver.extensions.GenericEventExtension;
+import com.winlator.cmod.xserver.extensions.GLXExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
+import com.winlator.cmod.xserver.extensions.ShapeExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
+import com.winlator.cmod.xserver.extensions.XComposite;
 import com.winlator.cmod.xserver.extensions.XInput2Extension;
+import com.winlator.cmod.xserver.extensions.XKeyboardExtension;
+import com.winlator.cmod.xserver.extensions.XineramaExtension;
 
 import java.nio.charset.Charset;
 import java.util.EnumMap;
@@ -47,6 +53,8 @@ public class XServer {
     private boolean simulateTouchScreen = false;
     private boolean isGrabbed = false;
     private XClient grabbingClient = null;
+    private int nextExtensionEventId = 64;
+    private int nextExtensionErrorId = 128;
 
     public XServer(ScreenInfo screenInfo) {
         this.screenInfo = screenInfo;
@@ -189,7 +197,7 @@ public class XServer {
                 pointer.setPosition(x, y);
             }
 
-            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE, XInput2Extension.class);
             if (xInput2 != null) xInput2.emitRawMotion(2, dx, dy);
         }
     }
@@ -197,7 +205,7 @@ public class XServer {
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, true);
-            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE, XInput2Extension.class);
             if (xInput2 != null) xInput2.emitRawButton(2, buttonCode.code(), true);
         }
     }
@@ -205,7 +213,7 @@ public class XServer {
     public void injectPointerButtonRelease(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, false);
-            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+            XInput2Extension xInput2 = getExtension(XInput2Extension.MAJOR_OPCODE, XInput2Extension.class);
             if (xInput2 != null) xInput2.emitRawButton(2, buttonCode.code(), false);
         }
     }
@@ -227,19 +235,104 @@ public class XServer {
     }
 
     private void setupExtensions() {
-        extensions.put(BigReqExtension.MAJOR_OPCODE, new BigReqExtension());
-        extensions.put(MITSHMExtension.MAJOR_OPCODE, new MITSHMExtension());
-        extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension());
-        extensions.put(PresentExtension.MAJOR_OPCODE, new PresentExtension());
-        extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension());
-        XInput2Extension xInput2Extension = new XInput2Extension();
-        xInput2Extension.setFirstEventId((byte)65);
-        xInput2Extension.setFirstErrorId((byte)-127);
-        extensions.put(XInput2Extension.MAJOR_OPCODE, xInput2Extension);
+        registerExtension(new BigReqExtension());
+        registerExtension(new DRI3Extension());
+        registerExtension(new PresentExtension());
+        registerExtension(new SyncExtension());
+        registerExtension(new ShapeExtension(this));
+        registerExtension(new XComposite(this));
+        registerExtension(new GenericEventExtension());
+        registerExtension(new XKeyboardExtension());
+        registerExtension(new XineramaExtension(this));
+        registerGlxExtension();
+        registerExtension(new XInput2Extension());
+        logExtensionSkipped("MIT-SHM", "disabled_until_abi_compatible_client_bridge");
     }
 
-    public <T extends Extension> T getExtension(int opcode) {
-        return (T)extensions.get(opcode);
+    private void registerExtension(Extension extension) {
+        assignExtensionRanges(extension);
+        extensions.put(extension.getMajorOpcode(), extension);
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_EXTENSION_REGISTERED",
+                null,
+                "xserver_extensions",
+                "x11_extension_registered",
+                ForensicLogger.fields(
+                        "extension_name", extension.getName(),
+                        "major_opcode", Byte.toUnsignedInt(extension.getMajorOpcode()),
+                        "first_event_id", Byte.toUnsignedInt(extension.getFirstEventId()),
+                        "num_events", extension.getNumEvents(),
+                        "first_error_id", Byte.toUnsignedInt(extension.getFirstErrorId()),
+                        "num_errors", extension.getNumErrors()
+                )
+        );
+    }
+
+    private void assignExtensionRanges(Extension extension) {
+        int numEvents = extension.getNumEvents();
+        if (numEvents > 0) {
+            int firstEventId = Byte.toUnsignedInt(extension.getFirstEventId());
+            if (firstEventId == 0) {
+                firstEventId = nextExtensionEventId;
+                extension.setFirstEventId((byte)firstEventId);
+            }
+            nextExtensionEventId = Math.max(nextExtensionEventId, firstEventId + numEvents);
+        }
+
+        int numErrors = extension.getNumErrors();
+        if (numErrors > 0) {
+            int firstErrorId = Byte.toUnsignedInt(extension.getFirstErrorId());
+            if (firstErrorId == 0) {
+                firstErrorId = nextExtensionErrorId;
+                extension.setFirstErrorId((byte)firstErrorId);
+            }
+            nextExtensionErrorId = Math.max(nextExtensionErrorId, firstErrorId + numErrors);
+        }
+    }
+
+    private void registerGlxExtension() {
+        try {
+            registerExtension(new GLXExtension(this));
+        }
+        catch (Throwable error) {
+            ForensicLogger.error(
+                    ForensicLogger.getAppContext(),
+                    "XSERVER_EXTENSION_REGISTER_FAILED",
+                    null,
+                    "xserver_extensions",
+                    "x11_extension_register_failed",
+                    error,
+                    ForensicLogger.fields("extension_name", "GLX")
+            );
+        }
+    }
+
+    private void logExtensionSkipped(String name, String reason) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_EXTENSION_REGISTER_SKIPPED",
+                null,
+                "xserver_extensions",
+                "x11_extension_register_skipped",
+                ForensicLogger.fields(
+                        "extension_name", name,
+                        "reason", reason
+                )
+        );
+    }
+
+    public Extension getExtension(int opcode) {
+        return extensions.get(opcode);
+    }
+
+    public <T extends Extension> T getExtension(int opcode, Class<T> extensionType) {
+        Extension extension = getExtension(opcode);
+        return extensionType != null && extensionType.isInstance(extension)
+                ? extensionType.cast(extension)
+                : null;
     }
 
     public synchronized void setGrabbed(boolean grabbed, XClient client) {

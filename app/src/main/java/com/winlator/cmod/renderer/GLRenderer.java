@@ -9,6 +9,7 @@ import android.util.Log;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.XrActivity;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.material.CursorMaterial;
@@ -56,6 +57,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private int renderTargetWidthOverride = 0;
     private int renderTargetHeightOverride = 0;
     private final EffectComposer effectComposer;
+    private boolean firstFrameLogged = false;
+    private int frameCount = 0;
 
     public GLRenderer(XServerView xServerView, XServer xServer) {
         this.xServerView = xServerView;
@@ -88,6 +91,19 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         effectComposer.invalidateGLResources();
+        ForensicLogger.logEvent(
+                xServerView.getContext(),
+                "info",
+                "XSERVER_GL_SURFACE_CREATED",
+                null,
+                "xserver_surface",
+                "gl_surface_created",
+                ForensicLogger.fields(
+                        "render_mode", "when_dirty",
+                        "cursor_visible", cursorVisible
+                )
+        );
+        xServerView.requestRender();
     }
 
     @Override
@@ -105,6 +121,21 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         surfaceHeight = height;
         viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
         viewportNeedsUpdate = true;
+        ForensicLogger.logEvent(
+                xServerView.getContext(),
+                "info",
+                "XSERVER_GL_SURFACE_CHANGED",
+                null,
+                "xserver_surface",
+                "gl_surface_changed",
+                ForensicLogger.fields(
+                        "surface_width", surfaceWidth,
+                        "surface_height", surfaceHeight,
+                        "xserver_width", xServer.screenInfo.width,
+                        "xserver_height", xServer.screenInfo.height
+                )
+        );
+        xServerView.requestRender();
     }
 
     @Override
@@ -117,6 +148,25 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         }
 
         drawFrame();
+        frameCount++;
+        if (!firstFrameLogged) {
+            firstFrameLogged = true;
+            ForensicLogger.logEvent(
+                    xServerView.getContext(),
+                    "info",
+                    "XSERVER_GL_FIRST_FRAME_DRAWN",
+                    null,
+                    "xserver_surface",
+                    "gl_first_frame_drawn",
+                    ForensicLogger.fields(
+                            "surface_width", surfaceWidth,
+                            "surface_height", surfaceHeight,
+                            "renderable_window_count", renderableWindows.size(),
+                            "cursor_visible", cursorVisible,
+                            "viewport_needs_update", viewportNeedsUpdate
+                    )
+            );
+        }
     }
 
     public void drawFrame() {

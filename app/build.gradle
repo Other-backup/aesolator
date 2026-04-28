@@ -92,6 +92,43 @@ class AeBuildHostSupport {
 
         hasRequiredFiles(bundledDir, requiredNames) ? bundledDir : null
     }
+
+    static String runCommand(List<String> command, File workingDir = null, boolean captureOutput = false, File logFile = null) {
+        List<String> normalizedCommand = command.collect { it.toString() }
+        ProcessBuilder builder = new ProcessBuilder(normalizedCommand)
+        if (workingDir != null) {
+            builder.directory(workingDir)
+        }
+        builder.redirectErrorStream(true)
+        if (logFile != null) {
+            logFile.parentFile.mkdirs()
+            builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
+        }
+        Process process = builder.start()
+        StringBuilder output = new StringBuilder()
+        if (logFile == null) {
+            process.inputStream.withReader("UTF-8") { reader ->
+                reader.eachLine { line ->
+                    if (captureOutput) {
+                        output.append(line).append('\n')
+                    } else {
+                        System.out.println(line)
+                    }
+                }
+            }
+        }
+        int exitCode = process.waitFor()
+        if (exitCode != 0) {
+            String tail = logFile != null && logFile.isFile() ? "\nLog tail:\n${tail(logFile, 80)}" : ""
+            throw new GradleException("Command failed with exit code ${exitCode}: ${normalizedCommand.join(' ')}${tail}")
+        }
+        output.toString()
+    }
+
+    static String tail(File file, int maxLines) {
+        List<String> lines = file.readLines("UTF-8")
+        lines.drop(Math.max(0, lines.size() - maxLines)).join('\n')
+    }
 }
 
 plugins {
@@ -106,6 +143,19 @@ def aeBundledArm64JniLibsDir = new File(rootProject.projectDir, "app/src/main/jn
 def aeVirglWrapperPointerFile = new File(rootProject.projectDir, "out/graphics-source-builds/latest-virgl-wrapper-run.txt")
 def aeTarExtractTool = new File(rootProject.projectDir, "tools/extract_tar_member.py")
 def aeVulkanWrapperArchive = new File(aeAssetDir, "graphics_driver/libvulkan_wrapper.tar.xz")
+def aeLlvm22Root = (
+        project.findProperty("ae.llvm22.root")
+                ?: aeBuildEnv["AEO_LLVM22_ROOT"]
+                ?: "/data/data/com.termux/files/home/.toolchains/llvm-22.1.1-termux"
+).toString()
+def aeLlvm22AndroidToolchainFile = new File(rootProject.projectDir, "tools/cmake/aesolator-llvm22-android.toolchain.cmake")
+def aeLlvm22NativeBuildDir = new File(buildDir, "ae-native-llvm22/debug")
+def aeLlvm22NativeLogFile = new File(buildDir, "logs/ae-native-llvm22.log")
+def aeUseLlvm22Native = (
+        project.findProperty("ae.useLlvm22Native")
+                ?: aeBuildEnv["AEO_USE_LLVM22_NATIVE"]
+                ?: "true"
+).toString().toBoolean()
 def aeBundledProton11AssetPath = "contents/runtime/proton11/proton-wine-11-arm64ec.wcp.xz"
 def aeBundledProton11LocalPath = (
         project.findProperty("ae.proton11.localWcp")
@@ -374,6 +424,78 @@ tasks.register("prepareVulkanWrapperJni") {
     }
 }
 
+tasks.register("buildNativeLlvm22") {
+    onlyIf { aeUseLlvm22Native }
+    File outputDir = new File(aeGeneratedJniLibsDir, "arm64-v8a")
+    File sourceDir = new File(projectDir, "src/main/cpp")
+    inputs.dir(sourceDir)
+    inputs.file(aeLlvm22AndroidToolchainFile)
+    inputs.property("aeLlvm22Root", aeLlvm22Root)
+    outputs.dir(outputDir)
+    doLast {
+        File clang = new File(aeLlvm22Root, "bin/clang")
+        File clangxx = new File(aeLlvm22Root, "bin/clang++")
+        if (!clang.isFile() || !clang.canExecute() || !clangxx.isFile() || !clangxx.canExecute()) {
+            throw new GradleException("LLVM 22.1.1 toolchain is required: ${aeLlvm22Root}")
+        }
+        if (!aeLlvm22AndroidToolchainFile.isFile()) {
+            throw new GradleException("LLVM 22.1.1 Android toolchain file is missing: ${aeLlvm22AndroidToolchainFile}")
+        }
+
+        String versionOutput = AeBuildHostSupport.runCommand([clang.absolutePath, "--version"], null, true)
+        if (!versionOutput.contains("22.1.1")) {
+            throw new GradleException("Native APK build must use clang 22.1.1, got: ${versionOutput.readLines().take(1).join("")}")
+        }
+
+        File cacheFile = new File(aeLlvm22NativeBuildDir, "CMakeCache.txt")
+        if (cacheFile.isFile() && !cacheFile.getText("UTF-8").contains("CMAKE_HOME_DIRECTORY:INTERNAL=${sourceDir.absolutePath}")) {
+            aeLlvm22NativeBuildDir.deleteDir()
+        }
+        File buildLog = aeLlvm22NativeLogFile
+        if (buildLog.isFile()) buildLog.delete()
+
+        AeBuildHostSupport.runCommand([
+                "cmake",
+                "-S", sourceDir.absolutePath,
+                "-B", aeLlvm22NativeBuildDir.absolutePath,
+                "-G", "Ninja",
+                "-DCMAKE_TOOLCHAIN_FILE=${aeLlvm22AndroidToolchainFile.absolutePath}",
+                "-DAEO_LLVM22_ROOT=${aeLlvm22Root}"
+        ], null, false, buildLog)
+        AeBuildHostSupport.runCommand(["cmake", "--build", aeLlvm22NativeBuildDir.absolutePath, "--", "-j8"], null, false, buildLog)
+
+        outputDir.mkdirs()
+        [
+                "OpenXR-SDK/src/loader/libopenxr_loader.so",
+                "adrenotools/libadrenotools.so",
+                "adrenotools/src/hook/libfile_redirect_hook.so",
+                "adrenotools/src/hook/libgsl_alloc_hook.so",
+                "adrenotools/src/hook/libhook_impl.so",
+                "adrenotools/src/hook/libmain_hook.so",
+                "gladiorenderer/libgladiorenderer.so",
+                "libaero_android_sysvshm.so",
+                "libaero_evshim.so",
+                "libaero_fakeinput.so",
+                "libaero_native_xz.so",
+                "libaero_redirect_bionic.so",
+                "libaero_redirect_glibc.so",
+                "libwinlator.so",
+                "libwinlatorxr.so",
+                "patchelf/libpatchelf.so",
+                "proot/libproot-loader.so",
+                "proot/libproot.so",
+                "virglrenderer/libvirglbridge.so",
+                "vortekrenderer/libvortekrenderer.so"
+        ].each { relativePath ->
+            File source = new File(aeLlvm22NativeBuildDir, relativePath)
+            if (!source.isFile()) {
+                throw new GradleException("LLVM 22.1.1 native output is missing: ${source}")
+            }
+            Files.copy(source.toPath(), new File(outputDir, source.name).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
 preBuild.dependsOn(verifyNoRetiredImageFsAssets)
 preBuild.dependsOn(verifyBundledImageFsAssets)
 preBuild.dependsOn(prepareEmbeddedWineAssets)
@@ -381,6 +503,7 @@ preBuild.dependsOn(prepareBundledProton11Asset)
 preBuild.dependsOn(prepareRuntimeSharedJni)
 preBuild.dependsOn(prepareVirglWrapperJni)
 preBuild.dependsOn(prepareVulkanWrapperJni)
+preBuild.dependsOn(buildNativeLlvm22)
 
 def aeroVersionCodeRaw = project.findProperty("ae.versionCode") ?: System.getenv("AEROSO_APP_VERSION_CODE") ?: "21"
 int aeroVersionCode
@@ -431,10 +554,12 @@ android {
         versionName aeroVersionName
         manifestPlaceholders = [aeAppLabel: aeroAppLabel]
 
-        // External native build from Winlator
-        externalNativeBuild {
-            cmake {
-                cppFlags ''
+        if (!aeUseLlvm22Native) {
+            // External native build from Winlator
+            externalNativeBuild {
+                cmake {
+                    cppFlags ''
+                }
             }
         }
 
@@ -476,9 +601,11 @@ android {
 
     ndkVersion aeResolvedNdkVersion
 
-    externalNativeBuild {
-        cmake {
-            path 'src/main/cpp/CMakeLists.txt'
+    if (!aeUseLlvm22Native) {
+        externalNativeBuild {
+            cmake {
+                path 'src/main/cpp/CMakeLists.txt'
+            }
         }
     }
 

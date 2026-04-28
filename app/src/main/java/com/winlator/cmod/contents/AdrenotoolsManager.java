@@ -18,6 +18,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import org.json.JSONArray;
@@ -927,7 +928,7 @@ public class AdrenotoolsManager {
             File sourceFile = new File(packageRoot, mapping.source);
             if (!sourceFile.exists()) continue;
 
-            String relativeTarget = resolveRelativeTargetPath(mapping.target);
+            String relativeTarget = resolveRelativeTargetPath(rootDir, mapping.target);
             if (relativeTarget.isEmpty()) continue;
             File targetFile = new File(rootDir, relativeTarget);
             File backupFile = new File(backupRoot, relativeTarget);
@@ -997,14 +998,25 @@ public class AdrenotoolsManager {
                 || "System".equalsIgnoreCase(adrenotoolsDriverId.trim());
     }
 
-    private String resolveRelativeTargetPath(String targetTemplate) {
+    private String resolveRelativeTargetPath(File rootDir, String targetTemplate) {
         if (targetTemplate == null || targetTemplate.trim().isEmpty()) return "";
         String normalized = targetTemplate.trim();
+        String driveCRelative = "home/xuser/.wine/drive_c";
+        try {
+            File driveCRoot = WineUtils.resolveHostWineDriveCRoot(rootDir);
+            driveCRelative = rootDir.toPath()
+                    .toAbsolutePath()
+                    .normalize()
+                    .relativize(driveCRoot.toPath().toAbsolutePath().normalize())
+                    .toString()
+                    .replace(File.separatorChar, '/');
+        } catch (Exception ignored) {
+        }
         normalized = normalized.replace("${libdir}/", "usr/lib/");
         normalized = normalized.replace("${bindir}/", "usr/bin/");
         normalized = normalized.replace("${sharedir}/", "usr/share/");
-        normalized = normalized.replace("${system32}/", ImageFs.WINEPREFIX + "/drive_c/windows/system32/");
-        normalized = normalized.replace("${syswow64}/", ImageFs.WINEPREFIX + "/drive_c/windows/syswow64/");
+        normalized = normalized.replace("${system32}/", driveCRelative + "/windows/system32/");
+        normalized = normalized.replace("${syswow64}/", driveCRelative + "/windows/syswow64/");
         return normalized.replaceFirst("^/+", "");
     }
 }

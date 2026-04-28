@@ -4,6 +4,7 @@ import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCC
 
 import android.util.Log;
 
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
@@ -113,6 +114,7 @@ public class XInput2Extension implements Extension {
 
     private static void getExtensionVersion(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException {
         inputStream.skip(client.getRemainingRequestLength());
+        logReply(client, "XSERVER_XINPUT2_GET_EXTENSION_VERSION", "xinput2_get_extension_version", "server_major", XI_MAJOR, "server_minor", 0);
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
             outputStream.writeByte((byte)0);
@@ -127,6 +129,7 @@ public class XInput2Extension implements Extension {
 
     private static void getClientPointer(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException {
         inputStream.skip(client.getRemainingRequestLength());
+        logReply(client, "XSERVER_XINPUT2_GET_CLIENT_POINTER", "xinput2_get_client_pointer", "device_id", MASTER_POINTER_ID);
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
             outputStream.writeByte((byte)0);
@@ -150,6 +153,16 @@ public class XInput2Extension implements Extension {
             negotiatedMajor = XI_MAJOR;
             negotiatedMinor = XI_MINOR;
         }
+
+        logReply(
+                client,
+                "XSERVER_XINPUT2_QUERY_VERSION",
+                "xinput2_query_version",
+                "requested_major", Short.toUnsignedInt(clientMajor),
+                "requested_minor", Short.toUnsignedInt(clientMinor),
+                "server_major", Short.toUnsignedInt(negotiatedMajor),
+                "server_minor", Short.toUnsignedInt(negotiatedMinor)
+        );
 
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
@@ -201,6 +214,15 @@ public class XInput2Extension implements Extension {
         int numValuators = 2;
         int numClasses = 1 + numValuators;
         int deviceInfoSize = 12 + namePad + buttonClassBytes + 44 * numValuators;
+
+        logReply(
+                client,
+                "XSERVER_XINPUT2_QUERY_DEVICE",
+                "xinput2_query_device",
+                "device_id", MASTER_POINTER_ID,
+                "num_classes", numClasses,
+                "reply_payload_bytes", deviceInfoSize
+        );
 
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
@@ -261,6 +283,15 @@ public class XInput2Extension implements Extension {
                     && old.windowId == windowId
                     && old.deviceId == deviceId);
             selections.add(selection);
+            logReply(
+                    client,
+                    "XSERVER_XINPUT2_SELECT_EVENTS",
+                    "xinput2_select_events",
+                    "window_id", windowId,
+                    "device_id", deviceId,
+                    "mask_len", maskLen,
+                    "mask_bits", mask.getBits()
+            );
         }
 
         inputStream.skip(client.getRemainingRequestLength());
@@ -269,6 +300,7 @@ public class XInput2Extension implements Extension {
     @Override
     public void handleRequest(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
         int opcode = client.getRequestData();
+        logRequest(client, opcode);
         switch (opcode) {
             case ClientOpcodes.GET_EXTENSION_VERSION:
                 getExtensionVersion(client, inputStream, outputStream);
@@ -289,6 +321,7 @@ public class XInput2Extension implements Extension {
                 break;
             default:
                 Log.w(TAG, "Unhandled minor opcode=" + opcode + " length=" + client.getRemainingRequestLength());
+                logSkipped(client, opcode, "unsupported_xinput2_minor_opcode");
                 inputStream.skip(client.getRemainingRequestLength());
                 break;
         }
@@ -296,11 +329,17 @@ public class XInput2Extension implements Extension {
 
     public void onClientDisconnected(XClient client) {
         selections.removeIf(selection -> selection.client == client);
+        GenericEventExtension genericEventExtension = client.xServer.getExtension(GenericEventExtension.MAJOR_OPCODE, GenericEventExtension.class);
+        if (genericEventExtension != null) genericEventExtension.onClientDisconnected(client);
     }
 
     public void emitRawMotion(int deviceId, double deltaX, double deltaY) {
         for (Selection selection : selections) {
             if (!matchesSelection(selection, deviceId) || !selection.mask.isSet(XI_RAW_MOTION_MASK)) continue;
+            if (!canSendLongGenericEvent(selection.client)) {
+                logGenericEventSuppressed(selection.client, deviceId, "raw_motion_requires_xge_query_version");
+                continue;
+            }
             try {
                 selection.client.sendEvent(new XIRawMotionNotify(deviceId, MAJOR_OPCODE, new double[] {deltaX, deltaY}, RAW_MOTION_XY_MASK));
             }
@@ -324,5 +363,108 @@ public class XInput2Extension implements Extension {
             catch (RuntimeException ignored) {
             }
         }
+    }
+
+    private boolean canSendLongGenericEvent(XClient client) {
+        GenericEventExtension genericEventExtension = client.xServer.getExtension(GenericEventExtension.MAJOR_OPCODE, GenericEventExtension.class);
+        return genericEventExtension != null && genericEventExtension.isClientVersionAware(client);
+    }
+
+    private static void logRequest(XClient client, int opcode) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_XINPUT2_REQUEST",
+                null,
+                "xserver_extensions",
+                "xinput2_request",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "minor_opcode", Byte.toUnsignedInt((byte)opcode),
+                        "minor_opcode_name", describeMinorOpcode(opcode),
+                        "request_length", client.getRequestLength(),
+                        "remaining_request_length", client.getRemainingRequestLength()
+                )
+        );
+    }
+
+    private static void logReply(XClient client, String eventId, String message, Object... extraFields) {
+        Object[] baseFields = new Object[8 + extraFields.length];
+        baseFields[0] = "client_fd";
+        baseFields[1] = client.fd;
+        baseFields[2] = "resource_id_base";
+        baseFields[3] = client.resourceIDBase;
+        baseFields[4] = "sequence_number";
+        baseFields[5] = Short.toUnsignedInt(client.getSequenceNumber());
+        baseFields[6] = "request_length";
+        baseFields[7] = client.getRequestLength();
+        System.arraycopy(extraFields, 0, baseFields, 8, extraFields.length);
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                eventId,
+                null,
+                "xserver_extensions",
+                message,
+                ForensicLogger.fields(baseFields)
+        );
+    }
+
+    private static void logSkipped(XClient client, int opcode, String reason) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "XSERVER_XINPUT2_REQUEST_SKIPPED",
+                null,
+                "xserver_extensions",
+                "xinput2_request_skipped",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "minor_opcode", Byte.toUnsignedInt((byte)opcode),
+                        "minor_opcode_name", describeMinorOpcode(opcode),
+                        "request_length", client.getRequestLength(),
+                        "remaining_request_length", client.getRemainingRequestLength(),
+                        "reason", reason
+                )
+        );
+    }
+
+    private static String describeMinorOpcode(int opcode) {
+        switch (opcode) {
+            case ClientOpcodes.GET_EXTENSION_VERSION:
+                return "GetExtensionVersion";
+            case ClientOpcodes.GET_CLIENT_POINTER:
+                return "GetClientPointer";
+            case ClientOpcodes.SELECT_EVENTS:
+                return "SelectEvents";
+            case ClientOpcodes.QUERY_VERSION:
+                return "QueryVersion";
+            case ClientOpcodes.QUERY_DEVICE:
+                return "QueryDevice";
+            default:
+                return "Unknown";
+        }
+    }
+
+    private static void logGenericEventSuppressed(XClient client, int deviceId, String reason) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "warn",
+                "XSERVER_XINPUT2_GENERIC_EVENT_SUPPRESSED",
+                null,
+                "xserver_extensions",
+                "xinput2_generic_event_suppressed",
+                ForensicLogger.fields(
+                        "client_fd", client.fd,
+                        "resource_id_base", client.resourceIDBase,
+                        "sequence_number", Short.toUnsignedInt(client.getSequenceNumber()),
+                        "device_id", deviceId,
+                        "reason", reason
+                )
+        );
     }
 }

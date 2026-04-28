@@ -13,6 +13,7 @@ set(AERO_WINLATOR_COMMON_SOURCES
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
+add_subdirectory(proot)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/adrenotools/CMakeLists.txt")
     add_subdirectory(adrenotools)
     set(HAS_ADRENOTOOLS ON)
