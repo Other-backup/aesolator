@@ -122,14 +122,21 @@ public abstract class WineUtils {
         }
 
         public boolean isComplete() {
+            return hasCorePayload()
+                    && prefixPack != null
+                    && prefixPack.isFile();
+        }
+
+        public boolean hasCorePayload() {
             return runtimeRootDir != null
                     && runtimeRootDir.isDirectory()
                     && binDir != null
                     && binDir.isDirectory()
+                    && new File(binDir, "wine").isFile()
                     && libDir != null
                     && libDir.isDirectory()
-                    && prefixPack != null
-                    && prefixPack.isFile();
+                    && wineLibDir != null
+                    && wineLibDir.isDirectory();
         }
     }
 
@@ -148,6 +155,9 @@ public abstract class WineUtils {
         public final String glibcLibcPath;
         public final String glibcLoaderRejectedPath;
         public final String glibcLibcRejectedPath;
+        public final String glibcGuestLoaderMode;
+        public final String glibcGuestSupportPath;
+        public final String glibcGuestSupportRejectedPath;
 
         private RuntimeAbiContract(
                 boolean required,
@@ -163,7 +173,10 @@ public abstract class WineUtils {
                 String glibcLoaderPath,
                 String glibcLibcPath,
                 String glibcLoaderRejectedPath,
-                String glibcLibcRejectedPath
+                String glibcLibcRejectedPath,
+                String glibcGuestLoaderMode,
+                String glibcGuestSupportPath,
+                String glibcGuestSupportRejectedPath
         ) {
             this.required = required;
             this.complete = complete;
@@ -179,6 +192,9 @@ public abstract class WineUtils {
             this.glibcLibcPath = glibcLibcPath;
             this.glibcLoaderRejectedPath = glibcLoaderRejectedPath;
             this.glibcLibcRejectedPath = glibcLibcRejectedPath;
+            this.glibcGuestLoaderMode = glibcGuestLoaderMode;
+            this.glibcGuestSupportPath = glibcGuestSupportPath;
+            this.glibcGuestSupportRejectedPath = glibcGuestSupportRejectedPath;
         }
     }
 
@@ -253,6 +269,18 @@ public abstract class WineUtils {
             "lib/x86_64-linux-gnu/libc.so.6",
             "lib64/libc.so.6",
             "lib/libc.so.6"
+    };
+    private static final String[] RUNTIME_X86_64_BOX64_CANDIDATES = {
+            "usr/local/bin/box64",
+            "usr/bin/box64",
+            "bin/box64"
+    };
+    private static final String[] RUNTIME_X86_64_GLIBC_SUPPORT_CANDIDATES = {
+            "usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+            "usr/local/lib/x86_64-linux-gnu/libgcc_s.so.1",
+            "lib/x86_64-linux-gnu/libgcc_s.so.1",
+            "lib64/libgcc_s.so.1",
+            "lib/libgcc_s.so.1"
     };
     private static final String[] RUNTIME_X86_GLIBC_LOADER_CANDIDATES = {
             "usr/lib/i386-linux-gnu/ld-linux.so.2",
@@ -498,13 +526,39 @@ public abstract class WineUtils {
         File glibcLibc = null;
         AbiFileResolution glibcLoaderResolution = new AbiFileResolution(null, "");
         AbiFileResolution glibcLibcResolution = new AbiFileResolution(null, "");
+        AbiFileResolution glibcGuestSupportResolution = new AbiFileResolution(null, "");
+        String glibcGuestLoaderMode = "";
+        File glibcGuestSupport = null;
         if (glibcAbiRequired) {
-            glibcLoaderResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, true);
-            glibcLibcResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, false);
-            glibcLoader = glibcLoaderResolution.file;
-            glibcLibc = glibcLibcResolution.file;
-            if (glibcLoader == null || !glibcLoader.isFile()) missing = appendMissing(missing, arch + "_glibc_loader");
-            if (glibcLibc == null || !glibcLibc.isFile()) missing = appendMissing(missing, arch + "_glibc_libc");
+            if ("x86_64".equals(arch)) {
+                AbiFileResolution box64Resolution = resolveExistingRelativeAbiFile(
+                        imageFsRootDir,
+                        RUNTIME_X86_64_BOX64_CANDIDATES,
+                        null
+                );
+                glibcGuestSupportResolution = resolveExistingRelativeAbiFile(
+                        imageFsRootDir,
+                        RUNTIME_X86_64_GLIBC_SUPPORT_CANDIDATES,
+                        expectedGlibcElfAbi(arch)
+                );
+                glibcGuestSupport = glibcGuestSupportResolution.file;
+                if (box64Resolution.file == null || !box64Resolution.file.isFile()) {
+                    missing = appendMissing(missing, "x86_64_box64_launcher");
+                } else {
+                    glibcGuestLoaderMode = "box64_wrapped";
+                    glibcLoader = box64Resolution.file;
+                }
+                if (glibcGuestSupport == null || !glibcGuestSupport.isFile()) {
+                    missing = appendMissing(missing, "x86_64_glibc_support_libgcc");
+                }
+            } else {
+                glibcLoaderResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, true);
+                glibcLibcResolution = resolveGlibcAbiFile(imageFsRootDir, runtimeRootDir, arch, false);
+                glibcLoader = glibcLoaderResolution.file;
+                glibcLibc = glibcLibcResolution.file;
+                if (glibcLoader == null || !glibcLoader.isFile()) missing = appendMissing(missing, arch + "_glibc_loader");
+                if (glibcLibc == null || !glibcLibc.isFile()) missing = appendMissing(missing, arch + "_glibc_libc");
+            }
         }
 
         boolean required = glibcAbiRequired
@@ -529,7 +583,10 @@ public abstract class WineUtils {
                 glibcLoader != null ? glibcLoader.getAbsolutePath() : "",
                 glibcLibc != null ? glibcLibc.getAbsolutePath() : "",
                 glibcLoaderResolution.rejected,
-                glibcLibcResolution.rejected
+                glibcLibcResolution.rejected,
+                glibcGuestLoaderMode,
+                glibcGuestSupport != null ? glibcGuestSupport.getAbsolutePath() : "",
+                glibcGuestSupportResolution.rejected
         );
     }
 
@@ -963,14 +1020,18 @@ public abstract class WineUtils {
         if (runtimeRootDir == null) return null;
 
         File current = runtimeRootDir;
-        File best = hasRuntimePayload(current) ? current : null;
+        File best = hasRuntimeCorePayload(current) ? current : null;
         for (int depth = 0; depth < 4 && current != null; depth++) {
             current = current.getParentFile();
-            if (current != null && hasRuntimePayload(current)) {
+            if (current != null && hasRuntimeCorePayload(current)) {
                 best = current;
             }
         }
         return best != null ? best : runtimeRootDir;
+    }
+
+    public static boolean hasRuntimeCorePayload(File runtimeRootDir) {
+        return resolveRuntimeLayout(runtimeRootDir).hasCorePayload();
     }
 
     public static boolean hasRuntimePayload(File runtimeRootDir) {

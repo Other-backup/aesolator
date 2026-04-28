@@ -24,10 +24,22 @@ public class RuntimeFeedRegistryTest {
     }
 
     @Test
+    public void protonSourceModesIncludeAndreVtoDedicatedLane() {
+        ArrayList<RuntimeFeedRegistry.FeedSpec> feeds = RuntimeFeedRegistry.getFeedsForSourceMode(
+                RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON,
+                ContentProfile.ContentType.CONTENT_TYPE_PROTON
+        );
+        String joinedIds = feeds.stream().map(feed -> feed.sourceFeedId).collect(Collectors.joining(" "));
+
+        assertTrue(joinedIds.contains("andrevto-proton11"));
+    }
+
+    @Test
     public void launchHydrationPrefersBionicFeedsForBionicRuntime() {
         ArrayList<RuntimeFeedRegistry.FeedSpec> feeds = RuntimeFeedRegistry.getLaunchHydrationFeeds("bionic", "freewine11");
         String joinedIds = feeds.stream().map(feed -> feed.sourceFeedId).collect(Collectors.joining(" "));
 
+        assertTrue(joinedIds.contains("andrevto-proton11"));
         assertTrue(joinedIds.contains("community-alexoqool-bionic"));
         assertTrue(joinedIds.contains("community-xnick-bionic"));
     }

@@ -241,7 +241,18 @@ public abstract class ImageFsInstaller {
     }
 
     public static boolean isInstallRequired(Context context, Container container, String requestedRuntimeModel) {
-        ImageFs imageFs = ImageFs.find(context);
+        return isInstallRequired(context, container, requestedRuntimeModel, container != null ? container.getWineVersion() : "");
+    }
+
+    public static boolean isInstallRequired(Context context, Container container, String requestedRuntimeModel, String requestedRuntimeIdentity) {
+        String explicitRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedRuntimeModel);
+        if (explicitRuntimeModel.isEmpty() && container != null) {
+            explicitRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(container.getWineVersion());
+            if (explicitRuntimeModel.isEmpty()) {
+                explicitRuntimeModel = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+            }
+        }
+        ImageFs imageFs = ImageFs.find(context, explicitRuntimeModel, requestedRuntimeIdentity);
         String requestedVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
         boolean universalGameNativeRootfs = imageFs.isGameNativeRootfs()
                 && GLIBC_IMAGEFS_ARCHIVE.equals(BIONIC_IMAGEFS_ARCHIVE);
@@ -953,9 +964,14 @@ public abstract class ImageFsInstaller {
     }
 
     public static void installWineFromAssets(final Context context, String containerVariant) {
+        installWineFromAssets(context, containerVariant, ImageFs.find(context), "");
+    }
+
+    private static void installWineFromAssets(final Context context, String containerVariant, ImageFs imageFs, String requestedRuntimeIdentity) {
         String[] versions = getBundledWineEntries(context, containerVariant);
-        File rootDir = ImageFs.find(context).getRootDir();
+        File rootDir = imageFs.getRootDir();
         for (String version : versions) {
+            if (!shouldInstallBundledWineEntry(version, requestedRuntimeIdentity)) continue;
             if (!assetExists(context, version + ".txz")) continue;
             File outFile = new File(rootDir, "opt/" + version);
             outFile.mkdirs();
@@ -964,16 +980,27 @@ public abstract class ImageFsInstaller {
     }
 
     public static void installWineFromDownloads(final Context context, String containerVariant) {
+        installWineFromDownloads(context, containerVariant, ImageFs.find(context), "");
+    }
+
+    private static void installWineFromDownloads(final Context context, String containerVariant, ImageFs imageFs, String requestedRuntimeIdentity) {
         String[] versions = getBundledWineEntries(context, containerVariant);
-        File rootDir = ImageFs.find(context).getRootDir();
-        ImageFs imageFs = ImageFs.find(context);
+        File rootDir = imageFs.getRootDir();
         for (String version : versions) {
+            if (!shouldInstallBundledWineEntry(version, requestedRuntimeIdentity)) continue;
             File downloaded = new File(imageFs.getFilesDir(), version + ".txz");
             if (!downloaded.isFile()) continue;
             File outFile = new File(rootDir, "opt/" + version);
             outFile.mkdirs();
             TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, downloaded, outFile);
         }
+    }
+
+    private static boolean shouldInstallBundledWineEntry(String bundledVersion, String requestedRuntimeIdentity) {
+        String requested = ImageFs.normalizeRuntimeIdentity(requestedRuntimeIdentity);
+        if (requested.isEmpty()) return true;
+        String bundled = ImageFs.normalizeRuntimeIdentity(bundledVersion);
+        return requested.equals(bundled);
     }
 
     public static void installDriversFromAssets(final MainActivity activity) {
@@ -1629,7 +1656,15 @@ public abstract class ImageFsInstaller {
     private static Future<Boolean> installFromAssetsFuture(final Context context, AssetManager assetManager,
                                                            Container container, String requestedRuntimeModel,
                                                            Callback<Integer> onProgress) {
-        ImageFs imageFs = ImageFs.find(context);
+        return installFromAssetsFuture(context, assetManager, container, requestedRuntimeModel,
+                container != null ? container.getWineVersion() : "", onProgress);
+    }
+
+    private static Future<Boolean> installFromAssetsFuture(final Context context, AssetManager assetManager,
+                                                           Container container, String requestedRuntimeModel,
+                                                           String requestedRuntimeIdentity,
+                                                           Callback<Integer> onProgress) {
+        ImageFs imageFs = ImageFs.find(context, requestedRuntimeModel, requestedRuntimeIdentity);
         final File rootDir = imageFs.getRootDir();
         final String containerVariant = resolveInstallVariant(imageFs, container, requestedRuntimeModel);
 
@@ -1729,8 +1764,8 @@ public abstract class ImageFsInstaller {
                     });
 
             if (success) {
-                installWineFromAssets(context, containerVariant);
-                installWineFromDownloads(context, containerVariant);
+                installWineFromAssets(context, containerVariant, imageFs, requestedRuntimeIdentity);
+                installWineFromDownloads(context, containerVariant, imageFs, requestedRuntimeIdentity);
                 if (context instanceof MainActivity) {
                     installDriversFromAssets((MainActivity) context);
                 }
@@ -1787,9 +1822,17 @@ public abstract class ImageFsInstaller {
     public static Future<Boolean> installIfNeededFuture(final Context context, AssetManager assetManager,
                                                         Container container, String requestedRuntimeModel,
                                                         Callback<Integer> onProgress) {
-        ImageFs imageFs = ImageFs.find(context);
-        if (isInstallRequired(context, container, requestedRuntimeModel)) {
-            return installFromAssetsFuture(context, assetManager, container, requestedRuntimeModel, onProgress);
+        return installIfNeededFuture(context, assetManager, container, requestedRuntimeModel,
+                container != null ? container.getWineVersion() : "", onProgress);
+    }
+
+    public static Future<Boolean> installIfNeededFuture(final Context context, AssetManager assetManager,
+                                                        Container container, String requestedRuntimeModel,
+                                                        String requestedRuntimeIdentity,
+                                                        Callback<Integer> onProgress) {
+        if (isInstallRequired(context, container, requestedRuntimeModel, requestedRuntimeIdentity)) {
+            return installFromAssetsFuture(context, assetManager, container, requestedRuntimeModel,
+                    requestedRuntimeIdentity, onProgress);
         }
         return Executors.newSingleThreadExecutor().submit(() -> true);
     }

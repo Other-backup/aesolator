@@ -61,6 +61,9 @@ public final class RemoteProfileFeedMerger {
         if (RuntimeFeedRegistry.looksLikeNightliesSource(joined)) {
             return RuntimeFeedRegistry.SOURCE_MODE_NIGHTLIES;
         }
+        if (RuntimeFeedRegistry.looksLikeAndreVtoProtonSource(joined)) {
+            return RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON;
+        }
         if (joined.contains("gamehub-components") || joined.contains("gamehub")) {
             return RuntimeFeedRegistry.SOURCE_MODE_GAMEHUB;
         }
@@ -166,6 +169,7 @@ public final class RemoteProfileFeedMerger {
             if (sourceRepo.contains("raw")) return 245;
             return 250;
         }
+        if (RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON.equals(sourceMode)) return 242;
         if (RuntimeFeedRegistry.SOURCE_MODE_COMMUNITY.equals(sourceMode)) {
             String joined = (
                     optString(object, ContentProfile.MARK_SOURCE_REPO) + " " +

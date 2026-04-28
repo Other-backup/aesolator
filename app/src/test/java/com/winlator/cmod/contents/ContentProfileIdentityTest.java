@@ -110,6 +110,22 @@ public class ContentProfileIdentityTest {
     }
 
     @Test
+    public void rejectsRuntimePayloadCompatibilityAcrossExplicitArchitectures() {
+        ContentProfile arm64ec = new ContentProfile();
+        arm64ec.type = ContentProfile.ContentType.CONTENT_TYPE_WINE;
+        arm64ec.verName = "10.10-arm64ec";
+        arm64ec.runtimeModel = ContentProfile.RUNTIME_MODEL_GLIBC;
+
+        ContentProfile amd64 = new ContentProfile();
+        amd64.type = ContentProfile.ContentType.CONTENT_TYPE_WINE;
+        amd64.verName = "10.15-amd64";
+        amd64.runtimeModel = ContentProfile.RUNTIME_MODEL_GLIBC;
+
+        assertFalse(ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(arm64ec, amd64));
+        assertFalse(ContentProfileIdentity.areEquivalentProfiles(arm64ec, amd64));
+    }
+
+    @Test
     public void doesNotTreatExactRuntimeIdentityAsAliasEquivalence() {
         ContentProfile actual = new ContentProfile();
         actual.type = ContentProfile.ContentType.CONTENT_TYPE_PROTON;

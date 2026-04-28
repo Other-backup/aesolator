@@ -78,7 +78,7 @@ final class EmulatorRuntimePresenceDependency implements LaunchDependency {
             requestedRuntimeModel = inferredRuntimeModel;
         }
         WineInfo wineInfo = WineInfo.fromIdentifier(context, manager, selectedWine, requestedRuntimeModel);
-        ImageFs imageFs = ImageFs.find(context);
+        ImageFs imageFs = ImageFs.find(context, requestedRuntimeModel, selectedWine);
         File imageFsRoot = imageFs.getRootDir();
         File winePrefixDir = container != null && container.getRootDir() != null
                 ? WineUtils.resolveHostWinePrefixDir(container.getRootDir())

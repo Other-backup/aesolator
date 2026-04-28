@@ -15,10 +15,12 @@ public class ImageFsTest {
         File mainWineRoot = new File(rootDir, "opt/wine");
         File abiBinDir = new File(mainWineRoot, "arm64-v8a/bin");
         File abiWineLibDir = new File(mainWineRoot, "arm64-v8a/lib/wine");
+        File abiWineBinary = new File(abiBinDir, "wine");
         File rootPrefixPack = new File(mainWineRoot, "prefixPack.txz");
 
         assertTrue("abi bin dir created", abiBinDir.mkdirs());
         assertTrue("abi wine lib dir created", abiWineLibDir.mkdirs());
+        assertTrue("abi wine binary created", abiWineBinary.createNewFile());
         assertTrue("root prefixpack created", rootPrefixPack.createNewFile());
 
         ImageFs imageFs = ImageFs.find(rootDir);
@@ -60,5 +62,34 @@ public class ImageFsTest {
         imageFs.createVariantFile("gamenative");
 
         assertEquals(ImageFs.ROOTFS_PROVIDER_GAMENATIVE, imageFs.getRootfsProvider());
+    }
+
+    @Test
+    public void packageRuntimeRootsKeepWinePackagesIsolatedInsideRuntimeModel() {
+        assertEquals(
+                "imagefs-runtime-glibc-proton-glibc-10.0-amd64-1",
+                ImageFs.getRuntimeRootDirName("glibc", "Proton-glibc-10.0-amd64-1")
+        );
+        assertEquals(
+                "imagefs-runtime-bionic-proton-bionic-11.0-1-arm64ec-1",
+                ImageFs.getRuntimeRootDirName("bionic", "Proton-bionic-11.0-1-arm64ec-1")
+        );
+        assertEquals(ImageFs.BIONIC_ROOT_DIR_NAME, ImageFs.getRuntimeRootDirName("bionic", ""));
+        assertEquals(ImageFs.GLIBC_ROOT_DIR_NAME, ImageFs.getRuntimeRootDirName("glibc", ""));
+    }
+
+    @Test
+    public void runtimeSpecificRootSelectionDoesNotCollapseToActiveAlias() throws Exception {
+        File filesDir = Files.createTempDirectory("imagefs-files").toFile();
+        File activeAlias = ImageFs.getActiveRootDir(filesDir);
+        File glibcPackageRoot = ImageFs.getRuntimeRootDir(filesDir, "glibc", "Wine-glibc-wine-10.15-amd64-2026041211");
+        File bionicPackageRoot = ImageFs.getRuntimeRootDir(filesDir, "bionic", "Proton-bionic-11.0-1-arm64ec-1");
+
+        assertEquals("imagefs", activeAlias.getName());
+        assertEquals("imagefs-runtime-glibc-wine-glibc-wine-10.15-amd64-2026041211", glibcPackageRoot.getName());
+        assertEquals("imagefs-runtime-bionic-proton-bionic-11.0-1-arm64ec-1", bionicPackageRoot.getName());
+        assertTrue("glibc package root is not active alias", !activeAlias.getCanonicalFile().equals(glibcPackageRoot.getCanonicalFile()));
+        assertTrue("bionic package root is not active alias", !activeAlias.getCanonicalFile().equals(bionicPackageRoot.getCanonicalFile()));
+        assertTrue("glibc and bionic package roots are independent", !glibcPackageRoot.getCanonicalFile().equals(bionicPackageRoot.getCanonicalFile()));
     }
 }

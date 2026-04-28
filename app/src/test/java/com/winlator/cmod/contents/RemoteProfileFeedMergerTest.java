@@ -43,6 +43,19 @@ public class RemoteProfileFeedMergerTest {
     }
 
     @Test
+    public void classifySourceModeRecognizesAndreVtoProtonLane() {
+        assertEquals(
+                RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON,
+                RemoteProfileFeedMerger.classifySourceMode(
+                        "andrevto-proton11",
+                        "AndreVto/proton-wine Releases",
+                        "AndreVto Bionic Proton 11",
+                        "https://api.github.com/repos/AndreVto/proton-wine/releases?per_page=100"
+                )
+        );
+    }
+
+    @Test
     public void mergePayloadsPrefersHigherPriorityCommunityBionicDonorOverWcpHub() {
         String wcphubPayload = "[" +
                 "{\"type\":\"Wine\",\"verName\":\"11.4\",\"verCode\":1140," +

@@ -146,7 +146,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
 
     private void copyDefaultBox64RCFile() {
         Context context = environment.getContext();
-        ImageFs imageFs = ImageFs.find(context);
+        ImageFs imageFs = environment.getImageFs() != null ? environment.getImageFs() : ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
         File rcFile = new File(rootDir, "etc/config.box64rc");
         if (rcFile.isFile()) return;
@@ -289,6 +289,9 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "abi_missing", abiContract.missing,
                         "abi_glibc_loader_rejected", abiContract.glibcLoaderRejectedPath,
                         "abi_glibc_libc_rejected", abiContract.glibcLibcRejectedPath,
+                        "abi_glibc_guest_loader_mode", abiContract.glibcGuestLoaderMode,
+                        "abi_glibc_guest_support", abiContract.glibcGuestSupportPath,
+                        "abi_glibc_guest_support_rejected", abiContract.glibcGuestSupportRejectedPath,
                         "command_head", summarizePathHead(command == null ? "" : command.replace(' ', ':'), 6),
                         "outer_ld_path_cleared", launchEnv == null || !launchEnv.has("LD_LIBRARY_PATH"),
                         "outer_ld_preload_cleared", launchEnv == null || !launchEnv.has("LD_PRELOAD"),

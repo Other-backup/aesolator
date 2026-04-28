@@ -158,7 +158,7 @@ public class WineUtilsTest {
     }
 
     @Test
-    public void validateRuntimeAbiContractFailsX8664GlibcWithoutGuestLibc() throws Exception {
+    public void validateRuntimeAbiContractFailsX8664GlibcWithoutBox64GuestRoute() throws Exception {
         File imageRoot = Files.createTempDirectory("wineutils-image-root").toFile();
         File runtimeRoot = Files.createTempDirectory("wineutils-x8664-abi-missing").toFile();
         assertTrue("runtime bin created", new File(runtimeRoot, "bin").mkdirs());
@@ -175,13 +175,13 @@ public class WineUtilsTest {
                 "glibc"
         );
 
-        assertFalse("x86_64 glibc ABI should be incomplete without loader/libc", contract.complete);
-        assertTrue("missing x86_64 loader recorded", contract.missing.contains("x86_64_glibc_loader"));
-        assertTrue("missing x86_64 libc recorded", contract.missing.contains("x86_64_glibc_libc"));
+        assertFalse("x86_64 glibc ABI should be incomplete without box64 route", contract.complete);
+        assertTrue("missing box64 launcher recorded", contract.missing.contains("x86_64_box64_launcher"));
+        assertTrue("missing x86_64 support libgcc recorded", contract.missing.contains("x86_64_glibc_support_libgcc"));
     }
 
     @Test
-    public void validateRuntimeAbiContractAcceptsX8664GlibcWithImageRootAbi() throws Exception {
+    public void validateRuntimeAbiContractAcceptsX8664GlibcWithBox64GuestRoute() throws Exception {
         File imageRoot = Files.createTempDirectory("wineutils-image-root-x64").toFile();
         File runtimeRoot = Files.createTempDirectory("wineutils-x8664-abi-ok").toFile();
         assertTrue("runtime bin created", new File(runtimeRoot, "bin").mkdirs());
@@ -189,10 +189,12 @@ public class WineUtilsTest {
         assertTrue("runtime x86_64 unix created", new File(runtimeRoot, "lib/wine/x86_64-unix").mkdirs());
         assertTrue("runtime x86_64 windows created", new File(runtimeRoot, "lib/wine/x86_64-windows").mkdirs());
         assertTrue("runtime prefix pack created", new File(runtimeRoot, "prefixPack.txz").createNewFile());
+        File binDir = new File(imageRoot, "usr/local/bin");
         File abiDir = new File(imageRoot, "usr/lib/x86_64-linux-gnu");
-        assertTrue("image root x86_64 abi dir created", abiDir.mkdirs());
-        writeElfHeader(new File(abiDir, "ld-linux-x86-64.so.2"), 2, 62);
-        writeElfHeader(new File(abiDir, "libc.so.6"), 2, 62);
+        assertTrue("image root bin dir created", binDir.mkdirs());
+        assertTrue("image root x86_64 support dir created", abiDir.mkdirs());
+        assertTrue("box64 launcher created", new File(binDir, "box64").createNewFile());
+        writeElfHeader(new File(abiDir, "libgcc_s.so.1"), 2, 62);
 
         WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
         WineUtils.RuntimeAbiContract contract = WineUtils.validateRuntimeAbiContract(
@@ -202,8 +204,10 @@ public class WineUtilsTest {
                 "glibc"
         );
 
-        assertTrue("x86_64 glibc ABI should be complete when image root carries loader/libc", contract.complete);
+        assertTrue("x86_64 glibc ABI should be complete when image root carries box64 route", contract.complete);
         assertEquals("", contract.missing);
+        assertEquals("box64_wrapped", contract.glibcGuestLoaderMode);
+        assertTrue("x86_64 support libgcc recorded", contract.glibcGuestSupportPath.endsWith("libgcc_s.so.1"));
     }
 
     @Test
@@ -215,9 +219,10 @@ public class WineUtilsTest {
         assertTrue("runtime x86_64 unix created", new File(runtimeRoot, "lib/wine/x86_64-unix").mkdirs());
         assertTrue("runtime x86_64 windows created", new File(runtimeRoot, "lib/wine/x86_64-windows").mkdirs());
         assertTrue("runtime prefix pack created", new File(runtimeRoot, "prefixPack.txz").createNewFile());
-        assertTrue("image root lib64 created", new File(imageRoot, "lib64").mkdirs());
-        writeElfHeader(new File(imageRoot, "lib64/ld-linux-x86-64.so.2"), 2, 183);
-        writeElfHeader(new File(imageRoot, "lib64/libc.so.6"), 2, 183);
+        assertTrue("image root bin created", new File(imageRoot, "usr/bin").mkdirs());
+        assertTrue("image root x86_64 lib created", new File(imageRoot, "usr/lib/x86_64-linux-gnu").mkdirs());
+        assertTrue("box64 launcher created", new File(imageRoot, "usr/bin/box64").createNewFile());
+        writeElfHeader(new File(imageRoot, "usr/lib/x86_64-linux-gnu/libgcc_s.so.1"), 2, 183);
 
         WineInfo wineInfo = new WineInfo("wine", "10.15", "x86_64", runtimeRoot.getPath());
         WineUtils.RuntimeAbiContract contract = WineUtils.validateRuntimeAbiContract(
@@ -228,16 +233,12 @@ public class WineUtilsTest {
         );
 
         assertFalse("x86_64 glibc ABI should reject aarch64 ELF files", contract.complete);
-        assertTrue("wrong-arch loader remains missing", contract.missing.contains("x86_64_glibc_loader"));
-        assertTrue("wrong-arch libc remains missing", contract.missing.contains("x86_64_glibc_libc"));
-        assertEquals("", contract.glibcLoaderPath);
+        assertTrue("wrong-arch libgcc remains missing", contract.missing.contains("x86_64_glibc_support_libgcc"));
         assertEquals("", contract.glibcLibcPath);
-        assertTrue("loader rejection records observed and expected machine",
-                contract.glibcLoaderRejectedPath.contains("machine=183")
-                        && contract.glibcLoaderRejectedPath.contains("expectedMachine=62"));
-        assertTrue("libc rejection records observed and expected machine",
-                contract.glibcLibcRejectedPath.contains("machine=183")
-                        && contract.glibcLibcRejectedPath.contains("expectedMachine=62"));
+        assertEquals("box64_wrapped", contract.glibcGuestLoaderMode);
+        assertTrue("support rejection records observed and expected machine",
+                contract.glibcGuestSupportRejectedPath.contains("machine=183")
+                        && contract.glibcGuestSupportRejectedPath.contains("expectedMachine=62"));
     }
 
     @Test
@@ -246,10 +247,12 @@ public class WineUtilsTest {
         File abiRoot = new File(runtimeRoot, "arm64-v8a");
         File abiBinDir = new File(abiRoot, "bin");
         File abiWineLibDir = new File(abiRoot, "lib/wine");
+        File abiWineBinary = new File(abiBinDir, "wine");
         File rootPrefixPack = new File(runtimeRoot, "prefixPack.tzst");
 
         assertTrue("abi bin dir created", abiBinDir.mkdirs());
         assertTrue("abi wine lib dir created", abiWineLibDir.mkdirs());
+        assertTrue("abi wine binary created", abiWineBinary.createNewFile());
         assertTrue("root prefixpack created", rootPrefixPack.createNewFile());
 
         assertEquals(runtimeRoot.getAbsolutePath(), WineUtils.resolveCanonicalRuntimeRoot(abiBinDir).getAbsolutePath());
@@ -257,16 +260,50 @@ public class WineUtilsTest {
     }
 
     @Test
+    public void runtimeCorePayloadDoesNotRequirePrefixPack() throws Exception {
+        File runtimeRoot = Files.createTempDirectory("wineutils-core-payload").toFile();
+        File binDir = new File(runtimeRoot, "bin");
+        File wineBinary = new File(binDir, "wine");
+        File wineLibDir = new File(runtimeRoot, "lib/wine");
+
+        assertTrue("bin dir created", binDir.mkdirs());
+        assertTrue("wine lib dir created", wineLibDir.mkdirs());
+        assertTrue("wine binary created", wineBinary.createNewFile());
+
+        assertTrue("core launch payload accepted", WineUtils.hasRuntimeCorePayload(runtimeRoot));
+        assertFalse("install payload still requires prefix pack", WineUtils.hasRuntimePayload(runtimeRoot));
+    }
+
+    @Test
+    public void resolveCanonicalRuntimeRootUsesCorePayloadForPackageRootWithoutPrefixPack() throws Exception {
+        File runtimeRoot = Files.createTempDirectory("wineutils-core-canonical-root").toFile();
+        File abiRoot = new File(runtimeRoot, "arm64-v8a");
+        File abiBinDir = new File(abiRoot, "bin");
+        File abiWineLibDir = new File(abiRoot, "lib/wine");
+        File abiWineBinary = new File(abiBinDir, "wine");
+
+        assertTrue("abi bin dir created", abiBinDir.mkdirs());
+        assertTrue("abi wine lib dir created", abiWineLibDir.mkdirs());
+        assertTrue("abi wine binary created", abiWineBinary.createNewFile());
+
+        assertTrue("core payload accepted without prefix pack", WineUtils.hasRuntimeCorePayload(runtimeRoot));
+        assertFalse("full runtime payload still reports incomplete", WineUtils.hasRuntimePayload(runtimeRoot));
+        assertEquals(runtimeRoot.getAbsolutePath(), WineUtils.resolveCanonicalRuntimeRoot(abiBinDir).getAbsolutePath());
+    }
+
+    @Test
     public void resolveRuntimeLayoutPrefersCanonicalRootWhenCompatSurfaceExists() throws Exception {
         File runtimeRoot = Files.createTempDirectory("wineutils-runtime-layout-root").toFile();
         File rootBinDir = new File(runtimeRoot, "bin");
         File rootWineLibDir = new File(runtimeRoot, "lib/wine");
+        File rootWineBinary = new File(rootBinDir, "wine");
         File rootPrefixPack = new File(runtimeRoot, "prefixPack.txz");
         File abiBinDir = new File(runtimeRoot, "arm64-v8a/bin");
         File abiWineLibDir = new File(runtimeRoot, "arm64-v8a/lib/wine");
 
         assertTrue("root bin created", rootBinDir.mkdirs());
         assertTrue("root wine lib created", rootWineLibDir.mkdirs());
+        assertTrue("root wine binary created", rootWineBinary.createNewFile());
         assertTrue("root prefixpack created", rootPrefixPack.createNewFile());
         assertTrue("abi bin created", abiBinDir.mkdirs());
         assertTrue("abi wine lib created", abiWineLibDir.mkdirs());
@@ -326,10 +363,12 @@ public class WineUtilsTest {
         File runtimeRoot = Files.createTempDirectory("wineutils-runtime-layout-mixed").toFile();
         File abiWineLibDir = new File(runtimeRoot, "arm64-v8a/lib/wine");
         File abiBinDir = new File(runtimeRoot, "arm64-v8a/bin");
+        File abiWineBinary = new File(abiBinDir, "wine");
         File rootPrefixPack = new File(runtimeRoot, "prefixPack.tzst");
 
         assertTrue("abi wine lib created", abiWineLibDir.mkdirs());
         assertTrue("abi bin created", abiBinDir.mkdirs());
+        assertTrue("abi wine binary created", abiWineBinary.createNewFile());
         assertTrue("root prefixpack created", rootPrefixPack.createNewFile());
 
         assertTrue("mixed runtime payload accepted", WineUtils.hasRuntimePayload(runtimeRoot));

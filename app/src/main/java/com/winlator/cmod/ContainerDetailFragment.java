@@ -681,7 +681,7 @@ public class ContainerDetailFragment extends Fragment {
                 File selectedRuntimeRoot = selectedWineInfo.path == null || selectedWineInfo.path.trim().isEmpty()
                         ? null
                         : new File(selectedWineInfo.path);
-                boolean runtimeReady = selectedRuntimeRoot != null && WineUtils.hasRuntimePayload(selectedRuntimeRoot);
+                boolean runtimeReady = selectedRuntimeRoot != null && WineUtils.hasRuntimeCorePayload(selectedRuntimeRoot);
                 ForensicLogger.logEvent(
                         context,
                         runtimeReady ? "info" : "warn",
@@ -698,6 +698,8 @@ public class ContainerDetailFragment extends Fragment {
                                 "runtime_model", requestedRuntimeModel,
                                 "path_exists", selectedRuntimeRoot != null && selectedRuntimeRoot.exists(),
                                 "runtime_ready", runtimeReady,
+                                "runtime_payload_complete", selectedRuntimeRoot != null && WineUtils.hasRuntimePayload(selectedRuntimeRoot),
+                                "prefix_pack_present", selectedRuntimeRoot != null && WineUtils.resolveRuntimePrefixPack(selectedRuntimeRoot) != null,
                                 "profile_found", selectedRuntimeProfile != null,
                                 "profile_type", selectedRuntimeProfile != null && selectedRuntimeProfile.type != null
                                         ? selectedRuntimeProfile.type.toString()
@@ -1523,7 +1525,7 @@ public class ContainerDetailFragment extends Fragment {
                     ? imageFs.getMainWineDir()
                     : WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "opt/" + version));
             if (!wineDir.isDirectory()) return false;
-            return WineUtils.hasRuntimePayload(wineDir);
+            return WineUtils.hasRuntimeCorePayload(wineDir);
         } catch (Exception ignored) {
             return false;
         }

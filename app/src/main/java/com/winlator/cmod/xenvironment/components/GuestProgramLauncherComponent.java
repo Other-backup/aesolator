@@ -991,6 +991,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             return -1;
         }
 
+        bindLaunchRuntimeWinePath(context, imageFs, stageTraceId, appId);
+
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean enableBox64Logs = preferences.getBoolean("enable_box64_logs", false);
         boolean openWithAndroidBrowser = preferences.getBoolean("open_with_android_browser", false);
@@ -1110,7 +1112,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 "glibc_loader", abiContract.glibcLoaderPath,
                 "glibc_libc", abiContract.glibcLibcPath,
                 "glibc_loader_rejected", abiContract.glibcLoaderRejectedPath,
-                "glibc_libc_rejected", abiContract.glibcLibcRejectedPath
+                "glibc_libc_rejected", abiContract.glibcLibcRejectedPath,
+                "glibc_guest_loader_mode", abiContract.glibcGuestLoaderMode,
+                "glibc_guest_support", abiContract.glibcGuestSupportPath,
+                "glibc_guest_support_rejected", abiContract.glibcGuestSupportRejectedPath
         );
         if (!abiContract.complete) {
             return -1;
@@ -1891,6 +1896,81 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         );
     }
 
+    private void bindLaunchRuntimeWinePath(Context context, ImageFs imageFs, String traceId, String appId) {
+        if (imageFs == null) return;
+
+        String before = normalizePathValue(imageFs.getWinePath());
+        String targetPath = resolveLaunchRuntimeWinePath();
+        if (!targetPath.isEmpty()) {
+            imageFs.setWinePath(targetPath);
+        }
+        String after = normalizePathValue(imageFs.getWinePath());
+        logLaunchStageEvent(
+                context,
+                "info",
+                "LAUNCH_RUNTIME_WINE_PATH_BOUND",
+                traceId,
+                "runtime_wine_path_bound",
+                appId,
+                -1L,
+                null,
+                "runtime_profile", wineProfile != null ? ContentsManager.getEntryName(wineProfile) : "-",
+                "imagefs_root", imageFs.getRootDir().getAbsolutePath(),
+                "imagefs_root_name", imageFs.getRootDir().getName(),
+                "imagefs_root_is_active_alias", ImageFs.ACTIVE_ROOT_DIR_NAME.equals(imageFs.getRootDir().getName()) ? "1" : "0",
+                "active_root_alias", ImageFs.getActiveRootDir(context).getAbsolutePath(),
+                "active_root_alias_target", FileUtils.isSymlink(ImageFs.getActiveRootDir(context)) ? FileUtils.readSymlink(ImageFs.getActiveRootDir(context)) : "",
+                "wine_info_path", wineInfo != null ? normalizePathValue(wineInfo.path) : "",
+                "wine_path_before", before,
+                "wine_path_after", after,
+                "wine_path_rebound", !before.equals(after) ? "1" : "0",
+                "runtime_core_payload_present", !after.isEmpty() && WineUtils.hasRuntimeCorePayload(new File(after)) ? "1" : "0"
+        );
+    }
+
+    private String resolveLaunchRuntimeWinePath() {
+        File profileRoot = resolveWineProfileRuntimeRoot();
+        if (profileRoot != null) return profileRoot.getPath();
+
+        String wineInfoPath = wineInfo != null ? normalizePathValue(wineInfo.path) : "";
+        if (!wineInfoPath.isEmpty()) {
+            File wineInfoRoot = WineUtils.resolveCanonicalRuntimeRoot(new File(wineInfoPath));
+            if (wineInfoRoot != null && WineUtils.hasRuntimeCorePayload(wineInfoRoot)) {
+                return wineInfoRoot.getPath();
+            }
+            return wineInfoPath;
+        }
+        return "";
+    }
+
+    private File resolveWineProfileRuntimeRoot() {
+        if (contentsManager == null
+                || wineProfile == null
+                || !wineProfile.isWineProtonFamily()
+                || !contentsManager.isInstalledProfileUsable(wineProfile)) {
+            return null;
+        }
+
+        File runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(contentsManager.getRuntimeRootDir(wineProfile));
+        if (runtimeRoot != null && WineUtils.hasRuntimeCorePayload(runtimeRoot)) {
+            return runtimeRoot;
+        }
+
+        ContentsManager.InstalledProfileDiagnostics diagnostics =
+                contentsManager.resolveInstalledProfileDiagnostics(wineProfile);
+        if (diagnostics.runtimePayloadPresent && !normalizePathValue(diagnostics.runtimeRoot).equals("-")) {
+            runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(new File(diagnostics.runtimeRoot));
+            if (runtimeRoot != null && WineUtils.hasRuntimeCorePayload(runtimeRoot)) {
+                return runtimeRoot;
+            }
+        }
+        return null;
+    }
+
+    private static String normalizePathValue(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private void ensureRuntimeSdlCompatLink(Context context, ImageFs imageFs) {
         File libDir = imageFs != null ? imageFs.getLibDir() : null;
         File sdlSo = libDir != null ? new File(libDir, "libSDL2-2.0.so") : null;
@@ -2069,6 +2149,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     private void bindActiveContainerHome(ImageFs imageFs) {
         if (imageFs == null || container == null) return;
+        String runtimeModel = wineProfile != null ? wineProfile.getRuntimeModel() : "";
+        if (ContentProfile.normalizeRuntimeModel(runtimeModel).isEmpty()) {
+            runtimeModel = ContainerManager.resolveContainerRuntimeModel(container);
+        }
+        String runtimeIdentity = wineProfile != null
+                ? ContentsManager.getEntryName(wineProfile)
+                : ContainerManager.resolveContainerRuntimeIdentity(container);
+        ImageFs.ensureContainerHomeForRuntime(environment.getContext(), container.id, container.getRootDir(), runtimeModel, runtimeIdentity);
         ContainerManager.activateContainerHome(new File(imageFs.getRootDir(), "home"), container);
         imageFs.setHomeDir(container.getRootDir());
     }

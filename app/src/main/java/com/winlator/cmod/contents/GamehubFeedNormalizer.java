@@ -190,7 +190,7 @@ public final class GamehubFeedNormalizer {
                 candidate.addProperty(ContentProfile.MARK_CHANNEL, deriveReleaseChannel((JsonObject) null, entry.tag, assetName));
                 candidate.addProperty(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
                 candidate.addProperty(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
-                String runtimeModel = resolveRuntimeModel(type, assetName, entry.tag, sourceRepo, sourceLabel);
+                String runtimeModel = resolveRuntimeModel(type, assetName, entry.tag, sourceRepo, sourceLabel, descriptionPrefix);
                 if (!runtimeModel.isEmpty()) candidate.addProperty(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
                 candidate.addProperty(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
                 candidate.addProperty(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);
@@ -312,7 +312,7 @@ public final class GamehubFeedNormalizer {
         normalized.addProperty(ContentProfile.MARK_CHANNEL, channel);
         normalized.addProperty(ContentProfile.MARK_DELIVERY, ContentProfile.DELIVERY_REMOTE);
         normalized.addProperty(ContentProfile.MARK_DISPLAY_CATEGORY, resolveDisplayCategory(type, assetName));
-        String runtimeModel = resolveRuntimeModel(type, assetName, releaseTag, sourceRepo, sourceLabel);
+        String runtimeModel = resolveRuntimeModel(type, assetName, releaseTag, sourceRepo, sourceLabel, descriptionPrefix);
         if (!runtimeModel.isEmpty()) normalized.addProperty(ContentProfile.MARK_RUNTIME_MODEL, runtimeModel);
         normalized.addProperty(ContentProfile.MARK_SOURCE_REPO, sourceRepo);
         normalized.addProperty(ContentProfile.MARK_SOURCE_FEED, sourceFeedId);

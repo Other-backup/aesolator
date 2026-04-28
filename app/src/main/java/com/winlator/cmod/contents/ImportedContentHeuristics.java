@@ -24,7 +24,7 @@ final class ImportedContentHeuristics {
         if (remoteHint != null && remoteHint.type != null) return remoteHint.type;
         if (rootDir == null || !rootDir.isDirectory()) return null;
 
-        if (WineUtils.hasRuntimePayload(rootDir)) {
+        if (WineUtils.hasRuntimeCorePayload(rootDir)) {
             return surfaceLooksLikeProton(parsedProfile, remoteHint, importDisplayName)
                     ? ContentProfile.ContentType.CONTENT_TYPE_PROTON
                     : ContentProfile.ContentType.CONTENT_TYPE_WINE;

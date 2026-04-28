@@ -937,20 +937,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "rootfs_payload_prepare_deferred_to_bootstrap_executor",
                 ForensicLogger.fields("imagefs_root", imageFs.getRootDir().getAbsolutePath())
         );
-        File devInputDir = new File(imageFs.getRootDir(), "dev/input");
-        if (devInputDir.exists() || devInputDir.mkdirs()) {
-            for (int i = 0; i < 4; i++) {
-                File eventFile = new File(devInputDir, "event" + i);
-                if (eventFile.exists() && !eventFile.delete()) {
-                    Log.w("XServerDisplayActivity", "Failed to delete stale fake input node " + eventFile.getAbsolutePath());
-                }
-                File jsFile = new File(devInputDir, "js" + i);
-                if (jsFile.exists() && !jsFile.delete()) {
-                    Log.w("XServerDisplayActivity", "Failed to delete stale fake joystick node " + jsFile.getAbsolutePath());
-                }
-            }
-        }
-        winHandler.setFakeInputPath(devInputDir.getAbsolutePath());
+        prepareRootfsDevInputPath();
 
         String screenSize = Container.DEFAULT_SCREEN_SIZE;
         containerManager = new ContainerManager(this);
@@ -1013,7 +1000,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 resolveIntentLaunchRouteToken(launchIntent),
                 resolveIntentTemporaryOverrideAppId(launchIntent)
         );
-        bindActiveContainerState(container);
 
         if (shortcutPath != null && !shortcutPath.isEmpty()) {
             shortcut = new Shortcut(container, new File(shortcutPath));
@@ -1036,6 +1022,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String requestedWineVersion = resolveLaunchWineVersion();
         effectiveRuntimeModel = resolveLaunchRuntimeModel(requestedWineVersion);
         String wineVersion = resolveEffectiveLaunchWineVersion(requestedWineVersion, effectiveRuntimeModel);
+        bindActiveContainerState(container, effectiveRuntimeModel, wineVersion);
+        prepareRootfsDevInputPath();
         if (ensureLaunchRootfsReady(wineVersion, effectiveRuntimeModel)) {
             return;
         }
@@ -1066,9 +1054,40 @@ public class XServerDisplayActivity extends AppCompatActivity {
             canonicalWineVersion = ContentsManager.getEntryName(selectedRuntimeProfile);
         }
         persistResolvedLaunchRuntime(requestedWineVersion, canonicalWineVersion, effectiveRuntimeModel);
+        bindActiveContainerState(container, effectiveRuntimeModel, canonicalWineVersion);
+        prepareRootfsDevInputPath();
         wineInfo = WineInfo.fromIdentifier(this, contentsManager, canonicalWineVersion, effectiveRuntimeModel);
-
-        imageFs.setWinePath(wineInfo.path);
+        String wineInfoPathBeforeBind = wineInfo != null ? safeTrim(wineInfo.path) : "";
+        String launchWinePath = resolveLaunchRuntimeWinePath(wineInfo, selectedRuntimeProfile);
+        if (!launchWinePath.isEmpty()
+                && wineInfo != null
+                && !launchWinePath.equals(wineInfoPathBeforeBind)) {
+            wineInfo = new WineInfo(
+                    wineInfo.type,
+                    wineInfo.version,
+                    wineInfo.subversion,
+                    wineInfo.getArch(),
+                    launchWinePath
+            );
+        }
+        imageFs.setWinePath(!launchWinePath.isEmpty() ? launchWinePath : wineInfoPathBeforeBind);
+        logBootstrapCheckpoint(
+                "XSERVER_RUNTIME_WINE_PATH_BOUND",
+                "runtime_wine_path_bound_before_guest_bootstrap",
+                "requested_entry", safeTrim(requestedWineVersion),
+                "canonical_entry", safeTrim(canonicalWineVersion),
+                "runtime_model", safeTrim(effectiveRuntimeModel),
+                "runtime_profile", selectedRuntimeProfile != null ? ContentsManager.getEntryName(selectedRuntimeProfile) : "-",
+                "imagefs_root", imageFs.getRootDir().getAbsolutePath(),
+                "imagefs_root_name", imageFs.getRootDir().getName(),
+                "imagefs_root_is_active_alias", ImageFs.ACTIVE_ROOT_DIR_NAME.equals(imageFs.getRootDir().getName()) ? "1" : "0",
+                "active_root_alias", ImageFs.getActiveRootDir(this).getAbsolutePath(),
+                "active_root_alias_target", FileUtils.isSymlink(ImageFs.getActiveRootDir(this)) ? FileUtils.readSymlink(ImageFs.getActiveRootDir(this)) : "",
+                "wine_info_path_before", wineInfoPathBeforeBind,
+                "bound_wine_path", imageFs.getWinePath(),
+                "wine_info_path_rewritten", !safeTrim(wineInfo != null ? wineInfo.path : "").equals(wineInfoPathBeforeBind) ? "1" : "0",
+                "runtime_core_payload_present", WineUtils.hasRuntimeCorePayload(new File(imageFs.getWinePath())) ? "1" : "0"
+        );
 
         ForensicConfig.Snapshot requestedForensicSnapshot = ForensicConfig.load(this);
         ForensicConfig.Snapshot runtimeForensicSnapshot = resolveRuntimeForensicSnapshot(requestedForensicSnapshot);
@@ -1605,6 +1624,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String normalizedRequested = requestedWineVersion == null ? "" : requestedWineVersion.trim();
         String normalizedResolved = resolvedWineVersion == null ? "" : resolvedWineVersion.trim();
         String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
+        if (!shouldPersistResolvedLaunchRuntime(normalizedRequested, normalizedResolved)) {
+            ForensicLogger.logEvent(
+                    this,
+                    "warn",
+                    "XSERVER_RUNTIME_CANONICALIZE_PRESERVED_REQUESTED",
+                    null,
+                    "xserver",
+                    "explicit_runtime_selection_not_overwritten_by_fallback",
+                    ForensicLogger.fields(
+                            "requested_entry", normalizedRequested,
+                            "resolved_entry", normalizedResolved,
+                            "container_variant", container.getContainerVariant(),
+                            "runtime_model", normalizedRuntimeModel
+                    )
+            );
+            return;
+        }
         boolean changed = false;
 
         if (!normalizedResolved.isEmpty() && !normalizedResolved.equalsIgnoreCase(container.getWineVersion())) {
@@ -1636,6 +1672,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
     }
 
+    private boolean shouldPersistResolvedLaunchRuntime(String requestedWineVersion, String resolvedWineVersion) {
+        String normalizedRequested = requestedWineVersion == null ? "" : requestedWineVersion.trim();
+        String normalizedResolved = resolvedWineVersion == null ? "" : resolvedWineVersion.trim();
+        if (normalizedResolved.isEmpty()) return false;
+        if (normalizedRequested.isEmpty()) return true;
+        if (normalizedRequested.equalsIgnoreCase(normalizedResolved)) return true;
+        return WineInfo.isMainWineVersion(normalizedRequested);
+    }
+
     @Nullable
     private ContentProfile findPreferredMainWineRuntimeProfile(String runtimeModel) {
         ContentProfile proton = findPreferredLaunchRuntimeProfile(ContentProfile.ContentType.CONTENT_TYPE_PROTON, runtimeModel);
@@ -1645,7 +1690,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Nullable
     private ContentProfile findPreferredLaunchRuntimeProfile(@Nullable ContentProfile.ContentType preferredType, String runtimeModel) {
+        return findPreferredLaunchRuntimeProfile(preferredType, runtimeModel, "");
+    }
+
+    @Nullable
+    private ContentProfile findPreferredLaunchRuntimeProfile(@Nullable ContentProfile.ContentType preferredType,
+                                                            String runtimeModel,
+                                                            String requestedArch) {
         ContentProfile best = null;
+        String normalizedRequestedArch = normalizeRuntimeArchHint(requestedArch);
         for (ContentProfile.ContentType type : new ContentProfile.ContentType[] {
                 ContentProfile.ContentType.CONTENT_TYPE_PROTON,
                 ContentProfile.ContentType.CONTENT_TYPE_WINE
@@ -1659,6 +1712,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 boolean runtimeModelMatches = profile.isRuntimeModelCompatible(runtimeModel)
                         && (normalizedRuntimeModel.isEmpty() || normalizedRuntimeModel.equals(profile.getRuntimeModel()));
                 if (!runtimeModelMatches) {
+                    continue;
+                }
+                if (!normalizedRequestedArch.isEmpty()
+                        && !profile.matchesArchitectureFilter(normalizedRequestedArch)) {
                     continue;
                 }
                 best = pickPreferredLaunchRuntime(best, profile);
@@ -1710,7 +1767,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean ensureLaunchRootfsReady(String wineVersion, String runtimeModel) {
-        if (!ImageFsInstaller.isInstallRequired(this, container, runtimeModel)) {
+        if (!ImageFsInstaller.isInstallRequired(this, container, runtimeModel, wineVersion)) {
             return false;
         }
 
@@ -1749,6 +1806,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         getAssets(),
                         container,
                         runtimeModel,
+                        wineVersion,
                         progress -> runOnUiThread(() -> preloaderDialog.setProgress(progress))
                 ).get();
             } catch (Exception e) {
@@ -1794,20 +1852,74 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private boolean ensureSelectedRuntimeReady(String wineVersion, String runtimeModel) {
         ContentProfile launchProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
+        logRuntimeReadinessCheckpoint(
+                "XSERVER_RUNTIME_READY_CHECK",
+                "runtime_ready_check_before_guest_bootstrap",
+                wineVersion,
+                runtimeModel,
+                launchProfile
+        );
         final int launchGeneration = launchBindingGeneration;
         final Intent restartIntent = new Intent(getIntent());
         if (launchProfile == null) {
-            if (!shouldAttemptRemoteRuntimeBootstrap(wineVersion, runtimeModel)) {
+            boolean remoteBootstrapAllowed = shouldAttemptRemoteRuntimeBootstrap(wineVersion, runtimeModel);
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_PROFILE_ABSENT",
+                    "runtime_profile_absent_before_guest_bootstrap",
+                    "requested_entry", safeTrim(wineVersion),
+                    "runtime_model", safeTrim(runtimeModel),
+                    "remote_bootstrap_allowed", remoteBootstrapAllowed ? "1" : "0"
+            );
+            if (!remoteBootstrapAllowed) {
                 return false;
             }
             preloaderDialog.show(R.string.installing_content);
             Executors.newSingleThreadExecutor().execute(() -> {
+                logBootstrapCheckpoint(
+                        "XSERVER_RUNTIME_HYDRATE_BEGIN",
+                        "runtime_profile_hydration_begin",
+                        "requested_entry", safeTrim(wineVersion),
+                        "runtime_model", safeTrim(runtimeModel)
+                );
                 hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel);
                 ContentProfile hydratedProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
-                boolean ready = hydratedProfile != null && (isRuntimeProfileReady(hydratedProfile)
-                        || (hydratedProfile.isRemoteDownloadable() && installRemoteRuntimeProfile(hydratedProfile)));
+                boolean hydratedReady = isRuntimeProfileReady(hydratedProfile);
+                boolean installedFromRemote = false;
+                if (!hydratedReady && hydratedProfile != null && hydratedProfile.isRemoteDownloadable()) {
+                    logBootstrapCheckpoint(
+                            "XSERVER_RUNTIME_REMOTE_INSTALL_BEGIN",
+                            "runtime_remote_install_begin_after_hydration",
+                            "requested_entry", safeTrim(wineVersion),
+                            "runtime_model", safeTrim(runtimeModel),
+                            "profile_entry", ContentsManager.getEntryName(hydratedProfile)
+                    );
+                    installedFromRemote = installRemoteRuntimeProfile(hydratedProfile);
+                    hydratedReady = installedFromRemote && isRuntimeProfileReady(hydratedProfile);
+                }
+                boolean ready = hydratedProfile != null && hydratedReady;
+                logRuntimeReadinessCheckpoint(
+                        "XSERVER_RUNTIME_HYDRATE_RESULT",
+                        "runtime_profile_hydration_result",
+                        wineVersion,
+                        runtimeModel,
+                        hydratedProfile
+                );
+                logBootstrapCheckpoint(
+                        "XSERVER_RUNTIME_GATE_RESULT",
+                        "runtime_gate_result_after_hydration",
+                        "requested_entry", safeTrim(wineVersion),
+                        "runtime_model", safeTrim(runtimeModel),
+                        "ready", ready ? "1" : "0",
+                        "installed_from_remote", installedFromRemote ? "1" : "0"
+                );
                 runOnUiThread(() -> {
                     if (!isLaunchBindingCurrent(launchGeneration)) {
+                        logBootstrapCheckpoint(
+                                "XSERVER_RUNTIME_GATE_STALE",
+                                "runtime_gate_result_ignored_for_stale_launch_binding",
+                                "requested_entry", safeTrim(wineVersion),
+                                "runtime_model", safeTrim(runtimeModel)
+                        );
                         preloaderDialog.closeOnUiThread();
                         return;
                     }
@@ -1825,6 +1937,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return true;
         }
         if (isRuntimeProfileReady(launchProfile)) {
+            logRuntimeReadinessCheckpoint(
+                    "XSERVER_RUNTIME_READY",
+                    "runtime_profile_ready_before_guest_bootstrap",
+                    wineVersion,
+                    runtimeModel,
+                    launchProfile
+            );
             return false;
         }
         if (!launchProfile.isRemoteDownloadable()) {
@@ -1849,14 +1968,43 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         preloaderDialog.show(R.string.installing_content);
         Executors.newSingleThreadExecutor().execute(() -> {
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_INSTALL_BEGIN",
+                    "runtime_remote_install_begin",
+                    "requested_entry", safeTrim(wineVersion),
+                    "runtime_model", safeTrim(runtimeModel),
+                    "profile_entry", ContentsManager.getEntryName(launchProfile)
+            );
             boolean installed = installRemoteRuntimeProfile(launchProfile);
+            boolean ready = installed && isRuntimeProfileReady(launchProfile);
+            logRuntimeReadinessCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_INSTALL_RESULT",
+                    "runtime_remote_install_result",
+                    wineVersion,
+                    runtimeModel,
+                    launchProfile
+            );
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_GATE_RESULT",
+                    "runtime_gate_result_after_remote_install",
+                    "requested_entry", safeTrim(wineVersion),
+                    "runtime_model", safeTrim(runtimeModel),
+                    "installed", installed ? "1" : "0",
+                    "ready", ready ? "1" : "0"
+            );
             runOnUiThread(() -> {
                 if (!isLaunchBindingCurrent(launchGeneration)) {
+                    logBootstrapCheckpoint(
+                            "XSERVER_RUNTIME_GATE_STALE",
+                            "runtime_gate_result_ignored_for_stale_launch_binding",
+                            "requested_entry", safeTrim(wineVersion),
+                            "runtime_model", safeTrim(runtimeModel)
+                    );
                     preloaderDialog.closeOnUiThread();
                     return;
                 }
                 preloaderDialog.closeOnUiThread();
-                if (!installed) {
+                if (!ready) {
                     AppUtils.showToast(this, R.string.unable_to_install_content);
                     finish();
                     return;
@@ -1867,6 +2015,40 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         });
         return true;
+    }
+
+    private void logRuntimeReadinessCheckpoint(String eventId,
+                                               String message,
+                                               String wineVersion,
+                                               String runtimeModel,
+                                               @Nullable ContentProfile profile) {
+        ContentsManager.InstalledProfileDiagnostics diagnostics = profile != null
+                ? contentsManager.resolveInstalledProfileDiagnostics(profile)
+                : null;
+        logBootstrapCheckpoint(
+                eventId,
+                message,
+                "requested_entry", safeTrim(wineVersion),
+                "runtime_model", safeTrim(runtimeModel),
+                "profile_present", profile != null ? "1" : "0",
+                "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : "-",
+                "profile_type", profile != null && profile.type != null ? profile.type.toString() : "-",
+                "profile_runtime_model", profile != null ? profile.getRuntimeModel() : "-",
+                "profile_remote_downloadable", profile != null && profile.isRemoteDownloadable() ? "1" : "0",
+                "profile_remote_url_present", profile != null && !safeTrim(profile.remoteUrl).isEmpty() ? "1" : "0",
+                "state_present", diagnostics != null && diagnostics.state.present ? "1" : "0",
+                "state_usable", diagnostics != null && diagnostics.state.usable ? "1" : "0",
+                "broken_reason", diagnostics != null && !diagnostics.state.brokenReason.isEmpty()
+                        ? diagnostics.state.brokenReason
+                        : "-",
+                "expected_install_root", diagnostics != null ? diagnostics.canonicalInstallDir : "-",
+                "resolved_install_root", diagnostics != null ? diagnostics.resolvedInstallDir : "-",
+                "runtime_root", diagnostics != null ? diagnostics.runtimeRoot : "-",
+                "profile_json_present", diagnostics != null && diagnostics.profileJsonPresent ? "1" : "0",
+                "runtime_root_present", diagnostics != null && diagnostics.runtimeRootPresent ? "1" : "0",
+                "runtime_payload_present", diagnostics != null && diagnostics.runtimePayloadPresent ? "1" : "0",
+                "alias_resolved", diagnostics != null && diagnostics.aliasResolved ? "1" : "0"
+        );
     }
 
     private boolean shouldAttemptRemoteRuntimeBootstrap(String wineVersion, String runtimeModel) {
@@ -1912,7 +2094,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         ContentProfile.ContentType preferredType = wineVersion != null && wineVersion.toLowerCase(Locale.US).startsWith("proton-")
                 ? ContentProfile.ContentType.CONTENT_TYPE_PROTON
                 : ContentProfile.ContentType.CONTENT_TYPE_WINE;
-        ContentProfile fallback = findPreferredLaunchRuntimeProfile(preferredType, runtimeModel);
+        String requestedArch = resolveRuntimeArchHintFromEntry(wineVersion);
+        ContentProfile fallback = findPreferredLaunchRuntimeProfile(preferredType, runtimeModel, requestedArch);
         if (fallback != null) {
             ForensicLogger.logEvent(
                     this,
@@ -1930,6 +2113,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
             );
         }
         return fallback;
+    }
+
+    private String resolveRuntimeArchHintFromEntry(String entryName) {
+        String lower = entryName == null ? "" : entryName.trim().toLowerCase(Locale.US);
+        if (lower.contains("arm64ec") || lower.contains("arm64-ec")) return "arm64ec";
+        if (lower.contains("x86_64") || lower.contains("x86-64") || lower.contains("amd64")) return "x86_64";
+        if (lower.contains("arm64") || lower.contains("aarch64")) return "arm64";
+        if (lower.contains("x86")) return "x86";
+        return "";
+    }
+
+    private String normalizeRuntimeArchHint(String arch) {
+        String lower = arch == null ? "" : arch.trim().toLowerCase(Locale.US);
+        if (lower.equals("amd64") || lower.equals("x64") || lower.equals("x86-64")) return "x86_64";
+        if (lower.equals("arm64-ec")) return "arm64ec";
+        return lower;
     }
 
     private void hydrateLaunchRuntimeProfiles(String wineVersion, String runtimeModel) {
@@ -1980,6 +2179,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean installRemoteRuntimeProfile(ContentProfile remoteProfile) {
         File downloadDir = new File(getCacheDir(), "contents-runtime-downloads");
         if (!downloadDir.exists() && !downloadDir.mkdirs()) {
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_CACHE_DIR_FAILED",
+                    "runtime_remote_payload_cache_dir_failed",
+                    "profile_entry", remoteProfile != null ? ContentsManager.getEntryName(remoteProfile) : "-",
+                    "download_dir", downloadDir.getAbsolutePath()
+            );
             return false;
         }
 
@@ -1995,18 +2200,117 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? ".wcp"
                 : ".pkg";
         File payloadFile = new File(downloadDir, ContentsManager.getEntryName(remoteProfile) + suffix);
-        boolean downloaded = ContentPayloadResolver.materialize(getApplicationContext(), remoteProfile, payloadFile);
-        if (!downloaded || !payloadFile.isFile()) {
+        long cachedPayloadBytes = payloadFile.isFile() ? payloadFile.length() : 0L;
+        boolean materialized = cachedPayloadBytes > 0L
+                || ContentPayloadResolver.materialize(getApplicationContext(), remoteProfile, payloadFile);
+        logBootstrapCheckpoint(
+                cachedPayloadBytes > 0L
+                        ? "XSERVER_RUNTIME_REMOTE_PAYLOAD_CACHE_HIT"
+                        : "XSERVER_RUNTIME_REMOTE_PAYLOAD_MATERIALIZE_RESULT",
+                cachedPayloadBytes > 0L
+                        ? "runtime_remote_payload_cache_hit"
+                        : "runtime_remote_payload_materialize_result",
+                "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                "remote_url_present", remoteProfile != null && remoteProfile.remoteUrl != null && !remoteProfile.remoteUrl.trim().isEmpty() ? "1" : "0",
+                "payload_file", payloadFile.getAbsolutePath(),
+                "cached_bytes", cachedPayloadBytes,
+                "payload_bytes", payloadFile.isFile() ? payloadFile.length() : 0L,
+                "materialized", materialized ? "1" : "0",
+                "part_bytes", new File(payloadFile.getAbsolutePath() + ".part").isFile()
+                        ? new File(payloadFile.getAbsolutePath() + ".part").length()
+                        : 0L
+        );
+        if (!materialized || !payloadFile.isFile()) {
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_MATERIALIZE_FAILED",
+                    "runtime_remote_payload_materialize_failed",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "payload_file", payloadFile.getAbsolutePath(),
+                    "payload_exists", payloadFile.isFile() ? "1" : "0",
+                    "payload_bytes", payloadFile.isFile() ? payloadFile.length() : 0L
+            );
             return false;
         }
 
+        RuntimePayloadInstallResult installResult = installMaterializedRuntimePayload(remoteProfile, payloadFile);
+        if (!installResult.success && cachedPayloadBytes > 0L && "extract".equals(installResult.failureStage)) {
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_CACHE_REJECTED",
+                    "runtime_remote_payload_cache_rejected_before_redownload",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "payload_file", payloadFile.getAbsolutePath(),
+                    "cached_bytes", cachedPayloadBytes
+            );
+            FileUtils.delete(payloadFile);
+            boolean redownloaded = ContentPayloadResolver.materialize(getApplicationContext(), remoteProfile, payloadFile);
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_REDOWNLOAD_RESULT",
+                    "runtime_remote_payload_redownload_result",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "payload_file", payloadFile.getAbsolutePath(),
+                    "payload_bytes", payloadFile.isFile() ? payloadFile.length() : 0L,
+                    "redownloaded", redownloaded ? "1" : "0"
+            );
+            if (redownloaded && payloadFile.isFile()) {
+                installResult = installMaterializedRuntimePayload(remoteProfile, payloadFile);
+            }
+        }
+
+        if (!installResult.success) {
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_INSTALL_FAILED",
+                    "runtime_remote_install_failed",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "failure_stage", installResult.failureStage,
+                    "payload_file", payloadFile.getAbsolutePath(),
+                    "payload_bytes", payloadFile.isFile() ? payloadFile.length() : 0L
+            );
+            return false;
+        }
+
+        contentsManager.syncContents();
+        ContentProfile installedProfile = contentsManager.resolveBestRuntimeProfile(ContentsManager.getEntryName(remoteProfile), remoteProfile.getRuntimeModel());
+        boolean ready = isRuntimeProfileReady(installedProfile != null ? installedProfile : remoteProfile);
+        logBootstrapCheckpoint(
+                "XSERVER_RUNTIME_REMOTE_INSTALL_READY_CHECK",
+                "runtime_remote_install_ready_check",
+                "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                "installed_profile_entry", installedProfile != null ? ContentsManager.getEntryName(installedProfile) : "-",
+                "ready", ready ? "1" : "0"
+        );
+        return ready;
+    }
+
+    private static final class RuntimePayloadInstallResult {
+        final boolean success;
+        final String failureStage;
+
+        private RuntimePayloadInstallResult(boolean success, String failureStage) {
+            this.success = success;
+            this.failureStage = failureStage == null ? "" : failureStage;
+        }
+
+        static RuntimePayloadInstallResult success() {
+            return new RuntimePayloadInstallResult(true, "");
+        }
+
+        static RuntimePayloadInstallResult failure(String failureStage) {
+            return new RuntimePayloadInstallResult(false, failureStage);
+        }
+    }
+
+    private RuntimePayloadInstallResult installMaterializedRuntimePayload(ContentProfile remoteProfile, File payloadFile) {
         final ContentProfile[] extractedProfile = new ContentProfile[1];
         final boolean[] installSucceeded = new boolean[1];
+        final String[] failureReason = new String[] { "" };
+        final String[] failureDetail = new String[] { "" };
 
         contentsManager.extraContentFile(Uri.fromFile(payloadFile), remoteProfile, new ContentsManager.OnInstallFinishedCallback() {
             @Override
             public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
                 installSucceeded[0] = false;
+                failureReason[0] = reason != null ? reason.name() : "";
+                failureDetail[0] = e != null ? e.getClass().getName() + ":" + e.getMessage() : "";
             }
 
             @Override
@@ -2016,14 +2320,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         });
         if (!installSucceeded[0] || extractedProfile[0] == null) {
-            return false;
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_EXTRACT_FAILED",
+                    "runtime_remote_payload_extract_failed",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "payload_file", payloadFile != null ? payloadFile.getAbsolutePath() : "",
+                    "reason", failureReason[0],
+                    "detail", failureDetail[0]
+            );
+            return RuntimePayloadInstallResult.failure("extract");
         }
 
         installSucceeded[0] = false;
+        failureReason[0] = "";
+        failureDetail[0] = "";
         contentsManager.finishInstallContent(extractedProfile[0], new ContentsManager.OnInstallFinishedCallback() {
             @Override
             public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
                 installSucceeded[0] = false;
+                failureReason[0] = reason != null ? reason.name() : "";
+                failureDetail[0] = e != null ? e.getClass().getName() + ":" + e.getMessage() : "";
             }
 
             @Override
@@ -2032,12 +2348,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         });
         if (!installSucceeded[0]) {
-            return false;
+            logBootstrapCheckpoint(
+                    "XSERVER_RUNTIME_REMOTE_PAYLOAD_FINISH_FAILED",
+                    "runtime_remote_payload_finish_failed",
+                    "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                    "extracted_profile_entry", extractedProfile[0] != null ? ContentsManager.getEntryName(extractedProfile[0]) : "-",
+                    "payload_file", payloadFile != null ? payloadFile.getAbsolutePath() : "",
+                    "reason", failureReason[0],
+                    "detail", failureDetail[0]
+            );
+            return RuntimePayloadInstallResult.failure("finish");
         }
 
-        contentsManager.syncContents();
-        ContentProfile installed = contentsManager.resolveBestRuntimeProfile(ContentsManager.getEntryName(remoteProfile), remoteProfile.getRuntimeModel());
-        return isRuntimeProfileReady(installed != null ? installed : remoteProfile);
+        logBootstrapCheckpoint(
+                "XSERVER_RUNTIME_REMOTE_PAYLOAD_INSTALLED",
+                "runtime_remote_payload_installed",
+                "profile_entry", ContentsManager.getEntryName(remoteProfile),
+                "extracted_profile_entry", extractedProfile[0] != null ? ContentsManager.getEntryName(extractedProfile[0]) : "-"
+        );
+        return RuntimePayloadInstallResult.success();
     }
 
     private String normalizeSha256(String value) {
@@ -5963,7 +6292,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return false;
         }
 
-        bindActiveContainerState(container);
+        bindActiveContainerState(container, effectiveRuntimeModel, resolveActiveRuntimeIdentity());
+        prepareRootfsDevInputPath();
 
         int detachedPid = guestProgramLauncherComponent.launchDetachedGuestProgram(
                 normalizedExecutable,
@@ -7453,7 +7783,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         pendingBootstrapRunnable = null;
         guestBootstrapSubmitted = true;
         bootstrapWaitingForFocus = false;
-        bindActiveContainerState(container);
+        bindActiveContainerState(container, effectiveRuntimeModel, resolveActiveRuntimeIdentity());
+        prepareRootfsDevInputPath();
         if (hasRealWindowFocus) {
             logBootstrapCheckpoint(
                     "XSERVER_BOOTSTRAP_FOCUS_GATE_PASSED",
@@ -7640,10 +7971,98 @@ public class XServerDisplayActivity extends AppCompatActivity {
         overridePendingTransition(0, 0);
     }
 
-    private void bindActiveContainerState(@Nullable Container targetContainer) {
+    private void bindActiveContainerState(@Nullable Container targetContainer, @Nullable String runtimeModel, @Nullable String runtimeIdentity) {
         if (targetContainer == null || containerManager == null || imageFs == null) return;
-        containerManager.activateContainer(targetContainer);
+        String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
+        if (normalizedRuntimeModel.isEmpty()) {
+            normalizedRuntimeModel = ContainerManager.resolveContainerRuntimeModel(targetContainer);
+        }
+        String normalizedRuntimeIdentity = runtimeIdentity == null || runtimeIdentity.trim().isEmpty()
+                ? ContainerManager.resolveContainerRuntimeIdentity(targetContainer)
+                : runtimeIdentity.trim();
+        imageFs = ImageFs.find(this, normalizedRuntimeModel, normalizedRuntimeIdentity);
+        ImageFs.ensureContainerHomeForRuntime(this, targetContainer.id, targetContainer.getRootDir(), normalizedRuntimeModel, normalizedRuntimeIdentity);
+        ContainerManager.activateContainerHome(new File(imageFs.getRootDir(), "home"), targetContainer);
         imageFs.setHomeDir(targetContainer.getRootDir());
+    }
+
+    private String resolveLaunchRuntimeWinePath(@Nullable WineInfo resolvedWineInfo,
+                                                @Nullable ContentProfile runtimeProfile) {
+        File profileRoot = resolveProfileRuntimeRoot(runtimeProfile);
+        if (profileRoot != null) return profileRoot.getPath();
+
+        String wineInfoPath = resolvedWineInfo != null ? safeTrim(resolvedWineInfo.path) : "";
+        if (!wineInfoPath.isEmpty()) {
+            File wineInfoRoot = WineUtils.resolveCanonicalRuntimeRoot(new File(wineInfoPath));
+            if (wineInfoRoot != null && WineUtils.hasRuntimeCorePayload(wineInfoRoot)) {
+                return wineInfoRoot.getPath();
+            }
+        }
+        return wineInfoPath;
+    }
+
+    @Nullable
+    private File resolveProfileRuntimeRoot(@Nullable ContentProfile runtimeProfile) {
+        if (runtimeProfile == null
+                || contentsManager == null
+                || !runtimeProfile.isWineProtonFamily()
+                || !contentsManager.isInstalledProfileUsable(runtimeProfile)) {
+            return null;
+        }
+
+        File runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(contentsManager.getRuntimeRootDir(runtimeProfile));
+        if (runtimeRoot != null && WineUtils.hasRuntimeCorePayload(runtimeRoot)) {
+            return runtimeRoot;
+        }
+
+        ContentsManager.InstalledProfileDiagnostics diagnostics =
+                contentsManager.resolveInstalledProfileDiagnostics(runtimeProfile);
+        if (diagnostics.runtimePayloadPresent && !safeTrim(diagnostics.runtimeRoot).equals("-")) {
+            runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(new File(diagnostics.runtimeRoot));
+            if (runtimeRoot != null && WineUtils.hasRuntimeCorePayload(runtimeRoot)) {
+                return runtimeRoot;
+            }
+        }
+        return null;
+    }
+
+    private String resolveActiveRuntimeIdentity() {
+        if (selectedRuntimeProfile != null) {
+            return ContentsManager.getEntryName(selectedRuntimeProfile);
+        }
+        if (wineInfo != null) {
+            return wineInfo.identifier();
+        }
+        String requestedWineVersion = resolveLaunchWineVersion();
+        return resolveEffectiveLaunchWineVersion(requestedWineVersion, effectiveRuntimeModel);
+    }
+
+    private void prepareRootfsDevInputPath() {
+        if (imageFs == null || winHandler == null) return;
+        if (ImageFs.ACTIVE_ROOT_DIR_NAME.equals(imageFs.getRootDir().getName())) {
+            logBootstrapCheckpoint(
+                    "XSERVER_ROOTFS_DEV_INPUT_ALIAS_SKIPPED",
+                    "rootfs_dev_input_prepare_skipped_until_runtime_root_bound",
+                    "imagefs_root", imageFs.getRootDir().getAbsolutePath(),
+                    "active_root_alias", ImageFs.getActiveRootDir(this).getAbsolutePath(),
+                    "active_root_alias_target", FileUtils.isSymlink(ImageFs.getActiveRootDir(this)) ? FileUtils.readSymlink(ImageFs.getActiveRootDir(this)) : ""
+            );
+            return;
+        }
+        File devInputDir = new File(imageFs.getRootDir(), "dev/input");
+        if (devInputDir.exists() || devInputDir.mkdirs()) {
+            for (int i = 0; i < 4; i++) {
+                File eventFile = new File(devInputDir, "event" + i);
+                if (eventFile.exists() && !eventFile.delete()) {
+                    Log.w("XServerDisplayActivity", "Failed to delete stale fake input node " + eventFile.getAbsolutePath());
+                }
+                File jsFile = new File(devInputDir, "js" + i);
+                if (jsFile.exists() && !jsFile.delete()) {
+                    Log.w("XServerDisplayActivity", "Failed to delete stale fake joystick node " + jsFile.getAbsolutePath());
+                }
+            }
+        }
+        winHandler.setFakeInputPath(devInputDir.getAbsolutePath());
     }
 
     private String normalizeRequestedVulkanApi(String raw) {

@@ -64,6 +64,45 @@ public class WineInfoTest {
         assertEquals("arm64ec", getParsedField(parsed, "arch"));
     }
 
+    @Test
+    public void parseIdentifierNormalizesAmd64Alias() throws Exception {
+        Object parsed = invokeParseIdentifier("wine-10.15-amd64");
+
+        assertNotNull(parsed);
+        assertEquals("wine", getParsedField(parsed, "type"));
+        assertEquals("10.15", getParsedField(parsed, "version"));
+        assertEquals("x86_64", getParsedField(parsed, "arch"));
+    }
+
+    @Test
+    public void parseIdentifierNormalizesAmd64AliasWithBuildStamp() throws Exception {
+        Object parsed = invokeParseIdentifier("wine-10.15-amd64-2026041211");
+
+        assertNotNull(parsed);
+        assertEquals("wine", getParsedField(parsed, "type"));
+        assertEquals("10.15-2026041211", getParsedField(parsed, "version"));
+        assertEquals("x86_64", getParsedField(parsed, "arch"));
+    }
+
+    @Test
+    public void parseProfileIdentifierNormalizesGlibcAmd64WineProfile() throws Exception {
+        ContentProfile profile = new ContentProfile();
+        profile.type = ContentProfile.ContentType.CONTENT_TYPE_WINE;
+        profile.verName = "wine-10.15-amd64";
+        profile.runtimeModel = ContentProfile.RUNTIME_MODEL_GLIBC;
+        profile.artifactName = "imagefs-runtime-glibc-wine-glibc-wine-10.15-amd64-2026041211";
+        profile.wineBinPath = "bin";
+        profile.wineLibPath = "lib";
+        profile.winePrefixPack = "prefixPack.txz";
+
+        Object parsed = invokeParseProfileIdentifier(profile);
+
+        assertNotNull(parsed);
+        assertEquals("wine", getParsedField(parsed, "type"));
+        assertEquals("10.15", getParsedField(parsed, "version"));
+        assertEquals("x86_64", getParsedField(parsed, "arch"));
+    }
+
     private static Object invokeParseProfileIdentifier(ContentProfile profile) throws Exception {
         Method method = WineInfo.class.getDeclaredMethod("parseProfileIdentifier", ContentProfile.class);
         method.setAccessible(true);

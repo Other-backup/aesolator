@@ -51,7 +51,14 @@ public class ContainerManager {
         containers.clear();
         maxContainerId = 0;
 
-        File[] files = homeDir.listFiles();
+        for (File rootDir : ImageFs.getKnownRootDirs(context)) {
+            loadContainersFromHomeDir(new File(rootDir, "home"));
+        }
+    }
+
+    private void loadContainersFromHomeDir(File scanHomeDir) {
+        if (scanHomeDir == null) return;
+        File[] files = scanHomeDir.listFiles();
         if (files == null) return;
 
         for (File file : files) {
@@ -85,6 +92,10 @@ public class ContainerManager {
                 }
                 JSONObject data = new JSONObject(configContent);
                 container.loadData(data);
+                if (getContainerById(container.id) != null) {
+                    Log.d("ContainerManager", "Skipping duplicate container " + container.id + " from " + file.getAbsolutePath());
+                    continue;
+                }
                 containers.add(container);
                 maxContainerId = Math.max(maxContainerId, container.id);
             } catch (JSONException | NumberFormatException | NullPointerException e) {
@@ -194,7 +205,7 @@ public class ContainerManager {
             ContentProfile profile = manager.readProfile(profileFile);
             if (profile == null || profile.type != type) continue;
             File runtimeRoot = WineUtils.resolveCanonicalRuntimeRoot(installRoot);
-            if (runtimeRoot == null || !WineUtils.hasRuntimePayload(runtimeRoot)) continue;
+            if (runtimeRoot == null || !WineUtils.hasRuntimeCorePayload(runtimeRoot)) continue;
             String dirName = installRoot.getName();
             int dashIndex = dirName.lastIndexOf('-');
             if (dashIndex <= 0 || dashIndex >= dirName.length() - 1) continue;
@@ -232,7 +243,25 @@ public class ContainerManager {
 
 
     public void activateContainer(Container container) {
-        activateContainerHome(homeDir, container);
+        if (container == null) return;
+        String runtimeModel = resolveContainerRuntimeModel(container);
+        String runtimeIdentity = resolveContainerRuntimeIdentity(container);
+        ImageFs.ensureActiveRuntimeRoot(context, runtimeModel, runtimeIdentity);
+        ImageFs.ensureContainerHomeForRuntime(context, container.id, container.getRootDir(), runtimeModel, runtimeIdentity);
+        activateContainerHome(new File(ImageFs.find(context, runtimeModel, runtimeIdentity).getRootDir(), "home"), container);
+    }
+
+    public static String resolveContainerRuntimeModel(Container container) {
+        if (container == null) return ContentProfile.RUNTIME_MODEL_BIONIC;
+        String entry = ContentProfile.inferRuntimeModelFromEntryName(container.getWineVersion());
+        if (!entry.isEmpty()) return entry;
+        String variant = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        return variant.isEmpty() ? ContentProfile.RUNTIME_MODEL_BIONIC : variant;
+    }
+
+    public static String resolveContainerRuntimeIdentity(Container container) {
+        if (container == null || container.getWineVersion() == null) return "";
+        return container.getWineVersion().trim();
     }
 
     public static File resolveContainerHomeDir(File homeDir, int containerId) {
@@ -322,7 +351,12 @@ public class ContainerManager {
                     )
             );
 
-            File containerDir = new File(homeDir, ImageFs.USER+"-"+id);
+            String requestedRuntimeModel = ContentProfile.inferRuntimeModelFromEntryName(requestedWineVersion);
+            if (requestedRuntimeModel.isEmpty()) {
+                requestedRuntimeModel = ContentProfile.normalizeRuntimeModel(requestedVariant);
+            }
+            File targetHomeDir = new File(ImageFs.find(context, requestedRuntimeModel, requestedWineVersion).getRootDir(), "home");
+            File containerDir = new File(targetHomeDir, ImageFs.USER+"-"+id);
             if (!containerDir.mkdirs()) {
                 ForensicLogger.logEvent(
                         context,
@@ -414,7 +448,10 @@ public class ContainerManager {
     private void duplicateContainer(Container srcContainer) {
         int id = maxContainerId + 1;
 
-        File dstDir = new File(homeDir, ImageFs.USER + "-" + id);
+        String runtimeModel = resolveContainerRuntimeModel(srcContainer);
+        String runtimeIdentity = resolveContainerRuntimeIdentity(srcContainer);
+        File targetHomeDir = new File(ImageFs.find(context, runtimeModel, runtimeIdentity).getRootDir(), "home");
+        File dstDir = new File(targetHomeDir, ImageFs.USER + "-" + id);
         if (!dstDir.mkdirs()) return;
 
         // Use the refactored copy method that doesn't require a Context for File operations
@@ -566,6 +603,7 @@ public class ContainerManager {
                         "resolved_arch", wineInfo.getArch(),
                         "resolved_path", wineInfo.path == null ? "" : wineInfo.path,
                         "runtime_root_exists", runtimeRoot != null && runtimeRoot.isDirectory(),
+                        "runtime_core_payload_present", runtimeRoot != null && WineUtils.hasRuntimeCorePayload(runtimeRoot),
                         "runtime_payload_complete", runtimeRoot != null && WineUtils.hasRuntimePayload(runtimeRoot)
                 )
         );

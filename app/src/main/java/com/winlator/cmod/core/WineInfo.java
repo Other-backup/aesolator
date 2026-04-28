@@ -20,10 +20,11 @@ import java.util.regex.Pattern;
 
 public class WineInfo implements Parcelable {
     public static final WineInfo MAIN_WINE_VERSION = new WineInfo("wine","11.1", "arm64ec");
-    private static final Pattern strictPattern = Pattern.compile("^(wine|proton)\\-([0-9\\.]+)\\-?([0-9\\.]+)?\\-(x86|x86_64|arm64|arm64ec)$");
-    private static final Pattern flexiblePattern = Pattern.compile("^(wine|proton)\\-(.+?)\\-(x86|x86_64|arm64|arm64ec)(?:\\-(.+))?$");
-    private static final Pattern archSuffixPattern = Pattern.compile("\\-(x86|x86_64|arm64|arm64ec)$");
-    private static final Pattern versionArchSuffixPattern = Pattern.compile(".*\\-(x86|x86_64|arm64|arm64ec)$");
+    private static final String ARCH_TOKEN_PATTERN = "(x86_64|x86-64|amd64|x64|arm64ec|arm64-ec|aarch64|arm64|x86)";
+    private static final Pattern strictPattern = Pattern.compile("^(wine|proton)\\-([0-9\\.]+)\\-?([0-9\\.]+)?\\-" + ARCH_TOKEN_PATTERN + "$");
+    private static final Pattern flexiblePattern = Pattern.compile("^(wine|proton)\\-(.+?)\\-" + ARCH_TOKEN_PATTERN + "(?:\\-(.+))?$");
+    private static final Pattern archSuffixPattern = Pattern.compile("\\-" + ARCH_TOKEN_PATTERN + "$");
+    private static final Pattern versionArchSuffixPattern = Pattern.compile(".*\\-" + ARCH_TOKEN_PATTERN + "$");
     public final String version;
     public final String type;
     public String subversion;
@@ -200,7 +201,7 @@ public class WineInfo implements Parcelable {
         File runtimeRoot = contentsManager.getRuntimeRootDir(profile);
         File resolvedRoot = runtimeRoot != null ? runtimeRoot : contentsManager.getInstallDir(context, profile);
         File canonicalRoot = WineUtils.resolveCanonicalRuntimeRoot(resolvedRoot);
-        return canonicalRoot != null && WineUtils.hasRuntimePayload(canonicalRoot) ? canonicalRoot.getPath() : "";
+        return canonicalRoot != null && WineUtils.hasRuntimeCorePayload(canonicalRoot) ? canonicalRoot.getPath() : "";
     }
 
     private static String resolveInstalledRuntimeRootFallback(Context context, ContentsManager contentsManager, ContentProfile profile) {
@@ -243,7 +244,7 @@ public class WineInfo implements Parcelable {
     private static String resolveOptRuntimePath(ImageFs imageFs, String runtimeToken) {
         if (imageFs == null || runtimeToken == null || runtimeToken.trim().isEmpty()) return "";
         File candidate = WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "opt/" + runtimeToken.trim()));
-        return candidate != null && WineUtils.hasRuntimePayload(candidate) ? candidate.getPath() : "";
+        return candidate != null && WineUtils.hasRuntimeCorePayload(candidate) ? candidate.getPath() : "";
     }
 
     public static boolean isMainWineVersion(String wineVersion) {
@@ -262,7 +263,7 @@ public class WineInfo implements Parcelable {
             return new ParsedIdentifier(
                     strictMatcher.group(1),
                     appendVersionSuffix(strictMatcher.group(2), strictMatcher.group(3)),
-                    strictMatcher.group(4)
+                    normalizeArchitectureToken(strictMatcher.group(4))
             );
         }
 
@@ -270,7 +271,11 @@ public class WineInfo implements Parcelable {
         if (flexibleMatcher.matches()) {
             String version = appendVersionSuffix(flexibleMatcher.group(2), flexibleMatcher.group(4));
             if (!version.isEmpty()) {
-                return new ParsedIdentifier(flexibleMatcher.group(1), version, flexibleMatcher.group(3));
+                return new ParsedIdentifier(
+                        flexibleMatcher.group(1),
+                        version,
+                        normalizeArchitectureToken(flexibleMatcher.group(3))
+                );
             }
         }
 
@@ -279,7 +284,7 @@ public class WineInfo implements Parcelable {
             return null;
         }
 
-        String arch = archMatcher.group(1);
+        String arch = normalizeArchitectureToken(archMatcher.group(1));
         String base = normalized.substring(0, archMatcher.start());
         String type;
         String version;
@@ -307,6 +312,15 @@ public class WineInfo implements Parcelable {
         }
 
         return new ParsedIdentifier(type, version, arch);
+    }
+
+    private static String normalizeArchitectureToken(String arch) {
+        if (arch == null) return "";
+        String normalized = arch.trim().toLowerCase(Locale.ENGLISH);
+        if (normalized.equals("x86-64") || normalized.equals("amd64") || normalized.equals("x64")) return "x86_64";
+        if (normalized.equals("arm64-ec")) return "arm64ec";
+        if (normalized.equals("aarch64")) return "arm64";
+        return normalized;
     }
 
     private static String appendVersionSuffix(String base, String suffix) {
@@ -374,14 +388,25 @@ public class WineInfo implements Parcelable {
         }
 
         String normalizedArch = archTag.trim().toLowerCase(Locale.ENGLISH);
-        cleaned = cleaned.replace("-" + normalizedArch + "-", "-");
-        if (cleaned.endsWith("-" + normalizedArch)) {
-            cleaned = cleaned.substring(0, cleaned.length() - normalizedArch.length() - 1);
-        }
-        if (cleaned.startsWith(normalizedArch + "-")) {
-            cleaned = cleaned.substring(normalizedArch.length() + 1);
+        for (String alias : architectureAliases(normalizedArch)) {
+            cleaned = cleaned.replace("-" + alias + "-", "-");
+            if (cleaned.endsWith("-" + alias)) {
+                cleaned = cleaned.substring(0, cleaned.length() - alias.length() - 1);
+            }
+            if (cleaned.startsWith(alias + "-")) {
+                cleaned = cleaned.substring(alias.length() + 1);
+            }
         }
         return cleaned.replaceAll("--+", "-").replaceAll("^-+", "").replaceAll("-+$", "");
+    }
+
+    private static String[] architectureAliases(String archTag) {
+        String normalized = normalizeArchitectureToken(archTag);
+        if ("x86_64".equals(normalized)) return new String[] {"x86_64", "x86-64", "amd64", "x64"};
+        if ("arm64ec".equals(normalized)) return new String[] {"arm64ec", "arm64-ec"};
+        if ("arm64".equals(normalized)) return new String[] {"aarch64", "arm64"};
+        if ("x86".equals(normalized)) return new String[] {"x86"};
+        return new String[] {archTag};
     }
 
     private static String stripEntryVersionCodeSuffix(String identifier) {

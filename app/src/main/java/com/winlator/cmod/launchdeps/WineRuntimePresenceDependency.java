@@ -53,13 +53,14 @@ final class WineRuntimePresenceDependency implements LaunchDependency {
             return hasValidProfileLayout(context, manager, profile);
         }
 
-        File fallbackOptPath = WineUtils.resolveCanonicalRuntimeRoot(new File(ImageFs.find(context).getRootDir(), "opt/" + canonicalEntry));
+        ImageFs imageFs = ImageFs.find(context, requestedRuntimeModel, canonicalEntry);
+        File fallbackOptPath = WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getRootDir(), "opt/" + canonicalEntry));
         if (fallbackOptPath.isDirectory()) {
-            return WineUtils.hasRuntimePayload(fallbackOptPath);
+            return WineUtils.hasRuntimeCorePayload(fallbackOptPath);
         }
 
-        File mainOptPath = ImageFs.find(context).getMainWineDir();
-        if (WineUtils.hasRuntimePayload(mainOptPath)) {
+        File mainOptPath = imageFs.getMainWineDir();
+        if (WineUtils.hasRuntimeCorePayload(mainOptPath)) {
             if (!WineInfo.isMainWineVersion(canonicalEntry)) {
                 Log.w(TAG, "Custom runtime missing, falling back to canonical main wine: " + canonicalEntry);
             }
