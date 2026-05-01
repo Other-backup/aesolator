@@ -1500,3 +1500,19 @@ Reflective result from the latest clean-session batch:
   - native CMake builds `libaero_native_xz.so`;
   - targeted unit tests plus `:app:assembleDebug` are green;
   - APK proof confirms the native runtime libraries are packaged.
+
+### 2026-05-01 browser migration + context restoration baseline
+
+- Source continuity is now restored from local split archives:
+  `backup.zip.001..003` and `rollout.zip.001..011` were reassembled and
+  unpacked into `.ingest/backup` and `.ingest/rollout` for deterministic
+  replay of rules, history, and operating context.
+- Build/release source policy is reaffirmed for the new lane:
+  fresh runtime builds are consumed from `wcp-runtime-lanes` GitHub releases
+  rather than local CLI-era assumptions.
+- Device proof policy is updated for the current workflow:
+  autonomous install + user-sent forensic bundles without `adb` is now the
+  default proof intake until explicit `adb` restoration.
+- Immediate next lane:
+  wait for the next fresh forensic package, then run one strict closure loop:
+  forensic correlation -> code-path audit -> source remediation -> docs sync.

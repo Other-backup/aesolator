@@ -667,9 +667,9 @@ public class ForensicCenterFragment extends Fragment {
         Context context = getContext();
         if (context == null) return;
 
-        String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
-        File outFile = ForensicLogger.createExportFile(context, String.format(Locale.US, "forensics_%s.jsonl", ts));
-        String exportBody = ForensicLogger.buildExportBody(context, latestFile, tail);
+        String day = DateFormat.format("yyyy-MM-dd", new Date()).toString();
+        File outFile = ForensicLogger.createExportFile(context, String.format(Locale.US, "forensics_session_%s.jsonl", day));
+        String exportBody = ForensicLogger.buildExportBodyForDay(context, latestFile, tail, day);
         if (!FileUtils.writeString(outFile, exportBody)) {
             AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
             return;

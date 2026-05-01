@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -303,7 +304,7 @@ public final class ForensicLogger {
 
     public static File createExportFile(Context context, String fileName) {
         String safeName = fileName == null || fileName.trim().isEmpty()
-                ? "forensics_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".jsonl"
+                ? "forensics_session_" + DateFormat.format("yyyy-MM-dd", new Date()) + ".jsonl"
                 : fileName.trim();
         for (ForensicSink sink : getForensicSinks(context)) {
             File dir = new File(sink.dir, "exports");
@@ -319,7 +320,15 @@ public final class ForensicLogger {
     }
 
     public static String buildExportBody(Context context, File preferredFile, String fallbackTail) {
+        return buildExportBodyForDay(context, preferredFile, fallbackTail, DateFormat.format("yyyy-MM-dd", new Date()).toString());
+    }
+
+    public static String buildExportBodyForDay(Context context, File preferredFile, String fallbackTail, String dayKey) {
         ArrayList<File> files = getForensicLogFiles(context);
+        if (dayKey != null && !dayKey.trim().isEmpty()) {
+            String normalizedDay = dayKey.trim();
+            files.removeIf(file -> file == null || !isForensicFileForDay(file, normalizedDay));
+        }
         if (preferredFile != null && preferredFile.isFile()) {
             String preferredPath = preferredFile.getAbsolutePath();
             files.removeIf(file -> preferredPath.equals(file.getAbsolutePath()));
@@ -343,6 +352,19 @@ public final class ForensicLogger {
             }
         }
         return out.toString().trim();
+    }
+
+    private static boolean isForensicFileForDay(File file, String dayKey) {
+        if (file == null || dayKey == null || dayKey.isEmpty()) return false;
+        String name = file.getName();
+        if (name.contains(dayKey)) return true;
+        Calendar fileCal = Calendar.getInstance();
+        fileCal.setTimeInMillis(file.lastModified());
+        String fileDay = String.format(Locale.US, "%04d-%02d-%02d",
+                fileCal.get(Calendar.YEAR),
+                fileCal.get(Calendar.MONTH) + 1,
+                fileCal.get(Calendar.DAY_OF_MONTH));
+        return dayKey.equals(fileDay);
     }
 
     public static String describeLatestTrace(Context context) {
