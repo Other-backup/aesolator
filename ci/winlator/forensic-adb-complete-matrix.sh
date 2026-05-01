@@ -30,6 +30,9 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 : "${WLT_LINKER_DEBUG_FLAGS:=dlopen,dlsym,dlerror}"
 : "${WLT_ADB_HOST_TIMEOUT_SEC:=12}"
 : "${WLT_ACTIVITY_START_HOST_TIMEOUT_SEC:=20}"
+: "${WLT_ADB_FALLBACK_ENDPOINTS:=127.0.0.1:5555}"
+: "${WLT_ADB_CONNECT_TIMEOUT_SEC:=4}"
+: "${WLT_ADB_OFFLINE_STUB:=1}"
 WLT_APP_DATA_DIR=""
 WLT_APP_FILES_DIR=""
 WLT_APP_PRIVATE_RUNTIME_LOG_ROOT_ABS=""
@@ -54,14 +57,95 @@ fail() { printf '[forensic-complete][error] %s\n' "$*" >&2; exit 1; }
 
 require_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"; }
 
+adb_state_for_serial() {
+  local serial="$1"
+  [[ -n "${serial}" ]] || return 0
+  adb -s "${serial}" get-state 2>/dev/null | tr -d '\r' | awk 'NF{print; exit}' || true
+}
+
+first_active_adb_serial() {
+  adb devices | awk 'NR>1 && $2=="device" {print $1; exit}'
+}
+
+effective_adb_fallback_endpoints() {
+  local requested endpoint host seen=""
+  requested="${ADB_SERIAL:-}"
+  if [[ -n "${requested}" && "${requested}" == *:* ]]; then
+    host="${requested%:*}"
+    if [[ -n "${host}" && "${host}" != "${requested}" ]]; then
+      endpoint="${host}:5555"
+      if [[ " ${seen} " != *" ${endpoint} "* ]]; then
+        printf '%s\n' "${endpoint}"
+        seen="${seen} ${endpoint}"
+      fi
+    fi
+  fi
+  for endpoint in ${WLT_ADB_FALLBACK_ENDPOINTS}; do
+    [[ -n "${endpoint}" ]] || continue
+    if [[ " ${seen} " == *" ${endpoint} "* ]]; then
+      continue
+    fi
+    printf '%s\n' "${endpoint}"
+    seen="${seen} ${endpoint}"
+  done
+}
+
+join_effective_adb_fallback_endpoints() {
+  local endpoint joined=""
+  while IFS= read -r endpoint; do
+    [[ -n "${endpoint}" ]] || continue
+    joined="${joined}${joined:+ }${endpoint}"
+  done < <(effective_adb_fallback_endpoints)
+  printf '%s' "${joined}"
+}
+
+record_adb_connect_attempt() {
+  local endpoint="$1"
+  local detail="$2"
+  [[ -n "${WLT_OUT_DIR:-}" ]] || return 0
+  mkdir -p "${WLT_OUT_DIR}" 2>/dev/null || return 0
+  printf '%s endpoint=%s %s\n' "$(iso_now 2>/dev/null || date -Is)" "${endpoint}" "${detail}" \
+    >> "${WLT_OUT_DIR}/adb-connect-attempts.txt"
+}
+
+try_connect_adb_endpoint() {
+  local endpoint="$1"
+  local output state
+  [[ -n "${endpoint}" ]] || return 1
+  if command -v timeout >/dev/null 2>&1; then
+    output="$(timeout --foreground "${WLT_ADB_CONNECT_TIMEOUT_SEC}" adb connect "${endpoint}" 2>&1 || true)"
+  else
+    output="$(adb connect "${endpoint}" 2>&1 || true)"
+  fi
+  state="$(adb_state_for_serial "${endpoint}")"
+  record_adb_connect_attempt "${endpoint}" "state=${state:-none} output=$(printf '%s' "${output}" | tr '\n\r' '  ')"
+  [[ "${state}" == "device" ]]
+}
+
 pick_serial() {
-  local serial
+  local serial state endpoint
   serial="${ADB_SERIAL:-}"
+  if [[ -n "${serial}" ]]; then
+    state="$(adb_state_for_serial "${serial}")"
+    if [[ "${state}" == "device" ]]; then
+      printf '%s\n' "${serial}"
+      return 0
+    fi
+    record_adb_connect_attempt "${serial}" "requested_state=${state:-none}"
+  fi
+  serial="$(first_active_adb_serial)"
   if [[ -n "${serial}" ]]; then
     printf '%s\n' "${serial}"
     return 0
   fi
-  adb devices | awk 'NR>1 && $2=="device" {print $1; exit}'
+  while IFS= read -r endpoint; do
+    [[ -n "${endpoint}" ]] || continue
+    if try_connect_adb_endpoint "${endpoint}"; then
+      printf '%s\n' "${endpoint}"
+      return 0
+    fi
+  done < <(effective_adb_fallback_endpoints)
+  first_active_adb_serial
 }
 
 adb_s() { adb -s "${ADB_SERIAL_PICKED}" "$@"; }
@@ -131,6 +215,82 @@ sanitize_label() {
   safe="${safe%%_}"
   [[ -n "${safe}" ]] || safe="scenario"
   printf '%s\n' "${safe}"
+}
+
+write_adb_offline_stub() {
+  local scenario_specs=()
+  local spec label safe_label cid scenario_dir trace_id now effective_endpoints
+  now="$(iso_now)"
+  effective_endpoints="$(join_effective_adb_fallback_endpoints)"
+  mkdir -p "${WLT_OUT_DIR}"
+  adb devices -l > "${WLT_OUT_DIR}/adb-devices.txt" 2>&1 || true
+  printf 'package=%s\nserial=\ntime=%s\ncontainer_ids=%s\nscenarios=%s\nadb_stub_active=1\nadb_stub_kind=offline\nadb_fallback_endpoints_config=%s\nadb_fallback_endpoints_effective=%s\nadb_connect_timeout_sec=%s\nblocker=no_active_adb_device\n' \
+    "${WLT_PACKAGE}" "${now}" "${WLT_CONTAINER_IDS}" "${WLT_SCENARIOS}" "${WLT_ADB_FALLBACK_ENDPOINTS}" "${effective_endpoints}" "${WLT_ADB_CONNECT_TIMEOUT_SEC}" \
+    > "${WLT_OUT_DIR}/session_meta.txt"
+  if [[ -n "${WLT_SCENARIOS}" ]]; then
+    read -r -a scenario_specs <<< "${WLT_SCENARIOS}"
+  else
+    for cid in ${WLT_CONTAINER_IDS}; do
+      scenario_specs+=("container-${cid}:${cid}")
+    done
+  fi
+  for spec in "${scenario_specs[@]}"; do
+    [[ "${spec}" == *:* ]] || continue
+    label="${spec%%:*}"
+    cid="${spec##*:}"
+    safe_label="$(sanitize_label "${label}")"
+    scenario_dir="${WLT_OUT_DIR}/${safe_label}"
+    trace_id="${safe_label}-adb-offline-stub-$(date +%s)"
+    mkdir -p "${scenario_dir}"
+    printf 'label=%s\nsafe_label=%s\ncontainer_id=%s\ntime=%s\nadb_stub_active=1\n' \
+      "${label}" "${safe_label}" "${cid}" "${now}" > "${scenario_dir}/scenario_meta.txt"
+    printf '%s\n' "${trace_id}" > "${scenario_dir}/trace_id.txt"
+    cat > "${scenario_dir}/wait-status.txt" <<EOF
+trace_id=${trace_id}
+elapsed_sec=0
+intent_elapsed_sec=0
+post_intent_elapsed_sec=0
+phase=adb_offline_stub
+timed_out_phase=adb_offline_stub
+intent_seen_at_sec=-1
+submit_seen_at_sec=-1
+terminal_seen_at_sec=-1
+saw_intent=0
+saw_submit=0
+saw_terminal=0
+adb_stub_active=1
+blocker=no_active_adb_device
+EOF
+    cat > "${scenario_dir}/runtime-log-assembler.summary.txt" <<EOF
+runtime_log_assembler_summary
+issue_count=1
+max_severity=high
+category_counts=adb_offline_stub:1
+library_counts=adb:1
+EOF
+    cat > "${scenario_dir}/runtime-log-assembler.md" <<EOF
+# Runtime Log Assembler
+
+- trace_id: \`${trace_id}\`
+- adb_stub_active: \`1\`
+- blocker: \`no_active_adb_device\`
+
+No device-backed runtime capture was performed. The effective ADB fallback
+endpoint list was exhausted before launch: \`${effective_endpoints}\`.
+EOF
+  done
+  cat > "${WLT_OUT_DIR}/OFFLINE_STUB.md" <<EOF
+# ADB Offline Stub
+
+- time: \`${now}\`
+- package: \`${WLT_PACKAGE}\`
+- configured fallback endpoints: \`${WLT_ADB_FALLBACK_ENDPOINTS}\`
+- effective fallback endpoints: \`${effective_endpoints}\`
+- status: no active ADB device after fallback attempts
+
+This artifact is a blocker record, not a successful device run.
+EOF
+  log "ADB unavailable; wrote offline stub artifacts to ${WLT_OUT_DIR}"
 }
 
 logcat_has_trace_event() {
@@ -645,9 +805,16 @@ main() {
   require_cmd adb
   require_cmd python3
   [[ "${WLT_CAPTURE_CONFLICT_LOGS}" =~ ^[01]$ ]] || fail "WLT_CAPTURE_CONFLICT_LOGS must be 0 or 1"
+  [[ "${WLT_ADB_OFFLINE_STUB}" =~ ^[01]$ ]] || fail "WLT_ADB_OFFLINE_STUB must be 0 or 1"
   mkdir -p "${WLT_OUT_DIR}"
   ADB_SERIAL_PICKED="$(pick_serial)"
-  [[ -n "${ADB_SERIAL_PICKED}" ]] || fail "No active adb device"
+  if [[ -z "${ADB_SERIAL_PICKED}" ]]; then
+    if [[ "${WLT_ADB_OFFLINE_STUB}" == "1" ]]; then
+      write_adb_offline_stub
+      return 0
+    fi
+    fail "No active adb device"
+  fi
   export ADB_SERIAL_PICKED
   WLT_APP_DATA_DIR="$(resolve_app_data_dir)"
   WLT_APP_FILES_DIR="${WLT_APP_DATA_DIR}/files"

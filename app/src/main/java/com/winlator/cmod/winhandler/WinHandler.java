@@ -59,6 +59,7 @@ public class WinHandler {
     private static final int BRING_TO_FRONT_NAME_BYTES = SEND_PACKET_SIZE - 1 - Integer.BYTES - Long.BYTES;
     private static final int MAX_CONTROLLERS = 4;
     private static final int OSC_DEVICE_ID = -1;
+    private static final int VIBRATION_SOCKET_BIND_RETRIES = 6;
     private static final Object VIBRATION_SOCKET_LOCK = new Object();
     private static WinHandler activeVibrationOwner;
     private static LocalServerSocket activeVibrationServer;
@@ -1249,7 +1250,7 @@ public class WinHandler {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 claimVibrationSocketOwnership();
-                vibrationServer = new LocalServerSocket("winlator_vibration");
+                vibrationServer = openVibrationServerWithRetry();
                 synchronized (VIBRATION_SOCKET_LOCK) {
                     activeVibrationOwner = this;
                     activeVibrationServer = vibrationServer;
@@ -1296,6 +1297,39 @@ public class WinHandler {
                 releaseVibrationSocketOwnership();
             }
         });
+    }
+
+    private LocalServerSocket openVibrationServerWithRetry() throws IOException {
+        IOException lastError = null;
+        for (int attempt = 0; attempt <= VIBRATION_SOCKET_BIND_RETRIES; attempt++) {
+            try {
+                return new LocalServerSocket("winlator_vibration");
+            } catch (IOException e) {
+                lastError = e;
+                if (!vibrationRunning || vibrationSuperseded || attempt == VIBRATION_SOCKET_BIND_RETRIES) break;
+                ForensicLogger.logEvent(
+                        activity,
+                        "info",
+                        "WINHANDLER_VIBRATION_BIND_RETRY",
+                        null,
+                        "input",
+                        "winhandler_vibration_bind_retry",
+                        ForensicLogger.fields(
+                                "attempt", attempt + 1,
+                                "max_retries", VIBRATION_SOCKET_BIND_RETRIES,
+                                "exception_class", e.getClass().getName(),
+                                "exception_detail", String.valueOf(e.getMessage())
+                        )
+                );
+                try {
+                    Thread.sleep(75L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        throw lastError != null ? lastError : new IOException("Unable to bind winlator_vibration");
     }
 
     private void claimVibrationSocketOwnership() {

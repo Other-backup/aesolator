@@ -205,6 +205,14 @@ public abstract class ProcessHelper {
     }
 
     public static int exec(String command, String[] envp, File workingDir, Callback<Integer> terminationCallback) {
+        return exec(command, envp, workingDir, terminationCallback, null);
+    }
+
+    public static int exec(String command,
+                           String[] envp,
+                           File workingDir,
+                           Callback<Integer> terminationCallback,
+                           Callback<String> streamCallback) {
         Log.d("ProcessHelper", "env: " + Arrays.toString(envp) + "\ncmd: " + command);
 
         // Store env vars for future use
@@ -213,6 +221,7 @@ public abstract class ProcessHelper {
         int pid = -1;
         boolean forensicMode = isForensicModeEnv(envp);
         int callbackCount = getDebugCallbackCount();
+        boolean processStreamCapture = streamCallback != null;
         boolean nativeLifecycleReady = ensureNativeLifecycleAvailable();
         String[] splitCommand = new String[0];
         try {
@@ -223,11 +232,12 @@ public abstract class ProcessHelper {
             ProcessBuilder pb = new ProcessBuilder(splitCommand);
             pb.directory(workingDir);
             pb.environment().putAll(EnvironmentManager.getEnvVars());
-            if (callbackCount == 0 && !forensicMode) {
+            if (callbackCount == 0 && !forensicMode && !processStreamCapture) {
                 File null_file = new File("/dev/null");
                 pb.redirectError(null_file);
                 pb.redirectOutput(null_file);
             }
+            boolean streamCapture = callbackCount > 0 || forensicMode || processStreamCapture;
             ForensicLogger.logEvent(
                     ForensicLogger.getAppContext(),
                     "info",
@@ -240,7 +250,8 @@ public abstract class ProcessHelper {
                             "working_dir", workingDir != null ? workingDir.getAbsolutePath() : "",
                             "forensic_mode", forensicMode ? "1" : "0",
                             "debug_callback_count", callbackCount,
-                            "stream_capture", (callbackCount > 0 || forensicMode) ? "1" : "0",
+                            "process_stream_capture", processStreamCapture ? "1" : "0",
+                            "stream_capture", streamCapture ? "1" : "0",
                             "native_lifecycle_ready", nativeLifecycleReady ? "1" : "0",
                             "env_hash", hashEnvp(envp)
                     )
@@ -266,13 +277,14 @@ public abstract class ProcessHelper {
                             "command", command,
                             "forensic_mode", forensicMode ? "1" : "0",
                             "debug_callback_count", callbackCount,
-                            "stream_capture", (callbackCount > 0 || forensicMode) ? "1" : "0"
+                            "process_stream_capture", processStreamCapture ? "1" : "0",
+                            "stream_capture", streamCapture ? "1" : "0"
                     )
             );
 
-            if (callbackCount > 0 || forensicMode) {
-                createDebugThread(process.getInputStream());
-                createDebugThread(process.getErrorStream());
+            if (streamCapture) {
+                createDebugThread(process.getInputStream(), streamCallback);
+                createDebugThread(process.getErrorStream(), streamCallback);
             }
 
             if (terminationCallback != null) createWaitForThread(process, terminationCallback);
@@ -344,6 +356,10 @@ public abstract class ProcessHelper {
     }
 
     private static void createDebugThread(final InputStream inputStream) {
+        createDebugThread(inputStream, null);
+    }
+
+    private static void createDebugThread(final InputStream inputStream, final Callback<String> streamCallback) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
                 char[] readBuffer = new char[DEBUG_STREAM_READ_BUFFER_CHARS];
@@ -355,7 +371,7 @@ public abstract class ProcessHelper {
                         char ch = readBuffer[i];
                         if (ch == '\r') continue;
                         if (ch == '\n') {
-                            if (!discardingOversizeLine) emitDebugLine(lineBuffer.toString());
+                            if (!discardingOversizeLine) emitDebugLine(lineBuffer.toString(), streamCallback);
                             lineBuffer.setLength(0);
                             discardingOversizeLine = false;
                             continue;
@@ -363,7 +379,7 @@ public abstract class ProcessHelper {
                         if (discardingOversizeLine) continue;
                         if (lineBuffer.length() >= DEBUG_STREAM_MAX_LINE_CHARS) {
                             lineBuffer.append(" [truncated:debug_stream_line_exceeded_").append(DEBUG_STREAM_MAX_LINE_CHARS).append("_chars]");
-                            emitDebugLine(lineBuffer.toString());
+                            emitDebugLine(lineBuffer.toString(), streamCallback);
                             lineBuffer.setLength(0);
                             discardingOversizeLine = true;
                             continue;
@@ -372,7 +388,7 @@ public abstract class ProcessHelper {
                     }
                 }
                 if (!discardingOversizeLine && lineBuffer.length() > 0) {
-                    emitDebugLine(lineBuffer.toString());
+                    emitDebugLine(lineBuffer.toString(), streamCallback);
                 }
             }
             catch (IOException e) {
@@ -382,7 +398,12 @@ public abstract class ProcessHelper {
     }
 
     private static void emitDebugLine(String line) {
+        emitDebugLine(line, null);
+    }
+
+    private static void emitDebugLine(String line, Callback<String> streamCallback) {
         if (PRINT_DEBUG) System.out.println(line);
+        if (streamCallback != null) streamCallback.call(line);
         synchronized (debugCallbacks) {
             if (!debugCallbacks.isEmpty()) {
                 for (Callback<String> callback : debugCallbacks) callback.call(line);

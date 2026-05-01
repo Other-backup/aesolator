@@ -21,6 +21,7 @@ public class Downloader {
     private static final int READ_TIMEOUT_MS = 120000;
     private static final int MAX_RETRIES = 4;
     private static final int BUFFER_SIZE = 64 * 1024;
+    private static final int HTTP_REQUESTED_RANGE_NOT_SATISFIABLE = 416;
     private static final String USER_AGENT =
             "Mozilla/5.0 (Android 14; Mobile; rv:124.0) Gecko/124.0 Ae.solator/ContentsDownloader";
 
@@ -90,7 +91,7 @@ public class Downloader {
                 boolean partialResponse = responseCode == HttpURLConnection.HTTP_PARTIAL;
                 boolean okResponse = responseCode == HttpURLConnection.HTTP_OK;
                 if (!partialResponse && !okResponse) {
-                    if (responseCode == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE
+                    if (responseCode == HTTP_REQUESTED_RANGE_NOT_SATISFIABLE
                             && resumeFrom > 0L
                             && finalizeDownload(partFile, file)) {
                         safeDelete(metaFile);

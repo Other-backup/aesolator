@@ -10,6 +10,7 @@ import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.WineRuntimeElfInterpreterSanitizer;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.core.FileUtils;
@@ -221,6 +222,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
 
     private void applyGlibcProotContract(Context context, ImageFs imageFs, File rootDir,
                                          EnvVars launchEnv, boolean directArm64EcGuest) {
+        sanitizeGlibcProotElfInterpreters(context, imageFs);
         GlibcProotContract contract = buildGlibcProotContract(imageFs, rootDir);
         if (launchEnv != null && contract.shouldUse) {
             launchEnv.put("PROOT_LOADER", contract.loaderPath);
@@ -254,6 +256,26 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "proot_no_seccomp_supported", false,
                         "root_path", contract.rootPath
                 )
+        );
+    }
+
+    private void sanitizeGlibcProotElfInterpreters(Context context, ImageFs imageFs) {
+        WineRuntimeElfInterpreterSanitizer.Result rootfsResult =
+                WineRuntimeElfInterpreterSanitizer.sanitizeRootfsCriticalSurface(imageFs);
+        WineRuntimeElfInterpreterSanitizer.logResult(
+                context,
+                "GLIBC_ROOTFS_ELF_INTERPRETER_REBIND",
+                rootfsResult,
+                imageFs != null ? imageFs.getRootDir() : null
+        );
+
+        WineRuntimeElfInterpreterSanitizer.Result runtimeResult =
+                WineRuntimeElfInterpreterSanitizer.sanitizeCurrentWineRuntime(imageFs);
+        WineRuntimeElfInterpreterSanitizer.logResult(
+                context,
+                "GLIBC_RUNTIME_ELF_INTERPRETER_REBIND",
+                runtimeResult,
+                imageFs != null ? WineUtils.resolveCanonicalRuntimeRoot(new File(imageFs.getWinePath())) : null
         );
     }
 

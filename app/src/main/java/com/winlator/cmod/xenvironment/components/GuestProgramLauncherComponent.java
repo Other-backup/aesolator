@@ -91,6 +91,39 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
     }
 
+    private static final class LaunchOutputRing {
+        private static final int MAX_LINES = 40;
+        private static final int MAX_CHARS = 8192;
+        private static final int MAX_LINE_CHARS = 2048;
+        private final ArrayList<String> lines = new ArrayList<>();
+        private int charCount = 0;
+
+        synchronized void add(String line) {
+            String value = line == null ? "" : line;
+            if (value.length() > MAX_LINE_CHARS) {
+                value = value.substring(0, MAX_LINE_CHARS) + " [truncated]";
+            }
+            lines.add(value);
+            charCount += value.length();
+            trim();
+        }
+
+        synchronized int lineCount() {
+            return lines.size();
+        }
+
+        synchronized String snapshot() {
+            return String.join("\n", lines);
+        }
+
+        private void trim() {
+            while (!lines.isEmpty() && (lines.size() > MAX_LINES || charCount > MAX_CHARS)) {
+                String removed = lines.remove(0);
+                charCount -= removed != null ? removed.length() : 0;
+            }
+        }
+    }
+
     public void setWineInfo(WineInfo wineInfo) {
         this.wineInfo = wineInfo;
     }
@@ -1353,7 +1386,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         );
 
         final String submittedGuestExecutable = guestExecutable != null ? guestExecutable : "";
-        return ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
+        final LaunchOutputRing launchOutput = new LaunchOutputRing();
+        int launchedPid = ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
+            String outputTail = launchOutput.snapshot();
             ForensicLogger.logEvent(
                     context,
                     resolveLaunchExitSeverity(status, trackPrimaryPid, desktopShellBootstrap),
@@ -1365,7 +1400,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "status", status,
                             "track_primary_pid", trackPrimaryPid,
                             "guest_executable", submittedGuestExecutable,
-                            "command", command
+                            "command", command,
+                            "output_tail_line_count", launchOutput.lineCount(),
+                            "output_tail_sha256", ForensicLogger.sha256Hex(outputTail),
+                            "output_tail", outputTail
                     )
             );
             if (trackPrimaryPid) {
@@ -1377,7 +1415,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             if (activeTerminationCallback != null) {
                 activeTerminationCallback.call(status);
             }
-        });
+        }, launchOutput::add);
+        return launchedPid;
     }
 
     private String resolveLaunchExitSeverity(int status, boolean trackPrimaryPid, boolean desktopShellBootstrap) {

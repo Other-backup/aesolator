@@ -9,6 +9,7 @@ import com.winlator.cmod.xserver.XClientRequestHandler;
 import com.winlator.cmod.xserver.XServer;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 
@@ -119,9 +120,34 @@ public class XServerComponent extends EnvironmentComponent {
 
         for (String abstractPath : abstractPaths) {
             if (abstractPath == null || abstractPath.trim().isEmpty()) continue;
+            if (!isAbstractSocketNameSafe(abstractPath)) {
+                logXServerTransportSkip(abstractPath);
+                continue;
+            }
             result.add(UnixSocketConfig.createAbstractSocket(abstractPath));
         }
         return result;
+    }
+
+    private static boolean isAbstractSocketNameSafe(String abstractPath) {
+        if (abstractPath == null) return false;
+        return abstractPath.getBytes(StandardCharsets.UTF_8).length <= 100;
+    }
+
+    private static void logXServerTransportSkip(String abstractPath) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XSERVER_ABSTRACT_TRANSPORT_SKIPPED",
+                null,
+                "xserver_transport",
+                "x11_abstract_transport_skipped",
+                ForensicLogger.fields(
+                        "abstract_socket", abstractPath == null ? "" : abstractPath,
+                        "path_bytes", abstractPath == null ? 0 : abstractPath.getBytes(StandardCharsets.UTF_8).length,
+                        "reason", "abstract_path_too_long_for_sockaddr"
+                )
+        );
     }
 
     private static String resolveRootPathFromX11Socket(String path) {

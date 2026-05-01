@@ -1395,6 +1395,10 @@ public class ContentsManager {
 
         for (File legacyRoot : buildPackageRuntimeLegacyCandidates(packageOptDir, requestedProfile)) {
             if (legacyRoot == null || !legacyRoot.isDirectory()) continue;
+            if (!isRuntimeRootModelCompatibleWithRequest(requestedProfile, legacyRoot)) {
+                logRuntimeModelRootMismatchSkipped(requestedProfile, legacyRoot, "package_legacy_candidate");
+                continue;
+            }
             ContentProfile materializedProfile = requestedProfile;
             repairWineFamilyProfile(legacyRoot, materializedProfile, requestedProfile, requestedProfile.artifactName);
             if (!hasResolvedRuntimePayload(legacyRoot, materializedProfile)) continue;
@@ -1539,6 +1543,52 @@ public class ContentsManager {
         return "";
     }
 
+    private boolean isRuntimeRootModelCompatibleWithRequest(@Nullable ContentProfile requestedProfile,
+                                                            @Nullable File root) {
+        if (requestedProfile == null || root == null) return true;
+        String requestedModel = ContentProfile.normalizeRuntimeModel(requestedProfile.getRuntimeModel());
+        if (requestedModel.isEmpty()) return true;
+        String rootModel = inferRuntimeModelFromRootPath(root);
+        return rootModel.isEmpty() || requestedModel.equals(rootModel);
+    }
+
+    private String inferRuntimeModelFromRootPath(@Nullable File root) {
+        if (root == null) return "";
+        String path = root.getAbsolutePath();
+        if (path == null) return "";
+        String lower = path.toLowerCase(Locale.US).replace('\\', '/');
+        String bionicPackagePrefix = "/" + ImageFs.PACKAGE_ROOT_PREFIX + ContentProfile.RUNTIME_MODEL_BIONIC + "-";
+        String glibcPackagePrefix = "/" + ImageFs.PACKAGE_ROOT_PREFIX + ContentProfile.RUNTIME_MODEL_GLIBC + "-";
+        if (lower.contains(bionicPackagePrefix) || lower.contains("/" + ImageFs.BIONIC_ROOT_DIR_NAME + "/")) {
+            return ContentProfile.RUNTIME_MODEL_BIONIC;
+        }
+        if (lower.contains(glibcPackagePrefix) || lower.contains("/" + ImageFs.GLIBC_ROOT_DIR_NAME + "/")) {
+            return ContentProfile.RUNTIME_MODEL_GLIBC;
+        }
+        return "";
+    }
+
+    private void logRuntimeModelRootMismatchSkipped(@Nullable ContentProfile requestedProfile,
+                                                    @Nullable File root,
+                                                    String phase) {
+        if (context == null || requestedProfile == null || root == null) return;
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "CONTENTS_RUNTIME_MODEL_ROOT_MISMATCH_SKIPPED",
+                null,
+                "contents",
+                "runtime_model_root_mismatch_skipped",
+                ForensicLogger.fields(
+                        "requested_entry", getEntryName(requestedProfile),
+                        "requested_runtime_model", requestedProfile.getRuntimeModel(),
+                        "root_runtime_model", inferRuntimeModelFromRootPath(root),
+                        "root_path", root.getAbsolutePath(),
+                        "phase", phase
+                )
+        );
+    }
+
     private String normalizeRuntimeArchHint(@Nullable String arch) {
         String lower = arch == null ? "" : arch.trim().toLowerCase(Locale.US);
         if (lower.equals("amd64") || lower.equals("x64") || lower.equals("x86-64")) return "x86_64";
@@ -1547,7 +1597,7 @@ public class ContentsManager {
         if (lower.contains("x86_64") || lower.contains("x86-64") || lower.contains("amd64")) return "x86_64";
         if (lower.contains("aarch64") || lower.contains("arm64")) return "arm64";
         if (lower.contains("x86")) return "x86";
-        return lower;
+        return "";
     }
 
     @Nullable
@@ -2748,6 +2798,10 @@ public class ContentsManager {
         for (File installRoot : installedRoots) {
             if (installRoot == null || !installRoot.isDirectory()) continue;
             scannedRoots++;
+            if (!isRuntimeRootModelCompatibleWithRequest(requestedProfile, installRoot)) {
+                logRuntimeModelRootMismatchSkipped(requestedProfile, installRoot, "installed_root_scan");
+                continue;
+            }
             File profileFile = new File(installRoot, PROFILE_NAME);
             if (!profileFile.isFile()) continue;
 
@@ -2791,7 +2845,10 @@ public class ContentsManager {
         if (requestedProfile == null || !requestedProfile.isWineProtonFamily()) return null;
         for (String key : buildInstalledRuntimeLookupKeys(requestedProfile)) {
             InstalledRuntimeRoot direct = installedRuntimeRootByKey.get(key);
-            if (direct != null) return direct;
+            if (direct != null) {
+                if (isRuntimeRootModelCompatibleWithRequest(requestedProfile, direct.installRoot)) return direct;
+                logRuntimeModelRootMismatchSkipped(requestedProfile, direct.installRoot, "registered_direct_lookup");
+            }
         }
 
         InstalledRuntimeRoot bestStrict = null;
@@ -2799,6 +2856,10 @@ public class ContentsManager {
         LinkedHashSet<InstalledRuntimeRoot> roots = new LinkedHashSet<>(installedRuntimeRootByKey.values());
         for (InstalledRuntimeRoot candidate : roots) {
             if (candidate == null || candidate.profile == null) continue;
+            if (!isRuntimeRootModelCompatibleWithRequest(requestedProfile, candidate.installRoot)) {
+                logRuntimeModelRootMismatchSkipped(requestedProfile, candidate.installRoot, "registered_equivalent_lookup");
+                continue;
+            }
             boolean strictMatch = ContentProfileIdentity.areEquivalentProfiles(candidate.profile, requestedProfile);
             boolean compatiblePayload = strictMatch
                     || ContentProfileIdentity.areRuntimePayloadCompatibleProfiles(candidate.profile, requestedProfile);

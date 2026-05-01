@@ -23,7 +23,7 @@ public final class WineRuntimeElfInterpreterSanitizer {
     private static final String TAG = "WineElfInterpSanitizer";
     private static final int MAX_SAMPLE_COUNT = 12;
     private static final String MARKER_NAME = ".aeso_elf_interpreter_sanitizer_version";
-    private static final String MARKER_VERSION = "1";
+    private static final String MARKER_VERSION = "3";
 
     private WineRuntimeElfInterpreterSanitizer() {
     }
@@ -283,6 +283,9 @@ public final class WineRuntimeElfInterpreterSanitizer {
         File rootDir = imageFs.getRootDir();
         if (rootDir == null) return "";
 
+        String donorRelativeTarget = resolveGuestAbsoluteTargetFromDonorInterpreter(rootDir, currentInterpreter);
+        if (!donorRelativeTarget.isEmpty()) return donorRelativeTarget;
+
         ArrayList<File> candidates = new ArrayList<>();
         if ("ld-linux-aarch64.so.1".equals(basename)) {
             candidates.add(new File(rootDir, "usr/lib/ld-linux-aarch64.so.1"));
@@ -305,9 +308,45 @@ public final class WineRuntimeElfInterpreterSanitizer {
         }
 
         for (File candidate : candidates) {
-            if (candidate.isFile()) return candidate.getAbsolutePath();
+            String guestAbsoluteTarget = toGuestAbsoluteTarget(rootDir, candidate);
+            if (!guestAbsoluteTarget.isEmpty()) return guestAbsoluteTarget;
         }
         return "";
+    }
+
+    private static String resolveGuestAbsoluteTargetFromDonorInterpreter(File rootDir, String currentInterpreter) {
+        if (rootDir == null || currentInterpreter == null) return "";
+        String normalized = currentInterpreter.trim().replace('\\', '/');
+        String[] anchors = new String[] {
+                "/proc/self/cwd/",
+                "/files/imagefs/",
+                "/files/imagefs-glibc/",
+                "/files/imagefs-bionic/"
+        };
+        for (String anchor : anchors) {
+            int index = normalized.indexOf(anchor);
+            if (index < 0) continue;
+            String relative = normalized.substring(index + anchor.length());
+            String target = toGuestAbsoluteTarget(rootDir, new File(rootDir, relative));
+            if (!target.isEmpty()) return target;
+        }
+        return "";
+    }
+
+    private static String toGuestAbsoluteTarget(File rootDir, File candidate) {
+        if (rootDir == null || candidate == null || !candidate.isFile()) return "";
+        try {
+            String relative = rootDir.toPath()
+                    .toAbsolutePath()
+                    .normalize()
+                    .relativize(candidate.toPath().toAbsolutePath().normalize())
+                    .toString()
+                    .replace(File.separatorChar, '/');
+            if (relative.isEmpty() || relative.startsWith("../")) return "";
+            return "/" + relative;
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     @Nullable

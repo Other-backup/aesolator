@@ -289,17 +289,35 @@ public final class ForensicLogger {
     }
 
     public static ArrayList<File> getForensicLogFiles(Context context) {
-        ArrayList<File> out = new ArrayList<>();
+        ArrayList<ForensicLogFileEntry> entries = new ArrayList<>();
         LinkedHashSet<String> seen = new LinkedHashSet<>();
         for (ForensicSink sink : getForensicSinks(context)) {
             File[] files = sink.dir.listFiles((d, name) -> name.endsWith(".jsonl"));
             if (files == null) continue;
             for (File file : files) {
-                if (seen.add(file.getAbsolutePath())) out.add(file);
+                if (seen.add(file.getAbsolutePath())) entries.add(new ForensicLogFileEntry(file));
             }
         }
-        out.sort((left, right) -> Long.compare(right.lastModified(), left.lastModified()));
+        entries.sort((left, right) -> {
+            int modifiedCompare = Long.compare(right.lastModified, left.lastModified);
+            if (modifiedCompare != 0) return modifiedCompare;
+            return left.path.compareTo(right.path);
+        });
+        ArrayList<File> out = new ArrayList<>(entries.size());
+        for (ForensicLogFileEntry entry : entries) out.add(entry.file);
         return out;
+    }
+
+    private static final class ForensicLogFileEntry {
+        final File file;
+        final long lastModified;
+        final String path;
+
+        ForensicLogFileEntry(File file) {
+            this.file = file;
+            this.lastModified = file != null ? file.lastModified() : 0L;
+            this.path = file != null ? file.getAbsolutePath() : "";
+        }
     }
 
     public static File createExportFile(Context context, String fileName) {
