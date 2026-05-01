@@ -52,7 +52,7 @@ public class UnixSocketConfig {
         File socketFile = guestSocketFile;
         boolean relocated = false;
 
-        if (isPathTooLongForSockaddr(socketFile.getPath())) {
+        if (shouldRelocateSocketPath(rootPath, normalizedRelativePath, socketFile.getPath())) {
             File shortRoot = buildShortSocketRoot(rootPath, normalizedRelativePath);
             ensureRootedSocketParents(shortRoot.getAbsolutePath(), normalizedRelativePath);
             socketFile = new File(shortRoot, normalizedRelativePath);
@@ -98,6 +98,15 @@ public class UnixSocketConfig {
     private static boolean isPathTooLongForSockaddr(String path) {
         if (path == null) return false;
         return path.getBytes(StandardCharsets.UTF_8).length > UNIX_SOCKET_PATH_SAFE_BYTES;
+    }
+
+    private static boolean shouldRelocateSocketPath(String rootPath, String normalizedRelativePath, String socketPath) {
+        if (isPathTooLongForSockaddr(socketPath)) return true;
+        if (rootPath == null || normalizedRelativePath == null) return false;
+
+        String normalizedRoot = rootPath.trim().replace('\\', '/');
+        if (!normalizedRoot.contains("/files/imagefs-runtime-")) return false;
+        return normalizedRelativePath.startsWith("tmp/");
     }
 
     private static File buildShortSocketRoot(String rootPath, String normalizedRelativePath) {
