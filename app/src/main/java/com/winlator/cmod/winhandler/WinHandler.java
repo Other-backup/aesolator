@@ -323,6 +323,11 @@ public class WinHandler {
     }
 
     public void listProcesses() {
+        if (!running) {
+            OnGetProcessInfoListener listener = onGetProcessInfoListener;
+            if (listener != null) listener.onGetProcessInfo(0, 0, null);
+            return;
+        }
         addAction(() -> {
             sendData.rewind();
             sendData.put(RequestCodes.LIST_PROCESSES);
@@ -417,6 +422,7 @@ public class WinHandler {
 
     private void addAction(Runnable action) {
         synchronized (actions) {
+            if (!running) return;
             actions.add(action);
             actions.notifyAll();
         }
@@ -470,6 +476,7 @@ public class WinHandler {
         gamepadClients.clear();
 
         synchronized (actions) {
+            actions.clear();
             actions.notifyAll();
         }
 
@@ -832,6 +839,7 @@ public class WinHandler {
     }
 
     public boolean onGenericMotionEvent(MotionEvent event) {
+        if (!running) return false;
         ExternalController controller = resolveController(event.getDeviceId());
         boolean handled = false;
         if (controller != null) {
@@ -859,6 +867,7 @@ public class WinHandler {
     }
 
     public boolean onKeyEvent(KeyEvent event) {
+        if (!running) return false;
         if (event.getKeyCode() == gyroTriggerButton) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (isToggleMode) {

@@ -67,6 +67,7 @@
     </string-array>
     <string-array name="graphics_feed_source_entries">
         <item>Ae.solator Archive (Recommended)</item>
+        <item>WinNative Turnip Drivers</item>
         <item>StevenMXZ Turnip CI</item>
         <item>GameNative Drivers</item>
         <item>whitebelyash Turnip CI</item>
@@ -74,6 +75,7 @@
     </string-array>
     <string-array name="graphics_feed_source_values">
         <item>ae_archive</item>
+        <item>winnative</item>
         <item>stevenmxz</item>
         <item>gamenative</item>
         <item>whitebelyash</item>

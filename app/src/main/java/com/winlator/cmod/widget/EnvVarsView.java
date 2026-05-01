@@ -46,6 +46,14 @@ public class EnvVarsView extends FrameLayout {
         {"WRAPPER_MAX_IMAGE_COUNT", "TEXT"},
         {"MESA_GL_VERSION_OVERRIDE", "TEXT"},
         {"PULSE_LATENCY_MSEC", "NUMBER"},
+        {"ANDROID_ALSA_LATENCY_MS", "NUMBER"},
+        {"ANDROID_ALSA_VOLUME", "DECIMAL"},
+        {"ANDROID_ALSA_BASS_BOOST", "DECIMAL"},
+        {"ANDROID_ALSA_PERFORMANCE_MODE", "SELECT", "low_latency", "none", "power_saving"},
+        {"WINNATIVE_ALSA_LATENCY_MS", "NUMBER"},
+        {"WINNATIVE_ALSA_VOLUME", "DECIMAL"},
+        {"WINNATIVE_ALSA_BASS_BOOST", "DECIMAL"},
+        {"WINNATIVE_ALSA_PERFORMANCE_MODE", "SELECT", "low_latency", "none", "power_saving"},
         {"WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER", "CHECKBOX", "0", "1"},
         {"WINE_NEW_MEDIASOURCE", "CHECKBOX", "0", "1"},
         {"GALLIUM_HUD", "SELECT_MULTIPLE", "simple", "fps", "frametime"}
@@ -253,11 +261,15 @@ public class EnvVarsView extends FrameLayout {
                 getValueCallback = () -> editText.getText().toString();
                 break;
             case "NUMBER":
+            case "DECIMAL":
             default:
                 EditText editTextNumber = itemView.findViewById(R.id.EditText);
                 editTextNumber.setVisibility(VISIBLE);
                 editTextNumber.setText(value);
                 if (type.equals("NUMBER")) editTextNumber.setInputType(InputType.TYPE_CLASS_NUMBER);
+                if (type.equals("DECIMAL")) {
+                    editTextNumber.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                }
                 applyDarkTheme(editTextNumber);
                 getValueCallback = () -> editTextNumber.getText().toString();
                 break;

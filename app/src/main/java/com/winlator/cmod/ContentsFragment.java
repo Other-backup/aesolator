@@ -73,6 +73,7 @@ public class ContentsFragment extends Fragment {
     private static final String SOURCE_MODE_GAMEHUB = "gamehub";
     private static final String SOURCE_MODE_NIGHTLIES = "nightlies";
     private static final String SOURCE_MODE_COMMUNITY = RuntimeFeedRegistry.SOURCE_MODE_COMMUNITY;
+    private static final String SOURCE_MODE_GAMENATIVE_PROTON = RuntimeFeedRegistry.SOURCE_MODE_GAMENATIVE_PROTON;
     private static final String SOURCE_MODE_ANDREVTO_PROTON = RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON;
     private static final int MAX_GAMEHUB_RELEASE_PAGES = 16;
     private static final int MAX_NIGHTLIES_RELEASE_PAGES = 16;
@@ -564,6 +565,7 @@ public class ContentsFragment extends Fragment {
             if (sourceRepo.contains("raw")) return 245;
             return 250;
         }
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equals(profileMode)) return 244;
         if (SOURCE_MODE_COMMUNITY.equals(profileMode)) return 225;
         if (SOURCE_MODE_WCPHUB.equals(profileMode)) return 200;
         return 50;
@@ -637,7 +639,8 @@ public class ContentsFragment extends Fragment {
                 changed = true;
             }
         }
-        if (SOURCE_MODE_ANDREVTO_PROTON.equalsIgnoreCase(sourceMode)
+        if ((SOURCE_MODE_GAMENATIVE_PROTON.equalsIgnoreCase(sourceMode)
+                || SOURCE_MODE_ANDREVTO_PROTON.equalsIgnoreCase(sourceMode))
                 && !"stable".equalsIgnoreCase(channelMode)) {
             channelMode = "stable";
             changed = true;
@@ -700,6 +703,8 @@ public class ContentsFragment extends Fragment {
             sourceScope = getString(R.string.contents_lane_scope_archive);
         } else if (SOURCE_MODE_COMMUNITY.equalsIgnoreCase(sourceMode)) {
             sourceScope = getString(R.string.contents_lane_scope_community);
+        } else if (SOURCE_MODE_GAMENATIVE_PROTON.equalsIgnoreCase(sourceMode)) {
+            sourceScope = getString(R.string.contents_lane_scope_gamenative_proton);
         } else if (SOURCE_MODE_ANDREVTO_PROTON.equalsIgnoreCase(sourceMode)) {
             sourceScope = getString(R.string.contents_lane_scope_andrevto_proton);
         } else if (SOURCE_MODE_NIGHTLIES.equalsIgnoreCase(sourceMode)) {
@@ -909,6 +914,7 @@ public class ContentsFragment extends Fragment {
             ordered.add(SOURCE_MODE_ARCHIVE);
             ordered.add(SOURCE_MODE_COMMUNITY);
             if (type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                ordered.add(SOURCE_MODE_GAMENATIVE_PROTON);
                 ordered.add(SOURCE_MODE_ANDREVTO_PROTON);
                 ordered.add(SOURCE_MODE_NIGHTLIES);
             }
@@ -932,6 +938,7 @@ public class ContentsFragment extends Fragment {
     private String getSourceEntryLabel(String sourceValue) {
         if (SOURCE_MODE_ARCHIVE.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_aesolator_mainline);
         if (SOURCE_MODE_COMMUNITY.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_community_feed);
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_gamenative_proton_feed);
         if (SOURCE_MODE_ANDREVTO_PROTON.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_andrevto_proton_feed);
         if (SOURCE_MODE_NIGHTLIES.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_nightlies_feed);
         if (SOURCE_MODE_GAMEHUB.equalsIgnoreCase(sourceValue)) return getString(R.string.contents_source_gamehub_feed);
@@ -1368,6 +1375,8 @@ public class ContentsFragment extends Fragment {
             manager.setArchiveRemoteProfiles(json);
         } else if (SOURCE_MODE_NIGHTLIES.equals(selectedSourceMode)) {
             manager.setNightliesRemoteProfiles(json);
+        } else if (SOURCE_MODE_GAMENATIVE_PROTON.equals(selectedSourceMode)) {
+            manager.setGameNativeProtonRemoteProfiles(json);
         } else if (SOURCE_MODE_ANDREVTO_PROTON.equals(selectedSourceMode)) {
             manager.setAndreVtoProtonRemoteProfiles(json);
         } else if (SOURCE_MODE_GAMEHUB.equals(selectedSourceMode)) {
@@ -1455,6 +1464,12 @@ public class ContentsFragment extends Fragment {
             return urls;
         }
         if (SOURCE_MODE_COMMUNITY.equals(selectedSourceMode)) {
+            for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getFeedsForSourceMode(selectedSourceMode, currentContentType)) {
+                urls.add(feed.url);
+            }
+            return urls;
+        }
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equals(selectedSourceMode)) {
             for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getFeedsForSourceMode(selectedSourceMode, currentContentType)) {
                 urls.add(feed.url);
             }
@@ -2120,6 +2135,7 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return getString(R.string.contents_package_remote_generic);
         String sourceMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_ARCHIVE.equals(sourceMode)) return getString(R.string.contents_source_aesolator);
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equals(sourceMode)) return getString(R.string.contents_source_gamenative_proton);
         if (SOURCE_MODE_ANDREVTO_PROTON.equals(sourceMode)) return getString(R.string.contents_source_andrevto_proton);
         if (SOURCE_MODE_COMMUNITY.equals(sourceMode)) {
             if (profile.sourceLabel != null && !profile.sourceLabel.trim().isEmpty()) {
@@ -2237,6 +2253,7 @@ public class ContentsFragment extends Fragment {
         if (profile == null) return "";
         String sourceMode = resolveProfileSourceMode(profile);
         if (SOURCE_MODE_COMMUNITY.equals(sourceMode)) return getString(R.string.contents_source_community_lane);
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equals(sourceMode)) return getString(R.string.contents_source_gamenative_proton_release_lane);
         if (SOURCE_MODE_ANDREVTO_PROTON.equals(sourceMode)) return getString(R.string.contents_source_andrevto_proton_release_lane);
         if (SOURCE_MODE_WCPHUB.equals(sourceMode)) return "";
         if (SOURCE_MODE_NIGHTLIES.equals(sourceMode)) return getString(R.string.contents_source_nightlies_release_lane);

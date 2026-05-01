@@ -97,4 +97,72 @@ public class RemoteFeedPayloadLoaderTest {
         assertTrue(result.payload.contains("\"sourceFeed\":\"andrevto-proton11\""));
         assertTrue(result.payload.contains("\"sha256\":\"sha256:c6a2b2bccb65db42ba39700ac1a3c124102732c4113592c4c22900273d68309a\""));
     }
+
+    @Test
+    public void gamenativeProtonWineReleasePayloadProvidesBionicWineAndProtonPackages() {
+        String releasesJson = "[" +
+                "{" +
+                "\"tag_name\":\"build-20260430-1-sdk35\"," +
+                "\"published_at\":\"2026-04-30T12:18:33Z\"," +
+                "\"assets\":[" +
+                "{" +
+                "\"name\":\"proton-10.0-4-arm64ec.wcp\"," +
+                "\"browser_download_url\":\"https://github.com/GameNative/proton-wine/releases/download/build-20260430-1-sdk35/proton-10.0-4-arm64ec.wcp\"" +
+                "}," +
+                "{" +
+                "\"name\":\"proton-wine-10.0-4-x86_64.wcp.xz\"," +
+                "\"browser_download_url\":\"https://github.com/GameNative/proton-wine/releases/download/build-20260430-1-sdk35/proton-wine-10.0-4-x86_64.wcp.xz\"" +
+                "}" +
+                "]" +
+                "}" +
+                "]";
+
+        RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNormalizedFeed(
+                RuntimeFeedRegistry.GAMENATIVE_PROTON_RELEASES_URL,
+                url -> new Downloader.StringResponse(url, 200, releasesJson, "", null)
+        );
+
+        assertTrue(result.payload, result.hasPayload());
+        assertTrue(result.payload.contains("\"type\":\"Proton\""));
+        assertTrue(result.payload.contains("proton-10.0-4-arm64ec.wcp"));
+        assertTrue(result.payload.contains("proton-wine-10.0-4-x86_64.wcp.xz"));
+        assertTrue(result.payload.contains("\"runtimeModel\":\"bionic\""));
+        assertTrue(result.payload.contains("\"sourceFeed\":\"gamenative-proton-wine\""));
+        assertTrue(result.payload.contains("\"sourceRepo\":\"GameNative/proton-wine Releases\""));
+    }
+
+    @Test
+    public void xnickBionicNightlyPayloadClassifiesTagOwnedComponents() {
+        String releasesJson = "[" +
+                "{" +
+                "\"tag_name\":\"dxvk-nightly-ec9111c0\"," +
+                "\"name\":\"DXVK Nightly ec9111c0\"," +
+                "\"published_at\":\"2026-05-01T04:50:50Z\"," +
+                "\"assets\":[{" +
+                "\"name\":\"2.7.1-gplasync-ec9111c0.wcp\"," +
+                "\"browser_download_url\":\"https://github.com/Xnick417x/Winlator-Bionic-Nightly-wcp/releases/download/dxvk-nightly-ec9111c0/2.7.1-gplasync-ec9111c0.wcp\"" +
+                "}]" +
+                "}," +
+                "{" +
+                "\"tag_name\":\"vk3dk-arm64ec-nightly-497357c0\"," +
+                "\"name\":\"Vk3dk arm64ec Nightly 497357c0\"," +
+                "\"published_at\":\"2026-05-01T04:38:44Z\"," +
+                "\"assets\":[{" +
+                "\"name\":\"Vk3dk-3.0b-arm64ec-497357c0.wcp\"," +
+                "\"browser_download_url\":\"https://github.com/Xnick417x/Winlator-Bionic-Nightly-wcp/releases/download/vk3dk-arm64ec-nightly-497357c0/Vk3dk-3.0b-arm64ec-497357c0.wcp\"" +
+                "}]" +
+                "}" +
+                "]";
+
+        RemoteFeedPayloadLoader.FeedLoadResult result = RemoteFeedPayloadLoader.loadNormalizedFeed(
+                RuntimeFeedRegistry.COMMUNITY_XNICK_BIONIC_RELEASES_URL,
+                url -> new Downloader.StringResponse(url, 200, releasesJson, "", null)
+        );
+
+        assertTrue(result.payload, result.hasPayload());
+        assertTrue(result.payload.contains("\"type\":\"DXVK\""));
+        assertTrue(result.payload.contains("\"type\":\"VKD3D\""));
+        assertTrue(result.payload.contains("\"sourceFeed\":\"community-xnick-bionic\""));
+        assertTrue(result.payload.contains("\"channel\":\"nightly\""));
+    }
 }

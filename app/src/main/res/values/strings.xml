@@ -925,6 +925,7 @@
     <string name="graphics_center_driver_feed_empty">No driver packages were found for the current source and release line.</string>
     <string name="graphics_center_driver_feed_loading">Loading driver releases...</string>
     <string name="graphics_feed_source_ae_archive">Ae.solator Archive (Recommended)</string>
+    <string name="graphics_feed_source_winnative">WinNative Turnip Drivers</string>
     <string name="graphics_feed_source_stevenmxz">StevenMXZ Turnip CI</string>
     <string name="graphics_feed_source_gamenative">GameNative Drivers</string>
     <string name="graphics_feed_source_whitebelyash">whitebelyash Turnip CI</string>
@@ -966,11 +967,13 @@
     <string name="contents_arch_selector">Architecture</string>
     <string name="contents_source_aesolator_mainline">WCP Archive</string>
     <string name="contents_source_nightlies_feed">Nightlies</string>
+    <string name="contents_source_gamenative_proton_feed">GameNative Proton 10</string>
     <string name="contents_source_andrevto_proton_feed">AndreVto Proton 11</string>
     <string name="contents_source_gamehub_feed">GameHub</string>
     <string name="contents_source_wcphub_feed">WCPHub</string>
     <string name="contents_source_wcphub">WCPHub</string>
     <string name="contents_source_nightlies">Nightlies</string>
+    <string name="contents_source_gamenative_proton">GameNative Proton 10</string>
     <string name="contents_source_andrevto_proton">AndreVto Proton 11</string>
     <string name="contents_source_gamehub">GameHub</string>
     <string name="contents_source_aesolator">WCP Archive</string>
@@ -996,6 +999,7 @@
     <string name="contents_source_archive_runtime_lane">Runtime lane</string>
     <string name="contents_source_archive_graphics_lane">Graphics lane</string>
     <string name="contents_source_wcphub_lane">Community feed</string>
+    <string name="contents_source_gamenative_proton_release_lane">proton_10.0 release lane</string>
     <string name="contents_source_andrevto_proton_release_lane">proton_11.0 release lane</string>
     <string name="contents_source_nightlies_release_lane">Nightly release lane</string>
     <string name="contents_source_gamehub_release_lane">Release lane</string>
@@ -1008,6 +1012,7 @@
     <string name="contents_lane_scope_runtime">Runtime packages maintained in WCP Runtime Lanes</string>
     <string name="contents_lane_scope_graphics">Graphics packages maintained in WCP Graphics Lanes</string>
     <string name="contents_lane_scope_wcphub">WCPHub community runtime packages</string>
+    <string name="contents_lane_scope_gamenative_proton">GameNative bionic Proton 10 builds from proton-wine releases</string>
     <string name="contents_lane_scope_andrevto_proton">AndreVto bionic Proton 11 builds from proton-wine releases</string>
     <string name="contents_lane_scope_nightlies">The412Banner nightly packages sourced from Nightlies releases</string>
     <string name="contents_lane_scope_gamehub">GameHub packages sourced from Gamehub-Components releases and raw component feeds</string>

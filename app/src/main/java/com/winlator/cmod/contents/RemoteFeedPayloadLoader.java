@@ -238,6 +238,7 @@ public final class RemoteFeedPayloadLoader {
             return RuntimeFeedRegistry.SOURCE_MODE_ARCHIVE;
         }
         if (RuntimeFeedRegistry.looksLikeNightliesSource(lower)) return RuntimeFeedRegistry.SOURCE_MODE_NIGHTLIES;
+        if (RuntimeFeedRegistry.looksLikeGameNativeProtonSource(lower)) return RuntimeFeedRegistry.SOURCE_MODE_GAMENATIVE_PROTON;
         if (RuntimeFeedRegistry.looksLikeAndreVtoProtonSource(lower)) return RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON;
         if (lower.contains("the412banner/gamehub-components")
                 || lower.contains("api.github.com/repos/the412banner/gamehub-components/releases")

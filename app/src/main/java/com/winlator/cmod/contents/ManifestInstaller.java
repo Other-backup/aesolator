@@ -6,6 +6,7 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
 import java.util.List;
@@ -107,6 +108,8 @@ public abstract class ManifestInstaller {
         try {
             ContentsManager manager = new ContentsManager(context);
             if (progressListener != null) progressListener.onProgress(0f);
+            ContentProfile remoteHint = buildRemoteHint(entry, expectedType);
+            prepareRuntimeRootLane(context, remoteHint);
             destFile = new File(context.getCacheDir(), buildCacheName(entry));
             if (!Downloader.downloadFile(entry.url, destFile)) {
                 return new ManifestInstallResult(
@@ -115,7 +118,6 @@ public abstract class ManifestInstaller {
                 );
             }
 
-            ContentProfile remoteHint = buildRemoteHint(entry, expectedType);
             ContentProfile profile = extractContent(manager, Uri.fromFile(destFile), remoteHint);
             if (profile == null) {
                 return new ManifestInstallResult(
@@ -152,6 +154,15 @@ public abstract class ManifestInstaller {
                 destFile.delete();
             }
         }
+    }
+
+    private static void prepareRuntimeRootLane(Context context, @Nullable ContentProfile profile) {
+        if (context == null || profile == null || !profile.isWineProtonFamily()) return;
+        ImageFs.ensureActiveRuntimeRoot(
+                context,
+                profile.getRuntimeModel(),
+                ContentsManager.getEntryName(profile)
+        );
     }
 
     private static boolean hasInstalledManifestPayload(ContentsManager manager,

@@ -61,6 +61,9 @@ public final class RemoteProfileFeedMerger {
         if (RuntimeFeedRegistry.looksLikeNightliesSource(joined)) {
             return RuntimeFeedRegistry.SOURCE_MODE_NIGHTLIES;
         }
+        if (RuntimeFeedRegistry.looksLikeGameNativeProtonSource(joined)) {
+            return RuntimeFeedRegistry.SOURCE_MODE_GAMENATIVE_PROTON;
+        }
         if (RuntimeFeedRegistry.looksLikeAndreVtoProtonSource(joined)) {
             return RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON;
         }
@@ -170,6 +173,7 @@ public final class RemoteProfileFeedMerger {
             return 250;
         }
         if (RuntimeFeedRegistry.SOURCE_MODE_ANDREVTO_PROTON.equals(sourceMode)) return 242;
+        if (RuntimeFeedRegistry.SOURCE_MODE_GAMENATIVE_PROTON.equals(sourceMode)) return 244;
         if (RuntimeFeedRegistry.SOURCE_MODE_COMMUNITY.equals(sourceMode)) {
             String joined = (
                     optString(object, ContentProfile.MARK_SOURCE_REPO) + " " +

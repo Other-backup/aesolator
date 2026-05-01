@@ -71,6 +71,7 @@ public class AdrenotoolsFragment extends Fragment {
     private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
     private static final String GRAPHICS_SOURCE_AE_ARCHIVE = "ae_archive";
     private static final String GRAPHICS_SOURCE_STEVENMXZ = "stevenmxz";
+    private static final String GRAPHICS_SOURCE_WINNATIVE = "winnative";
     private static final String GRAPHICS_SOURCE_GAMENATIVE = "gamenative";
     private static final String GRAPHICS_SOURCE_WHITEBELYASH = "whitebelyash";
     private static final String GRAPHICS_SOURCE_MRPURPLE = "mrpurple";
@@ -1007,7 +1008,9 @@ public class AdrenotoolsFragment extends Fragment {
         ArrayList<ContentProfile> profiles = new ArrayList<>();
         String source = selectedSourceMode == null ? GRAPHICS_SOURCE_AE_ARCHIVE : selectedSourceMode.trim().toLowerCase(Locale.US);
 
-        if (GRAPHICS_SOURCE_STEVENMXZ.equals(source)) {
+        if (GRAPHICS_SOURCE_WINNATIVE.equals(source)) {
+            profiles.addAll(fetchGitHubReleaseZipProfiles("WinNative-Emu/Drivers", lane, source));
+        } else if (GRAPHICS_SOURCE_STEVENMXZ.equals(source)) {
             profiles.addAll(fetchGitHubReleaseZipProfiles("StevenMXZ/freedreno_turnip-CI", lane, source));
         } else if (GRAPHICS_SOURCE_GAMENATIVE.equals(source)) {
             profiles.addAll(fetchGameNativeZipProfiles(lane));
@@ -1320,6 +1323,15 @@ public class AdrenotoolsFragment extends Fragment {
             if (lowerName.contains("a6xx") && lowerName.contains("fix")) return "a6xx-fix";
             if (lowerName.contains("_r") || lowerName.contains("-r") || tag.toLowerCase(Locale.US).contains("-r")) return "r-series";
             return "mainline";
+        }
+        if ("winnative".equals(source)) {
+            if (lowerName.contains("_b_") || lowerName.contains("-b_") || lowerName.contains("_b-") || lowerName.contains("-b-")) {
+                return "winnative-b";
+            }
+            if (lowerName.contains("_p_") || lowerName.contains("-p_") || lowerName.contains("_p-") || lowerName.contains("-p-")) {
+                return "winnative-p";
+            }
+            return "winnative";
         }
         if ("whitebelyash".equals(source)) {
             if (lowerName.contains("a8xx") || lowerName.contains("gen8")) return "a8xx-gen8";
@@ -1660,6 +1672,9 @@ public class AdrenotoolsFragment extends Fragment {
         return switch (normalized) {
             case "main", "mainline" -> "Mainline";
             case "experimental" -> "Experimental";
+            case "winnative", "winnative-b", "winnative-p" -> normalized.equals("winnative-b")
+                    ? "WinNative B"
+                    : normalized.equals("winnative-p") ? "WinNative P" : "WinNative";
             case "r-series", "rseries" -> "R-series";
             case "gen8" -> "Gen8";
             case "autotuner" -> "Autotuner";
@@ -1701,6 +1716,7 @@ public class AdrenotoolsFragment extends Fragment {
         if (sourceKey == null || sourceKey.trim().isEmpty()) return "";
         return switch (sourceKey.trim().toLowerCase(Locale.US)) {
             case GRAPHICS_SOURCE_AE_ARCHIVE -> getStringOrFallback(R.string.graphics_feed_source_ae_archive, "Ae.solator archive");
+            case GRAPHICS_SOURCE_WINNATIVE -> getStringOrFallback(R.string.graphics_feed_source_winnative, "WinNative Drivers");
             case GRAPHICS_SOURCE_STEVENMXZ -> getStringOrFallback(R.string.graphics_feed_source_stevenmxz, "StevenMXZ");
             case GRAPHICS_SOURCE_GAMENATIVE -> getStringOrFallback(R.string.graphics_feed_source_gamenative, "GameNative");
             case GRAPHICS_SOURCE_WHITEBELYASH -> getStringOrFallback(R.string.graphics_feed_source_whitebelyash, "WhiteBelyash");
@@ -1731,6 +1747,9 @@ public class AdrenotoolsFragment extends Fragment {
         if (GRAPHICS_SOURCE_GAMENATIVE.equalsIgnoreCase(sourceKey)) {
             return LANE_OPENGL.equals(selectedLane) ? "qcom-opengl" : "gen8-turnip";
         }
+        if (GRAPHICS_SOURCE_WINNATIVE.equalsIgnoreCase(sourceKey)) {
+            return "winnative-b";
+        }
         return "mainline";
     }
 
@@ -1743,10 +1762,11 @@ public class AdrenotoolsFragment extends Fragment {
         if (sourceKey == null) return Integer.MAX_VALUE;
         return switch (sourceKey.trim().toLowerCase(Locale.US)) {
             case GRAPHICS_SOURCE_AE_ARCHIVE -> 0;
-            case GRAPHICS_SOURCE_STEVENMXZ -> 1;
-            case GRAPHICS_SOURCE_GAMENATIVE -> 2;
-            case GRAPHICS_SOURCE_WHITEBELYASH -> 3;
-            case GRAPHICS_SOURCE_MRPURPLE -> 4;
+            case GRAPHICS_SOURCE_WINNATIVE -> 1;
+            case GRAPHICS_SOURCE_STEVENMXZ -> 2;
+            case GRAPHICS_SOURCE_GAMENATIVE -> 3;
+            case GRAPHICS_SOURCE_WHITEBELYASH -> 4;
+            case GRAPHICS_SOURCE_MRPURPLE -> 5;
             default -> 10;
         };
     }
@@ -1768,6 +1788,14 @@ public class AdrenotoolsFragment extends Fragment {
                 case "mainline" -> 2;
                 case "autotuner" -> 3;
                 case "a6xx-fix" -> 4;
+                default -> 20;
+            };
+        }
+        if (GRAPHICS_SOURCE_WINNATIVE.equals(source)) {
+            return switch (branch) {
+                case "winnative-b" -> 0;
+                case "winnative-p" -> 1;
+                case "winnative" -> 2;
                 default -> 20;
             };
         }

@@ -38,6 +38,7 @@ public class FEXCorePresetManager {
                     break;
                 }
             }
+            normalizeSmcChecksEnvVars(envVars);
             return envVars;
         }
 
@@ -150,7 +151,34 @@ public class FEXCorePresetManager {
             envVars.put("FEX_LOG_LEVEL", "off");
         }
 
+        normalizeSmcChecksEnvVars(envVars);
         return envVars;
+    }
+
+    public static void normalizeSmcChecksEnvVars(EnvVars envVars) {
+        normalizeSmcChecksEnvVars(envVars, null);
+    }
+
+    public static void normalizeSmcChecksEnvVars(EnvVars envVars, EnvVars preferredEnvVars) {
+        if (envVars == null) return;
+        String smcChecks = envVars.get("FEX_SMCCHECKS");
+        String legacySmcChecks = envVars.get("FEX_SMC_CHECKS");
+        if (preferredEnvVars != null) {
+            String preferredSmcChecks = preferredEnvVars.get("FEX_SMCCHECKS");
+            String preferredLegacySmcChecks = preferredEnvVars.get("FEX_SMC_CHECKS");
+            if (!preferredSmcChecks.isEmpty()) {
+                smcChecks = preferredSmcChecks;
+            } else if (!preferredLegacySmcChecks.isEmpty()) {
+                smcChecks = preferredLegacySmcChecks;
+            }
+        }
+        if (smcChecks.isEmpty()) {
+            smcChecks = legacySmcChecks;
+        }
+        if (!smcChecks.isEmpty()) {
+            envVars.put("FEX_SMCCHECKS", smcChecks);
+            envVars.put("FEX_SMC_CHECKS", smcChecks);
+        }
     }
 
     private static void applyBasePresetDefaults(EnvVars envVars) {

@@ -790,6 +790,8 @@ public class ContainerManager {
             String requestedRuntimeModel = container != null ? container.getContainerVariant() : null;
             WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion, requestedRuntimeModel);
             container.putExtra("wineprefixArch", wineInfo.getArch());
+            container.putExtra("wineprefixRuntimeModel", requestedRuntimeModel == null ? "" : requestedRuntimeModel);
+            container.putExtra("wineprefixWineVersion", wineVersion == null ? "" : wineVersion);
             container.putExtra("wineprefixNeedsUpdate", null);
             container.putExtra("appVersion", null);
             container.putExtra("imgVersion", null);

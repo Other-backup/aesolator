@@ -52,6 +52,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
+import com.winlator.cmod.alsaserver.ALSAClient;
 import com.winlator.cmod.box64.Box64EditPresetDialog;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
@@ -208,6 +209,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     public static int NOTIFICATION_ID = -1;
     private static final String NOEXEC_LAUNCH_MIRROR_DIR = "AeLaunchMirror";
     private static final String NOEXEC_LAUNCH_MIRROR_STAMP = ".aelaunchmirror.json";
+    private static final String EXTRA_APPLIED_CONTAINER_VARIANT = "appliedContainerVariant";
+    private static final String EXTRA_APPLIED_RUNTIME_MODEL = "appliedRuntimeModel";
+    private static final String EXTRA_APPLIED_WINE_VERSION = "appliedWineVersion";
+    private static final String EXTRA_WINEPREFIX_RUNTIME_MODEL = "wineprefixRuntimeModel";
+    private static final String EXTRA_WINEPREFIX_WINE_VERSION = "wineprefixWineVersion";
     private static final String[] ANDROID_HOST_WRAPPER_REQUIRED_LIBS = {
             "libandroid-sysvshm.so",
             "libadrenotools.so",
@@ -266,8 +272,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private MagnifierView magnifierView;
     private DebugDialog debugDialog;
     private final ArrayList<Callback<String>> forensicRuntimeCallbacks = new ArrayList<>();
-    private short taskAffinityMask = 0;
-    private short taskAffinityMaskWoW64 = 0;
+    private int taskAffinityMask = 0;
+    private int taskAffinityMaskWoW64 = 0;
     private int frameRatingWindowId = -1;
     private boolean cursorLock; // Flag to track if pointer capture was requested
     private final float[] xform = XForm.getInstance();
@@ -1005,12 +1011,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut = new Shortcut(container, new File(shortcutPath));
         }
 
-        taskAffinityMask = (short) ProcessHelper.getAffinityMask(container.getCPUList(true));
-        taskAffinityMaskWoW64 = (short) ProcessHelper.getAffinityMask(container.getCPUListWoW64(true));
+        taskAffinityMask = ProcessHelper.getAffinityMask(container.getCPUList(true));
+        taskAffinityMaskWoW64 = ProcessHelper.getAffinityMask(container.getCPUListWoW64(true));
 
         if (shortcut != null) {
-            taskAffinityMask = (short) ProcessHelper.getAffinityMask(shortcut.getExtra("cpuList", container.getCPUList(true)));
-            taskAffinityMaskWoW64 = taskAffinityMask;
+            taskAffinityMask = ProcessHelper.getAffinityMask(shortcut.getExtra("cpuList", container.getCPUList(true)));
+            taskAffinityMaskWoW64 = ProcessHelper.getAffinityMask(shortcut.getExtra("cpuListWoW64", container.getCPUListWoW64(true)));
         }
 
         // Determine the class name for the startup workarounds
@@ -5552,18 +5558,84 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
     }
 
+    private String resolveCurrentLaunchRuntimeModelMarker() {
+        String normalized = ContentProfile.normalizeRuntimeModel(effectiveRuntimeModel);
+        if (!normalized.isEmpty()) return normalized;
+        if (container != null) {
+            normalized = ContentProfile.normalizeRuntimeModel(container.getContainerVariant());
+        }
+        return normalized.isEmpty() ? ContentProfile.RUNTIME_MODEL_BIONIC : normalized;
+    }
+
+    private String resolveCurrentLaunchWineVersionMarker() {
+        if (selectedRuntimeProfile != null) {
+            return ContentsManager.getEntryName(selectedRuntimeProfile);
+        }
+        String requested = resolveLaunchWineVersion();
+        String runtimeModel = resolveCurrentLaunchRuntimeModelMarker();
+        String resolved = resolveEffectiveLaunchWineVersion(requested, runtimeModel);
+        return resolved == null ? "" : resolved.trim();
+    }
+
+    private boolean markerMismatch(String target, String stored) {
+        String normalizedTarget = target == null ? "" : target.trim();
+        String normalizedStored = stored == null ? "" : stored.trim();
+        return !normalizedTarget.isEmpty()
+                && !normalizedStored.isEmpty()
+                && !normalizedTarget.equalsIgnoreCase(normalizedStored);
+    }
+
+    private boolean markerMissingOrMismatch(String target, String stored) {
+        String normalizedTarget = target == null ? "" : target.trim();
+        String normalizedStored = stored == null ? "" : stored.trim();
+        return !normalizedTarget.isEmpty()
+                && (normalizedStored.isEmpty() || !normalizedTarget.equalsIgnoreCase(normalizedStored));
+    }
+
     private void setupWineSystemFiles() {
         ensureWinePrefixReady();
         String appVersion = String.valueOf(AppUtils.getVersionCode(this));
         String imgVersion = String.valueOf(imageFs.getVersion());
+        String launchRuntimeModel = resolveCurrentLaunchRuntimeModelMarker();
+        String launchWineVersion = resolveCurrentLaunchWineVersionMarker();
+        String appliedContainerVariant = container.getExtra(EXTRA_APPLIED_CONTAINER_VARIANT);
+        String appliedRuntimeModel = container.getExtra(EXTRA_APPLIED_RUNTIME_MODEL);
+        String appliedWineVersion = container.getExtra(EXTRA_APPLIED_WINE_VERSION);
         boolean containerDataChanged = false;
+        boolean appOrImageChanged = !container.getExtra("appVersion").equals(appVersion)
+                || !container.getExtra("imgVersion").equals(imgVersion);
+        boolean runtimeModelChanged = markerMissingOrMismatch(launchRuntimeModel, appliedRuntimeModel);
+        boolean containerVariantChanged = markerMissingOrMismatch(launchRuntimeModel, appliedContainerVariant);
+        boolean wineVersionChanged = markerMissingOrMismatch(launchWineVersion, appliedWineVersion);
 
-        if (!container.getExtra("appVersion").equals(appVersion) || !container.getExtra("imgVersion").equals(imgVersion)) {
+        if (appOrImageChanged || runtimeModelChanged || containerVariantChanged || wineVersionChanged) {
             applyGeneralPatches(container);
             container.putExtra("appVersion", appVersion);
             container.putExtra("imgVersion", imgVersion);
+            container.putExtra(EXTRA_APPLIED_CONTAINER_VARIANT, launchRuntimeModel);
+            container.putExtra(EXTRA_APPLIED_RUNTIME_MODEL, launchRuntimeModel);
+            container.putExtra(EXTRA_APPLIED_WINE_VERSION, launchWineVersion);
             firstTimeBoot = true;
             containerDataChanged = true;
+            ForensicLogger.logEvent(
+                    this,
+                    "info",
+                    "WINE_SYSTEM_FILES_RUNTIME_MARKERS_APPLIED",
+                    null,
+                    "xserver",
+                    "wine_system_files_runtime_markers_applied",
+                    ForensicLogger.fields(
+                            "container_id", container.id,
+                            "app_or_image_changed", appOrImageChanged,
+                            "runtime_model_changed", runtimeModelChanged,
+                            "container_variant_changed", containerVariantChanged,
+                            "wine_version_changed", wineVersionChanged,
+                            "launch_runtime_model", launchRuntimeModel,
+                            "launch_wine_version", launchWineVersion,
+                            "previous_applied_runtime_model", appliedRuntimeModel,
+                            "previous_applied_wine_version", appliedWineVersion
+                    )
+            );
         }
 
         ensureWinePrefixEssentialFiles();
@@ -5624,8 +5696,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         else
             startupSelection = String.valueOf(container.getStartupSelection());
 
+        WineUtils.changeServicesStatus(container, Byte.parseByte(startupSelection) != Container.STARTUP_SELECTION_NORMAL);
         if (!startupSelection.equals(container.getExtra("startupSelection"))) {
-            WineUtils.changeServicesStatus(container, Byte.parseByte(startupSelection) != Container.STARTUP_SELECTION_NORMAL);
             container.putExtra("startupSelection", startupSelection);
             containerDataChanged = true;
         }
@@ -5641,12 +5713,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File containerDir = container.getRootDir();
         boolean prefixInvalid = !WineUtils.isPrefixValid(containerDir);
         String storedPrefixArch = container.getExtra("wineprefixArch");
+        String targetRuntimeModel = resolveCurrentLaunchRuntimeModelMarker();
+        String targetWineVersion = resolveCurrentLaunchWineVersionMarker();
+        String storedPrefixRuntimeModel = container.getExtra(EXTRA_WINEPREFIX_RUNTIME_MODEL);
+        String storedPrefixWineVersion = container.getExtra(EXTRA_WINEPREFIX_WINE_VERSION);
+        if (storedPrefixWineVersion.isEmpty()) {
+            storedPrefixWineVersion = container.getExtra(EXTRA_APPLIED_WINE_VERSION);
+        }
         boolean archMismatch = !storedPrefixArch.isEmpty() && !storedPrefixArch.equalsIgnoreCase(wineInfo.getArch());
+        boolean wineVersionMismatch = markerMismatch(targetWineVersion, storedPrefixWineVersion);
         boolean prefixNeedsUpdate = "t".equalsIgnoreCase(container.getExtra("wineprefixNeedsUpdate"));
 
         ForensicLogger.logEvent(
                 this,
-                prefixInvalid || archMismatch || prefixNeedsUpdate ? "warn" : "info",
+                prefixInvalid || archMismatch || wineVersionMismatch || prefixNeedsUpdate ? "warn" : "info",
                 "WINE_PREFIX_HEALTH_EVAL",
                 null,
                 "xserver",
@@ -5657,13 +5737,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "arch_mismatch", archMismatch,
                         "stored_arch", storedPrefixArch,
                         "target_arch", wineInfo.getArch(),
+                        "target_runtime_model", targetRuntimeModel,
+                        "stored_prefix_runtime_model", storedPrefixRuntimeModel,
+                        "target_wine_version", targetWineVersion,
+                        "stored_prefix_wine_version", storedPrefixWineVersion,
+                        "wine_version_mismatch", wineVersionMismatch,
                         "prefix_needs_update", prefixNeedsUpdate
                 )
         );
 
-        if (!prefixInvalid && !archMismatch && !prefixNeedsUpdate) {
-            if (storedPrefixArch.isEmpty()) {
+        if (!prefixInvalid && !archMismatch && !wineVersionMismatch && !prefixNeedsUpdate) {
+            if (storedPrefixArch.isEmpty()
+                    || storedPrefixRuntimeModel.isEmpty()
+                    || container.getExtra(EXTRA_WINEPREFIX_WINE_VERSION).isEmpty()) {
                 container.putExtra("wineprefixArch", wineInfo.getArch());
+                container.putExtra(EXTRA_WINEPREFIX_RUNTIME_MODEL, targetRuntimeModel);
+                container.putExtra(EXTRA_WINEPREFIX_WINE_VERSION, targetWineVersion);
                 container.putExtra("wineprefixNeedsUpdate", null);
                 container.saveData();
             }
@@ -5692,6 +5781,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "arch_mismatch", archMismatch,
                         "stored_arch", storedPrefixArch,
                         "target_arch", wineInfo.getArch(),
+                        "target_runtime_model", targetRuntimeModel,
+                        "stored_prefix_runtime_model", storedPrefixRuntimeModel,
+                        "target_wine_version", targetWineVersion,
+                        "stored_prefix_wine_version", storedPrefixWineVersion,
+                        "wine_version_mismatch", wineVersionMismatch,
                         "prefix_needs_update", prefixNeedsUpdate
                 )
         );
@@ -5928,7 +6022,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("ANDROID_ASERVER_USE_SHM", "true");
             environment.addComponent(
                     new ALSAServerComponent(
-                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.ALSA_SERVER_PATH)
+                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.ALSA_SERVER_PATH),
+                            ALSAClient.Options.fromEnvVars(envVars)
                     )
             );
         } else if (audioDriver.equals("pulseaudio")) {
@@ -11785,10 +11880,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void assignTaskAffinity(Window window) {
-        if (taskAffinityMask == 0 || taskAffinityMaskWoW64 == 0) return;
+        if (taskAffinityMask == 0 && taskAffinityMaskWoW64 == 0) return;
         int processId = window.getProcessId();
         String className = window.getClassName();
         int processAffinity = window.isWoW64() ? taskAffinityMaskWoW64 : taskAffinityMask;
+        if (processAffinity == 0) return;
 
         if (processId > 0) {
             winHandler.setProcessAffinity(processId, processAffinity);

@@ -56,6 +56,19 @@ public class RemoteProfileFeedMergerTest {
     }
 
     @Test
+    public void classifySourceModeRecognizesGameNativeProtonLane() {
+        assertEquals(
+                RuntimeFeedRegistry.SOURCE_MODE_GAMENATIVE_PROTON,
+                RemoteProfileFeedMerger.classifySourceMode(
+                        "gamenative-proton-wine",
+                        "GameNative/proton-wine Releases",
+                        "GameNative Proton/Wine Releases",
+                        "https://api.github.com/repos/GameNative/proton-wine/releases?per_page=100"
+                )
+        );
+    }
+
+    @Test
     public void mergePayloadsPrefersHigherPriorityCommunityBionicDonorOverWcpHub() {
         String wcphubPayload = "[" +
                 "{\"type\":\"Wine\",\"verName\":\"11.4\",\"verCode\":1140," +

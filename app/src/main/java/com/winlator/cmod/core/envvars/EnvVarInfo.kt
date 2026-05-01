@@ -141,6 +141,10 @@ data class EnvVarInfo(
                 identifier = "FEX_SMC_CHECKS",
                 possibleValues = listOf("none", "mtrack", "full"),
             ),
+            "FEX_SMCCHECKS" to EnvVarInfo(
+                identifier = "FEX_SMCCHECKS",
+                possibleValues = listOf("none", "mtrack", "full"),
+            ),
             "FEX_VOLATILEMETADATA" to EnvVarInfo(
                 identifier = "FEX_VOLATILEMETADATA",
                 selectionType = EnvVarSelectionType.TOGGLE,
@@ -234,6 +238,32 @@ data class EnvVarInfo(
             ),
             "PULSE_LATENCY_MSEC" to EnvVarInfo(
                 identifier = "PULSE_LATENCY_MSEC",
+            ),
+            "ANDROID_ALSA_LATENCY_MS" to EnvVarInfo(
+                identifier = "ANDROID_ALSA_LATENCY_MS",
+            ),
+            "ANDROID_ALSA_VOLUME" to EnvVarInfo(
+                identifier = "ANDROID_ALSA_VOLUME",
+            ),
+            "ANDROID_ALSA_BASS_BOOST" to EnvVarInfo(
+                identifier = "ANDROID_ALSA_BASS_BOOST",
+            ),
+            "ANDROID_ALSA_PERFORMANCE_MODE" to EnvVarInfo(
+                identifier = "ANDROID_ALSA_PERFORMANCE_MODE",
+                possibleValues = listOf("low_latency", "none", "power_saving"),
+            ),
+            "WINNATIVE_ALSA_LATENCY_MS" to EnvVarInfo(
+                identifier = "WINNATIVE_ALSA_LATENCY_MS",
+            ),
+            "WINNATIVE_ALSA_VOLUME" to EnvVarInfo(
+                identifier = "WINNATIVE_ALSA_VOLUME",
+            ),
+            "WINNATIVE_ALSA_BASS_BOOST" to EnvVarInfo(
+                identifier = "WINNATIVE_ALSA_BASS_BOOST",
+            ),
+            "WINNATIVE_ALSA_PERFORMANCE_MODE" to EnvVarInfo(
+                identifier = "WINNATIVE_ALSA_PERFORMANCE_MODE",
+                possibleValues = listOf("low_latency", "none", "power_saving"),
             ),
             "MESA_VK_WSI_PRESENT_MODE" to EnvVarInfo(
                 identifier = "MESA_VK_WSI_PRESENT_MODE",

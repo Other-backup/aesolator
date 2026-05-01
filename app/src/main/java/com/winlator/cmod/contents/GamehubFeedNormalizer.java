@@ -174,7 +174,7 @@ public final class GamehubFeedNormalizer {
                 String downloadUrl = href.startsWith("http") ? href : "https://github.com" + href;
                 if (!looksLikeArchive(assetName)) continue;
 
-                ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName);
+                ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName + " " + entry.tag);
                 if (type == null) continue;
 
                 String publishedAt = findFirstGroup(EXPANDED_ASSET_DATETIME_PATTERN, rowHtml);
@@ -290,10 +290,11 @@ public final class GamehubFeedNormalizer {
         String downloadUrl = optString(asset, "browser_download_url").trim();
         if (assetName.isEmpty() || downloadUrl.isEmpty() || !looksLikeArchive(assetName)) return null;
 
-        ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName);
+        String releaseTag = optString(release, "tag_name").trim();
+        String releaseName = optString(release, "name").trim();
+        ContentProfile.ContentType type = resolveTypeFromReleaseAsset(assetName + " " + releaseTag + " " + releaseName);
         if (type == null) return null;
 
-        String releaseTag = optString(release, "tag_name").trim();
         String versionName = stripArchiveSuffix(assetName);
         String channel = deriveReleaseChannel(release, releaseTag, assetName);
         String publishedAt = optString(release, "published_at", optString(asset, "updated_at")).trim();
@@ -373,6 +374,9 @@ public final class GamehubFeedNormalizer {
 
     private static ContentProfile.ContentType resolveTypeFromReleaseAsset(String assetName) {
         String lower = assetName == null ? "" : assetName.trim().toLowerCase(Locale.US);
+        if (lower.contains("vk3dk") || lower.contains("vk3d") || lower.contains("vkd3d")) {
+            return ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
+        }
         if (lower.contains("vkd3d-proton")) return ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
         if (lower.contains("dxvk")) return ContentProfile.ContentType.CONTENT_TYPE_DXVK;
         if (lower.contains("fex")) return ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;

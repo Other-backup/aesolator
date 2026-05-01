@@ -1240,6 +1240,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         ensureRuntimeSdlCompatLink(context, imageFs);
         applyProtonControllerBridgeEnv(context, imageFs, launchEnv);
         mergeExternalEnvVars(launchEnv, ownedLdPreload.toString(), launchEnv.get("FAKE_EVDEV_DIR"));
+        FEXCorePresetManager.normalizeSmcChecksEnvVars(launchEnv, this.envVars);
         applyRuntimeRedirectDebugContract(context, launchEnv, stageTraceId, appId);
 
         if (openWithAndroidBrowser) {
@@ -1461,6 +1462,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (enableLogs) {
             envVars.put("BOX64_LOG", "1");
             envVars.put("BOX64_DYNAREC_MISSING", "1");
+        }
+
+        if (container != null) {
+            String cpuList = container.getCPUList(true);
+            if (cpuList != null && !cpuList.isEmpty()) {
+                envVars.put("BOX64_CPULIST", cpuList);
+                envVars.put("BOX86_CPULIST", cpuList);
+            }
         }
     }
 

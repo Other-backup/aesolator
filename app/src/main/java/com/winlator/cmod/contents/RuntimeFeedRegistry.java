@@ -11,12 +11,14 @@ public final class RuntimeFeedRegistry {
     public static final String SOURCE_MODE_GAMEHUB = "gamehub";
     public static final String SOURCE_MODE_WCPHUB = "wcphub";
     public static final String SOURCE_MODE_COMMUNITY = "community";
+    public static final String SOURCE_MODE_GAMENATIVE_PROTON = "gamenative_proton";
     public static final String SOURCE_MODE_ANDREVTO_PROTON = "andrevto_proton";
 
     public static final String COMMUNITY_WAIM_RELEASES_URL = "https://api.github.com/repos/Waim908/wine-winlator/releases?per_page=100";
     public static final String COMMUNITY_MOZE_WCP_RELEASES_URL = "https://api.github.com/repos/moze30/winlator-wcp/releases?per_page=100";
     public static final String COMMUNITY_ALEXOQOOL_BIONIC_RELEASES_URL = "https://api.github.com/repos/Alexoqool/winlator-bionic-build/releases?per_page=100";
     public static final String COMMUNITY_XNICK_BIONIC_RELEASES_URL = "https://api.github.com/repos/Xnick417x/Winlator-Bionic-Nightly-wcp/releases?per_page=100";
+    public static final String GAMENATIVE_PROTON_RELEASES_URL = "https://api.github.com/repos/GameNative/proton-wine/releases?per_page=100";
     public static final String ANDREVTO_PROTON_RELEASES_URL = "https://api.github.com/repos/AndreVto/proton-wine/releases?per_page=100";
 
     public enum FeedFormat {
@@ -112,7 +114,12 @@ public final class RuntimeFeedRegistry {
             COMMUNITY_XNICK_BIONIC_RELEASES_URL,
             "https://api.github.com/repos/Xnick417x/Winlator-Bionic-Nightly-wcp/releases",
             FeedFormat.GITHUB_RELEASES,
-            ContentProfile.ContentType.CONTENT_TYPE_WINE
+            ContentProfile.ContentType.CONTENT_TYPE_WINE,
+            ContentProfile.ContentType.CONTENT_TYPE_DXVK,
+            ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
+            ContentProfile.ContentType.CONTENT_TYPE_BOX64,
+            ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
+            ContentProfile.ContentType.CONTENT_TYPE_FEXCORE
     );
 
     private static final FeedSpec FEED_ANDREVTO_PROTON_RELEASES = new FeedSpec(
@@ -124,6 +131,19 @@ public final class RuntimeFeedRegistry {
             ANDREVTO_PROTON_RELEASES_URL,
             "https://api.github.com/repos/AndreVto/proton-wine/releases",
             FeedFormat.GITHUB_RELEASES,
+            ContentProfile.ContentType.CONTENT_TYPE_PROTON
+    );
+
+    private static final FeedSpec FEED_GAMENATIVE_PROTON_RELEASES = new FeedSpec(
+            SOURCE_MODE_GAMENATIVE_PROTON,
+            "gamenative-proton-wine",
+            "GameNative Proton/Wine Releases",
+            "GameNative/proton-wine Releases",
+            "GameNative bionic Proton/Wine package",
+            GAMENATIVE_PROTON_RELEASES_URL,
+            "https://api.github.com/repos/GameNative/proton-wine/releases",
+            FeedFormat.GITHUB_RELEASES,
+            ContentProfile.ContentType.CONTENT_TYPE_WINE,
             ContentProfile.ContentType.CONTENT_TYPE_PROTON
     );
 
@@ -170,6 +190,7 @@ public final class RuntimeFeedRegistry {
         if (SOURCE_MODE_COMMUNITY.equals(normalizedMode)) {
             addIfSupported(feeds, FEED_ALEXOQOOL_BIONIC_RELEASES, type);
             addIfSupported(feeds, FEED_XNICK_BIONIC_RELEASES, type);
+            addIfSupported(feeds, FEED_GAMENATIVE_PROTON_RELEASES, type);
             addIfSupported(feeds, FEED_ANDREVTO_PROTON_RELEASES, type);
             addIfSupported(feeds, FEED_WAIM_WINE_RELEASES, type);
             addIfSupported(feeds, FEED_MOZE_WCP_RELEASES, type);
@@ -179,6 +200,10 @@ public final class RuntimeFeedRegistry {
         }
         if (SOURCE_MODE_ANDREVTO_PROTON.equals(normalizedMode)) {
             addIfSupported(feeds, FEED_ANDREVTO_PROTON_RELEASES, type);
+            return feeds;
+        }
+        if (SOURCE_MODE_GAMENATIVE_PROTON.equals(normalizedMode)) {
+            addIfSupported(feeds, FEED_GAMENATIVE_PROTON_RELEASES, type);
             return feeds;
         }
         if (SOURCE_MODE_WCPHUB.equals(normalizedMode)) {
@@ -205,6 +230,7 @@ public final class RuntimeFeedRegistry {
         if (!wantsBionicCommunity && !wantsGlibcCommunity) return feeds;
 
         if (wantsBionicCommunity) {
+            feeds.add(FEED_GAMENATIVE_PROTON_RELEASES);
             feeds.add(FEED_ANDREVTO_PROTON_RELEASES);
             feeds.add(FEED_ALEXOQOOL_BIONIC_RELEASES);
             feeds.add(FEED_XNICK_BIONIC_RELEASES);
@@ -239,6 +265,13 @@ public final class RuntimeFeedRegistry {
                 || normalized.contains("andrevto-proton11");
     }
 
+    public static boolean looksLikeGameNativeProtonSource(String value) {
+        String normalized = normalize(value);
+        return normalized.contains("gamenative/proton-wine")
+                || normalized.contains("gamenative proton/wine")
+                || normalized.contains("gamenative-proton-wine");
+    }
+
     public static boolean looksLikeWcpHubSource(String value) {
         String normalized = normalize(value);
         return normalized.contains("open-wine-components")
@@ -259,6 +292,7 @@ public final class RuntimeFeedRegistry {
                 || normalized.contains("community bionic runtime package")
                 || normalized.contains("xnick417x/winlator-bionic-nightly-wcp")
                 || normalized.contains("community bionic nightly package")
+                || looksLikeGameNativeProtonSource(normalized)
                 || looksLikeAndreVtoProtonSource(normalized)
                 || normalized.contains("ludashi")
                 || normalized.contains("ciore cmod ludashi");
@@ -268,6 +302,7 @@ public final class RuntimeFeedRegistry {
         return Arrays.asList(
                 FEED_ALEXOQOOL_BIONIC_RELEASES,
                 FEED_XNICK_BIONIC_RELEASES,
+                FEED_GAMENATIVE_PROTON_RELEASES,
                 FEED_ANDREVTO_PROTON_RELEASES,
                 FEED_WAIM_WINE_RELEASES,
                 FEED_MOZE_WCP_RELEASES,

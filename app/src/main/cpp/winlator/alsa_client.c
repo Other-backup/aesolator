@@ -19,7 +19,20 @@ static aaudio_format_t toAAudioFormat(int format) {
     }
 }
 
-static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t sampleRate, int32_t bufferSize) {
+static aaudio_performance_mode_t toAAudioPerformanceMode(int performanceMode) {
+    switch (performanceMode) {
+        case 0:
+            return AAUDIO_PERFORMANCE_MODE_NONE;
+        case 2:
+            return AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
+        case 1:
+        default:
+            return AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+    }
+}
+
+static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t sampleRate,
+                                  int32_t bufferSize, int32_t performanceMode) {
     aaudio_result_t result;
     AAudioStreamBuilder *builder;
     AAudioStream *stream;
@@ -27,7 +40,7 @@ static AAudioStream *aaudioCreate(int32_t format, int8_t channelCount, int32_t s
     result = AAudio_createStreamBuilder(&builder);
     if (result != AAUDIO_OK) return NULL;
 
-    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    AAudioStreamBuilder_setPerformanceMode(builder, toAAudioPerformanceMode(performanceMode));
     AAudioStreamBuilder_setFormat(builder, toAAudioFormat(format));
     AAudioStreamBuilder_setChannelCount(builder, channelCount);
     AAudioStreamBuilder_setSampleRate(builder, sampleRate);
@@ -73,8 +86,9 @@ static void aaudioFlush(AAudioStream *aaudioStream) {
 
 JNIEXPORT jlong JNICALL
 Java_com_winlator_cmod_alsaserver_ALSAClient_create(JNIEnv *env, jobject obj, jint format,
-                                               jbyte channelCount, jint sampleRate, jint bufferSize) {
-    return (jlong)aaudioCreate(format, channelCount, sampleRate, bufferSize);
+                                               jbyte channelCount, jint sampleRate, jint bufferSize,
+                                               jint performanceMode) {
+    return (jlong)aaudioCreate(format, channelCount, sampleRate, bufferSize, performanceMode);
 }
 
 JNIEXPORT jint JNICALL

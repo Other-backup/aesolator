@@ -13,8 +13,8 @@ public class Win32AppWorkarounds {
     private static final String TAG = "Win32AppWorkarounds";
 
     private final XServer xServer;
-    private volatile short taskAffinityMask;
-    private volatile short taskAffinityMaskWoW64;
+    private volatile int taskAffinityMask;
+    private volatile int taskAffinityMaskWoW64;
 
     private interface DXWrapperConfigWorkaround extends Workaround {
         void setValue(String value, KeyValueSet keyValueSet);
@@ -60,8 +60,8 @@ public class Win32AppWorkarounds {
     }
 
     public void setTaskAffinityMasks(int taskAffinityMask, int taskAffinityMaskWoW64) {
-        this.taskAffinityMask = (short) taskAffinityMask;
-        this.taskAffinityMaskWoW64 = (short) taskAffinityMaskWoW64;
+        this.taskAffinityMask = taskAffinityMask;
+        this.taskAffinityMaskWoW64 = taskAffinityMaskWoW64;
     }
 
     private void applyWorkaround(Workaround workaround) {

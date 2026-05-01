@@ -51,6 +51,7 @@ public class ContentsManager {
     public static final String REMOTE_SCOPE_GAMEHUB = "gamehub";
     public static final String REMOTE_SCOPE_NIGHTLIES = "nightlies";
     public static final String REMOTE_SCOPE_WCPHUB = "wcphub";
+    public static final String REMOTE_SCOPE_GAMENATIVE_PROTON = "gamenative_proton";
     public static final String REMOTE_SCOPE_ANDREVTO_PROTON = "andrevto_proton";
     public static final String REMOTE_SCOPE_HYDRATED_RUNTIME = "hydrated_runtime";
     private static final String FALLBACK_PREFIX_PACK_NAME = "prefixPack.tzst";
@@ -251,6 +252,10 @@ public class ContentsManager {
 
     public void setNightliesRemoteProfiles(String json) {
         setRemoteProfilesForScope(REMOTE_SCOPE_NIGHTLIES, json, false, false, false, true);
+    }
+
+    public void setGameNativeProtonRemoteProfiles(String json) {
+        setRemoteProfilesForScope(REMOTE_SCOPE_GAMENATIVE_PROTON, json, false, false, false, true);
     }
 
     public void setAndreVtoProtonRemoteProfiles(String json) {
