@@ -40,6 +40,7 @@ final class ContentProfileIdentity {
         if (left == null || right == null || left.type == null || right.type == null) return false;
         if (!left.isWineProtonFamily() || !right.isWineProtonFamily()) return false;
         if (!runtimeFamilyKindMatches(left, right)) return false;
+        if (!runtimeModelMatches(left, right)) return false;
         if (!runtimeArchMatches(left, right)) return false;
         return runtimeVersionMatches(left, right);
     }

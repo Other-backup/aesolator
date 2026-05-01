@@ -6,6 +6,7 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.ForensicLogger;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
@@ -105,13 +106,19 @@ public abstract class ManifestInstaller {
             @Nullable ProgressListener progressListener
     ) {
         File destFile = null;
+        long startedAt = System.currentTimeMillis();
+        ContentProfile remoteHint = null;
         try {
             ContentsManager manager = new ContentsManager(context);
             if (progressListener != null) progressListener.onProgress(0f);
-            ContentProfile remoteHint = buildRemoteHint(entry, expectedType);
+            remoteHint = buildRemoteHint(entry, expectedType);
+            logContentInstallEvent(context, "info", "CONTENTS_INSTALL_START", "content_install_start",
+                    entry, expectedType, remoteHint, null, true, "start", startedAt);
             prepareRuntimeRootLane(context, remoteHint);
             destFile = new File(context.getCacheDir(), buildCacheName(entry));
             if (!Downloader.downloadFile(entry.url, destFile)) {
+                logContentInstallEvent(context, "error", "CONTENTS_INSTALL_DONE", "content_install_done",
+                        entry, expectedType, remoteHint, null, false, "download_failed", startedAt);
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_download_failed, entry.getDisplayName())
@@ -120,12 +127,16 @@ public abstract class ManifestInstaller {
 
             ContentProfile profile = extractContent(manager, Uri.fromFile(destFile), remoteHint);
             if (profile == null) {
+                logContentInstallEvent(context, "error", "CONTENTS_INSTALL_DONE", "content_install_done",
+                        entry, expectedType, remoteHint, destFile, false, "extract_failed", startedAt);
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
                 );
             }
             if (!finishInstall(manager, profile)) {
+                logContentInstallEvent(context, "error", "CONTENTS_INSTALL_DONE", "content_install_done",
+                        entry, expectedType, profile, destFile, false, "finish_failed", startedAt);
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
@@ -133,17 +144,24 @@ public abstract class ManifestInstaller {
             }
             manager.syncContents();
             if (!hasInstalledManifestPayload(manager, expectedType, entry, profile)) {
+                logContentInstallEvent(context, "error", "CONTENTS_INSTALL_DONE", "content_install_done",
+                        entry, expectedType, profile, destFile, false, "payload_missing_after_install", startedAt);
                 return new ManifestInstallResult(
                         false,
                         context.getString(R.string.manifest_install_failed, entry.getDisplayName())
                 );
             }
             if (progressListener != null) progressListener.onProgress(1f);
+            logContentInstallEvent(context, "info", "CONTENTS_INSTALL_DONE", "content_install_done",
+                    entry, expectedType, profile, destFile, true, "success", startedAt);
             return new ManifestInstallResult(
                     true,
                     context.getString(R.string.manifest_install_success, entry.getDisplayName())
             );
         } catch (Exception e) {
+            logContentInstallEvent(context, "error", "CONTENTS_INSTALL_DONE", "content_install_done",
+                    entry, expectedType, remoteHint, destFile, false,
+                    "exception:" + e.getClass().getSimpleName(), startedAt);
             return new ManifestInstallResult(
                     false,
                     context.getString(R.string.manifest_download_failed, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
@@ -154,6 +172,44 @@ public abstract class ManifestInstaller {
                 destFile.delete();
             }
         }
+    }
+
+    private static void logContentInstallEvent(Context context,
+                                               String severity,
+                                               String eventId,
+                                               String message,
+                                               ManifestEntry entry,
+                                               @Nullable ContentProfile.ContentType expectedType,
+                                               @Nullable ContentProfile profile,
+                                               @Nullable File cacheFile,
+                                               boolean success,
+                                               String reason,
+                                               long startedAt) {
+        ForensicLogger.logEvent(
+                context,
+                severity,
+                eventId,
+                null,
+                "contents",
+                message,
+                ForensicLogger.fields(
+                        "entry_id", entry != null ? entry.id : "",
+                        "display_name", entry != null ? entry.getDisplayName() : "",
+                        "content_type", expectedType != null ? expectedType.toString() : "",
+                        "runtime_model", profile != null ? profile.getRuntimeModel() : "",
+                        "profile_version", profile != null ? profile.verName : "",
+                        "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : "",
+                        "artifact_name", profile != null ? profile.artifactName : "",
+                        "release_tag", profile != null ? profile.releaseTag : "",
+                        "source_repo", profile != null ? profile.sourceRepo : "",
+                        "source_feed", profile != null ? profile.sourceFeed : "",
+                        "cache_file", cacheFile != null ? cacheFile.getAbsolutePath() : "",
+                        "cache_file_size", cacheFile != null && cacheFile.isFile() ? cacheFile.length() : 0L,
+                        "success", success,
+                        "reason", reason != null ? reason : "",
+                        "duration_ms", Math.max(0L, System.currentTimeMillis() - startedAt)
+                )
+        );
     }
 
     private static void prepareRuntimeRootLane(Context context, @Nullable ContentProfile profile) {

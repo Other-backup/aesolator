@@ -93,13 +93,16 @@ public class XServerComponent extends EnvironmentComponent {
         ArrayList<UnixSocketConfig> result = new ArrayList<>();
         if (socketConfig == null || socketConfig.path == null) return result;
 
-        String rootPath = resolveRootPathFromX11Socket(socketConfig.path);
+        String primaryGuestPath = socketConfig.guestPath != null && !socketConfig.guestPath.isEmpty()
+                ? socketConfig.guestPath
+                : socketConfig.path;
+        String rootPath = resolveRootPathFromX11Socket(primaryGuestPath);
         LinkedHashSet<String> abstractPaths = new LinkedHashSet<>();
         abstractPaths.add(UnixSocketConfig.XSERVER_PATH);
-        abstractPaths.add(socketConfig.path);
+        abstractPaths.add(primaryGuestPath);
         if (rootPath != null && !rootPath.isEmpty()) {
             String rootedUsrTmp = rootPath + "/usr/tmp/.X11-unix/X0";
-            if (!socketConfig.path.equals(rootedUsrTmp)) {
+            if (!primaryGuestPath.equals(rootedUsrTmp)) {
                 result.add(UnixSocketConfig.createSocket(rootPath, "/usr/tmp/.X11-unix/X0"));
             }
             abstractPaths.add(rootedUsrTmp);
@@ -142,6 +145,7 @@ public class XServerComponent extends EnvironmentComponent {
 
     private static void logXServerTransport(String eventId, String message, UnixSocketConfig config, Throwable error) {
         String socketPath = config != null ? config.path : "";
+        String guestSocketPath = config != null ? config.guestPath : "";
         String socketNamespace = config != null && config.abstractNamespace ? "abstract" : "pathname";
         boolean socketExists = !socketPath.isEmpty() && new File(socketPath).exists();
         if (error == null) {
@@ -156,7 +160,9 @@ public class XServerComponent extends EnvironmentComponent {
                             "pathname_socket", UnixSocketConfig.XSERVER_PATH,
                             "abstract_socket", UnixSocketConfig.XSERVER_PATH,
                             "socket_path", socketPath,
+                            "guest_socket_path", guestSocketPath,
                             "socket_namespace", socketNamespace,
+                            "socket_relocated", config != null && config.relocated,
                             "socket_exists", socketExists,
                             "contract", "x11_accepts_root_tmp_usr_tmp_and_known_donor_xcb_abstract_aliases"
                     )
@@ -174,7 +180,9 @@ public class XServerComponent extends EnvironmentComponent {
                             "pathname_socket", UnixSocketConfig.XSERVER_PATH,
                             "abstract_socket", UnixSocketConfig.XSERVER_PATH,
                             "socket_path", socketPath,
+                            "guest_socket_path", guestSocketPath,
                             "socket_namespace", socketNamespace,
+                            "socket_relocated", config != null && config.relocated,
                             "socket_exists", socketExists,
                             "contract", "x11_accepts_root_tmp_usr_tmp_and_known_donor_xcb_abstract_aliases"
                     )

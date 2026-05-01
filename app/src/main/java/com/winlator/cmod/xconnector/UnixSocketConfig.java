@@ -4,9 +4,11 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicLogger;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 public class UnixSocketConfig {
+    private static final int UNIX_SOCKET_PATH_SAFE_BYTES = 100;
     public static final String SYSVSHM_SERVER_PATH = "/tmp/.sysvshm/SM0";
     public static final String ALSA_SERVER_PATH = "/tmp/.sound/AS0";
     public static final String PULSE_SERVER_PATH = "/tmp/.sound/PS0";
@@ -15,32 +17,69 @@ public class UnixSocketConfig {
     public static final String VORTEK_SERVER_PATH = "/tmp/.vortek/V0";
     public static final String STEAM_PIPE_PATH = "/tmp/.steam/steam_pipe";
     public final String path;
+    public final String guestPath;
+    public final String rootPath;
+    public final String relativePath;
     public final boolean abstractNamespace;
+    public final boolean relocated;
 
     private UnixSocketConfig(String path) {
         this(path, false);
     }
 
     private UnixSocketConfig(String path, boolean abstractNamespace) {
+        this(path, abstractNamespace, path, "", "", false);
+    }
+
+    private UnixSocketConfig(String path,
+                             boolean abstractNamespace,
+                             String guestPath,
+                             String rootPath,
+                             String relativePath,
+                             boolean relocated) {
         this.path = path;
+        this.guestPath = guestPath;
+        this.rootPath = rootPath;
+        this.relativePath = relativePath;
         this.abstractNamespace = abstractNamespace;
+        this.relocated = relocated;
     }
 
     public static UnixSocketConfig createSocket(String rootPath, String relativePath) {
         String normalizedRelativePath = normalizeSocketRelativePath(relativePath);
         ensureRootedSocketParents(rootPath, normalizedRelativePath);
-        File socketFile = new File(rootPath, normalizedRelativePath);
+        File guestSocketFile = new File(rootPath, normalizedRelativePath);
+        File socketFile = guestSocketFile;
+        boolean relocated = false;
+
+        if (isPathTooLongForSockaddr(socketFile.getPath())) {
+            File shortRoot = buildShortSocketRoot(rootPath, normalizedRelativePath);
+            ensureRootedSocketParents(shortRoot.getAbsolutePath(), normalizedRelativePath);
+            socketFile = new File(shortRoot, normalizedRelativePath);
+            relocated = true;
+        }
 
         String dirname = FileUtils.getDirname(normalizedRelativePath);
         if (dirname.lastIndexOf("/") >= 0) {
-            File socketDir = new File(rootPath, dirname);
+            File socketDir = new File(socketFile.getParent());
             FileUtils.delete(socketDir);
             socketDir.mkdirs();
-            ensureCompatSocketLink(socketDir, socketFile, relativePath);
+            if (relocated) {
+                ensureGuestSocketSymlink(guestSocketFile, socketFile);
+                logSocketRelocated(rootPath, normalizedRelativePath, guestSocketFile, socketFile);
+            }
+            else ensureCompatSocketLink(socketDir, socketFile, relativePath);
         }
         else socketFile.delete();
 
-        return new UnixSocketConfig(socketFile.getPath());
+        return new UnixSocketConfig(
+                socketFile.getPath(),
+                false,
+                guestSocketFile.getPath(),
+                rootPath,
+                normalizedRelativePath,
+                relocated
+        );
     }
 
     public static UnixSocketConfig createAbstractSocket(String abstractPath) {
@@ -54,6 +93,32 @@ public class UnixSocketConfig {
         String normalized = path.trim().replace('\\', '/');
         while (normalized.startsWith("/")) normalized = normalized.substring(1);
         return normalized;
+    }
+
+    private static boolean isPathTooLongForSockaddr(String path) {
+        if (path == null) return false;
+        return path.getBytes(StandardCharsets.UTF_8).length > UNIX_SOCKET_PATH_SAFE_BYTES;
+    }
+
+    private static File buildShortSocketRoot(String rootPath, String normalizedRelativePath) {
+        String basePath = deriveFilesRoot(rootPath);
+        String hash = ForensicLogger.sha256Hex((rootPath != null ? rootPath : "") + "|" + (normalizedRelativePath != null ? normalizedRelativePath : ""));
+        String suffix = hash.length() >= 16 ? hash.substring(0, 16) : Long.toHexString(System.nanoTime());
+        return new File(basePath, ".sockets/" + suffix);
+    }
+
+    private static String deriveFilesRoot(String rootPath) {
+        String normalized = rootPath == null || rootPath.trim().isEmpty()
+                ? ""
+                : rootPath.trim().replace('\\', '/');
+        int filesIndex = normalized.indexOf("/files/");
+        if (filesIndex >= 0) return normalized.substring(0, filesIndex + "/files".length());
+        android.content.Context context = ForensicLogger.getAppContext();
+        String appFiles = context != null && context.getFilesDir() != null
+                ? context.getFilesDir().getAbsolutePath()
+                : "";
+        if (!appFiles.isEmpty()) return appFiles;
+        return normalized.isEmpty() ? "." : normalized;
     }
 
     private static void ensureRootedSocketParents(String rootPath, String normalizedRelativePath) {
@@ -72,6 +137,43 @@ public class UnixSocketConfig {
             current = new File(current, segment);
             ensureRealSocketDirectory(current, i == 0 ? "root_tmp" : "socket_parent");
         }
+    }
+
+    private static void ensureGuestSocketSymlink(File guestSocketFile, File hostSocketFile) {
+        if (guestSocketFile == null || hostSocketFile == null) return;
+        File guestDir = guestSocketFile.getParentFile();
+        if (guestDir != null) ensureRealSocketDirectory(guestDir, "guest_socket_parent");
+
+        boolean symlink = Files.isSymbolicLink(guestSocketFile.toPath());
+        boolean exists = guestSocketFile.exists();
+        if (symlink) {
+            String target = FileUtils.readSymlink(guestSocketFile);
+            if (hostSocketFile.getAbsolutePath().equals(target)) return;
+            guestSocketFile.delete();
+        }
+        else if (exists) {
+            FileUtils.delete(guestSocketFile);
+        }
+        FileUtils.symlink(hostSocketFile.getAbsolutePath(), guestSocketFile.getAbsolutePath());
+    }
+
+    private static void logSocketRelocated(String rootPath, String normalizedRelativePath, File guestSocketFile, File hostSocketFile) {
+        ForensicLogger.logEvent(
+                ForensicLogger.getAppContext(),
+                "info",
+                "XCONNECTOR_SOCKET_PATH_RELOCATED",
+                null,
+                "xconnector",
+                "xconnector_socket_path_relocated",
+                ForensicLogger.fields(
+                        "root_path", rootPath != null ? rootPath : "",
+                        "relative_path", normalizedRelativePath != null ? normalizedRelativePath : "",
+                        "guest_socket_path", guestSocketFile != null ? guestSocketFile.getAbsolutePath() : "",
+                        "host_socket_path", hostSocketFile != null ? hostSocketFile.getAbsolutePath() : "",
+                        "guest_path_bytes", guestSocketFile != null ? guestSocketFile.getAbsolutePath().getBytes(StandardCharsets.UTF_8).length : 0,
+                        "host_path_bytes", hostSocketFile != null ? hostSocketFile.getAbsolutePath().getBytes(StandardCharsets.UTF_8).length : 0
+                )
+        );
     }
 
     private static void ensureRealSocketDirectory(File directory, String role) {

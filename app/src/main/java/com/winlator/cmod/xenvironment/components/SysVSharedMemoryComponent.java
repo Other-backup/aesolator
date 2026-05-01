@@ -61,7 +61,9 @@ public class SysVSharedMemoryComponent extends EnvironmentComponent {
                     message,
                     ForensicLogger.fields(
                             "socket_path", socketConfig != null ? socketConfig.path : "",
+                            "guest_socket_path", socketConfig != null ? socketConfig.guestPath : "",
                             "socket_namespace", socketConfig != null && socketConfig.abstractNamespace ? "abstract" : "pathname",
+                            "socket_relocated", socketConfig != null && socketConfig.relocated,
                             "shm_manager_ready", xServer.getSHMSegmentManager() != null
                     )
             );
@@ -77,7 +79,9 @@ public class SysVSharedMemoryComponent extends EnvironmentComponent {
                 error,
                 ForensicLogger.fields(
                         "socket_path", socketConfig != null ? socketConfig.path : "",
+                        "guest_socket_path", socketConfig != null ? socketConfig.guestPath : "",
                         "socket_namespace", socketConfig != null && socketConfig.abstractNamespace ? "abstract" : "pathname",
+                        "socket_relocated", socketConfig != null && socketConfig.relocated,
                         "shm_manager_ready", xServer.getSHMSegmentManager() != null,
                         "degraded_mode", "mit_shm_requests_return_bad_segment_without_host_crash"
                 )

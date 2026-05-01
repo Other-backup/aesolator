@@ -31,7 +31,6 @@ import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.core.AppUtils;
-import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.ForensicConfig;
 import com.winlator.cmod.core.ForensicIssueComposer;
 import com.winlator.cmod.core.ForensicLogger;
@@ -669,8 +668,8 @@ public class ForensicCenterFragment extends Fragment {
 
         String day = DateFormat.format("yyyy-MM-dd", new Date()).toString();
         File outFile = ForensicLogger.createExportFile(context, String.format(Locale.US, "forensics_session_%s.jsonl", day));
-        String exportBody = ForensicLogger.buildExportBodyForDay(context, latestFile, tail, day);
-        if (!FileUtils.writeString(outFile, exportBody)) {
+        ForensicLogger.ExportResult exportResult = ForensicLogger.exportBodyForDayToFile(context, latestFile, tail, day, outFile);
+        if (!exportResult.success) {
             AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
             return;
         }
@@ -686,7 +685,10 @@ public class ForensicCenterFragment extends Fragment {
                         "source_file", latestFile != null ? latestFile.getAbsolutePath() : "",
                         "source_file_size", latestFile != null && latestFile.isFile() ? latestFile.length() : 0L,
                         "export_file", outFile.getAbsolutePath(),
-                        "export_chars", exportBody.length(),
+                        "export_chars", exportResult.charCount,
+                        "export_bytes", exportResult.byteCount,
+                        "export_files", exportResult.fileCount,
+                        "export_lines", exportResult.lineCount,
                         "tail_chars", tail != null ? tail.length() : 0
                 )
         );

@@ -187,6 +187,27 @@ public class ImageFs {
                                 "target_exists", targetRoot.exists()
                 )
         );
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "RUNTIME_ROOTFS_BOUND",
+                null,
+                        "rootfs",
+                        "runtime_rootfs_bound",
+                        ForensicLogger.fields(
+                                "runtime_model", normalizedRuntimeModel,
+                                "runtime_identity", normalizedRuntimeIdentity,
+                                "package_isolated", !normalizedRuntimeIdentity.isEmpty(),
+                                "active_root", activeRoot.getAbsolutePath(),
+                                "target_root", targetRoot.getAbsolutePath(),
+                                "target_root_name", targetRoot.getName(),
+                                "returned_root", targetRoot.getAbsolutePath(),
+                                "returned_root_is_active_alias", false,
+                                "active_is_symlink", FileUtils.isSymlink(activeRoot),
+                                "active_symlink_target", FileUtils.isSymlink(activeRoot) ? FileUtils.readSymlink(activeRoot) : "",
+                                "target_exists", targetRoot.exists()
+                )
+        );
         return targetRoot;
     }
 

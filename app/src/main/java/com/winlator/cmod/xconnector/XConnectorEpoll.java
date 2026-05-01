@@ -20,7 +20,9 @@ public class XConnectorEpoll implements Runnable {
     private final int serverFd;
     private final int shutdownFd;
     private final String socketPath;
+    private final String guestSocketPath;
     private final boolean socketAbstractNamespace;
+    private final boolean socketRelocated;
     private long acceptedConnectionCount = 0;
     private Thread epollThread;
     private boolean running = false;
@@ -38,7 +40,9 @@ public class XConnectorEpoll implements Runnable {
         this.connectionHandler = connectionHandler;
         this.requestHandler = requestHandler;
         this.socketPath = socketConfig != null ? socketConfig.path : "";
+        this.guestSocketPath = socketConfig != null ? socketConfig.guestPath : "";
         this.socketAbstractNamespace = socketConfig != null && socketConfig.abstractNamespace;
+        this.socketRelocated = socketConfig != null && socketConfig.relocated;
         setRLimitToMax();
 
         serverFd = createAFUnixSocket(socketPath, socketAbstractNamespace);
@@ -256,14 +260,18 @@ public class XConnectorEpoll implements Runnable {
     }
 
     private void logConnectorEvent(String eventId, String message, Object... fields) {
-        Object[] base = new Object[fields.length + 6];
+        Object[] base = new Object[fields.length + 10];
         base[0] = "socket_path";
         base[1] = socketPath;
         base[2] = "socket_role";
         base[3] = classifySocketRole(socketPath);
         base[4] = "socket_namespace";
         base[5] = socketAbstractNamespace ? "abstract" : "pathname";
-        System.arraycopy(fields, 0, base, 6, fields.length);
+        base[6] = "guest_socket_path";
+        base[7] = guestSocketPath;
+        base[8] = "socket_relocated";
+        base[9] = socketRelocated;
+        System.arraycopy(fields, 0, base, 10, fields.length);
         ForensicLogger.logEvent(
                 ForensicLogger.getAppContext(),
                 "info",

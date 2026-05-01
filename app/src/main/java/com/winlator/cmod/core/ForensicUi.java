@@ -357,8 +357,8 @@ public final class ForensicUi {
     private static void exportForensicSnapshot(Context context, File latestFile, String tail) {
         String ts = DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()).toString();
         File outFile = ForensicLogger.createExportFile(context, String.format(Locale.US, "forensics_%s.jsonl", ts));
-        String exportBody = ForensicLogger.buildExportBody(context, latestFile, tail);
-        if (!FileUtils.writeString(outFile, exportBody)) {
+        ForensicLogger.ExportResult exportResult = ForensicLogger.exportBodyToFile(context, latestFile, tail, outFile);
+        if (!exportResult.success) {
             AppUtils.showToast(context, R.string.diagnostics_forensic_log_export_fail);
             return;
         }
@@ -374,7 +374,10 @@ public final class ForensicUi {
                         "source_file", latestFile != null ? latestFile.getAbsolutePath() : "",
                         "source_file_size", latestFile != null && latestFile.isFile() ? latestFile.length() : 0L,
                         "export_file", outFile.getAbsolutePath(),
-                        "export_chars", exportBody.length(),
+                        "export_chars", exportResult.charCount,
+                        "export_bytes", exportResult.byteCount,
+                        "export_files", exportResult.fileCount,
+                        "export_lines", exportResult.lineCount,
                         "tail_chars", tail != null ? tail.length() : 0
                 )
         );

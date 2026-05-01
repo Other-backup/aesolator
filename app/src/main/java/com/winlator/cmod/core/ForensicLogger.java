@@ -324,16 +324,7 @@ public final class ForensicLogger {
     }
 
     public static String buildExportBodyForDay(Context context, File preferredFile, String fallbackTail, String dayKey) {
-        ArrayList<File> files = getForensicLogFiles(context);
-        if (dayKey != null && !dayKey.trim().isEmpty()) {
-            String normalizedDay = dayKey.trim();
-            files.removeIf(file -> file == null || !isForensicFileForDay(file, normalizedDay));
-        }
-        if (preferredFile != null && preferredFile.isFile()) {
-            String preferredPath = preferredFile.getAbsolutePath();
-            files.removeIf(file -> preferredPath.equals(file.getAbsolutePath()));
-            files.add(0, preferredFile);
-        }
+        ArrayList<File> files = collectExportFiles(context, preferredFile, dayKey);
         if (files.isEmpty()) return fallbackTail == null ? "" : fallbackTail;
 
         StringBuilder out = new StringBuilder();
@@ -352,6 +343,97 @@ public final class ForensicLogger {
             }
         }
         return out.toString().trim();
+    }
+
+    public static ExportResult exportBodyToFile(Context context, File preferredFile, String fallbackTail, File outFile) {
+        return exportBodyForDayToFile(context, preferredFile, fallbackTail, DateFormat.format("yyyy-MM-dd", new Date()).toString(), outFile);
+    }
+
+    public static ExportResult exportBodyForDayToFile(Context context, File preferredFile, String fallbackTail, String dayKey, File outFile) {
+        if (outFile == null) return ExportResult.failed("missing_output_file");
+        File parent = outFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
+            return ExportResult.failed("output_parent_mkdir_failed");
+        }
+
+        ArrayList<File> files = collectExportFiles(context, preferredFile, dayKey);
+        ExportResult result = new ExportResult(true);
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outFile, false))) {
+            if (files.isEmpty()) {
+                if (fallbackTail != null && !fallbackTail.isEmpty()) {
+                    result.add(writeExportLine(writer, fallbackTail));
+                }
+            }
+            for (File file : files) {
+                if (file == null || !file.isFile() || !seen.add(file.getAbsolutePath())) continue;
+                result.fileCount++;
+                result.add(writeExportLine(writer, buildExportSourceLine(file)));
+                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        result.add(writeExportLine(writer, line));
+                    }
+                }
+                catch (IOException e) {
+                    result.add(writeExportLine(writer, buildExportReadErrorLine(file, e)));
+                }
+            }
+            writer.flush();
+            result.byteCount = outFile.length();
+            return result;
+        }
+        catch (IOException e) {
+            return ExportResult.failed(e.getClass().getSimpleName() + ":" + String.valueOf(e.getMessage()));
+        }
+    }
+
+    private static ArrayList<File> collectExportFiles(Context context, File preferredFile, String dayKey) {
+        ArrayList<File> files = getForensicLogFiles(context);
+        if (dayKey != null && !dayKey.trim().isEmpty()) {
+            String normalizedDay = dayKey.trim();
+            files.removeIf(file -> file == null || !isForensicFileForDay(file, normalizedDay));
+        }
+        if (preferredFile != null && preferredFile.isFile()) {
+            String preferredPath = preferredFile.getAbsolutePath();
+            files.removeIf(file -> preferredPath.equals(file.getAbsolutePath()));
+            files.add(0, preferredFile);
+        }
+        return files;
+    }
+
+    private static long writeExportLine(BufferedWriter writer, String line) throws IOException {
+        String value = line != null ? line : "";
+        writer.write(value);
+        writer.newLine();
+        return value.length() + 1L;
+    }
+
+    public static final class ExportResult {
+        public final boolean success;
+        public int fileCount;
+        public long lineCount;
+        public long charCount;
+        public long byteCount;
+        public final String error;
+
+        private ExportResult(boolean success) {
+            this(success, "");
+        }
+
+        private ExportResult(boolean success, String error) {
+            this.success = success;
+            this.error = error != null ? error : "";
+        }
+
+        private static ExportResult failed(String error) {
+            return new ExportResult(false, error);
+        }
+
+        private void add(long charsWritten) {
+            lineCount++;
+            charCount += charsWritten;
+        }
     }
 
     private static boolean isForensicFileForDay(File file, String dayKey) {
