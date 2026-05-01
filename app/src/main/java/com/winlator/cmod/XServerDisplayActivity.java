@@ -8887,7 +8887,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File sourceIcdFile = resolveWrapperIcdSourceFile();
         if (sourceIcdFile == null) return null;
         File androidHostIcd = rewriteWrapperIcdForAndroidHost(sourceIcdFile);
-        return androidHostIcd != null && androidHostIcd.isFile() ? androidHostIcd : sourceIcdFile;
+        return androidHostIcd != null && androidHostIcd.isFile() ? androidHostIcd : null;
     }
 
     private int resolveWrapperIcdApiMinor(@Nullable File wrapperIcdFile) {
@@ -9314,13 +9314,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         if (GraphicsDrivers.isWrapper(normalizedGraphicsDriver)) {
-            File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
             File selectedWrapperIcd = resolveWrapperIcdFile();
-            String wrapperIcdPath = selectedWrapperIcd != null && selectedWrapperIcd.isFile()
-                    ? selectedWrapperIcd.getAbsolutePath()
-                    : imageFsWrapperIcd.getAbsolutePath();
-            envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
-            envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+            if (selectedWrapperIcd != null && selectedWrapperIcd.isFile()) {
+                String wrapperIcdPath = selectedWrapperIcd.getAbsolutePath();
+                envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
+                envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+            } else {
+                envVars.remove("VK_ICD_FILENAMES");
+                envVars.remove("VK_DRIVER_FILES");
+                envVars.put("AERO_VULKAN_WRAPPER_DEGRADED", "android_host_dependency_closure_unsatisfied");
+            }
             applyGraphicsRouteDefaults(vulkanPrimaryRoute, socClass);
             applyGraphicsDriverPackages(adrenoToolsDriverId, vulkanPrimaryRoute);
             applyWrapperGraphicsConfigEnv(rootDir, adrenoToolsDriverId, useDRI3, dri3ForceSwWsi, dri3PresentWait);
@@ -9337,15 +9340,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : resolveOpenGlBridgeTurnipInfo(adrenotoolsManager, adrenoToolsDriverId);
             VortekVulkanDriverPackageManager.PackageInfo companionAeMaliPanvkInfo = null;
             String openGlBridgeVulkanDegradedReason = "";
-            File imageFsWrapperIcd = new File(imageFs.getShareDir(), "vulkan/icd.d/wrapper_icd.aarch64.json");
             File selectedWrapperIcd = resolveWrapperIcdFile();
-            String wrapperIcdPath = selectedWrapperIcd != null && selectedWrapperIcd.isFile()
-                    ? selectedWrapperIcd.getAbsolutePath()
-                    : imageFsWrapperIcd.getAbsolutePath();
             int wrapperIcdApiMinor = resolveWrapperIcdApiMinor(selectedWrapperIcd);
             if (!openGlRouteWithoutVulkanCompanion) {
-                envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
-                envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+                if (selectedWrapperIcd != null && selectedWrapperIcd.isFile()) {
+                    String wrapperIcdPath = selectedWrapperIcd.getAbsolutePath();
+                    envVars.put("VK_ICD_FILENAMES", wrapperIcdPath);
+                    envVars.put("VK_DRIVER_FILES", wrapperIcdPath);
+                } else {
+                    envVars.remove("VK_ICD_FILENAMES");
+                    envVars.remove("VK_DRIVER_FILES");
+                    envVars.put("AERO_VULKAN_WRAPPER_DEGRADED", "android_host_dependency_closure_unsatisfied");
+                }
             }
 
             if (!openGlRouteWithoutVulkanCompanion && !maliSoC && companionTurnipInfo != null) {

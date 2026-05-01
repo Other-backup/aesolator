@@ -22,6 +22,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -633,7 +634,7 @@ public class ContentsManager {
         }
         if (!destination.exists() && !destination.mkdirs()) return false;
 
-        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+        try (InputStream inputStream = openImportInputStream(uri);
              ZipInputStream zis = inputStream == null ? null : new ZipInputStream(inputStream)) {
             if (zis == null) return false;
             ZipEntry entry;
@@ -649,6 +650,7 @@ public class ContentsManager {
                         FileUtils.delete(destination);
                         return false;
                     }
+                    zis.closeEntry();
                     continue;
                 }
 
@@ -658,6 +660,7 @@ public class ContentsManager {
                     return false;
                 }
                 Files.copy(zis, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                zis.closeEntry();
                 extractedAnything = true;
             }
             if (!extractedAnything) {
@@ -672,6 +675,17 @@ public class ContentsManager {
 
     private File getSafeZipEntryFile(File rootDir, ZipEntry entry) throws IOException {
         return FileUtils.resolveSafeArchiveEntry(rootDir, entry.getName());
+    }
+
+    @Nullable
+    private InputStream openImportInputStream(Uri uri) throws IOException {
+        if (uri == null) return null;
+        if ("file".equalsIgnoreCase(uri.getScheme())) {
+            String path = uri.getPath();
+            if (path == null || path.trim().isEmpty()) return null;
+            return new FileInputStream(new File(path));
+        }
+        return context.getContentResolver().openInputStream(uri);
     }
 
     @NonNull

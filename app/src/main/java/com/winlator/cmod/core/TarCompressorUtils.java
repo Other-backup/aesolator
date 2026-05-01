@@ -211,8 +211,9 @@ public abstract class TarCompressorUtils {
     public static boolean extract(Type type, Context context, Uri source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null) return false;
         try {
-            if (source.toString().startsWith("/")) {
-                return extract(type, new File(source.toString()), destination, onExtractFileListener);
+            File sourceFile = resolveFileUri(source);
+            if (sourceFile != null) {
+                return extract(type, sourceFile, destination, onExtractFileListener);
             } else {
                 return extract(type, context.getContentResolver().openInputStream(source), destination, onExtractFileListener);
             }
@@ -229,14 +230,26 @@ public abstract class TarCompressorUtils {
     public static boolean extractTar(Context context, Uri source, File destination, OnExtractFileListener onExtractFileListener) {
         if (source == null) return false;
         try {
-            if (source.toString().startsWith("/")) {
-                return extractTar(new File(source.toString()), destination, onExtractFileListener);
+            File sourceFile = resolveFileUri(source);
+            if (sourceFile != null) {
+                return extractTar(sourceFile, destination, onExtractFileListener);
             }
             return extractTar(context.getContentResolver().openInputStream(source), destination, onExtractFileListener);
         }
         catch (FileNotFoundException e) {
             return false;
         }
+    }
+
+    private static File resolveFileUri(Uri source) {
+        if (source == null) return null;
+        if ("file".equalsIgnoreCase(source.getScheme())) {
+            String path = source.getPath();
+            return path == null || path.trim().isEmpty() ? null : new File(path);
+        }
+        String raw = source.toString();
+        if (raw.startsWith("/")) return new File(raw);
+        return null;
     }
 
     public static boolean extract(Type type, File source, File destination) {
@@ -422,5 +435,4 @@ public abstract class TarCompressorUtils {
 
 
 }
-
 
