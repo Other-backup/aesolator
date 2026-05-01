@@ -90,6 +90,12 @@ public class Downloader {
                 boolean partialResponse = responseCode == HttpURLConnection.HTTP_PARTIAL;
                 boolean okResponse = responseCode == HttpURLConnection.HTTP_OK;
                 if (!partialResponse && !okResponse) {
+                    if (responseCode == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE
+                            && resumeFrom > 0L
+                            && finalizeDownload(partFile, file)) {
+                        safeDelete(metaFile);
+                        return true;
+                    }
                     continue;
                 }
 
@@ -134,6 +140,10 @@ public class Downloader {
                 closeQuietly(input);
                 if (connection != null) connection.disconnect();
             }
+        }
+        if (partFile.isFile() && partFile.length() > 0L && finalizeDownload(partFile, file)) {
+            safeDelete(metaFile);
+            return true;
         }
         return false;
     }
