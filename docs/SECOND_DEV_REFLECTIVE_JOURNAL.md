@@ -3267,3 +3267,22 @@
   `preBuild` no longer drags network mutation into the task graph,
   and the remaining build tail is reduced to narrower Gradle/AGP cleanup
   instead of host-drift folklore.
+
+### Entry 122: browser-interface migration restored full Codex context from split backup + rollout archives
+
+- Goal: rehydrate operational memory and execution posture after moving from
+  CLI sessions to browser sessions without losing Chapter 2 continuity.
+- Context: external network egress in the runtime environment was proxy-blocked
+  (`403 CONNECT`) for Drive/Mega/apt, so context restoration had to come from
+  local split archives staged in repo root.
+- Decision: reassemble and unpack `backup.zip.001..003` and
+  `rollout.zip.001..011`, then rebuild active context from those artifacts
+  before any new implementation pass.
+- Tradeoff: ingesting very large rollout history is slower than starting a new
+  lane, but it preserves contract truth, decision lineage, and defect-class
+  memory, which is mandatory for Black Diamond closure quality.
+- Verification: archive listing and extraction succeeded, and latest rollout
+  stream confirms active forensic-led continuation context.
+- Next step: run the next implementation pass against fresh user-sent forensic
+  bundles, with `wcp-runtime-lanes` GitHub releases treated as the runtime
+  build source of truth and no-`adb` intake as the default until restored.

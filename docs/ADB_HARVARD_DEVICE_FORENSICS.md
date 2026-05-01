@@ -12,6 +12,19 @@ This runbook defines the device-side automation loop for the Winlator matrix:
 ## Master Engineering Directive
 
 Device forensics follows `docs/MASTER_ENGINEERING_DIRECTIVE.md`.
+
+## No-ADB fallback (current migration lane)
+
+When `adb` is unavailable, do not block forensic closure work. Use the
+app-owned external forensic outputs as the primary source:
+
+- `/storage/emulated/0/Ae.solator/logs/forensics/*.jsonl`
+- `/storage/emulated/0/Ae.solator/logs/fatal_crash_*.txt`
+- runtime stream files under `/storage/emulated/0/Ae.solator/logs/`
+
+In this mode, the user provides exported bundles/screenshots after autonomous
+installs, and repository-side closure continues from those artifacts plus
+code-path audits.
 Forensic logs are evidence portals, not the target: if a runtime/app/device
 defect can be fixed in source, config, package routing, or tooling, the agent
 must apply the systemic fix and verify it instead of only describing the

@@ -7,6 +7,10 @@ This document is the canonical operating contract for Codex inside
 forensic process so the agent follows one coherent model instead of drifting
 between ad-hoc prompts.
 
+Migration addendum (2026-05-01): browser-interface continuity is active.
+When backup/rollout archives are present, context restoration from those
+artifacts is mandatory before continuing implementation.
+
 ## Master Engineering Directive
 
 `docs/MASTER_ENGINEERING_DIRECTIVE.md` is a hard operating rule, not a prompt
@@ -79,6 +83,9 @@ Default mode for normal implementation work.
 
 - Inspect, edit, build, test, use `adb`, and update docs when that is the
   shortest path to closure.
+- If `adb` is unavailable in the active lane, use app-owned external forensic
+  artifacts under `/storage/emulated/0/Ae.solator/logs/` and user-provided
+  forensic exports as the primary runtime truth until `adb` is restored.
 - Keep fixes minimal, reviewable, and source-backed.
 - Sync process docs in the same pass whenever build, runtime, or forensic
   behavior changes.
@@ -91,6 +98,8 @@ Default mode for normal implementation work.
   do not choose a fix from one symptom alone; correlate screenshot proof,
   forensic proof, code-path audit, and relevant donor/upstream references
   before closure.
+- During session migration/restoration, add rollout/history continuity proof as
+  a fourth evidence class alongside screenshot + forensic + code-path proof.
 - If the user declares the graphics/XServer donor lane a one-batch transfer,
   keep Java/Kotlin, JNI/native, XServer seams, assets, shipped-binary census,
   and rule/docs sync in one closure lane with no intermediate app build or APK
