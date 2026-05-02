@@ -85,6 +85,7 @@ import com.winlator.cmod.contents.MesaOpenGLDriverPackageManager;
 import com.winlator.cmod.contents.RemoteFeedPayloadLoader;
 import com.winlator.cmod.contents.RemoteProfileFeedMerger;
 import com.winlator.cmod.contents.RuntimeFeedRegistry;
+import com.winlator.cmod.contents.RuntimeLaunchPolicy;
 import com.winlator.cmod.contents.VirGLDriverPackageManager;
 import com.winlator.cmod.contents.VortekWrapperPackageManager;
 import com.winlator.cmod.contents.VortekVulkanDriverPackageManager;
@@ -358,6 +359,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String activeTemporaryOverrideAppId = "";
     private boolean activeTemporaryOverrideRestored = false;
     private int launchBindingGeneration = 1;
+    private static final String EXTRA_GLIBC_PROMOTION_PROBE_DONE =
+            "com.winlator.cmod.extra.GLIBC_PROMOTION_PROBE_DONE";
 
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
@@ -1591,37 +1594,106 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private String resolveEffectiveLaunchWineVersion(String wineVersion, String runtimeModel) {
         String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim();
-        if (!WineInfo.isMainWineVersion(normalizedWineVersion)) {
-            return normalizedWineVersion;
-        }
         if (!ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))) {
             return normalizedWineVersion;
         }
 
-        ContentProfile fallbackProfile = findPreferredMainWineRuntimeProfile(runtimeModel);
-        if (fallbackProfile == null) {
+        ContentProfile promotedProfile = resolvePromotedGlibcLaunchRuntimeProfile(normalizedWineVersion, runtimeModel);
+        if (promotedProfile == null) {
             return normalizedWineVersion;
         }
 
-        String promotedEntry = ContentsManager.getEntryName(fallbackProfile);
+        String promotedEntry = ContentsManager.getEntryName(promotedProfile);
         ForensicLogger.logEvent(
                 this,
                 "info",
-                "XSERVER_MAIN_WINE_PROMOTED",
+                WineInfo.isMainWineVersion(normalizedWineVersion)
+                        ? "XSERVER_MAIN_WINE_PROMOTED"
+                        : "XSERVER_GLIBC_RUNTIME_PROMOTED",
                 null,
                 "xserver",
-                "main_wine_promoted_to_contents_runtime",
+                WineInfo.isMainWineVersion(normalizedWineVersion)
+                        ? "main_wine_promoted_to_contents_runtime"
+                        : "glibc_runtime_promoted_before_rootfs_binding",
                 ForensicLogger.fields(
                         "requested_entry", normalizedWineVersion,
                         "promoted_entry", promotedEntry,
                         "runtime_model", runtimeModel,
-                        "locally_installed", contentsManager.isInstalledProfilePresent(fallbackProfile),
-                        "installed_present", contentsManager.isInstalledProfilePresent(fallbackProfile),
-                        "installed_usable", contentsManager.isInstalledProfileUsable(fallbackProfile),
-                        "source_label", fallbackProfile.sourceLabel
+                        "promotion_reason", resolveGlibcRuntimePromotionReason(normalizedWineVersion, runtimeModel, promotedProfile),
+                        "installed_present", contentsManager.isInstalledProfilePresent(promotedProfile),
+                        "installed_usable", contentsManager.isInstalledProfileUsable(promotedProfile),
+                        "remote_downloadable", promotedProfile.isRemoteDownloadable(),
+                        "source_label", promotedProfile.sourceLabel,
+                        "source_repo", promotedProfile.sourceRepo,
+                        "release_tag", promotedProfile.releaseTag,
+                        "architecture", promotedProfile.getArchitectureTag()
                 )
         );
         return promotedEntry;
+    }
+
+    @Nullable
+    private ContentProfile resolvePromotedGlibcLaunchRuntimeProfile(String wineVersion, String runtimeModel) {
+        if (!ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))) {
+            return null;
+        }
+
+        String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim();
+        ContentProfile current = null;
+        if (!WineInfo.isMainWineVersion(normalizedWineVersion)) {
+            String canonicalEntry = contentsManager.resolveBestRuntimeEntry(normalizedWineVersion, runtimeModel);
+            current = contentsManager.resolveBestRuntimeProfile(canonicalEntry, runtimeModel);
+            if (current == null) current = contentsManager.getProfileByEntryName(canonicalEntry);
+            if (current == null) current = contentsManager.getProfileByEntryName(normalizedWineVersion);
+        }
+
+        String requestedArch = resolveRuntimeArchHintFromEntry(normalizedWineVersion);
+        ContentProfile preferred = WineInfo.isMainWineVersion(normalizedWineVersion)
+                ? findPreferredMainWineRuntimeProfile(runtimeModel)
+                : findPreferredLaunchRuntimeProfile(null, runtimeModel, requestedArch);
+        if (preferred == null) {
+            return null;
+        }
+
+        boolean currentUsable = current != null && contentsManager.isInstalledProfileUsable(current);
+        boolean currentPresent = current != null && contentsManager.isInstalledProfilePresent(current);
+        boolean preferredUsable = contentsManager.isInstalledProfileUsable(preferred);
+        boolean preferredPresent = contentsManager.isInstalledProfilePresent(preferred);
+        return RuntimeLaunchPolicy.shouldPromoteGlibcRuntime(
+                current,
+                currentUsable,
+                currentPresent,
+                preferred,
+                preferredUsable,
+                preferredPresent,
+                normalizedWineVersion,
+                runtimeModel
+        ) ? preferred : null;
+    }
+
+    private String resolveGlibcRuntimePromotionReason(String wineVersion,
+                                                     String runtimeModel,
+                                                     @NonNull ContentProfile promotedProfile) {
+        ContentProfile current = null;
+        String normalizedWineVersion = wineVersion == null ? "" : wineVersion.trim();
+        if (!WineInfo.isMainWineVersion(normalizedWineVersion)) {
+            String canonicalEntry = contentsManager.resolveBestRuntimeEntry(normalizedWineVersion, runtimeModel);
+            current = contentsManager.resolveBestRuntimeProfile(canonicalEntry, runtimeModel);
+            if (current == null) current = contentsManager.getProfileByEntryName(canonicalEntry);
+            if (current == null) current = contentsManager.getProfileByEntryName(normalizedWineVersion);
+        }
+        boolean currentUsable = current != null && contentsManager.isInstalledProfileUsable(current);
+        boolean currentPresent = current != null && contentsManager.isInstalledProfilePresent(current);
+        return RuntimeLaunchPolicy.resolvePromotionReason(
+                current,
+                currentUsable,
+                currentPresent,
+                promotedProfile,
+                contentsManager.isInstalledProfileUsable(promotedProfile),
+                contentsManager.isInstalledProfilePresent(promotedProfile),
+                normalizedWineVersion,
+                runtimeModel
+        );
     }
 
     private void persistResolvedLaunchRuntime(String requestedWineVersion, String resolvedWineVersion, String runtimeModel) {
@@ -1630,7 +1702,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String normalizedRequested = requestedWineVersion == null ? "" : requestedWineVersion.trim();
         String normalizedResolved = resolvedWineVersion == null ? "" : resolvedWineVersion.trim();
         String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
-        if (!shouldPersistResolvedLaunchRuntime(normalizedRequested, normalizedResolved)) {
+        if (!shouldPersistResolvedLaunchRuntime(normalizedRequested, normalizedResolved, normalizedRuntimeModel)) {
             ForensicLogger.logEvent(
                     this,
                     "warn",
@@ -1678,13 +1750,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
     }
 
-    private boolean shouldPersistResolvedLaunchRuntime(String requestedWineVersion, String resolvedWineVersion) {
+    private boolean shouldPersistResolvedLaunchRuntime(String requestedWineVersion, String resolvedWineVersion, String runtimeModel) {
         String normalizedRequested = requestedWineVersion == null ? "" : requestedWineVersion.trim();
         String normalizedResolved = resolvedWineVersion == null ? "" : resolvedWineVersion.trim();
         if (normalizedResolved.isEmpty()) return false;
         if (normalizedRequested.isEmpty()) return true;
         if (normalizedRequested.equalsIgnoreCase(normalizedResolved)) return true;
-        return WineInfo.isMainWineVersion(normalizedRequested);
+        return WineInfo.isMainWineVersion(normalizedRequested)
+                || RuntimeLaunchPolicy.shouldPersistPromotedGlibcRuntime(normalizedRequested, normalizedResolved, runtimeModel);
     }
 
     @Nullable
@@ -1750,17 +1823,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private int computePreferredLaunchRuntimeScore(@NonNull ContentProfile profile) {
-        int score = 0;
-        if (contentsManager.isInstalledProfileUsable(profile)) score += 40;
-        else if (contentsManager.isInstalledProfilePresent(profile)) score += 10;
-        if (profile.isProtonLike()) score += 20;
-        String archTag = profile.getArchitectureTag();
-        if ("arm64ec".equalsIgnoreCase(archTag)) score += 12;
-        else if ("bundle".equalsIgnoreCase(archTag)) score += 10;
-        else if ("x86_64".equalsIgnoreCase(archTag)) score += 6;
-        else if ("generic".equalsIgnoreCase(archTag)) score += 2;
-        if (ContentProfile.CHANNEL_NIGHTLY.equals(profile.getChannel())) score += 1;
-        return score;
+        return RuntimeLaunchPolicy.computePreferredLaunchRuntimeScore(
+                profile,
+                contentsManager.isInstalledProfileUsable(profile),
+                contentsManager.isInstalledProfilePresent(profile)
+        );
     }
 
     private int comparePublishedAt(String left, String right) {
@@ -1942,6 +2009,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
             return true;
         }
+        if (isRuntimeProfileReady(launchProfile)
+                && shouldProbeGlibcRuntimePromotion(wineVersion, runtimeModel, launchProfile)) {
+            return hydrateAndMaybePromoteReadyGlibcRuntime(wineVersion, runtimeModel, launchProfile, launchGeneration, restartIntent);
+        }
         if (isRuntimeProfileReady(launchProfile)) {
             logRuntimeReadinessCheckpoint(
                     "XSERVER_RUNTIME_READY",
@@ -2023,6 +2094,120 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return true;
     }
 
+    private boolean hydrateAndMaybePromoteReadyGlibcRuntime(String wineVersion,
+                                                           String runtimeModel,
+                                                           @NonNull ContentProfile currentProfile,
+                                                           int launchGeneration,
+                                                           @NonNull Intent restartIntent) {
+        preloaderDialog.show(R.string.installing_content);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            String currentEntry = ContentsManager.getEntryName(currentProfile);
+            logBootstrapCheckpoint(
+                    "XSERVER_GLIBC_RUNTIME_PROMOTION_HYDRATE_BEGIN",
+                    "glibc_runtime_promotion_hydration_begin",
+                    "requested_entry", safeTrim(wineVersion),
+                    "runtime_model", safeTrim(runtimeModel),
+                    "current_entry", currentEntry,
+                    "current_source", safeTrim(currentProfile.sourceRepo)
+            );
+            hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel);
+            ContentProfile promotedProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
+            boolean sameProfile = isSameRuntimeProfile(currentProfile, promotedProfile);
+            boolean promoted = promotedProfile != null
+                    && !sameProfile
+                    && RuntimeLaunchPolicy.shouldPromoteGlibcRuntime(
+                    currentProfile,
+                    contentsManager.isInstalledProfileUsable(currentProfile),
+                    contentsManager.isInstalledProfilePresent(currentProfile),
+                    promotedProfile,
+                    contentsManager.isInstalledProfileUsable(promotedProfile),
+                    contentsManager.isInstalledProfilePresent(promotedProfile),
+                    wineVersion,
+                    runtimeModel
+            );
+            boolean installedFromRemote = false;
+            boolean ready = !promoted || isRuntimeProfileReady(promotedProfile);
+            if (promoted && !ready && promotedProfile != null && promotedProfile.isRemoteDownloadable()) {
+                logBootstrapCheckpoint(
+                        "XSERVER_GLIBC_RUNTIME_PROMOTION_INSTALL_BEGIN",
+                        "glibc_runtime_promotion_remote_install_begin",
+                        "requested_entry", safeTrim(wineVersion),
+                        "runtime_model", safeTrim(runtimeModel),
+                        "current_entry", currentEntry,
+                        "promoted_entry", ContentsManager.getEntryName(promotedProfile)
+                );
+                installedFromRemote = installRemoteRuntimeProfile(promotedProfile);
+                ready = installedFromRemote && isRuntimeProfileReady(promotedProfile);
+            }
+            ContentProfile resultProfile = promoted ? promotedProfile : currentProfile;
+            logRuntimeReadinessCheckpoint(
+                    promoted ? "XSERVER_GLIBC_RUNTIME_PROMOTION_RESULT" : "XSERVER_GLIBC_RUNTIME_PROMOTION_UNCHANGED",
+                    promoted ? "glibc_runtime_promotion_result" : "glibc_runtime_promotion_kept_current_runtime",
+                    wineVersion,
+                    runtimeModel,
+                    resultProfile
+            );
+            logBootstrapCheckpoint(
+                    "XSERVER_GLIBC_RUNTIME_PROMOTION_GATE_RESULT",
+                    "glibc_runtime_promotion_gate_result",
+                    "requested_entry", safeTrim(wineVersion),
+                    "runtime_model", safeTrim(runtimeModel),
+                    "current_entry", currentEntry,
+                    "promoted", promoted ? "1" : "0",
+                    "promoted_entry", promotedProfile != null ? ContentsManager.getEntryName(promotedProfile) : "-",
+                    "installed_from_remote", installedFromRemote ? "1" : "0",
+                    "ready", ready ? "1" : "0"
+            );
+            boolean finalReady = ready;
+            boolean finalPromoted = promoted;
+            runOnUiThread(() -> {
+                if (!isLaunchBindingCurrent(launchGeneration)) {
+                    logBootstrapCheckpoint(
+                            "XSERVER_GLIBC_RUNTIME_PROMOTION_GATE_STALE",
+                            "glibc_runtime_promotion_ignored_for_stale_launch_binding",
+                            "requested_entry", safeTrim(wineVersion),
+                            "runtime_model", safeTrim(runtimeModel)
+                    );
+                    preloaderDialog.closeOnUiThread();
+                    return;
+                }
+                preloaderDialog.closeOnUiThread();
+                if (finalPromoted && !finalReady) {
+                    AppUtils.showToast(this, R.string.unable_to_install_content);
+                    finish();
+                    return;
+                }
+
+                restartIntent.putExtra(EXTRA_GLIBC_PROMOTION_PROBE_DONE, true);
+                restartIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                recreateForLaunchRelaunch(restartIntent);
+            });
+        });
+        return true;
+    }
+
+    private boolean shouldProbeGlibcRuntimePromotion(String wineVersion,
+                                                    String runtimeModel,
+                                                    @NonNull ContentProfile currentProfile) {
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_GLIBC_PROMOTION_PROBE_DONE, false)) {
+            return false;
+        }
+        if (!ContentProfile.RUNTIME_MODEL_GLIBC.equals(ContentProfile.normalizeRuntimeModel(runtimeModel))) {
+            return false;
+        }
+        if (!currentProfile.isWineProtonFamily() || currentProfile.isProtonLike()) {
+            return RuntimeLaunchPolicy.isKnownLegacyGlibcLaunchRisk(currentProfile, wineVersion);
+        }
+        return true;
+    }
+
+    private boolean isSameRuntimeProfile(@Nullable ContentProfile left, @Nullable ContentProfile right) {
+        if (left == null || right == null) return false;
+        String leftEntry = ContentsManager.getEntryName(left);
+        String rightEntry = ContentsManager.getEntryName(right);
+        return !leftEntry.isEmpty() && leftEntry.equalsIgnoreCase(rightEntry);
+    }
+
     private void logRuntimeReadinessCheckpoint(String eventId,
                                                String message,
                                                String wineVersion,
@@ -2075,6 +2260,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private ContentProfile resolveLaunchRuntimeCandidate(String wineVersion, String runtimeModel) {
         if (WineInfo.isMainWineVersion(wineVersion)) {
             return findPreferredMainWineRuntimeProfile(runtimeModel);
+        }
+
+        ContentProfile promotedGlibcProfile = resolvePromotedGlibcLaunchRuntimeProfile(wineVersion, runtimeModel);
+        if (promotedGlibcProfile != null) {
+            return promotedGlibcProfile;
         }
 
         String canonicalEntry = contentsManager.resolveBestRuntimeEntry(wineVersion, runtimeModel);
