@@ -75,6 +75,14 @@ public class RuntimeFeedRegistryTest {
     }
 
     @Test
+    public void nightliesExposeTurnipGpuDriverFeed() {
+        assertTrue(RuntimeFeedRegistry.getFeedsForSourceMode(
+                RuntimeFeedRegistry.SOURCE_MODE_NIGHTLIES,
+                ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER
+        ).stream().anyMatch(feed -> "nightlies".equals(feed.sourceFeedId)));
+    }
+
+    @Test
     public void launchHydrationPrefersBionicFeedsForBionicRuntime() {
         ArrayList<RuntimeFeedRegistry.FeedSpec> feeds = RuntimeFeedRegistry.getLaunchHydrationFeeds("bionic", "freewine11");
         String joinedIds = feeds.stream().map(feed -> feed.sourceFeedId).collect(Collectors.joining(" "));

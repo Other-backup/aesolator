@@ -178,4 +178,16 @@ public class ContentProfileParserTest {
         assertEquals("payload/bin/box64", profile.fileList.get(0).source);
         assertEquals("${localbin}/box64", profile.fileList.get(0).target);
     }
+
+    @Test
+    public void mapsNightliesGpuDriverAliasToTurnipDriver() {
+        assertEquals(
+                ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER,
+                ContentProfile.ContentType.getTypeByName("GpuDriver")
+        );
+        assertEquals(
+                ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER,
+                ContentProfile.ContentType.getTypeByName("Vulkan Driver")
+        );
+    }
 }

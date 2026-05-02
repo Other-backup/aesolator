@@ -79,7 +79,13 @@ public class ContentProfile {
                 return normalized.contains("proton") ? CONTENT_TYPE_PROTON : CONTENT_TYPE_WINE;
             }
 
-            if (normalized.equals("turnipdriver") || normalized.equals("turnip driver") || normalized.equals("turnip")) {
+            if (normalized.equals("turnipdriver")
+                    || normalized.equals("turnip driver")
+                    || normalized.equals("turnip")
+                    || normalized.equals("gpudriver")
+                    || normalized.equals("gpu driver")
+                    || normalized.equals("vulkan driver")
+                    || normalized.equals("vulkandriver")) {
                 return CONTENT_TYPE_TURNIP_DRIVER;
             }
             if (normalized.equals("opengldriver") || normalized.equals("opengl driver")) return CONTENT_TYPE_OPENGL_DRIVER;

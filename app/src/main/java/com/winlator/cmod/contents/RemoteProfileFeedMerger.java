@@ -217,6 +217,10 @@ public final class RemoteProfileFeedMerger {
             if (normalizedUrl.endsWith(".wcp")) return 40;
             if (normalizedUrl.endsWith(".zip")) return 30;
         }
+        if ("turnipdriver".equals(normalizedType) || "opengldriver".equals(normalizedType)) {
+            if (normalizedUrl.endsWith(".wcp")) return 40;
+            if (normalizedUrl.endsWith(".zip")) return 35;
+        }
         return 10;
     }
 

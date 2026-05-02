@@ -379,6 +379,7 @@ public final class GamehubFeedNormalizer {
         }
         if (lower.contains("vkd3d-proton")) return ContentProfile.ContentType.CONTENT_TYPE_VKD3D;
         if (lower.contains("dxvk")) return ContentProfile.ContentType.CONTENT_TYPE_DXVK;
+        if (lower.contains("turnip")) return ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER;
         if (lower.contains("fex")) return ContentProfile.ContentType.CONTENT_TYPE_FEXCORE;
         if (lower.contains("wowbox64")) return ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64;
         if (lower.contains("wow64") && lower.contains("box64")) return ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64;
@@ -413,6 +414,7 @@ public final class GamehubFeedNormalizer {
         if (type == null) return "";
         String lower = rawName == null ? "" : rawName.trim().toLowerCase(Locale.US);
         if (type == ContentProfile.ContentType.CONTENT_TYPE_VKD3D && lower.contains("proton")) return "VKD3D-Proton";
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_TURNIP_DRIVER) return "Turnip";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64) return "WOWBox64";
         if (type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) return "FEXCore";
         return type.toString();
