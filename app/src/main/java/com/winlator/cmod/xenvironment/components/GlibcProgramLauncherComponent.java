@@ -228,12 +228,20 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             launchEnv.put("PROOT_LOADER", contract.loaderPath);
             launchEnv.put("PROOT_TMP_DIR", contract.tmpPath);
             launchEnv.put("PROOT_IGNORE_MISSING_BINDINGS", "1");
+            launchEnv.put("PROOT_NO_SECCOMP", "1");
+            launchEnv.put("AERO_GLIBC_PROOT_SECCOMP_DISABLED", "1");
             launchEnv.put("AERO_GLIBC_PROOT_ROOTFS", "1");
+            launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "glibc_proot_guest_root");
         } else if (launchEnv != null) {
             launchEnv.remove("PROOT_LOADER");
             launchEnv.remove("PROOT_TMP_DIR");
             launchEnv.remove("PROOT_IGNORE_MISSING_BINDINGS");
+            launchEnv.remove("PROOT_NO_SECCOMP");
+            launchEnv.remove("AERO_GLIBC_PROOT_SECCOMP_DISABLED");
             launchEnv.remove("AERO_GLIBC_PROOT_ROOTFS");
+            if (contract.hostBoundInterpreter) {
+                launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "glibc_host_interpreter_bound");
+            }
         }
         ForensicLogger.logEvent(
                 context,
@@ -253,7 +261,9 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "loader_present", contract.loaderPresent,
                         "tmp_path", contract.tmpPath,
                         "tmp_present", contract.tmpPresent,
-                        "proot_no_seccomp_supported", false,
+                        "proot_no_seccomp_supported", true,
+                        "proot_no_seccomp_requested", launchEnv != null && "1".equals(launchEnv.get("PROOT_NO_SECCOMP")),
+                        "redirect_mode", launchEnv != null ? launchEnv.get("AERO_RUNTIME_REDIRECT_MODE") : "",
                         "root_path", contract.rootPath
                 )
         );
@@ -294,6 +304,8 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             launchEnv.remove("PROOT_LOADER");
             launchEnv.remove("PROOT_TMP_DIR");
             launchEnv.remove("PROOT_IGNORE_MISSING_BINDINGS");
+            launchEnv.remove("PROOT_NO_SECCOMP");
+            launchEnv.remove("AERO_GLIBC_PROOT_SECCOMP_DISABLED");
             launchEnv.remove("AERO_GLIBC_PROOT_ROOTFS");
             launchEnv.put("AERO_GLIBC_BOX64_HOST_DIRECT", "1");
         }
@@ -352,6 +364,8 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             launchEnv.put("PROOT_LOADER", contract.loaderPath);
             launchEnv.put("PROOT_TMP_DIR", contract.tmpPath);
             launchEnv.put("PROOT_IGNORE_MISSING_BINDINGS", "1");
+            launchEnv.put("PROOT_NO_SECCOMP", "1");
+            launchEnv.put("AERO_GLIBC_PROOT_SECCOMP_DISABLED", "1");
             launchEnv.put("AERO_GLIBC_PROOT_ROOTFS", "1");
         }
 
@@ -404,6 +418,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "guest_script", guestScriptPath,
                         "command_head", summarizePathHead(command.replace(' ', ':'), 6),
                         "guest_command_head", summarizePathHead(guestCommand.replace(' ', ':'), 6),
+                        "proot_no_seccomp", launchEnv != null ? launchEnv.get("PROOT_NO_SECCOMP") : "",
                         "outer_ld_path_cleared", launchEnv == null || !launchEnv.has("LD_LIBRARY_PATH"),
                         "outer_ld_preload_cleared", launchEnv == null || !launchEnv.has("LD_PRELOAD")
                 )

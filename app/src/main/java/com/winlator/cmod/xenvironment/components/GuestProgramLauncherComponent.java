@@ -921,10 +921,17 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
 
         if (wineInfo.isArm64EC()) {
-            String hodll = effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore")
+            boolean usesFexCore = effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore");
+            String hodll = usesFexCore
                     ? "libwow64fex.dll"
                     : "wowbox64.dll";
             launchEnv.put("HODLL", hodll);
+            String hodll64 = usesFexCore ? "libarm64ecfex.dll" : "";
+            if (hodll64.isEmpty()) {
+                launchEnv.remove("HODLL64");
+            } else {
+                launchEnv.put("HODLL64", hodll64);
+            }
             ForensicLogger.logEvent(
                     context,
                     "info",
@@ -937,7 +944,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                             "effective_emulator", effectiveEmulator,
                             "desktop_shell_bootstrap", desktopShellBootstrap,
                             "guest_executable", guestExecutable != null ? guestExecutable : "",
-                            "hodll", hodll
+                            "hodll", hodll,
+                            "hodll64", hodll64
                     )
             );
             if (shouldUseWineBinaryLauncher(guestExecutable, desktopShellBootstrap)) {

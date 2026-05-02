@@ -452,6 +452,11 @@ public class ContentsManager {
                         ContentProfile profile = normalizeImportedProfile(readProfile(proFile), null);
                         if (profile != null && profile.type == type) {
                             classifyRuntimeProfileFromPayload(file, profile);
+                            if (profile.isWineProtonFamily()
+                                    && !isRuntimeRootModelCompatibleWithRequest(profile, file)) {
+                                logRuntimeModelRootMismatchSkipped(profile, file, "sync_installed_profile");
+                                continue;
+                            }
                             profile.setInstalledLocally(true);
                             registerInstalledRuntimeRoot(file, profile);
                             profiles.add(profile);
@@ -2702,6 +2707,10 @@ public class ContentsManager {
                 ContentProfile profile = normalizeImportedProfile(readProfile(profileFile), null);
                 if (profile == null || !profile.isWineProtonFamily()) continue;
                 classifyRuntimeProfileFromPayload(installRoot, profile);
+                if (!isRuntimeRootModelCompatibleWithRequest(profile, installRoot)) {
+                    logRuntimeModelRootMismatchSkipped(profile, installRoot, "runtime_overlay_repair");
+                    continue;
+                }
                 File normalizedRoot = migrateRuntimeInstallRoot(installRoot, getInstallDir(context, profile));
                 postProcessWineRuntimeInstall(normalizedRoot, profile);
                 persistProfileMetadata(new File(normalizedRoot, PROFILE_NAME), profile);

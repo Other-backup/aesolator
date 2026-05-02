@@ -23,7 +23,7 @@ public final class WineRuntimeElfInterpreterSanitizer {
     private static final String TAG = "WineElfInterpSanitizer";
     private static final int MAX_SAMPLE_COUNT = 12;
     private static final String MARKER_NAME = ".aeso_elf_interpreter_sanitizer_version";
-    private static final String MARKER_VERSION = "3";
+    private static final String MARKER_VERSION = "4";
 
     private WineRuntimeElfInterpreterSanitizer() {
     }
@@ -283,7 +283,7 @@ public final class WineRuntimeElfInterpreterSanitizer {
         File rootDir = imageFs.getRootDir();
         if (rootDir == null) return "";
 
-        String donorRelativeTarget = resolveGuestAbsoluteTargetFromDonorInterpreter(rootDir, currentInterpreter);
+        String donorRelativeTarget = resolveHostAbsoluteTargetFromDonorInterpreter(rootDir, currentInterpreter);
         if (!donorRelativeTarget.isEmpty()) return donorRelativeTarget;
 
         ArrayList<File> candidates = new ArrayList<>();
@@ -308,13 +308,13 @@ public final class WineRuntimeElfInterpreterSanitizer {
         }
 
         for (File candidate : candidates) {
-            String guestAbsoluteTarget = toGuestAbsoluteTarget(rootDir, candidate);
-            if (!guestAbsoluteTarget.isEmpty()) return guestAbsoluteTarget;
+            String hostAbsoluteTarget = toHostAbsoluteTarget(rootDir, candidate);
+            if (!hostAbsoluteTarget.isEmpty()) return hostAbsoluteTarget;
         }
         return "";
     }
 
-    private static String resolveGuestAbsoluteTargetFromDonorInterpreter(File rootDir, String currentInterpreter) {
+    private static String resolveHostAbsoluteTargetFromDonorInterpreter(File rootDir, String currentInterpreter) {
         if (rootDir == null || currentInterpreter == null) return "";
         String normalized = currentInterpreter.trim().replace('\\', '/');
         String[] anchors = new String[] {
@@ -327,23 +327,19 @@ public final class WineRuntimeElfInterpreterSanitizer {
             int index = normalized.indexOf(anchor);
             if (index < 0) continue;
             String relative = normalized.substring(index + anchor.length());
-            String target = toGuestAbsoluteTarget(rootDir, new File(rootDir, relative));
+            String target = toHostAbsoluteTarget(rootDir, new File(rootDir, relative));
             if (!target.isEmpty()) return target;
         }
         return "";
     }
 
-    private static String toGuestAbsoluteTarget(File rootDir, File candidate) {
+    private static String toHostAbsoluteTarget(File rootDir, File candidate) {
         if (rootDir == null || candidate == null || !candidate.isFile()) return "";
         try {
-            String relative = rootDir.toPath()
-                    .toAbsolutePath()
-                    .normalize()
-                    .relativize(candidate.toPath().toAbsolutePath().normalize())
-                    .toString()
-                    .replace(File.separatorChar, '/');
-            if (relative.isEmpty() || relative.startsWith("../")) return "";
-            return "/" + relative;
+            File canonicalRoot = rootDir.getCanonicalFile();
+            File canonicalCandidate = candidate.getCanonicalFile();
+            if (!canonicalCandidate.toPath().startsWith(canonicalRoot.toPath())) return "";
+            return canonicalCandidate.getAbsolutePath();
         } catch (Exception ignored) {
             return "";
         }

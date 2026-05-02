@@ -49,7 +49,7 @@ public class RemoteProfileFeedMergerTest {
                 RemoteProfileFeedMerger.classifySourceMode(
                         "andrevto-proton11",
                         "AndreVto/proton-wine Releases",
-                        "AndreVto Bionic Proton 11",
+                        "AndreVto Proton/Wine 11",
                         "https://api.github.com/repos/AndreVto/proton-wine/releases?per_page=100"
                 )
         );

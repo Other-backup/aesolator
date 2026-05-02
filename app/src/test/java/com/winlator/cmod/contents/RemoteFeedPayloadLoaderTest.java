@@ -70,13 +70,17 @@ public class RemoteFeedPayloadLoaderTest {
     }
 
     @Test
-    public void andreVtoProtonReleasePayloadStaysProtonAndBionic() {
+    public void andreVtoReleasePayloadSplitsProtonTypeAndWineTypeRuntimeModels() {
         String releasesJson = "[" +
                 "{" +
                 "\"tag_name\":\"build-20260427-1-sdk35\"," +
                 "\"target_commitish\":\"proton_11.0\"," +
                 "\"published_at\":\"2026-04-27T16:36:13Z\"," +
                 "\"assets\":[" +
+                "{" +
+                "\"name\":\"proton-11.0-1-x86_64.wcp\"," +
+                "\"browser_download_url\":\"https://github.com/AndreVto/proton-wine/releases/download/build-20260427-1-sdk35/proton-11.0-1-x86_64.wcp\"" +
+                "}," +
                 "{" +
                 "\"name\":\"proton-wine-11.0-1-x86_64.wcp.xz\"," +
                 "\"digest\":\"sha256:c6a2b2bccb65db42ba39700ac1a3c124102732c4113592c4c22900273d68309a\"," +
@@ -93,13 +97,16 @@ public class RemoteFeedPayloadLoaderTest {
 
         assertTrue(result.payload, result.hasPayload());
         assertTrue(result.payload.contains("\"type\":\"Proton\""));
+        assertTrue(result.payload.contains("proton-11.0-1-x86_64.wcp"));
         assertTrue(result.payload.contains("\"runtimeModel\":\"bionic\""));
+        assertTrue(result.payload.contains("proton-wine-11.0-1-x86_64.wcp.xz"));
+        assertTrue(result.payload.contains("\"runtimeModel\":\"glibc\""));
         assertTrue(result.payload.contains("\"sourceFeed\":\"andrevto-proton11\""));
         assertTrue(result.payload.contains("\"sha256\":\"sha256:c6a2b2bccb65db42ba39700ac1a3c124102732c4113592c4c22900273d68309a\""));
     }
 
     @Test
-    public void gamenativeProtonWineReleasePayloadProvidesBionicWineAndProtonPackages() {
+    public void gamenativeProtonWineReleasePayloadSplitsBionicAndGlibcPackages() {
         String releasesJson = "[" +
                 "{" +
                 "\"tag_name\":\"build-20260430-1-sdk35\"," +
@@ -127,6 +134,7 @@ public class RemoteFeedPayloadLoaderTest {
         assertTrue(result.payload.contains("proton-10.0-4-arm64ec.wcp"));
         assertTrue(result.payload.contains("proton-wine-10.0-4-x86_64.wcp.xz"));
         assertTrue(result.payload.contains("\"runtimeModel\":\"bionic\""));
+        assertTrue(result.payload.contains("\"runtimeModel\":\"glibc\""));
         assertTrue(result.payload.contains("\"sourceFeed\":\"gamenative-proton-wine\""));
         assertTrue(result.payload.contains("\"sourceRepo\":\"GameNative/proton-wine Releases\""));
     }

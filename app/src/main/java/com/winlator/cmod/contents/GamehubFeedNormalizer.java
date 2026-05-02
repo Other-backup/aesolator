@@ -423,6 +423,24 @@ public final class GamehubFeedNormalizer {
                 && type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             return "";
         }
+        String firstHint = "";
+        StringBuilder joinedHints = new StringBuilder();
+        if (hints != null) {
+            for (String hint : hints) {
+                if (hint == null || hint.trim().isEmpty()) continue;
+                if (firstHint.isEmpty()) firstHint = hint.trim();
+                if (joinedHints.length() > 0) joinedHints.append(' ');
+                joinedHints.append(hint.trim());
+            }
+        }
+        String normalizedAsset = firstHint.toLowerCase(Locale.US);
+        String normalizedJoined = joinedHints.toString().toLowerCase(Locale.US);
+        boolean protonWineReleaseSplit = RuntimeFeedRegistry.looksLikeAndreVtoProtonSource(normalizedJoined)
+                || RuntimeFeedRegistry.looksLikeGameNativeProtonSource(normalizedJoined);
+        if (protonWineReleaseSplit) {
+            if (normalizedAsset.startsWith("proton-wine-")) return ContentProfile.RUNTIME_MODEL_GLIBC;
+            if (normalizedAsset.startsWith("proton-")) return ContentProfile.RUNTIME_MODEL_BIONIC;
+        }
         return ContentProfile.inferRuntimeModel(type, hints);
     }
 

@@ -125,9 +125,9 @@ public final class RuntimeFeedRegistry {
     private static final FeedSpec FEED_ANDREVTO_PROTON_RELEASES = new FeedSpec(
             SOURCE_MODE_ANDREVTO_PROTON,
             "andrevto-proton11",
-            "AndreVto Bionic Proton 11",
+            "AndreVto Proton/Wine 11",
             "AndreVto/proton-wine Releases",
-            "AndreVto bionic Proton 11 package",
+            "AndreVto Proton/Wine 11 package",
             ANDREVTO_PROTON_RELEASES_URL,
             "https://api.github.com/repos/AndreVto/proton-wine/releases",
             FeedFormat.GITHUB_RELEASES,
@@ -221,12 +221,13 @@ public final class RuntimeFeedRegistry {
         ArrayList<FeedSpec> feeds = new ArrayList<>();
         String normalizedRuntimeModel = ContentProfile.normalizeRuntimeModel(runtimeModel);
         String normalizedWineVersion = normalize(wineVersion);
-        boolean wantsBionicCommunity = ContentProfile.RUNTIME_MODEL_BIONIC.equals(normalizedRuntimeModel)
+        boolean explicitlyBionicRuntime = ContentProfile.RUNTIME_MODEL_BIONIC.equals(normalizedRuntimeModel);
+        boolean wantsBionicCommunity = explicitlyBionicRuntime
                 || normalizedWineVersion.contains("freewine")
                 || normalizedWineVersion.contains("bionic")
                 || normalizedWineVersion.contains("android-native");
         boolean wantsGlibcCommunity = ContentProfile.RUNTIME_MODEL_GLIBC.equals(normalizedRuntimeModel)
-                || normalizedWineVersion.startsWith("proton-");
+                || (!explicitlyBionicRuntime && normalizedWineVersion.startsWith("proton-"));
         if (!wantsBionicCommunity && !wantsGlibcCommunity) return feeds;
 
         if (wantsBionicCommunity) {
@@ -236,6 +237,8 @@ public final class RuntimeFeedRegistry {
             feeds.add(FEED_XNICK_BIONIC_RELEASES);
         }
         if (wantsGlibcCommunity) {
+            feeds.add(FEED_GAMENATIVE_PROTON_RELEASES);
+            feeds.add(FEED_ANDREVTO_PROTON_RELEASES);
             feeds.add(FEED_WAIM_WINE_RELEASES);
             feeds.add(FEED_MOZE_WCP_RELEASES);
         }
@@ -261,6 +264,7 @@ public final class RuntimeFeedRegistry {
     public static boolean looksLikeAndreVtoProtonSource(String value) {
         String normalized = normalize(value);
         return normalized.contains("andrevto/proton-wine")
+                || normalized.contains("andrevto proton/wine 11")
                 || normalized.contains("andrevto bionic proton 11")
                 || normalized.contains("andrevto-proton11");
     }

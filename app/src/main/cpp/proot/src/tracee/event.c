@@ -52,6 +52,16 @@
 
 static bool seccomp_after_ptrace_enter = false;
 
+static bool is_seccomp_acceleration_disabled(void)
+{
+	const char *value = getenv("PROOT_NO_SECCOMP");
+	if (value != NULL && value[0] != '\0' && strcmp(value, "0") != 0)
+		return true;
+
+	value = getenv("PROOT_DISABLE_SECCOMP");
+	return value != NULL && value[0] != '\0' && strcmp(value, "0") != 0;
+}
+
 /**
  * Start @tracee->exe with the given @argv[].  This function
  * returns -errno if an error occurred, otherwise 0.
@@ -89,8 +99,10 @@ int launch_process(Tracee *tracee, char *const argv[])
 		 * does the same thing. */
 		kill(getpid(), SIGSTOP);
 
-		/* Improve performance by using seccomp mode 2  */
-		enable_syscall_filtering(tracee);
+		/* Improve performance by using seccomp mode 2 when the
+		 * Android/glibc payload did not explicitly disable it. */
+		if (!is_seccomp_acceleration_disabled())
+			enable_syscall_filtering(tracee);
 
 		/* Now process is ptraced, so the current rootfs is already the
 		 * guest rootfs.  Note: Valgrind can't handle execve(2) on
@@ -393,16 +405,26 @@ int handle_tracee_event(Tracee *tracee, int tracee_status)
 
 			deliver_sigtrap = true;
 
-			/* Try to enable seccomp mode 2...  */
-			status = ptrace(PTRACE_SETOPTIONS, tracee->pid, NULL,
-					default_ptrace_options | PTRACE_O_TRACESECCOMP);
-			if (status < 0) {
-				/* ... otherwise use default options only.  */
+			if (is_seccomp_acceleration_disabled()) {
 				status = ptrace(PTRACE_SETOPTIONS, tracee->pid, NULL,
 						default_ptrace_options);
 				if (status < 0) {
 					note(tracee, ERROR, SYSTEM, "ptrace(PTRACE_SETOPTIONS)");
 					exit(EXIT_FAILURE);
+				}
+			}
+			else {
+				/* Try to enable seccomp mode 2...  */
+				status = ptrace(PTRACE_SETOPTIONS, tracee->pid, NULL,
+						default_ptrace_options | PTRACE_O_TRACESECCOMP);
+				if (status < 0) {
+					/* ... otherwise use default options only.  */
+					status = ptrace(PTRACE_SETOPTIONS, tracee->pid, NULL,
+							default_ptrace_options);
+					if (status < 0) {
+						note(tracee, ERROR, SYSTEM, "ptrace(PTRACE_SETOPTIONS)");
+						exit(EXIT_FAILURE);
+					}
 				}
 			}
 		}

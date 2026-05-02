@@ -86,10 +86,12 @@ public class RuntimeFeedRegistryTest {
     }
 
     @Test
-    public void launchHydrationKeepsWaimForGlibcRuntime() {
+    public void launchHydrationIncludesCurrentProtonFeedsForGlibcRuntime() {
         ArrayList<RuntimeFeedRegistry.FeedSpec> feeds = RuntimeFeedRegistry.getLaunchHydrationFeeds("glibc", "proton-10.0");
         String joinedIds = feeds.stream().map(feed -> feed.sourceFeedId).collect(Collectors.joining(" "));
 
+        assertTrue(joinedIds.contains("gamenative-proton-wine"));
+        assertTrue(joinedIds.contains("andrevto-proton11"));
         assertTrue(joinedIds.contains("community-waim"));
         assertTrue(joinedIds.contains("community-moze-wcp"));
     }

@@ -24,8 +24,7 @@ final class ContentProfileIdentity {
         if (runtimeFamily) {
             return !runtimeVersionMatches(profile, remoteHint);
         }
-        return !actualVersion.equalsIgnoreCase(expectedVersion)
-                && !runtimeVersionMatches(profile, remoteHint);
+        return !actualVersion.equalsIgnoreCase(expectedVersion);
     }
 
     static boolean areEquivalentProfiles(@Nullable ContentProfile left, @Nullable ContentProfile right) {
