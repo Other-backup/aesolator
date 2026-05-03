@@ -20,6 +20,8 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -199,6 +201,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -361,6 +366,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int launchBindingGeneration = 1;
     private static final String EXTRA_GLIBC_PROMOTION_PROBE_DONE =
             "com.winlator.cmod.extra.GLIBC_PROMOTION_PROBE_DONE";
+    private static final long LAUNCH_RUNTIME_HYDRATION_TIMEOUT_MS = 8000L;
+    private static final long READY_GLIBC_PROMOTION_HYDRATION_TIMEOUT_MS = 3500L;
 
     private Handler  timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
@@ -375,6 +382,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final long DESKTOP_SHELL_BOOTSTRAP_HORIZON_MS =
             DESKTOP_SHELL_PRELOADER_FALLBACK_INITIAL_DELAY_MS
                     + (DESKTOP_SHELL_PRELOADER_FALLBACK_RETRY_MS * DESKTOP_SHELL_PRELOADER_FALLBACK_MAX_ATTEMPTS);
+    private static final class LaunchHydrationResult {
+        final boolean completed;
+        final boolean networkAvailable;
+        final boolean networkAttempted;
+        final long elapsedMs;
+        final String failureClass;
+
+        LaunchHydrationResult(boolean completed,
+                              boolean networkAvailable,
+                              boolean networkAttempted,
+                              long elapsedMs,
+                              String failureClass) {
+            this.completed = completed;
+            this.networkAvailable = networkAvailable;
+            this.networkAttempted = networkAttempted;
+            this.elapsedMs = elapsedMs;
+            this.failureClass = failureClass == null ? "" : failureClass;
+        }
+    }
     private final Handler runtimePauseHandler = new Handler(Looper.getMainLooper());
     private boolean deferredDesktopPauseScheduled = false;
     private long deferredDesktopPauseDeadlineAtMs = 0L;
@@ -1947,18 +1973,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 return false;
             }
             preloaderDialog.show(R.string.installing_content);
-            Executors.newSingleThreadExecutor().execute(() -> {
+            runtimeBootstrapExecutor.execute(() -> {
                 logBootstrapCheckpoint(
                         "XSERVER_RUNTIME_HYDRATE_BEGIN",
                         "runtime_profile_hydration_begin",
                         "requested_entry", safeTrim(wineVersion),
                         "runtime_model", safeTrim(runtimeModel)
                 );
-                hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel);
+                LaunchHydrationResult hydrationResult = hydrateLaunchRuntimeProfilesForLaunch(
+                        wineVersion,
+                        runtimeModel,
+                        LAUNCH_RUNTIME_HYDRATION_TIMEOUT_MS
+                );
+                logLaunchHydrationResult(
+                        "XSERVER_RUNTIME_HYDRATE_SOURCE_RESULT",
+                        "runtime_profile_hydration_source_result",
+                        wineVersion,
+                        runtimeModel,
+                        hydrationResult
+                );
                 ContentProfile hydratedProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
                 boolean hydratedReady = isRuntimeProfileReady(hydratedProfile);
                 boolean installedFromRemote = false;
-                if (!hydratedReady && hydratedProfile != null && hydratedProfile.isRemoteDownloadable()) {
+                if (!hydratedReady
+                        && hydratedProfile != null
+                        && hydratedProfile.isRemoteDownloadable()
+                        && canAttemptRemoteRuntimeInstall(hydratedProfile)) {
                     logBootstrapCheckpoint(
                             "XSERVER_RUNTIME_REMOTE_INSTALL_BEGIN",
                             "runtime_remote_install_begin_after_hydration",
@@ -1968,6 +2008,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     );
                     installedFromRemote = installRemoteRuntimeProfile(hydratedProfile);
                     hydratedReady = installedFromRemote && isRuntimeProfileReady(hydratedProfile);
+                } else if (!hydratedReady && hydratedProfile != null && hydratedProfile.isRemoteDownloadable()) {
+                    logRemoteRuntimeInstallBlockedOffline(hydratedProfile, wineVersion, runtimeModel);
                 }
                 boolean ready = hydratedProfile != null && hydratedReady;
                 logRuntimeReadinessCheckpoint(
@@ -2043,8 +2085,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return true;
         }
 
+        if (!canAttemptRemoteRuntimeInstall(launchProfile)) {
+            logRemoteRuntimeInstallBlockedOffline(launchProfile, wineVersion, runtimeModel);
+            AppUtils.showToast(this, R.string.unable_to_install_content);
+            finish();
+            return true;
+        }
+
         preloaderDialog.show(R.string.installing_content);
-        Executors.newSingleThreadExecutor().execute(() -> {
+        runtimeBootstrapExecutor.execute(() -> {
             logBootstrapCheckpoint(
                     "XSERVER_RUNTIME_REMOTE_INSTALL_BEGIN",
                     "runtime_remote_install_begin",
@@ -2100,7 +2149,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                                            int launchGeneration,
                                                            @NonNull Intent restartIntent) {
         preloaderDialog.show(R.string.installing_content);
-        Executors.newSingleThreadExecutor().execute(() -> {
+        runtimeBootstrapExecutor.execute(() -> {
             String currentEntry = ContentsManager.getEntryName(currentProfile);
             logBootstrapCheckpoint(
                     "XSERVER_GLIBC_RUNTIME_PROMOTION_HYDRATE_BEGIN",
@@ -2110,24 +2159,45 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     "current_entry", currentEntry,
                     "current_source", safeTrim(currentProfile.sourceRepo)
             );
-            hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel);
+            LaunchHydrationResult hydrationResult = hydrateLaunchRuntimeProfilesForLaunch(
+                    wineVersion,
+                    runtimeModel,
+                    READY_GLIBC_PROMOTION_HYDRATION_TIMEOUT_MS
+            );
+            logLaunchHydrationResult(
+                    "XSERVER_GLIBC_RUNTIME_PROMOTION_HYDRATE_SOURCE_RESULT",
+                    "glibc_runtime_promotion_hydration_source_result",
+                    wineVersion,
+                    runtimeModel,
+                    hydrationResult
+            );
             ContentProfile promotedProfile = resolveLaunchRuntimeCandidate(wineVersion, runtimeModel);
             boolean sameProfile = isSameRuntimeProfile(currentProfile, promotedProfile);
+            boolean promotedCandidateInstalled = contentsManager.isInstalledProfileUsable(promotedProfile)
+                    || contentsManager.isInstalledProfilePresent(promotedProfile);
+            boolean promotedCandidateLaunchable = promotedProfile != null
+                    && (contentsManager.isInstalledProfileUsable(promotedProfile)
+                    || (promotedProfile.isRemoteDownloadable() && canAttemptRemoteRuntimeInstall(promotedProfile)));
             boolean promoted = promotedProfile != null
                     && !sameProfile
+                    && promotedCandidateLaunchable
                     && RuntimeLaunchPolicy.shouldPromoteGlibcRuntime(
                     currentProfile,
                     contentsManager.isInstalledProfileUsable(currentProfile),
                     contentsManager.isInstalledProfilePresent(currentProfile),
                     promotedProfile,
                     contentsManager.isInstalledProfileUsable(promotedProfile),
-                    contentsManager.isInstalledProfilePresent(promotedProfile),
+                    promotedCandidateInstalled,
                     wineVersion,
                     runtimeModel
             );
             boolean installedFromRemote = false;
             boolean ready = !promoted || isRuntimeProfileReady(promotedProfile);
-            if (promoted && !ready && promotedProfile != null && promotedProfile.isRemoteDownloadable()) {
+            if (promoted
+                    && !ready
+                    && promotedProfile != null
+                    && promotedProfile.isRemoteDownloadable()
+                    && canAttemptRemoteRuntimeInstall(promotedProfile)) {
                 logBootstrapCheckpoint(
                         "XSERVER_GLIBC_RUNTIME_PROMOTION_INSTALL_BEGIN",
                         "glibc_runtime_promotion_remote_install_begin",
@@ -2138,6 +2208,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 );
                 installedFromRemote = installRemoteRuntimeProfile(promotedProfile);
                 ready = installedFromRemote && isRuntimeProfileReady(promotedProfile);
+            } else if (promoted && !ready && promotedProfile != null && promotedProfile.isRemoteDownloadable()) {
+                logRemoteRuntimeInstallBlockedOffline(promotedProfile, wineVersion, runtimeModel);
             }
             ContentProfile resultProfile = promoted ? promotedProfile : currentProfile;
             logRuntimeReadinessCheckpoint(
@@ -2327,7 +2399,79 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return lower;
     }
 
-    private void hydrateLaunchRuntimeProfiles(String wineVersion, String runtimeModel) {
+    private LaunchHydrationResult hydrateLaunchRuntimeProfilesForLaunch(String wineVersion,
+                                                                         String runtimeModel,
+                                                                         long timeoutMs) {
+        long startedAt = android.os.SystemClock.elapsedRealtime();
+        boolean networkAvailable = isLaunchHydrationNetworkAvailable();
+        if (!networkAvailable) {
+            hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel, false);
+            return new LaunchHydrationResult(
+                    true,
+                    false,
+                    false,
+                    android.os.SystemClock.elapsedRealtime() - startedAt,
+                    "network_unavailable"
+            );
+        }
+
+        ExecutorService hydrationExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread thread = new Thread(r, "XServerRuntimeHydration");
+            thread.setDaemon(true);
+            return thread;
+        });
+        Future<?> future = hydrationExecutor.submit(() -> hydrateLaunchRuntimeProfiles(wineVersion, runtimeModel, true));
+        try {
+            future.get(Math.max(1L, timeoutMs), TimeUnit.MILLISECONDS);
+            return new LaunchHydrationResult(
+                    true,
+                    true,
+                    true,
+                    android.os.SystemClock.elapsedRealtime() - startedAt,
+                    ""
+            );
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            return new LaunchHydrationResult(
+                    false,
+                    true,
+                    true,
+                    android.os.SystemClock.elapsedRealtime() - startedAt,
+                    "timeout"
+            );
+        } catch (Exception e) {
+            future.cancel(true);
+            return new LaunchHydrationResult(
+                    false,
+                    true,
+                    true,
+                    android.os.SystemClock.elapsedRealtime() - startedAt,
+                    e.getClass().getSimpleName()
+            );
+        } finally {
+            hydrationExecutor.shutdownNow();
+        }
+    }
+
+    private void logLaunchHydrationResult(String eventId,
+                                          String message,
+                                          String wineVersion,
+                                          String runtimeModel,
+                                          LaunchHydrationResult result) {
+        logBootstrapCheckpoint(
+                eventId,
+                message,
+                "requested_entry", safeTrim(wineVersion),
+                "runtime_model", safeTrim(runtimeModel),
+                "completed", result != null && result.completed ? "1" : "0",
+                "network_available", result != null && result.networkAvailable ? "1" : "0",
+                "network_attempted", result != null && result.networkAttempted ? "1" : "0",
+                "elapsed_ms", result != null ? result.elapsedMs : -1L,
+                "failure_class", result != null && !result.failureClass.isEmpty() ? result.failureClass : "-"
+        );
+    }
+
+    private void hydrateLaunchRuntimeProfiles(String wineVersion, String runtimeModel, boolean allowNetwork) {
         try {
             ArrayList<String> payloads = new ArrayList<>();
 
@@ -2339,12 +2483,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ));
             }
 
-            for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getLaunchHydrationFeeds(runtimeModel, wineVersion)) {
-                RemoteFeedPayloadLoader.FeedLoadResult result =
-                        RuntimeFeedRegistry.looksLikeNightliesSource(feed.sourceRepo + " " + feed.url)
-                                ? RemoteFeedPayloadLoader.loadNightliesPayload()
-                                : RemoteFeedPayloadLoader.loadNormalizedFeed(feed);
-                if (result.hasPayload()) payloads.add(result.payload);
+            if (allowNetwork) {
+                for (RuntimeFeedRegistry.FeedSpec feed : RuntimeFeedRegistry.getLaunchHydrationFeeds(runtimeModel, wineVersion)) {
+                    RemoteFeedPayloadLoader.FeedLoadResult result =
+                            RuntimeFeedRegistry.looksLikeNightliesSource(feed.sourceRepo + " " + feed.url)
+                                    ? RemoteFeedPayloadLoader.loadNightliesPayload()
+                                    : RemoteFeedPayloadLoader.loadNormalizedFeed(feed);
+                    if (result.hasPayload()) payloads.add(result.payload);
+                }
             }
 
             String merged = RemoteProfileFeedMerger.mergePayloads(payloads);
@@ -2354,6 +2500,58 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.w("XServerDisplayActivity", "Unable to hydrate runtime profiles for launch", e);
         }
+    }
+
+    private boolean isLaunchHydrationNetworkAvailable() {
+        try {
+            ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (connectivityManager == null) return false;
+            NetworkInfo info = connectivityManager.getActiveNetworkInfo();
+            return info != null && info.isConnected();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean canAttemptRemoteRuntimeInstall(@Nullable ContentProfile remoteProfile) {
+        if (remoteProfile == null || !remoteProfile.isRemoteDownloadable()) return false;
+        File payloadFile = getRuntimePayloadDownloadFile(remoteProfile);
+        return payloadFile.isFile() && payloadFile.length() > 0L || isLaunchHydrationNetworkAvailable();
+    }
+
+    private void logRemoteRuntimeInstallBlockedOffline(ContentProfile profile, String wineVersion, String runtimeModel) {
+        File payloadFile = getRuntimePayloadDownloadFile(profile);
+        logBootstrapCheckpoint(
+                "XSERVER_RUNTIME_REMOTE_INSTALL_BLOCKED_OFFLINE",
+                "runtime_remote_install_blocked_without_network_or_cache",
+                "requested_entry", safeTrim(wineVersion),
+                "runtime_model", safeTrim(runtimeModel),
+                "profile_entry", profile != null ? ContentsManager.getEntryName(profile) : "-",
+                "network_available", isLaunchHydrationNetworkAvailable() ? "1" : "0",
+                "payload_file", payloadFile.getAbsolutePath(),
+                "cached_bytes", payloadFile.isFile() ? payloadFile.length() : 0L
+        );
+    }
+
+    private File getRuntimePayloadDownloadFile(@Nullable ContentProfile remoteProfile) {
+        return getRuntimePayloadDownloadFile(new File(getCacheDir(), "contents-runtime-downloads"), remoteProfile);
+    }
+
+    private File getRuntimePayloadDownloadFile(File downloadDir, @Nullable ContentProfile remoteProfile) {
+        String entryName = remoteProfile != null ? ContentsManager.getEntryName(remoteProfile) : "runtime";
+        return new File(downloadDir, entryName + resolveRuntimePayloadSuffix(remoteProfile));
+    }
+
+    private String resolveRuntimePayloadSuffix(@Nullable ContentProfile remoteProfile) {
+        String remoteUrl = remoteProfile != null && remoteProfile.remoteUrl != null
+                ? remoteProfile.remoteUrl.toLowerCase(Locale.US)
+                : "";
+        if (remoteUrl.endsWith(".tzst")) return ".tzst";
+        if (remoteUrl.endsWith(".txz")) return ".txz";
+        if (remoteUrl.endsWith(".wcp.zst")) return ".wcp.zst";
+        if (remoteUrl.endsWith(".wcp.xz")) return ".wcp.xz";
+        if (remoteUrl.endsWith(".wcp")) return ".wcp";
+        return ".pkg";
     }
 
     @Nullable
@@ -2384,18 +2582,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return false;
         }
 
-        String suffix = remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".tzst")
-                ? ".tzst"
-                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".txz")
-                ? ".txz"
-                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp.zst")
-                ? ".wcp.zst"
-                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp.xz")
-                ? ".wcp.xz"
-                : remoteProfile.remoteUrl != null && remoteProfile.remoteUrl.toLowerCase(Locale.US).endsWith(".wcp")
-                ? ".wcp"
-                : ".pkg";
-        File payloadFile = new File(downloadDir, ContentsManager.getEntryName(remoteProfile) + suffix);
+        File payloadFile = getRuntimePayloadDownloadFile(downloadDir, remoteProfile);
         long cachedPayloadBytes = payloadFile.isFile() ? payloadFile.length() : 0L;
         boolean materialized = cachedPayloadBytes > 0L
                 || ContentPayloadResolver.materialize(getApplicationContext(), remoteProfile, payloadFile);

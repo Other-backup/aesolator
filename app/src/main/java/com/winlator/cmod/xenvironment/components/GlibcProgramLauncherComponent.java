@@ -57,6 +57,8 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         );
         launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "0");
         launchEnv.put("WINEESYNC_WINLATOR", "1");
+        boolean forceGlibcRootfsNamespace = shouldForceGlibcRootfsNamespace(directArm64EcGuest);
+        launchEnv.put("AERO_GLIBC_FORCE_ROOTFS_NAMESPACE", forceGlibcRootfsNamespace ? "1" : "0");
         launchEnv.putAll(Box64PresetManager.getEnvVars("box64", context, getBox64Preset()));
         if (!launchEnv.has("BOX64_NOBANNER")) {
             launchEnv.put("BOX64_NOBANNER", ProcessHelper.PRINT_DEBUG && enableBox64Logs ? "0" : "1");
@@ -84,7 +86,10 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         : "glibc_wowbox64_guest"
         );
         launchEnv.put("AERO_RUNTIME_ANDROID_BIONIC_ONLY", "0");
-        launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "glibc_interpreter_rebound");
+        boolean prootRootfs = "1".equals(launchEnv.get("AERO_GLIBC_PROOT_ROOTFS"));
+        if (!prootRootfs) {
+            launchEnv.put("AERO_RUNTIME_REDIRECT_MODE", "glibc_interpreter_rebound");
+        }
         GlibcPreloadContract preloadContract = applyGlibcOwnedPreloadContract(context, imageFs, launchEnv, "android_host_env");
         ForensicLogger.logEvent(
                 context,
@@ -97,6 +102,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "effective_emulator", effectiveEmulator,
                         "runtime_model", "glibc",
                         "redirect_mode", launchEnv.get("AERO_RUNTIME_REDIRECT_MODE"),
+                        "proot_rootfs", prootRootfs,
                         "ld_preload_removed", !preloadContract.hasPreload,
                         "ld_preload_head", summarizePreloadHead(launchEnv.get("LD_PRELOAD"), 4),
                         "redirect_preload_present", preloadContract.redirectPresent,
@@ -112,10 +118,18 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                                        String winePath, String effectiveEmulator, boolean desktopShellBootstrap) {
         String command;
         if (getWineInfo() != null && getWineInfo().isArm64EC()) {
-            if (shouldUseDirectArm64EcGuestLaunch(imageFs, effectiveEmulator, desktopShellBootstrap)) {
+            boolean directArm64EcGuest = shouldUseDirectArm64EcGuestLaunch(imageFs, effectiveEmulator, desktopShellBootstrap);
+            if (directArm64EcGuest) {
                 Log.i("GlibcProgramLauncher", "Using direct arm64ec guest launcher via " + effectiveEmulator);
                 command = super.buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
-                return wrapGlibcCommandWithProot(context, imageFs, rootDir, launchEnv, command);
+                return wrapGlibcCommandWithProot(
+                        context,
+                        imageFs,
+                        rootDir,
+                        launchEnv,
+                        command,
+                        shouldForceGlibcRootfsNamespace(directArm64EcGuest)
+                );
             }
             File wineBinary = new File(winePath, "wine");
             if (shouldWrapArm64EcWineWithBox64(wineBinary)) {
@@ -123,10 +137,10 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                 String box64Path = usrLocalBox64.isFile() ? usrLocalBox64.getPath() : imageFs.getBinDir() + "/box64";
                 Log.w("GlibcProgramLauncher", "Wrapping arm64ec wine ELF with box64: " + wineBinary.getPath());
                 command = box64Path + " " + getGuestExecutable();
-                return wrapGlibcCommandWithProot(context, imageFs, rootDir, launchEnv, command);
+                return wrapGlibcCommandWithProot(context, imageFs, rootDir, launchEnv, command, false);
             }
             command = super.buildGuestCommand(context, imageFs, rootDir, launchEnv, winePath, effectiveEmulator, desktopShellBootstrap);
-            return wrapGlibcCommandWithProot(context, imageFs, rootDir, launchEnv, command);
+            return wrapGlibcCommandWithProot(context, imageFs, rootDir, launchEnv, command, false);
         }
         File usrLocalBox64 = new File(imageFs.getLocalBinDir(), "box64");
         String box64Path = usrLocalBox64.isFile() ? usrLocalBox64.getPath() : imageFs.getBinDir() + "/box64";
@@ -223,7 +237,11 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
     private void applyGlibcProotContract(Context context, ImageFs imageFs, File rootDir,
                                          EnvVars launchEnv, boolean directArm64EcGuest) {
         sanitizeGlibcProotElfInterpreters(context, imageFs);
-        GlibcProotContract contract = buildGlibcProotContract(imageFs, rootDir);
+        GlibcProotContract contract = buildGlibcProotContract(
+                imageFs,
+                rootDir,
+                shouldForceGlibcRootfsNamespace(directArm64EcGuest)
+        );
         if (launchEnv != null && contract.shouldUse) {
             launchEnv.put("PROOT_LOADER", contract.loaderPath);
             launchEnv.put("PROOT_TMP_DIR", contract.tmpPath);
@@ -255,6 +273,9 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "should_use", contract.shouldUse,
                         "host_bound_interpreter", contract.hostBoundInterpreter,
                         "direct_arm64ec_guest", directArm64EcGuest,
+                        "force_namespace", contract.forceNamespace,
+                        "force_namespace_reason", contract.forceNamespaceReason,
+                        "skip_reason", contract.skipReason,
                         "proot_path", contract.prootPath,
                         "proot_present", contract.prootPresent,
                         "loader_path", contract.loaderPath,
@@ -336,12 +357,12 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
     }
 
     private String wrapGlibcCommandWithProot(Context context, ImageFs imageFs, File rootDir,
-                                             EnvVars launchEnv, String command) {
-        GlibcProotContract contract = buildGlibcProotContract(imageFs, rootDir);
+                                             EnvVars launchEnv, String command, boolean forceNamespace) {
+        GlibcProotContract contract = buildGlibcProotContract(imageFs, rootDir, forceNamespace);
         if (!contract.shouldUse || command == null || command.trim().isEmpty()) {
-            String status = contract.hostBoundInterpreter
+            String status = contract.skipReason.isEmpty() && contract.hostBoundInterpreter
                     ? "glibc_proot_skipped_host_bound_interpreter"
-                    : "glibc_proot_command_wrap_skipped";
+                    : contract.skipReason.isEmpty() ? "glibc_proot_command_wrap_skipped" : contract.skipReason;
             ForensicLogger.logEvent(
                     context,
                     (contract.available || contract.hostBoundInterpreter) ? "info" : "warn",
@@ -351,10 +372,15 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                     status,
                     ForensicLogger.fields(
                             "available", contract.available,
+                            "should_use", contract.shouldUse,
                             "command_empty", command == null || command.trim().isEmpty(),
                             "host_bound_interpreter", contract.hostBoundInterpreter,
+                            "force_namespace", contract.forceNamespace,
+                            "force_namespace_reason", contract.forceNamespaceReason,
+                            "skip_reason", contract.skipReason,
                             "proot_path", contract.prootPath,
-                            "loader_path", contract.loaderPath
+                            "loader_path", contract.loaderPath,
+                            "tmp_path", contract.tmpPath
                     )
             );
             return command;
@@ -414,6 +440,9 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
                         "proot_path", contract.prootPath,
                         "loader_path", contract.loaderPath,
                         "tmp_path", contract.tmpPath,
+                        "host_bound_interpreter", contract.hostBoundInterpreter,
+                        "force_namespace", contract.forceNamespace,
+                        "force_namespace_reason", contract.forceNamespaceReason,
                         "launch_script", launchScript.getAbsolutePath(),
                         "guest_script", guestScriptPath,
                         "command_head", summarizePathHead(command.replace(' ', ':'), 6),
@@ -506,7 +535,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         return path;
     }
 
-    private GlibcProotContract buildGlibcProotContract(ImageFs imageFs, File rootDir) {
+    private GlibcProotContract buildGlibcProotContract(ImageFs imageFs, File rootDir, boolean forceNamespace) {
         GlibcProotContract contract = new GlibcProotContract();
         File resolvedRoot = rootDir != null ? rootDir : (imageFs != null ? imageFs.getRootDir() : null);
         contract.rootPath = resolvedRoot != null ? resolvedRoot.getAbsolutePath() : "";
@@ -521,8 +550,21 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         contract.tmpPresent = tmp != null && tmp.isDirectory();
         contract.available = contract.prootPresent && contract.loaderPresent && contract.tmpPresent;
         contract.hostBoundInterpreter = hasHostBoundGlibcInterpreter(imageFs);
-        contract.shouldUse = contract.available && !contract.hostBoundInterpreter;
+        contract.forceNamespace = forceNamespace;
+        contract.forceNamespaceReason = forceNamespace
+                ? "direct_arm64ec_guest_requires_glibc_rootfs_namespace"
+                : "";
+        contract.shouldUse = contract.available && (!contract.hostBoundInterpreter || contract.forceNamespace);
+        if (!contract.available) {
+            contract.skipReason = "glibc_proot_unavailable";
+        } else if (contract.hostBoundInterpreter && !contract.forceNamespace) {
+            contract.skipReason = "glibc_proot_skipped_host_bound_interpreter";
+        }
         return contract;
+    }
+
+    private boolean shouldForceGlibcRootfsNamespace(boolean directArm64EcGuest) {
+        return directArm64EcGuest;
     }
 
     private void applyGlibcCwdRootAliasContract(Context context, ImageFs imageFs, File rootDir, EnvVars launchEnv) {
@@ -917,6 +959,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         boolean available;
         boolean shouldUse;
         boolean hostBoundInterpreter;
+        boolean forceNamespace;
         boolean prootPresent;
         boolean loaderPresent;
         boolean tmpPresent;
@@ -924,5 +967,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         String prootPath = "";
         String loaderPath = "";
         String tmpPath = "";
+        String forceNamespaceReason = "";
+        String skipReason = "";
     }
 }

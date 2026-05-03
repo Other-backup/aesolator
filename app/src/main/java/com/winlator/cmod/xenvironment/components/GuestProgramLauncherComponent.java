@@ -1370,7 +1370,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
         final String forensicTraceId = resolvedForensicTraceId;
 
-        // **Maybe remove this: Set execute permissions for box64 if necessary (Glibc/Proot artifact)
         File box64File = new File(rootDir, "usr/bin/box64");
         if (box64File.exists()) {
             FileUtils.chmod(box64File, 0755);
@@ -1397,6 +1396,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         final LaunchOutputRing launchOutput = new LaunchOutputRing();
         int launchedPid = ProcessHelper.exec(command, launchEnv.toStringArray(), rootDir, (status) -> {
             String outputTail = launchOutput.snapshot();
+            int exitSignal = ProcessHelper.resolveSignalFromExitStatus(status);
             ForensicLogger.logEvent(
                     context,
                     resolveLaunchExitSeverity(status, trackPrimaryPid, desktopShellBootstrap),
@@ -1406,6 +1406,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                     "launch_exec_exit",
                     ForensicLogger.fields(
                             "status", status,
+                            "exit_status_class", ProcessHelper.classifyExitStatus(status),
+                            "exit_signal", exitSignal,
+                            "exit_signal_name", ProcessHelper.resolveSignalName(exitSignal),
+                            "signal_exit", exitSignal > 0 ? "1" : "0",
                             "track_primary_pid", trackPrimaryPid,
                             "guest_executable", submittedGuestExecutable,
                             "command", command,

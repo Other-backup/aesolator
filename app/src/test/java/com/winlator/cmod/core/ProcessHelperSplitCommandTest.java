@@ -48,4 +48,16 @@ public class ProcessHelperSplitCommandTest {
         assertEquals(1200, info.ppid);
         assertEquals("wine server(arm64)", info.name);
     }
+
+    @Test
+    public void exitStatusDecoderClassifiesUnixSignalStyleStatuses() {
+        assertEquals("ok", ProcessHelper.classifyExitStatus(0));
+        assertEquals("exit_code", ProcessHelper.classifyExitStatus(1));
+        assertEquals("signal", ProcessHelper.classifyExitStatus(132));
+        assertEquals(4, ProcessHelper.resolveSignalFromExitStatus(132));
+        assertEquals("SIGILL", ProcessHelper.resolveSignalName(4));
+        assertEquals("SIGKILL", ProcessHelper.resolveSignalName(ProcessHelper.resolveSignalFromExitStatus(137)));
+        assertEquals("SIGTERM", ProcessHelper.resolveSignalName(ProcessHelper.resolveSignalFromExitStatus(143)));
+        assertEquals(0, ProcessHelper.resolveSignalFromExitStatus(255));
+    }
 }
