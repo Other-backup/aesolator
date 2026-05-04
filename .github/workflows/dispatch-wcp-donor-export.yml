@@ -1,0 +1,29 @@
+name: dispatch-wcp-donor-export
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "wcp-runtime-lanes ref"
+        required: true
+        default: "main"
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger donor export in wcp-runtime-lanes
+        env:
+          WCP_TOKEN: ${{ secrets.WCP_RUNTIME_TOKEN }}
+          TARGET_REF: ${{ inputs.target_ref }}
+        run: |
+          if [ -z "$WCP_TOKEN" ]; then
+            echo "Missing secret WCP_RUNTIME_TOKEN"
+            exit 1
+          fi
+
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $WCP_TOKEN" \
+            https://api.github.com/repos/kosoymiki/wcp-runtime-lanes/actions/workflows/donor-matrix-export.yml/dispatches \
+            -d "{\"ref\":\"${TARGET_REF}\"}"
