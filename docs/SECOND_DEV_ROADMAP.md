@@ -189,6 +189,18 @@ Carry these tails as one closure batch until a fresh live build disproves them:
    - do not call the batch closed until the freshest user screenshots no longer
      show the same geometry / contrast / flow defects
 
+
+### Active Whole-Repo RAW Reflection Lane (User request `10416`)
+
+- User request on `2026-05-04`: transfer all `10416` donor improvements with hard reflection and technical analysis across the entire repository, including file-by-file review without remote clone dependency.
+- Execution contract for this lane:
+  1. perform deterministic local file-by-file audit over the full repo surface,
+  2. classify each class/cell with explicit `import now` / `adapt` / `hold` evidence,
+  3. apply systemic fixes (code + docs + verification) in cumulative batch order,
+  4. keep unresolved donor-cell count tracked against the `10416` denominator.
+- Environment constraint remains explicit: remote clone is blocked in this environment (`CONNECT tunnel failed, response 403`), so this lane proceeds with locally available corpus first and records every blocked donor-source dependency.
+- Closure gate for this lane: no cosmetic status-only completion; each resolved segment must include source diff evidence, verification commands, and updated matrix/audit docs.
+
 ### Active Donor Base: Ajay / Prefix Install Flow
 
 - Fresh donor base is now staged locally from the official release:

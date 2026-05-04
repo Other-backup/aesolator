@@ -1,0 +1,9 @@
+{
+  "entries": [
+    {
+      "donor": "owner/repo",
+      "local_path": "app/src/main/java/com/winlator/cmod/SomeClass.java",
+      "raw_url": "https://raw.githubusercontent.com/owner/repo/main/app/src/main/java/com/winlator/SomeClass.java"
+    }
+  ]
+}

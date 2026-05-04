@@ -9,6 +9,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.os.Bundle;
 import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -1167,9 +1168,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         winHandler.setInputType((byte) container.getInputType());
         lc_all = container.getLC_ALL();
 
-        // Log only extra keys to avoid leaking user/runtime secrets in logs
-        Bundle extras = launchIntent.getExtras();
-        Log.d("XServerDisplayActivity", "Intent Extra Keys: " + (extras == null ? "[]" : extras.keySet()));
+        Log.d("XServerDisplayActivity", "Intent Extras Summary: " + summarizeIntentExtras(launchIntent));
 
         if (shortcut != null) {
             graphicsDriver = shortcut.getExtra("graphicsDriver", container.getGraphicsDriver());
@@ -7505,11 +7504,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 upscalerBackend,
                 frameGenerationActive,
                 upscalerFramegenMode,
-                upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource,
-                resolvedFgOutput,
-                effectiveGeneratedFrames,
-                effectiveThermalGuard,
-                upscalerDeprecatedAliasUsed
+                upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource
         );
 
         ForensicLogger.logEvent(
@@ -10795,6 +10790,43 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
 
         applyUpscalerEnvVars(vulkanPrimaryRoute, socClass);
+    }
+
+
+    private String summarizeIntentExtras(Intent intent) {
+        if (intent == null) return "intent:null";
+        Bundle extras = intent.getExtras();
+        if (extras == null || extras.isEmpty()) return "extras:empty";
+        StringBuilder sb = new StringBuilder();
+        sb.append("extras{");
+        boolean first = true;
+        for (String key : extras.keySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            Object value = extras.get(key);
+            sb.append(key).append('=');
+            if (isSensitiveIntentKey(key)) {
+                sb.append("<redacted>");
+            } else if (value == null) {
+                sb.append("null");
+            } else {
+                String raw = String.valueOf(value);
+                if (raw.length() > 96) raw = raw.substring(0, 96) + "…";
+                sb.append(raw.replace('\n', ' '));
+            }
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    private boolean isSensitiveIntentKey(String key) {
+        if (key == null) return false;
+        String normalized = key.toLowerCase(Locale.ENGLISH);
+        return normalized.contains("token")
+                || normalized.contains("secret")
+                || normalized.contains("password")
+                || normalized.contains("cookie")
+                || normalized.contains("auth");
     }
 
     @Override
