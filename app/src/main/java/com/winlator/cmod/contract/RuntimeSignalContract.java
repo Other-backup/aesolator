@@ -21,6 +21,10 @@ public final class RuntimeSignalContract {
     public static final String WINLATOR_LSFG_EFFECTIVE_FRAMEGEN = "WINLATOR_LSFG_EFFECTIVE_FRAMEGEN";
     public static final String WINLATOR_LSFG_EFFECTIVE_MODE = "WINLATOR_LSFG_EFFECTIVE_MODE";
     public static final String WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN = "WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN";
+    public static final String WINLATOR_LSFG_EFFECTIVE_FG_OUTPUT = "WINLATOR_LSFG_EFFECTIVE_FG_OUTPUT";
+    public static final String WINLATOR_LSFG_EFFECTIVE_GENERATED_FRAMES = "WINLATOR_LSFG_EFFECTIVE_GENERATED_FRAMES";
+    public static final String WINLATOR_LSFG_EFFECTIVE_THERMAL_GUARD = "WINLATOR_LSFG_EFFECTIVE_THERMAL_GUARD";
+    public static final String WINLATOR_LSFG_DEPRECATED_ALIAS_USED = "WINLATOR_LSFG_DEPRECATED_ALIAS_USED";
 
     private RuntimeSignalContract() {}
 
@@ -58,12 +62,20 @@ public final class RuntimeSignalContract {
             String backend,
             boolean framegenEnabled,
             String framegenMode,
-            String sourceChain) {
+            String sourceChain,
+            String fgOutput,
+            int generatedFrames,
+            boolean thermalGuardEnabled,
+            boolean deprecatedAliasUsed) {
         if (envVars == null) return;
         envVars.put(WINLATOR_LSFG_EFFECTIVE_BACKEND, normalize(backend, "off"));
         envVars.put(WINLATOR_LSFG_EFFECTIVE_FRAMEGEN, framegenEnabled ? "1" : "0");
         envVars.put(WINLATOR_LSFG_EFFECTIVE_MODE, normalize(framegenMode, "balanced"));
         envVars.put(WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN, normalize(sourceChain, "global_profile"));
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_FG_OUTPUT, normalize(fgOutput, "off"));
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_GENERATED_FRAMES, String.valueOf(Math.max(0, generatedFrames)));
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_THERMAL_GUARD, thermalGuardEnabled ? "1" : "0");
+        envVars.put(WINLATOR_LSFG_DEPRECATED_ALIAS_USED, deprecatedAliasUsed ? "1" : "0");
         refreshDecisionHash(envVars);
     }
 
@@ -81,7 +93,15 @@ public final class RuntimeSignalContract {
                 get(envVars, WINLATOR_SIGNAL_INPUT_ROUTE),
                 get(envVars, WINLATOR_SIGNAL_INPUT_LAUNCH_KIND),
                 get(envVars, WINLATOR_SIGNAL_INPUT_PRECHECK_REASON),
-                get(envVars, WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK));
+                get(envVars, WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_BACKEND),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_FRAMEGEN),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_MODE),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_FG_OUTPUT),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_GENERATED_FRAMES),
+                get(envVars, WINLATOR_LSFG_EFFECTIVE_THERMAL_GUARD),
+                get(envVars, WINLATOR_LSFG_DEPRECATED_ALIAS_USED));
         envVars.put(WINLATOR_SIGNAL_DECISION_HASH, sha256Short(data));
     }
 

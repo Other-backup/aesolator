@@ -3304,3 +3304,12 @@
 - Next: device/runtime proof and compatibility pass for legacy extras and env consumers.
 - Compatibility bridge landed: legacy `mobfgsr` extras/values are now consumed as `lsfg`, while runtime still exports mirrored `AERO_MOBFGSR_*` keys for old consumers during transition. Forensics now marks `deprecated_alias_used`.
 - UI contract aligned: resource arrays no longer advertise `MobFGSR/mobfgsr`; selectors now present `LSFG/lsfg` while alias bridge preserves legacy consumer compatibility.
+
+## 2026-05-04 — OMEGA LSFG single-batch closure reflection
+
+- Goal: finish the LSFG canonical transfer lane as one coherent pass across UI, storage, container/shortcut extras, launch env, and forensic contracts.
+- Context: prior pass already staged core code migration; this closure validates cross-layer contract consistency and records explicit decision/risk/rollback semantics.
+- Decision: preserve canonical `lsfg` write-path identity everywhere while keeping explicit legacy read/export compatibility (`mobfgsr` alias normalize + mirrored env keys) with forensic deprecation observability.
+- Tradeoff: temporary dual-key env exposure remains necessary for downstream runtime consumers not yet migrated; removal deferred to measured deprecation stage.
+- Verification: static source sweeps in app/doc surfaces confirm no reintroduced UI write-path drift and retained forensic alias marker path.
+- Next step: collect fresh device forensic bundle after runtime execution to confirm env/event parity on live launch traces before retiring legacy mirror keys.

@@ -109,3 +109,9 @@ For every reverted renderer change from donor history, record:
 - preserve fallback launch/env path,
 - one-command disable gate for LSFG Vulkan color fix and new binary lane,
 - documented rollback checklist in release notes before enabling by default.
+
+## 2026-05-04 — OMEGA closure update
+
+- Consolidated decision ledger for current LSFG lane as completed single-batch app-side transfer state.
+- Added explicit `import-policy/adapt/hold` outcomes and residual-risk note for legacy env consumers pending retirement window.
+- Renderer/native donor rows remain `hold` until source/SHA-complete evidence and guarded rollout probes are attached.

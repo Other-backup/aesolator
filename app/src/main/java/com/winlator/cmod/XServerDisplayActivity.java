@@ -7504,7 +7504,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 upscalerBackend,
                 frameGenerationActive,
                 upscalerFramegenMode,
-                upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource
+                upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource,
+                resolvedFgOutput,
+                effectiveGeneratedFrames,
+                effectiveThermalGuard,
+                upscalerDeprecatedAliasUsed
         );
 
         ForensicLogger.logEvent(

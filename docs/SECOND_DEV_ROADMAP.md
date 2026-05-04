@@ -1528,3 +1528,21 @@ Reflective result from the latest clean-session batch:
 - 2026-05-04 LSFG-only framegen lane started: backend identity switched from mobfgsr to lsfg across UI/profile/container/launch env surfaces; legacy compatibility validation pending.
 - 2026-05-04 LSFG migration hardening: enabled legacy read-compat (`mobfgsr` -> `lsfg`) and runtime mirror export (`AERO_MOBFGSR_*` mirrors from `AERO_LSFG_*`) with deprecation forensic flag.
 - 2026-05-04 UI parity fix: upscaler backend/fg-output entry lists now expose `LSFG/lsfg` instead of legacy MobFGSR labels to match canonical backend identity.
+
+### 2026-05-04 OMEGA single-batch closure pass (LSFG canonicalization)
+
+- Completed end-to-end LSFG contract closure across app-owned lanes in one batch:
+  UI (`AdrenotoolsFragment`, `ContainerDetailFragment`, `ShortcutSettingsDialog`, `arrays.xml`),
+  storage normalization (`UpscalerProfileStore`), launch env/export and forensic parity
+  (`XServerDisplayActivity`, `RuntimeSignalContract`), plus contract docs/matrix sync.
+- Decision ledger status:
+  - `import-policy`: keep `lsfg` as canonical backend/output identity for write paths.
+  - `adapt`: legacy read aliases (`mobfgsr`) normalize to canonical `lsfg`.
+  - `adapt`: legacy env mirrors (`AERO_MOBFGSR_*`) exported from canonical `AERO_LSFG_*`.
+  - `hold`: donor Vulkan/native swapchain binary replacements remain feature-flag-gated and not blindly imported.
+- Verification evidence in this pass:
+  - static sweep confirms canonical writes and compatibility reads remain in place;
+  - launch env lane confirms canonical + mirror parity with deprecation marker support;
+  - forensic lane confirms `LSFG_CONFIG_EFFECTIVE` payload includes `deprecated_alias_used`.
+- Residual risk: runtime-package-side consumers outside app lane may still prefer legacy keys;
+  mitigated by mirror export plus deprecation observability until retirement window is scheduled.
