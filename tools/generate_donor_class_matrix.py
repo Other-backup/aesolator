@@ -80,9 +80,11 @@ def pick_best_candidate(local_rel: str, candidates: Iterable[Path]) -> Path | No
         score = 0
         c = cand.as_posix()
         if "/com/winlator/" in local_rel and "/com/winlator/" in c:
-            score += 3
+            score += 4
         if "/src/main/" in c:
             score += 2
+        if c.endswith(local_rel):
+            score += 6
         if local_name == cand.name:
             score += 1
         if best is None or score > best[0]:
@@ -90,9 +92,8 @@ def pick_best_candidate(local_rel: str, candidates: Iterable[Path]) -> Path | No
     return best[1] if best else None
 
 
-def donor_match(local: ClassFile, donor_dir: Path, donor_key: str) -> DonorMatch | None:
-    index = build_donor_index(donor_dir)
-    candidates = index.get(Path(local.rel).name, [])
+def donor_match(local: ClassFile, donor_dir: Path, donor_key: str, donor_index: dict[str, list[Path]]) -> DonorMatch | None:
+    candidates = donor_index.get(Path(local.rel).name, [])
     if not candidates:
         return None
     best = pick_best_candidate(local.rel, candidates)
@@ -155,13 +156,14 @@ def main() -> None:
 
     lines = ["| " + " | ".join(cols) + " |", "|" + "|".join([" --- " for _ in cols]) + "|"]
 
-    donor_indexes = {d["key"]: donors_root / d["key"] for d in donors}
+    donor_roots = {d["key"]: donors_root / d["key"] for d in donors}
+    donor_indexes = {d["key"]: build_donor_index(donor_roots[d["key"]]) for d in donors}
 
     for c in classes:
         row = [c.rel, c.lane, c.kind, c.digest12]
         for donor in donors:
             key = donor["key"]
-            m = donor_match(c, donor_indexes[key], key)
+            m = donor_match(c, donor_roots[key], key, donor_indexes[key])
             if m is None:
                 row += ["pending", "-", "-"]
             else:

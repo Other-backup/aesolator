@@ -2,6 +2,16 @@
 
 ## 2026-05-04
 
+### Entry 16: raw whole-repo reflection kickoff for 10416-cell transfer
+
+- Goal: execute the user-directed hard reflection lane for all `10416` donor improvement cells with a strict file-by-file technical audit across `aesolator`.
+- Context: user explicitly prohibited reliance on clone operations in this environment and requested per-file analysis with engineering closure standards.
+- Decision: formalize a dedicated roadmap lane that keeps the `10416` denominator visible, performs deterministic local-source classification first, and records blocked donor dependencies explicitly instead of hiding them.
+- Tradeoff: progress is evidence-heavy and slower than patching one symptom, but it prevents false parity claims and keeps transfer truth auditable.
+- Verification: roadmap updated with an explicit whole-repo RAW reflection section and closure gate criteria.
+- Next step: run iterative file-by-file repo passes and convert matrix cells from unresolved to evidence-backed import/adapt/hold states with code+doc remediation commits.
+
+
 ### Entry 10: class-by-class donor sweep bootstrap
 
 - Goal: start the user-requested total donor transfer sweep across every Java/Kotlin class in `aesolator` without reducing scope to a single subsystem.
