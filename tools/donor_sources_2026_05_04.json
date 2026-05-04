@@ -1,0 +1,30 @@
+{
+  "version": "2026-05-04",
+  "notes": "Expanded donor universe for black-diamond class sweep",
+  "donors": [
+    {"key":"gamenative","label":"utkarshdalal/GameNative","tier":"A","lane":"app-runtime"},
+    {"key":"brunodev85_winlator","label":"brunodev85/winlator","tier":"A","lane":"app-runtime"},
+    {"key":"winebox64_winlator","label":"winebox64/winlator","tier":"B","lane":"app-runtime"},
+    {"key":"afeimod_winlator_mod","label":"afeimod/winlator-mod","tier":"B","lane":"app-runtime"},
+    {"key":"the412_nightlies","label":"The412Banner/Nightlies","tier":"A","lane":"package-feed"},
+    {"key":"arihany_wcphub","label":"Arihany/WinlatorWCPHub","tier":"A","lane":"package-feed"},
+    {"key":"waim908_wine_winlator","label":"Waim908/wine-winlator","tier":"A","lane":"package-feed"},
+    {"key":"xnick417x_bionic_nightly","label":"Xnick417x/Winlator-Bionic-Nightly-wcp","tier":"A","lane":"package-feed"},
+    {"key":"moze30_winlator_wcp","label":"moze30/winlator-wcp","tier":"B","lane":"package-feed"},
+    {"key":"alexoqool_bionic_build","label":"Alexoqool/winlator-bionic-build","tier":"A","lane":"rootfs"},
+    {"key":"waim908_rootfs","label":"Waim908/rootfs-winlator","tier":"A","lane":"rootfs"},
+    {"key":"moze30_glibc","label":"moze30/winlator-glibc","tier":"B","lane":"rootfs"},
+    {"key":"honkonx_winlator_honkon","label":"Honkonx/winlator-honkon","tier":"B","lane":"device-special"},
+    {"key":"fcharan_winlatormali","label":"Fcharan/WinlatorMali","tier":"B","lane":"device-special"},
+    {"key":"k11mch1_adreno","label":"K11MCH1/AdrenoToolsDrivers","tier":"A","lane":"graphics"},
+    {"key":"wearyconcern_exynos","label":"WearyConcern1165/ExynosTools","tier":"A","lane":"graphics"},
+    {"key":"leegao_bionic_wrapper","label":"leegao/bionic-vulkan-wrapper","tier":"B","lane":"graphics"},
+    {"key":"ptitseb_box64","label":"ptitSeb/box64","tier":"A","lane":"translator"},
+    {"key":"fex_emu","label":"FEX-Emu/FEX","tier":"A","lane":"translator"},
+    {"key":"andre_rh_wine","label":"AndreRH/wine","tier":"A","lane":"runtime-core"},
+    {"key":"andre_rh_hangover","label":"AndreRH/hangover","tier":"A","lane":"runtime-core"},
+    {"key":"valve_proton","label":"ValveSoftware/Proton","tier":"A","lane":"runtime-core"},
+    {"key":"xodiosx_wine_stuff","label":"xodiosx/wine-stuff","tier":"B","lane":"runtime-core"},
+    {"key":"brunodev85_winlator_frost","label":"MrPhryaNikFrosty/Winlator-Frost","tier":"C","lane":"archeology"}
+  ]
+}
