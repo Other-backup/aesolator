@@ -67,12 +67,12 @@ public class ShortcutSettingsDialog extends ContentDialog {
     private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
     private static final String UPSCALER_BACKEND_OFF = "off";
     private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
-    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String UPSCALER_BACKEND_LSFG = "lsfg";
     private static final String UPSCALER_EFFECT_NONE = "none";
     private static final String FG_SOURCE_NATIVE = "native";
     private static final String FG_SOURCE_OPTI_FG = "opti_fg";
     private static final String FG_OUTPUT_AUTO = "auto";
-    private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
+    private static final String FG_OUTPUT_LSFG = "lsfg";
     private static final String FRAMEGEN_MODE_BALANCED = "balanced";
     private static final String FRAMEGEN_MODE_QUALITY = "quality";
     private static final String FRAMEGEN_MODE_LOW_LATENCY = "low_latency";
@@ -448,7 +448,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
                         globalUpscalerProfile.frameGeneration ? "1" : "0"
                 )
         );
-        if (!UPSCALER_BACKEND_MOBFGSR.equals(initialUpscalerBackend)) {
+        if (!UPSCALER_BACKEND_LSFG.equals(initialUpscalerBackend)) {
             initialFrameGenerationEnabled = false;
         }
         String initialFgSource = normalizeFgSource(
@@ -584,8 +584,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final Runnable updateUpscalerUiState = () -> {
             String backendId = StringUtils.parseIdentifier(sUpscalerBackend.getSelectedItem());
             boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(backendId);
-            boolean frameGenerationSupported = UPSCALER_BACKEND_MOBFGSR.equals(backendId);
-            boolean mobfgsrDebugSupported = UPSCALER_BACKEND_MOBFGSR.equals(backendId);
+            boolean frameGenerationSupported = UPSCALER_BACKEND_LSFG.equals(backendId);
+            boolean lsfgDebugSupported = UPSCALER_BACKEND_LSFG.equals(backendId);
             sUpscalerPreset.setEnabled(upscalerEnabled);
             sUpscalerEffect.setEnabled(upscalerEnabled);
             sUpscalerScale.setEnabled(upscalerEnabled);
@@ -600,9 +600,9 @@ public class ShortcutSettingsDialog extends ContentDialog {
             cbUpscalerThermalGuard.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
             sbUpscalerTargetFps.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
             sbInterpolationFactor.setEnabled(upscalerEnabled && cbEnableFrameGeneration.isChecked());
-            cbUpscalerDebugOverlay.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
-            cbUpscalerDebugTearLines.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
-            cbUpscalerInterpolatedOnly.setEnabled(upscalerEnabled && mobfgsrDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbUpscalerDebugOverlay.setEnabled(upscalerEnabled && lsfgDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbUpscalerDebugTearLines.setEnabled(upscalerEnabled && lsfgDebugSupported && cbEnableFrameGeneration.isChecked());
+            cbUpscalerInterpolatedOnly.setEnabled(upscalerEnabled && lsfgDebugSupported && cbEnableFrameGeneration.isChecked());
             cbEnableVulkanValidationLayer.setEnabled(upscalerEnabled);
             sbSharpnessLevel.setEnabled(upscalerEnabled);
             sbSharpnessDenoise.setEnabled(upscalerEnabled);
@@ -989,8 +989,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
     private String normalizeFgOutput(String output) {
         String normalized = output == null ? FG_OUTPUT_AUTO : output.trim().toLowerCase(Locale.ENGLISH);
         return switch (normalized) {
-            case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
-            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_MOBFGSR;
+            case FG_OUTPUT_LSFG -> FG_OUTPUT_LSFG;
+            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_LSFG;
             default -> FG_OUTPUT_AUTO;
         };
     }

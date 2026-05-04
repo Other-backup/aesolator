@@ -310,6 +310,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String upscalerPresetSource = "global_profile";
     private String upscalerFramegenSource = "global_profile";
     private String upscalerValidationSource = "global_profile";
+    private boolean upscalerDeprecatedAliasUsed = false;
     PreloaderDialog preloaderDialog = null;
     private Runnable configChangedCallback = null;
     private Runnable pendingBootstrapRunnable = null;
@@ -570,12 +571,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String TOUCHPAD_PROFILE_COMPAT = "compat";
     private static final String UPSCALER_BACKEND_OFF = "off";
     private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
-    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String UPSCALER_BACKEND_LSFG = "lsfg";
     private static final String UPSCALER_EFFECT_NONE = "none";
     private static final String FG_SOURCE_NATIVE = "native";
     private static final String FG_SOURCE_OPTI_FG = "opti_fg";
     private static final String FG_OUTPUT_AUTO = "auto";
-    private static final String FG_OUTPUT_MOBFGSR = "mobfgsr";
+    private static final String FG_OUTPUT_LSFG = "lsfg";
     private boolean debugStartProbeArmed = false;
     private boolean debugStartProbeExecuted = false;
     private static final String FRAMEGEN_MODE_BALANCED = "balanced";
@@ -3662,7 +3663,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String humanizeUpscalerBackend(String backend) {
         String normalized = trimToEmpty(backend).toLowerCase(Locale.US);
         return switch (normalized) {
-            case "mobfgsr" -> "MobFGSR";
+            case "lsfg" -> "LSFG";
             case "vkbasalt" -> "vkBasalt";
             case "", "off" -> getString(R.string.runtime_graphics_status_framegen_off);
             default -> humanizeGraphicsLane(normalized);
@@ -7021,11 +7022,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void parseUpscalerLaunchSettings(@Nullable Shortcut activeShortcut) {
+        upscalerDeprecatedAliasUsed = false;
         UpscalerProfileStore.Profile globalProfile = UpscalerProfileStore.getSelectedProfile(preferences);
         ResolvedUpscalerValue backendSetting =
                 resolveUpscalerValue(activeShortcut, "upscalerBackend", globalProfile.backend);
-        String backend = StringUtils.parseIdentifier(backendSetting.value);
-        if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_MOBFGSR.equals(backend)) {
+        String backendRaw = StringUtils.parseIdentifier(backendSetting.value);
+        if ("mobfgsr".equals(backendRaw)) upscalerDeprecatedAliasUsed = true;
+        String backend = backendRaw;
+        if (!UPSCALER_BACKEND_VKBASALT.equals(backend) && !UPSCALER_BACKEND_LSFG.equals(backend)) {
             backend = UpscalerProfileStore.normalizeBackend(globalProfile.backend);
         }
         upscalerBackendSource = backendSetting.source;
@@ -7103,6 +7107,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         upscalerFgSource = normalizeFgSource(fgSourceRaw);
 
         String fgOutputRaw = resolveUpscalerValue(activeShortcut, "upscalerFgOutput", globalProfile.fgOutput).value;
+        if ("mobfgsr".equals(StringUtils.parseIdentifier(fgOutputRaw))) upscalerDeprecatedAliasUsed = true;
         upscalerFgOutput = normalizeFgOutput(fgOutputRaw);
 
         String framegenModeRaw = resolveUpscalerValue(
@@ -7228,8 +7233,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String normalizeFgOutput(String output) {
         String normalized = StringUtils.parseIdentifier(output);
         return switch (normalized) {
-            case FG_OUTPUT_MOBFGSR -> FG_OUTPUT_MOBFGSR;
-            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_MOBFGSR;
+            case FG_OUTPUT_LSFG -> FG_OUTPUT_LSFG;
+            case "dlssg_to_fsr3", "dlssg-to-fsr3", "dlssgtofsr3" -> FG_OUTPUT_LSFG;
             default -> FG_OUTPUT_AUTO;
         };
     }
@@ -7254,14 +7259,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(upscalerBackend)
                 && !UPSCALER_EFFECT_NONE.equals(upscalerEffect);
         boolean frameGenerationRequested = upscalerFrameGeneration && upscalerEnabled;
-        boolean frameGenerationBackendSupported = UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend);
+        boolean frameGenerationBackendSupported = UPSCALER_BACKEND_LSFG.equals(upscalerBackend);
         boolean frameGenerationActive = frameGenerationRequested && frameGenerationBackendSupported;
         if (frameGenerationRequested && !frameGenerationBackendSupported) {
-            guardReason = "framegen_requires_mobfgsr_backend";
+            guardReason = "framegen_requires_lsfg_backend";
         }
         String resolvedFgOutput = upscalerFgOutput;
         if (FG_OUTPUT_AUTO.equals(resolvedFgOutput)) {
-            resolvedFgOutput = UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend) ? FG_OUTPUT_MOBFGSR : FG_OUTPUT_AUTO;
+            resolvedFgOutput = UPSCALER_BACKEND_LSFG.equals(upscalerBackend) ? FG_OUTPUT_LSFG : FG_OUTPUT_AUTO;
         }
         String requestedPreset = normalizeUpscalerPreset(upscalerPreset);
         String effectivePreset = resolveUpscalerPresetForSoc(requestedPreset, normalizedSocClass);
@@ -7306,7 +7311,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
 
-        boolean mobfgsrDebugBridgeActive = frameGenerationActive && UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend);
+        boolean lsfgDebugBridgeActive = frameGenerationActive && UPSCALER_BACKEND_LSFG.equals(upscalerBackend);
         float modeScale;
         float modeQuality;
         float modeBudgetMs;
@@ -7336,7 +7341,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if ("none".equals(guardReason)) {
                 guardReason = "framegen_requires_dxvk_route";
             }
-            mobfgsrDebugBridgeActive = false;
+            lsfgDebugBridgeActive = false;
         }
         if (!frameGenerationActive) {
             resolvedFgOutput = "off";
@@ -7390,15 +7395,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         );
         setOrClearEnv(
                 "AERO_FRAMEGEN_DEBUG_OVERLAY",
-                mobfgsrDebugBridgeActive && upscalerDebugOverlay ? "1" : "0"
+                lsfgDebugBridgeActive && upscalerDebugOverlay ? "1" : "0"
         );
         setOrClearEnv(
                 "AERO_FRAMEGEN_DEBUG_TEAR_LINES",
-                mobfgsrDebugBridgeActive && upscalerDebugTearLines ? "1" : "0"
+                lsfgDebugBridgeActive && upscalerDebugTearLines ? "1" : "0"
         );
         setOrClearEnv(
                 "AERO_FRAMEGEN_INTERPOLATED_ONLY",
-                mobfgsrDebugBridgeActive && upscalerInterpolatedOnly ? "1" : "0"
+                lsfgDebugBridgeActive && upscalerInterpolatedOnly ? "1" : "0"
         );
 
         if (UPSCALER_BACKEND_VKBASALT.equals(upscalerBackend) && upscalerEnabled && !vkbasaltConfig.isEmpty()) {
@@ -7412,55 +7417,79 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setOrClearEnv("AERO_UPSCALER_PROVIDER", upscalerEnabled ? upscalerBackend : "");
         }
 
-        if (UPSCALER_BACKEND_MOBFGSR.equals(upscalerBackend) && upscalerEnabled) {
-            setOrClearEnv("AERO_MOBFGSR_ENABLE_SR", "1");
-            setOrClearEnv("AERO_MOBFGSR_ENABLE_INTERP", frameGenerationActive ? "1" : "0");
-            setOrClearEnv("AERO_MOBFGSR_PRESET", effectivePreset);
-            setOrClearEnv("AERO_MOBFGSR_SOC_CLASS", normalizedSocClass);
-            setOrClearEnv("AERO_MOBFGSR_GENERATED_FRAMES", String.valueOf(effectiveGeneratedFrames));
-            setOrClearEnv("AERO_MOBFGSR_RENDER_SCALE", String.format(Locale.US, "%.2f", upscalerScalePercent / 100.0f));
-            setOrClearEnv("AERO_MOBFGSR_MODE", upscalerFramegenMode);
-            setOrClearEnv("AERO_MOBFGSR_THERMAL_GUARD", effectiveThermalGuard ? "1" : "0");
-            setOrClearEnv("AERO_MOBFGSR_FG_SOURCE", upscalerFgSource);
-            setOrClearEnv("AERO_MOBFGSR_FG_OUTPUT", resolvedFgOutput);
-            setOrClearEnv("AERO_MOBFGSR_MODEL_SCALE", String.format(Locale.US, "%.2f", modeScale));
-            setOrClearEnv("AERO_MOBFGSR_QUALITY", String.format(Locale.US, "%.2f", modeQuality));
-            setOrClearEnv("AERO_MOBFGSR_FRAME_BUDGET_MS", String.format(Locale.US, "%.2f", modeBudgetMs));
-            setOrClearEnv("AERO_MOBFGSR_TARGET_FPS", String.valueOf(effectiveTargetFps));
+        if (UPSCALER_BACKEND_LSFG.equals(upscalerBackend) && upscalerEnabled) {
+            setOrClearEnv("AERO_LSFG_ENABLE_SR", "1");
+            setOrClearEnv("AERO_LSFG_ENABLE_INTERP", frameGenerationActive ? "1" : "0");
+            setOrClearEnv("AERO_LSFG_PRESET", effectivePreset);
+            setOrClearEnv("AERO_LSFG_SOC_CLASS", normalizedSocClass);
+            setOrClearEnv("AERO_LSFG_GENERATED_FRAMES", String.valueOf(effectiveGeneratedFrames));
+            setOrClearEnv("AERO_LSFG_RENDER_SCALE", String.format(Locale.US, "%.2f", upscalerScalePercent / 100.0f));
+            setOrClearEnv("AERO_LSFG_MODE", upscalerFramegenMode);
+            setOrClearEnv("AERO_LSFG_THERMAL_GUARD", effectiveThermalGuard ? "1" : "0");
+            setOrClearEnv("AERO_LSFG_FG_SOURCE", upscalerFgSource);
+            setOrClearEnv("AERO_LSFG_FG_OUTPUT", resolvedFgOutput);
+            setOrClearEnv("AERO_LSFG_MODEL_SCALE", String.format(Locale.US, "%.2f", modeScale));
+            setOrClearEnv("AERO_LSFG_QUALITY", String.format(Locale.US, "%.2f", modeQuality));
+            setOrClearEnv("AERO_LSFG_FRAME_BUDGET_MS", String.format(Locale.US, "%.2f", modeBudgetMs));
+            setOrClearEnv("AERO_LSFG_TARGET_FPS", String.valueOf(effectiveTargetFps));
             setOrClearEnv(
-                    "AERO_MOBFGSR_INTERPOLATION_FACTOR",
+                    "AERO_LSFG_INTERPOLATION_FACTOR",
                     frameGenerationActive ? String.valueOf(effectiveInterpolationFactor) : ""
             );
-            setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", upscalerDebugOverlay ? "1" : "0");
-            setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", upscalerDebugTearLines ? "1" : "0");
-            setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", upscalerInterpolatedOnly ? "1" : "0");
-            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", String.format(Locale.US, "%.4f", depthDiffThresholdSr));
-            setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", colorDiffThresholdFg));
-            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", depthDiffThresholdFg));
+            setOrClearEnv("AERO_LSFG_DEBUG_OVERLAY", upscalerDebugOverlay ? "1" : "0");
+            setOrClearEnv("AERO_LSFG_DEBUG_TEAR_LINES", upscalerDebugTearLines ? "1" : "0");
+            setOrClearEnv("AERO_LSFG_INTERPOLATED_ONLY", upscalerInterpolatedOnly ? "1" : "0");
+            setOrClearEnv("AERO_LSFG_DEPTH_DIFF_THRESHOLD_SR", String.format(Locale.US, "%.4f", depthDiffThresholdSr));
+            setOrClearEnv("AERO_LSFG_COLOR_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", colorDiffThresholdFg));
+            setOrClearEnv("AERO_LSFG_DEPTH_DIFF_THRESHOLD_FG", String.format(Locale.US, "%.4f", depthDiffThresholdFg));
         }
         else {
-            setOrClearEnv("AERO_MOBFGSR_ENABLE_SR", "");
-            setOrClearEnv("AERO_MOBFGSR_ENABLE_INTERP", "");
-            setOrClearEnv("AERO_MOBFGSR_PRESET", "");
-            setOrClearEnv("AERO_MOBFGSR_SOC_CLASS", "");
-            setOrClearEnv("AERO_MOBFGSR_GENERATED_FRAMES", "");
-            setOrClearEnv("AERO_MOBFGSR_RENDER_SCALE", "");
-            setOrClearEnv("AERO_MOBFGSR_MODE", "");
-            setOrClearEnv("AERO_MOBFGSR_THERMAL_GUARD", "");
-            setOrClearEnv("AERO_MOBFGSR_FG_SOURCE", "");
-            setOrClearEnv("AERO_MOBFGSR_FG_OUTPUT", "");
-            setOrClearEnv("AERO_MOBFGSR_MODEL_SCALE", "");
-            setOrClearEnv("AERO_MOBFGSR_QUALITY", "");
-            setOrClearEnv("AERO_MOBFGSR_FRAME_BUDGET_MS", "");
-            setOrClearEnv("AERO_MOBFGSR_TARGET_FPS", "");
-            setOrClearEnv("AERO_MOBFGSR_INTERPOLATION_FACTOR", "");
-            setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", "");
-            setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", "");
-            setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", "");
-            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", "");
-            setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", "");
-            setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", "");
+            setOrClearEnv("AERO_LSFG_ENABLE_SR", "");
+            setOrClearEnv("AERO_LSFG_ENABLE_INTERP", "");
+            setOrClearEnv("AERO_LSFG_PRESET", "");
+            setOrClearEnv("AERO_LSFG_SOC_CLASS", "");
+            setOrClearEnv("AERO_LSFG_GENERATED_FRAMES", "");
+            setOrClearEnv("AERO_LSFG_RENDER_SCALE", "");
+            setOrClearEnv("AERO_LSFG_MODE", "");
+            setOrClearEnv("AERO_LSFG_THERMAL_GUARD", "");
+            setOrClearEnv("AERO_LSFG_FG_SOURCE", "");
+            setOrClearEnv("AERO_LSFG_FG_OUTPUT", "");
+            setOrClearEnv("AERO_LSFG_MODEL_SCALE", "");
+            setOrClearEnv("AERO_LSFG_QUALITY", "");
+            setOrClearEnv("AERO_LSFG_FRAME_BUDGET_MS", "");
+            setOrClearEnv("AERO_LSFG_TARGET_FPS", "");
+            setOrClearEnv("AERO_LSFG_INTERPOLATION_FACTOR", "");
+            setOrClearEnv("AERO_LSFG_DEBUG_OVERLAY", "");
+            setOrClearEnv("AERO_LSFG_DEBUG_TEAR_LINES", "");
+            setOrClearEnv("AERO_LSFG_INTERPOLATED_ONLY", "");
+            setOrClearEnv("AERO_LSFG_DEPTH_DIFF_THRESHOLD_SR", "");
+            setOrClearEnv("AERO_LSFG_COLOR_DIFF_THRESHOLD_FG", "");
+            setOrClearEnv("AERO_LSFG_DEPTH_DIFF_THRESHOLD_FG", "");
         }
+
+        // Legacy mirror export for old runtime consumers during LSFG migration.
+        setOrClearEnv("AERO_MOBFGSR_ENABLE_SR", envVars.get("AERO_LSFG_ENABLE_SR"));
+        setOrClearEnv("AERO_MOBFGSR_ENABLE_INTERP", envVars.get("AERO_LSFG_ENABLE_INTERP"));
+        setOrClearEnv("AERO_MOBFGSR_PRESET", envVars.get("AERO_LSFG_PRESET"));
+        setOrClearEnv("AERO_MOBFGSR_SOC_CLASS", envVars.get("AERO_LSFG_SOC_CLASS"));
+        setOrClearEnv("AERO_MOBFGSR_GENERATED_FRAMES", envVars.get("AERO_LSFG_GENERATED_FRAMES"));
+        setOrClearEnv("AERO_MOBFGSR_RENDER_SCALE", envVars.get("AERO_LSFG_RENDER_SCALE"));
+        setOrClearEnv("AERO_MOBFGSR_MODE", envVars.get("AERO_LSFG_MODE"));
+        setOrClearEnv("AERO_MOBFGSR_THERMAL_GUARD", envVars.get("AERO_LSFG_THERMAL_GUARD"));
+        setOrClearEnv("AERO_MOBFGSR_FG_SOURCE", envVars.get("AERO_LSFG_FG_SOURCE"));
+        setOrClearEnv("AERO_MOBFGSR_FG_OUTPUT", envVars.get("AERO_LSFG_FG_OUTPUT"));
+        setOrClearEnv("AERO_MOBFGSR_MODEL_SCALE", envVars.get("AERO_LSFG_MODEL_SCALE"));
+        setOrClearEnv("AERO_MOBFGSR_QUALITY", envVars.get("AERO_LSFG_QUALITY"));
+        setOrClearEnv("AERO_MOBFGSR_FRAME_BUDGET_MS", envVars.get("AERO_LSFG_FRAME_BUDGET_MS"));
+        setOrClearEnv("AERO_MOBFGSR_TARGET_FPS", envVars.get("AERO_LSFG_TARGET_FPS"));
+        setOrClearEnv("AERO_MOBFGSR_INTERPOLATION_FACTOR", envVars.get("AERO_LSFG_INTERPOLATION_FACTOR"));
+        setOrClearEnv("AERO_MOBFGSR_DEBUG_OVERLAY", envVars.get("AERO_LSFG_DEBUG_OVERLAY"));
+        setOrClearEnv("AERO_MOBFGSR_DEBUG_TEAR_LINES", envVars.get("AERO_LSFG_DEBUG_TEAR_LINES"));
+        setOrClearEnv("AERO_MOBFGSR_INTERPOLATED_ONLY", envVars.get("AERO_LSFG_INTERPOLATED_ONLY"));
+        setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_SR", envVars.get("AERO_LSFG_DEPTH_DIFF_THRESHOLD_SR"));
+        setOrClearEnv("AERO_MOBFGSR_COLOR_DIFF_THRESHOLD_FG", envVars.get("AERO_LSFG_COLOR_DIFF_THRESHOLD_FG"));
+        setOrClearEnv("AERO_MOBFGSR_DEPTH_DIFF_THRESHOLD_FG", envVars.get("AERO_LSFG_DEPTH_DIFF_THRESHOLD_FG"));
+        setOrClearEnv("AERO_FRAMEGEN_BACKEND_ALIAS", upscalerDeprecatedAliasUsed ? "mobfgsr_deprecated_alias" : "");
 
         String runtimeGuardReason = envVars.get(RuntimeSignalContract.WINLATOR_RUNTIME_PRESET_GUARD_REASON);
         RuntimeSignalContract.putSignalPolicyMarkers(
@@ -7469,6 +7498,32 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 "shortcut+graphics+runtime",
                 runtimeGuardReason,
                 guardReason
+        );
+        RuntimeSignalContract.putLsfgEffectiveMarkers(
+                envVars,
+                upscalerBackend,
+                frameGenerationActive,
+                upscalerFramegenMode,
+                upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource
+        );
+
+        ForensicLogger.logEvent(
+                this,
+                "info",
+                "LSFG_CONFIG_EFFECTIVE",
+                null,
+                "graphics_route",
+                "Resolved effective LSFG/framegen launch config",
+                ForensicLogger.fields(
+                        "backend", upscalerBackend,
+                        "backend_source", upscalerBackendSource,
+                        "framegen_enabled", frameGenerationActive ? "1" : "0",
+                        "framegen_mode", upscalerFramegenMode,
+                        "source_chain", upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource,
+                        "preset_effective", effectivePreset,
+                        "guard_reason", guardReason,
+                        "deprecated_alias_used", upscalerDeprecatedAliasUsed ? "1" : "0"
+                )
         );
 
         ForensicLogger.logEvent(

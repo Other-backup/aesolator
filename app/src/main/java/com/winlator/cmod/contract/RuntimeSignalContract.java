@@ -17,6 +17,10 @@ public final class RuntimeSignalContract {
     public static final String WINLATOR_SIGNAL_INPUT_LAUNCH_KIND = "WINLATOR_SIGNAL_INPUT_LAUNCH_KIND";
     public static final String WINLATOR_SIGNAL_INPUT_PRECHECK_REASON = "WINLATOR_SIGNAL_INPUT_PRECHECK_REASON";
     public static final String WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK = "WINLATOR_SIGNAL_INPUT_PRECHECK_FALLBACK";
+    public static final String WINLATOR_LSFG_EFFECTIVE_BACKEND = "WINLATOR_LSFG_EFFECTIVE_BACKEND";
+    public static final String WINLATOR_LSFG_EFFECTIVE_FRAMEGEN = "WINLATOR_LSFG_EFFECTIVE_FRAMEGEN";
+    public static final String WINLATOR_LSFG_EFFECTIVE_MODE = "WINLATOR_LSFG_EFFECTIVE_MODE";
+    public static final String WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN = "WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN";
 
     private RuntimeSignalContract() {}
 
@@ -45,6 +49,21 @@ public final class RuntimeSignalContract {
         envVars.put(WINLATOR_SIGNAL_SOURCES, normalize(signalSources, "unset"));
         envVars.put(WINLATOR_RUNTIME_PRESET_GUARD_REASON, normalize(runtimePresetGuardReason, "none"));
         envVars.put(WINLATOR_UPSCALER_BINDING_GUARD_REASON, normalize(upscalerBindingGuardReason, "none"));
+        refreshDecisionHash(envVars);
+    }
+
+
+    public static void putLsfgEffectiveMarkers(
+            EnvVars envVars,
+            String backend,
+            boolean framegenEnabled,
+            String framegenMode,
+            String sourceChain) {
+        if (envVars == null) return;
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_BACKEND, normalize(backend, "off"));
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_FRAMEGEN, framegenEnabled ? "1" : "0");
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_MODE, normalize(framegenMode, "balanced"));
+        envVars.put(WINLATOR_LSFG_EFFECTIVE_SOURCE_CHAIN, normalize(sourceChain, "global_profile"));
         refreshDecisionHash(envVars);
     }
 

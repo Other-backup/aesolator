@@ -3286,3 +3286,21 @@
 - Next step: run the next implementation pass against fresh user-sent forensic
   bundles, with `wcp-runtime-lanes` GitHub releases treated as the runtime
   build source of truth and no-`adb` intake as the default until restored.
+
+## 2026-05-04 — Reflection: Winlator-Ludashi `lsfg-vk-color-fix` transfer controls
+
+- Goal: convert donor-level LSFG/Vulkan insights into contract-safe `aesolator` integration planning without blind renderer or binary copy.
+- Context: donor history includes useful LSFG manager/UI/env hooks and explicit renderer revert chain, indicating instability risk if merged wholesale.
+- Decision: introduce three guard artifacts first (`LUDASHI_TRANSFER_MATRIX_2026-05-04`, `LSFG_RUNTIME_CONTRACT`, `LSFG_VULKAN_COLOR_ROUTE_AUDIT`) before code transfer.
+- Tradeoff: delayed feature import speed in exchange for deterministic ownership and rollback-ready rollout.
+- Verification: documentation artifacts created and roadmap updated in same pass.
+- Next step: collect exact remaining SHA evidence for matrix `TBD-*` rows, then execute `import now` items through feature-flagged implementation.
+
+
+## 2026-05-04 — LSFG-only execution step
+- Goal: enforce LSFG as sole framegen backend and remove mobfgsr as active runtime identity.
+- Decision: switched backend/output/env constants and checks to `lsfg` across profile/UI/container/launch contract paths.
+- Tradeoff: may require downstream native/env consumer alias handling where mobfgsr names were previously hardcoded.
+- Next: device/runtime proof and compatibility pass for legacy extras and env consumers.
+- Compatibility bridge landed: legacy `mobfgsr` extras/values are now consumed as `lsfg`, while runtime still exports mirrored `AERO_MOBFGSR_*` keys for old consumers during transition. Forensics now marks `deprecated_alias_used`.
+- UI contract aligned: resource arrays no longer advertise `MobFGSR/mobfgsr`; selectors now present `LSFG/lsfg` while alias bridge preserves legacy consumer compatibility.

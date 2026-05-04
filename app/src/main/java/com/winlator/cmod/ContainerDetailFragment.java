@@ -800,7 +800,7 @@ public class ContainerDetailFragment extends Fragment {
                     container.putExtra("upscalerFramegenMode", containerUpscalerFramegenMode);
                     container.putExtra("upscalerFrameGeneration", containerUpscalerFramegen);
                     container.putExtra("upscalerThermalGuard", containerUpscalerThermalGuard);
-                    container.putExtra("upscalerBackend", cbContainerFgEnable.isChecked() ? "mobfgsr" : null);
+                    container.putExtra("upscalerBackend", cbContainerFgEnable.isChecked() ? "lsfg" : null);
                     container.saveData();
                     saveWineRegistryKeys(view);
                     boolean requireRestart = GraphicsDrivers.isMediaTekWrapperFamily(graphicsDriver)
@@ -849,7 +849,7 @@ public class ContainerDetailFragment extends Fragment {
                     extraData.put("upscalerFramegenMode", containerUpscalerFramegenMode);
                     extraData.put("upscalerFrameGeneration", containerUpscalerFramegen);
                     extraData.put("upscalerThermalGuard", containerUpscalerThermalGuard);
-                    extraData.put("upscalerBackend", cbContainerFgEnable.isChecked() ? "mobfgsr" : JSONObject.NULL);
+                    extraData.put("upscalerBackend", cbContainerFgEnable.isChecked() ? "lsfg" : JSONObject.NULL);
                     data.put("extraData", extraData);
 
                     preloaderDialog.show(R.string.creating_container);

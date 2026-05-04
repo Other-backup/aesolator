@@ -68,7 +68,7 @@ public class AdrenotoolsFragment extends Fragment {
     private static final String LANE_OPENGL = "opengl";
     private static final String UPSCALER_BACKEND_OFF = "off";
     private static final String UPSCALER_BACKEND_VKBASALT = "vkbasalt";
-    private static final String UPSCALER_BACKEND_MOBFGSR = "mobfgsr";
+    private static final String UPSCALER_BACKEND_LSFG = "lsfg";
     private static final String GRAPHICS_SOURCE_AE_ARCHIVE = "ae_archive";
     private static final String GRAPHICS_SOURCE_STEVENMXZ = "stevenmxz";
     private static final String GRAPHICS_SOURCE_WINNATIVE = "winnative";
@@ -476,8 +476,8 @@ public class AdrenotoolsFragment extends Fragment {
         final Runnable updateUiState = () -> {
             String backend = UpscalerProfileStore.normalizeBackend(StringUtils.parseIdentifier(sBackend.getSelectedItem()));
             boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(backend);
-            boolean framegenSupported = UPSCALER_BACKEND_VKBASALT.equals(backend) || UPSCALER_BACKEND_MOBFGSR.equals(backend);
-            boolean mobfgsrDebug = UPSCALER_BACKEND_MOBFGSR.equals(backend);
+            boolean framegenSupported = UPSCALER_BACKEND_VKBASALT.equals(backend) || UPSCALER_BACKEND_LSFG.equals(backend);
+            boolean lsfgDebug = UPSCALER_BACKEND_LSFG.equals(backend);
 
             sPreset.setEnabled(upscalerEnabled);
             sEffect.setEnabled(upscalerEnabled);
@@ -493,9 +493,9 @@ public class AdrenotoolsFragment extends Fragment {
             cbThermalGuard.setEnabled(framegenActive);
             sbTargetFps.setEnabled(framegenActive);
             sbInterpolation.setEnabled(framegenActive);
-            cbDebugOverlay.setEnabled(framegenActive && mobfgsrDebug);
-            cbDebugTear.setEnabled(framegenActive && mobfgsrDebug);
-            cbInterpolatedOnly.setEnabled(framegenActive && mobfgsrDebug);
+            cbDebugOverlay.setEnabled(framegenActive && lsfgDebug);
+            cbDebugTear.setEnabled(framegenActive && lsfgDebug);
+            cbInterpolatedOnly.setEnabled(framegenActive && lsfgDebug);
             cbVulkanValidation.setEnabled(upscalerEnabled);
             sbSharpness.setEnabled(upscalerEnabled);
             sbDenoise.setEnabled(upscalerEnabled);

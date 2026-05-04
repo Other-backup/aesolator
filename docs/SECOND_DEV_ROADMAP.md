@@ -1516,3 +1516,15 @@ Reflective result from the latest clean-session batch:
 - Immediate next lane:
   wait for the next fresh forensic package, then run one strict closure loop:
   forensic correlation -> code-path audit -> source remediation -> docs sync.
+
+## 2026-05-04 — Winlator-Ludashi LSFG/Vulkan transfer hardening lane
+
+- Added Black Diamond transfer staging artifacts for donor branch `lsfg-vk-color-fix`.
+- New matrix: `docs/LUDASHI_TRANSFER_MATRIX_2026-05-04.md` with per-commit decision classes (`import now/adapt later/hold/reject`), revert safety policy, and rollback gates.
+- New canonical schema: `docs/LSFG_RUNTIME_CONTRACT.md` to unify global/container/shortcut/launcher LSFG fields and forensic snapshot contract.
+- New renderer guard audit: `docs/LSFG_VULKAN_COLOR_ROUTE_AUDIT.md` to force feature-flagged rollout and fallback-first behavior for color-format path changes.
+- Next closure step: replace `TBD-*` entries in matrix with exact SHA rows from branch-dump evidence and then execute prioritized `import now` tasks.
+
+- 2026-05-04 LSFG-only framegen lane started: backend identity switched from mobfgsr to lsfg across UI/profile/container/launch env surfaces; legacy compatibility validation pending.
+- 2026-05-04 LSFG migration hardening: enabled legacy read-compat (`mobfgsr` -> `lsfg`) and runtime mirror export (`AERO_MOBFGSR_*` mirrors from `AERO_LSFG_*`) with deprecation forensic flag.
+- 2026-05-04 UI parity fix: upscaler backend/fg-output entry lists now expose `LSFG/lsfg` instead of legacy MobFGSR labels to match canonical backend identity.

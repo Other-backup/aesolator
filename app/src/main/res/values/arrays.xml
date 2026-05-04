@@ -492,7 +492,7 @@
     <string-array name="upscaler_backend_entries">
         <item>Off</item>
         <item>vkBasalt</item>
-        <item>MobFGSR</item>
+        <item>LSFG</item>
     </string-array>
     <string-array name="upscaler_effect_entries">
         <item>None</item>
@@ -519,7 +519,7 @@
     </string-array>
     <string-array name="upscaler_fg_output_entries">
         <item>auto</item>
-        <item>mobfgsr</item>
+        <item>lsfg</item>
     </string-array>
     <string-array name="upscaler_framegen_mode_entries">
         <item>balanced</item>
