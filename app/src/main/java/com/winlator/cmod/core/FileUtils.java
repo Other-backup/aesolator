@@ -60,11 +60,13 @@ public abstract class FileUtils {
     }
 
     public static String readString(Context context, String assetFile) {
-        return new String(read(context, assetFile), StandardCharsets.UTF_8);
+        byte[] data = read(context, assetFile);
+        return data == null ? "" : new String(data, StandardCharsets.UTF_8);
     }
 
     public static String readString(File file) {
-        return new String(read(file), StandardCharsets.UTF_8);
+        byte[] data = read(file);
+        return data == null ? "" : new String(data, StandardCharsets.UTF_8);
     }
 
     public static String readString(Context context, Uri uri) {
@@ -72,7 +74,9 @@ public abstract class FileUtils {
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
              BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\n");
+            }
             return sb.toString();
         }
         catch (IOException e) {

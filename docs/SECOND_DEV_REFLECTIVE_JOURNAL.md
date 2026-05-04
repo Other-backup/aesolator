@@ -3372,3 +3372,25 @@
 - Tradeoff: temporary dual-key env exposure remains necessary for downstream runtime consumers not yet migrated; removal deferred to measured deprecation stage.
 - Verification: static source sweeps in app/doc surfaces confirm no reintroduced UI write-path drift and retained forensic alias marker path.
 - Next step: collect fresh device forensic bundle after runtime execution to confirm env/event parity on live launch traces before retiring legacy mirror keys.
+
+### Entry 19: donor 10416 transfer execution plan hardening
+- Goal: respond to user request for full 10416 transfer by converting request into executable closure protocol.
+- Context: audit proves all 10416 donor cells unresolved (`pending/review`) and cannot be honestly promoted without donor materialization + class-level evidence.
+- Decision: add `docs/DONOR_TRANSFER_EXECUTION_PLAN_2026-05-04.md` with deterministic transfer loop, batch strategy, and closure gates.
+- Tradeoff: no fake closure claimed; prioritizes truthful evidence-first execution over mechanical status mutation.
+- Verification: plan document created and linked from active roadmap entry.
+- Next step: execute Batch A with donor trees materialized and per-class transfer decisions.
+
+### Entry 20: one-batch A/B/C/D execution attempt with hard network blocker
+- Goal: execute A/B/C/D transfer in one batch immediately after plan finalization.
+- Decision: ran full 24-donor materialization pass (single wave) against `tools/donor_sources_2026_05_04.json`.
+- Verification: every donor clone failed with identical `CONNECT tunnel failed, response 403`.
+- Defect class: environment egress restriction (not app/runtime source defect).
+- Impact: blocks matrix progression from pending/review to factual import/adapt decisions.
+- Next step: once egress is available, rerun materialization + matrix/audit and continue batch transfer without splitting scope.
+
+### Entry 21: no-clone RAW donor scan fallback and first executable transfer
+- Goal: keep A/B/C/D one-batch transfer moving despite clone restriction.
+- Decision: follow user no-clone directive and use direct RAW donor file inspection; applied first infrastructure hardening in `FileUtils` (null-safe readString + URI line separator preservation).
+- Verification: source updated and static grep confirms new logic points.
+- Next step: continue RAW sweep for B/C/D classes and apply per-class transfers in same frontier.

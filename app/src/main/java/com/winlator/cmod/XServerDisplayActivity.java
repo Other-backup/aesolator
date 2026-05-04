@@ -1167,8 +1167,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         winHandler.setInputType((byte) container.getInputType());
         lc_all = container.getLC_ALL();
 
-        // Log the entire intent to verify the extras
-        Log.d("XServerDisplayActivity", "Intent Extras: " + launchIntent.getExtras());
+        // Log only extra keys to avoid leaking user/runtime secrets in logs
+        Bundle extras = launchIntent.getExtras();
+        Log.d("XServerDisplayActivity", "Intent Extra Keys: " + (extras == null ? "[]" : extras.keySet()));
 
         if (shortcut != null) {
             graphicsDriver = shortcut.getExtra("graphicsDriver", container.getGraphicsDriver());

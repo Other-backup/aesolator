@@ -1551,3 +1551,9 @@ Reflective result from the latest clean-session batch:
   - forensic lane confirms `LSFG_CONFIG_EFFECTIVE` payload includes `deprecated_alias_used`.
 - Residual risk: runtime-package-side consumers outside app lane may still prefer legacy keys;
   mitigated by mirror export plus deprecation observability until retirement window is scheduled.
+
+- 2026-05-04: User requested literal transfer of all 10416 unresolved donor cells in one pass. Added deterministic execution plan doc (`docs/DONOR_TRANSFER_EXECUTION_PLAN_2026-05-04.md`) to formalize batch-wise closure loop and clarify that 10416 is matrix unresolved surface, not directly claimable improvements.
+
+- 2026-05-04: Executed one-batch A/B/C/D transfer start by materializing all 24 donors; all clone attempts failed with `CONNECT tunnel failed, response 403`, so class-level transfer remains blocked by network egress policy. See `docs/DONOR_BATCH_ABCD_EXECUTION_2026-05-04.md`.
+
+- 2026-05-04: Switched to no-clone donor transfer fallback (RAW online file inspection) per user instruction; executed first A-lane code transfer in `FileUtils` null-safe string reads + URI line-break preservation.

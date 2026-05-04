@@ -592,13 +592,20 @@ public class Container {
         }
     }
 
+    private static String sanitizeSessionMetadataKey(String name) {
+        if (name == null) return "";
+        return name.trim();
+    }
+
     public String getSessionMetadata(String name) {
         return getSessionMetadata(name, "");
     }
 
     public String getSessionMetadata(String name, String fallback) {
+        String key = sanitizeSessionMetadataKey(name);
+        if (key.isEmpty()) return fallback;
         try {
-            return sessionMetadata != null && sessionMetadata.has(name) ? sessionMetadata.getString(name) : fallback;
+            return sessionMetadata != null && sessionMetadata.has(key) ? sessionMetadata.getString(key) : fallback;
         }
         catch (JSONException e) {
             return fallback;
@@ -606,13 +613,15 @@ public class Container {
     }
 
     public void putSessionMetadata(String name, Object value) {
+        String key = sanitizeSessionMetadataKey(name);
+        if (key.isEmpty()) return;
         if (sessionMetadata == null) sessionMetadata = new JSONObject();
         try {
             if (value != null) {
-                sessionMetadata.put(name, value);
+                sessionMetadata.put(key, value);
             }
             else {
-                sessionMetadata.remove(name);
+                sessionMetadata.remove(key);
             }
         }
         catch (JSONException e) {
