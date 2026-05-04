@@ -1,0 +1,37 @@
+name: donor-matrix-export
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run donor export bundle
+        shell: bash
+        run: |
+          chmod +x tools/termux_export_donor_matrix.sh
+          bash tools/termux_export_donor_matrix.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out/ci_donor_export"
+
+      - name: Upload donor export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: donor-export-bundle
+          path: |
+            out/ci_donor_export/**
+            out/ci_donor_export.tar.gz
+            docs/DONOR_CLASS_SWEEP_MATRIX_2026-05-04.md
+            docs/DONOR_CLASS_SWEEP_AUDIT_2026-05-04.md
+            docs/DONOR_24_BATCH_PLAN_2026-05-04.md
+            docs/DONOR_24_APPLY_REPORT_2026-05-04.md
+            docs/DONOR_24_RAW_INTAKE_REPORT_2026-05-04.md
+          if-no-files-found: warn
