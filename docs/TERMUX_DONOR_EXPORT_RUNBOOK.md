@@ -45,3 +45,8 @@ If donors are private or GitHub API is rate-limited, export a token before run:
 export GITHUB_TOKEN=YOUR_TOKEN
 bash tools/termux_export_donor_matrix.sh
 ```
+
+
+## Merge-conflict safe mode
+
+If target repo already contains part of donor scripts/docs, prefer file-level copy of required scripts only (no recursive docs overwrite), then run export.

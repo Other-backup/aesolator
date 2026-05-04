@@ -37,8 +37,15 @@ jobs:
       - name: Run donor export bundle
         shell: bash
         run: |
-          cp -r aesolator-tools/tools ./tools
-          cp -r aesolator-tools/docs ./docs
+          mkdir -p tools docs
+          cp -f aesolator-tools/tools/termux_export_donor_matrix.sh tools/
+          cp -f aesolator-tools/tools/generate_donor_class_matrix.py tools/
+          cp -f aesolator-tools/tools/audit_donor_class_matrix.py tools/
+          cp -f aesolator-tools/tools/build_24_donor_batch_plan.py tools/
+          cp -f aesolator-tools/tools/apply_24_donor_batch.py tools/
+          cp -f aesolator-tools/tools/raw_donor_intake_scan.py tools/
+          cp -f aesolator-tools/tools/apply_raw_manifest_batch.py tools/
+          cp -f aesolator-tools/tools/donor_sources_2026_05_04.json tools/
           chmod +x tools/termux_export_donor_matrix.sh
           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           bash tools/termux_export_donor_matrix.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out/ci_donor_export"
