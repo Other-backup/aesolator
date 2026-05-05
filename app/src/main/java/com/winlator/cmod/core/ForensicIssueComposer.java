@@ -25,6 +25,8 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class ForensicIssueComposer {
     private static final String[] RUNTIME_LOG_PREFIXES = {
@@ -39,6 +41,17 @@ public final class ForensicIssueComposer {
             "vkd3d",
             "pulse",
             "alsa"
+    };
+    private static final String[] IMAGE_PIPELINE_PREFIXES = {
+            "imagefs",
+            "wrapper",
+            "vortek",
+            "virgl",
+            "adrenotools",
+            "aemali",
+            "aepanvk",
+            "opengl",
+            "vulkan"
     };
 
     private ForensicIssueComposer() {}
@@ -82,6 +95,7 @@ public final class ForensicIssueComposer {
             FileUtils.copy(candidate, copied);
             includedFiles.put(prefix, copied);
         }
+        captureImagePipelineLogs(context, bundleDir, includedFiles);
 
         try {
             JSONObject runtimeSnapshot = ForensicRuntimeSnapshot.capture();
@@ -133,6 +147,9 @@ public final class ForensicIssueComposer {
         String markdown = buildIssueMarkdown(context, config, issueTitle, issueReason, containerId, includedFiles);
         writeText(markdownFile, markdown);
         includedFiles.put("issue_markdown", markdownFile);
+        File githubIssueFile = new File(bundleDir, "GITHUB_ISSUE_TEMPLATE.md");
+        writeText(githubIssueFile, buildGithubIssueTemplate(context, issueTitle, issueReason, containerId, includedFiles, markdownFile.getName()));
+        includedFiles.put("github_issue_template", githubIssueFile);
 
         File zipFile = zipDirectory(bundleDir, new File(baseDir, bundleDir.getName() + ".zip"));
         return new IssueBundleResult(bundleDir, markdownFile, zipFile, markdown, latestForensic != null ? latestForensic.getAbsolutePath() : "");
@@ -255,6 +272,40 @@ public final class ForensicIssueComposer {
         sb.append(ForensicConfig.buildIssueBrowseCommand(context));
         sb.append("\n````\n");
         return sb.toString();
+    }
+
+    private static String buildGithubIssueTemplate(Context context, String issueTitle, String issueReason,
+                                                   Integer containerId, Map<String, File> includedFiles,
+                                                   String markdownFileName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# ").append(issueTitle == null || issueTitle.trim().isEmpty() ? "Ae.solator forensic issue" : issueTitle.trim()).append("\n\n");
+        sb.append("## Summary\n");
+        if (issueReason != null && !issueReason.trim().isEmpty()) {
+            sb.append("- reason: ").append(issueReason.trim()).append('\n');
+        }
+        if (containerId != null) sb.append("- container_id: ").append(containerId).append('\n');
+        sb.append("- package: ").append(context.getPackageName()).append('\n');
+        sb.append("- app_version: ").append(getVersionName(context)).append(" (").append(AppUtils.getVersionCode(context)).append(")\n");
+        sb.append("\n## Repro steps\n- [ ] launch container\n- [ ] run target executable\n- [ ] capture failure point\n");
+        sb.append("\n## Evidence bundle\n");
+        sb.append("- attach zip from `issue-bundles/*.zip`\n");
+        sb.append("- include `").append(markdownFileName).append("`\n");
+        sb.append("- included files: ").append(includedFiles.size()).append('\n');
+        sb.append("\n## Expected vs Actual\n- Expected:\n- Actual:\n");
+        return sb.toString();
+    }
+
+    private static void captureImagePipelineLogs(Context context, File bundleDir, Map<String, File> includedFiles) {
+        Set<String> copiedSources = new HashSet<>();
+        for (String prefix : IMAGE_PIPELINE_PREFIXES) {
+            File candidate = findLatestLogWithPrefix(WinlatorLogUtils.getCandidateLogsDirs(context), prefix);
+            if (candidate == null || !candidate.isFile()) continue;
+            String sourcePath = candidate.getAbsolutePath();
+            if (!copiedSources.add(sourcePath)) continue;
+            File copied = new File(bundleDir, "img_" + candidate.getName());
+            FileUtils.copy(candidate, copied);
+            includedFiles.put("image_pipeline_" + prefix, copied);
+        }
     }
 
     private static String readTail(File file, int maxLines) {

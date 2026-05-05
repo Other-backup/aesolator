@@ -406,6 +406,21 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
         File system32dir = resolveArm64EcSystem32Dir(imageFs);
+        if (system32dir == null) {
+            ForensicLogger.logEvent(
+                    context,
+                    "error",
+                    "ARM64EC_PAYLOAD_REFRESH_FAILED",
+                    null,
+                    "launch_dependency",
+                    "arm64ec_payload_refresh_failed",
+                    ForensicLogger.fields(
+                            "reason", "missing_system32_dir",
+                            "imagefs_root", imageFs != null && imageFs.getRootDir() != null ? imageFs.getRootDir().getAbsolutePath() : ""
+                    )
+            );
+            return;
+        }
         boolean containerDataChanged = false;
 
         String wowbox64Version = normalizeVersion(container.getBox64Version(), DefaultVersion.WOWBOX64);
@@ -413,10 +428,25 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         if (shortcut != null) {
             wowbox64Version = normalizeVersion(shortcut.getExtra("box64Version", shortcut.container.getBox64Version()), wowbox64Version);
+            fexcoreVersion = normalizeVersion(shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion()), fexcoreVersion);
         }
 
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
         Log.d("GuestProgramLauncherComponent", "fexcoreVersion in use: " + fexcoreVersion);
+        ForensicLogger.logEvent(
+                context,
+                "info",
+                "ARM64EC_PAYLOAD_SELECTION",
+                null,
+                "launch_dependency",
+                "arm64ec_payload_selection",
+                ForensicLogger.fields(
+                        "system32_dir", system32dir.getAbsolutePath(),
+                        "wowbox64_version", wowbox64Version,
+                        "fexcore_version", fexcoreVersion,
+                        "shortcut_present", shortcut != null
+                )
+        );
 
         File wowbox64Dll = new File(system32dir, "wowbox64.dll");
         boolean wowbox64Missing = needsFileRefresh(wowbox64Dll);
@@ -920,6 +950,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             return command.trim();
         }
 
+        String normalizedGuestExecutable = normalizeGuestExecutableForLaunch(guestExecutable);
         if (wineInfo.isArm64EC()) {
             boolean usesFexCore = effectiveEmulator.toLowerCase(Locale.ROOT).equals("fexcore");
             String hodll = usesFexCore
@@ -949,11 +980,161 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                     )
             );
             if (shouldUseWineBinaryLauncher(guestExecutable, desktopShellBootstrap)) {
-                return winePath + "/wine " + guestExecutable;
+                return winePath + "/wine " + normalizedGuestExecutable;
             }
-            return winePath + "/" + guestExecutable;
+            return winePath + "/" + normalizedGuestExecutable;
         }
-        return imageFs.getBinDir() + "/box64 " + guestExecutable;
+        return imageFs.getBinDir() + "/box64 " + normalizedGuestExecutable;
+    }
+
+    private String normalizeGuestExecutableForLaunch(String raw) {
+        if (raw == null) return "";
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) return "";
+        if (trimmed.startsWith("\"")) return trimmed;
+
+        int executableBoundary = findExecutableBoundaryForLaunch(trimmed);
+        if (executableBoundary > 0) {
+            String executablePart = trimmed.substring(0, executableBoundary).trim();
+            String suffix = executableBoundary < trimmed.length() ? trimmed.substring(executableBoundary).trim() : "";
+            if (!executablePart.startsWith("\"") && executablePart.contains(" ") && looksLikeExecutableToken(executablePart)) {
+                return suffix.isEmpty() ? "\"" + executablePart + "\"" : "\"" + executablePart + "\" " + suffix;
+            }
+        }
+        return trimmed;
+    }
+
+    private int findExecutableBoundaryForLaunch(String command) {
+        String lower = command.toLowerCase(Locale.ROOT);
+        String[] suffixes = {".exe", ".bat", ".cmd", ".com", ".msi", ".vbs", ".js"};
+        int bestBoundary = -1;
+        for (String suffix : suffixes) {
+            int index = 0;
+            while (index >= 0 && index < lower.length()) {
+                int suffixIndex = lower.indexOf(suffix, index);
+                if (suffixIndex < 0) break;
+                int boundary = suffixIndex + suffix.length();
+                if (boundary == lower.length()) return boundary;
+                char next = lower.charAt(boundary);
+                if (Character.isWhitespace(next)) {
+                    if (bestBoundary < 0 || boundary < bestBoundary) bestBoundary = boundary;
+                    break;
+                }
+                index = suffixIndex + 1;
+            }
+        }
+        return bestBoundary;
+    }
+
+    private boolean looksLikeExecutableToken(String token) {
+        String lower = token == null ? "" : token.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".exe")
+                || lower.endsWith(".bat")
+                || lower.endsWith(".cmd")
+                || lower.endsWith(".com")
+                || lower.endsWith(".msi")
+                || lower.endsWith(".vbs")
+                || lower.endsWith(".js")
+                || lower.contains(":\\");
+    }
+
+    private void logPayloadAudit(Context context, ImageFs imageFs, String requestedEmulator, String effectiveEmulator, String traceId, String appId) {
+        File box64RuntimeBinary = imageFs != null ? new File(imageFs.getRootDir(), "/usr/local/bin/box64") : null;
+        File box64ImageFsBinary = imageFs != null ? new File(imageFs.getRootDir(), "/usr/bin/box64") : null;
+        File system32Dir = resolveArm64EcSystem32Dir(imageFs);
+        File wowbox64Dll = system32Dir != null ? new File(system32Dir, "wowbox64.dll") : null;
+        File fexWow64Dll = system32Dir != null ? new File(system32Dir, "libwow64fex.dll") : null;
+        File fexArm64ecDll = system32Dir != null ? new File(system32Dir, "libarm64ecfex.dll") : null;
+
+        logLaunchStageEvent(
+                context,
+                "info",
+                "LAUNCH_PAYLOAD_AUDIT",
+                traceId,
+                "payload_audit",
+                appId,
+                -1L,
+                null,
+                "requested_emulator", requestedEmulator,
+                "effective_emulator", effectiveEmulator,
+                "arm64ec_runtime", wineInfo != null && wineInfo.isArm64EC(),
+                "system32_dir", system32Dir != null ? system32Dir.getAbsolutePath() : "",
+                "wowbox64_present", wowbox64Dll != null && wowbox64Dll.isFile(),
+                "fex_wow64_present", fexWow64Dll != null && fexWow64Dll.isFile(),
+                "fex_arm64ec_present", fexArm64ecDll != null && fexArm64ecDll.isFile(),
+                "box64_local_present", box64RuntimeBinary != null && box64RuntimeBinary.isFile(),
+                "box64_usr_present", box64ImageFsBinary != null && box64ImageFsBinary.isFile()
+        );
+    }
+
+    private boolean validateExecutableLaunchLane(Context context, ImageFs imageFs, String effectiveEmulator, String traceId, String appId) {
+        File system32Dir = resolveArm64EcSystem32Dir(imageFs);
+        boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
+        boolean fexSelected = "fexcore".equalsIgnoreCase(effectiveEmulator);
+        boolean wowboxSelected = "wowbox64".equalsIgnoreCase(effectiveEmulator);
+
+        if (arm64ec && fexSelected) {
+            boolean fexReady = system32Dir != null
+                    && new File(system32Dir, "libwow64fex.dll").isFile()
+                    && new File(system32Dir, "libarm64ecfex.dll").isFile();
+            if (!fexReady) {
+                logLaunchStageEvent(context, "error", "LAUNCH_LANE_INVALID", traceId, "payload_validation", appId, -1L, null,
+                        "reason", "fexcore_selected_without_dual_dll",
+                        "effective_emulator", effectiveEmulator,
+                        "system32_dir", system32Dir != null ? system32Dir.getAbsolutePath() : "");
+                AppUtils.showToast(context, "FEX payload is incomplete: missing libwow64fex.dll/libarm64ecfex.dll");
+                return false;
+            }
+        }
+
+        if (arm64ec && wowboxSelected) {
+            boolean wowboxReady = system32Dir != null && new File(system32Dir, "wowbox64.dll").isFile();
+            if (!wowboxReady) {
+                logLaunchStageEvent(context, "error", "LAUNCH_LANE_INVALID", traceId, "payload_validation", appId, -1L, null,
+                        "reason", "wowbox64_selected_without_dll",
+                        "effective_emulator", effectiveEmulator,
+                        "system32_dir", system32Dir != null ? system32Dir.getAbsolutePath() : "");
+                AppUtils.showToast(context, "wowbox64 payload is missing: wowbox64.dll");
+                return false;
+            }
+        }
+
+        if (!arm64ec) {
+            File box64Binary = imageFs != null ? new File(imageFs.getRootDir(), "/usr/local/bin/box64") : null;
+            File localBox64Binary = imageFs != null ? new File(imageFs.getRootDir(), "/usr/bin/box64") : null;
+            boolean box64Ready = (box64Binary != null && box64Binary.isFile())
+                    || (localBox64Binary != null && localBox64Binary.isFile());
+            if (!box64Ready) {
+                logLaunchStageEvent(context, "error", "LAUNCH_LANE_INVALID", traceId, "payload_validation", appId, -1L, null,
+                        "reason", "box64_binary_missing",
+                        "effective_emulator", effectiveEmulator);
+                AppUtils.showToast(context, "Box64 payload is missing in imagefs (/usr/local/bin/box64, /usr/bin/box64)");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void enforceGraphicsRuntimeContract(Context context, EnvVars launchEnv, String traceId, String appId) {
+        setIfMissing(launchEnv, "MESA_SHADER_CACHE_DISABLE", "0");
+        setIfMissing(launchEnv, "MESA_SHADER_CACHE_MAX_SIZE", "512M");
+        setIfMissing(launchEnv, "DXVK_LOG_LEVEL", "none");
+        setIfMissing(launchEnv, "VKD3D_DEBUG", "none");
+        setIfMissing(launchEnv, "MESA_VK_WSI_PRESENT_MODE", "fifo");
+        setIfMissing(launchEnv, "AERO_GRAPHICS_REPRO_MODE", "strict");
+
+        logLaunchStageEvent(context, "info", "GRAPHICS_RUNTIME_CONTRACT", traceId, "graphics_contract", appId, -1L, null,
+                "dxvk_log_level", launchEnv.get("DXVK_LOG_LEVEL"),
+                "vkd3d_debug", launchEnv.get("VKD3D_DEBUG"),
+                "mesa_shader_cache_disable", launchEnv.get("MESA_SHADER_CACHE_DISABLE"),
+                "mesa_shader_cache_max_size", launchEnv.get("MESA_SHADER_CACHE_MAX_SIZE"),
+                "mesa_vk_wsi_present_mode", launchEnv.get("MESA_VK_WSI_PRESENT_MODE"),
+                "aero_graphics_repro_mode", launchEnv.get("AERO_GRAPHICS_REPRO_MODE"));
+    }
+
+    private void setIfMissing(EnvVars envVars, String key, String value) {
+        String current = envVars.get(key);
+        if (current == null || current.trim().isEmpty()) envVars.put(key, value);
     }
 
     private boolean shouldUseWineBinaryLauncher(String guestExecutable, boolean desktopShellBootstrap) {
@@ -1043,6 +1224,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         String requestedEmulator = resolveRequestedEmulator();
         boolean desktopShellBootstrap = wineInfo.isArm64EC() && isDesktopShellBootstrap();
         String effectiveEmulator = resolveEffectiveEmulator(imageFs, requestedEmulator, desktopShellBootstrap);
+        logPayloadAudit(context, imageFs, requestedEmulator, effectiveEmulator, stageTraceId, appId);
+        if (!validateExecutableLaunchLane(context, imageFs, effectiveEmulator, stageTraceId, appId)) return -1;
 
         addBox64EnvVars(launchEnv, enableBox64Logs);
         if ("fexcore".equalsIgnoreCase(effectiveEmulator)) {
@@ -1071,6 +1254,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             launchEnv.remove("FEX_SILENTLOG");
             launchEnv.remove("FEX_DEBUG");
         }
+        enforceGraphicsRuntimeContract(context, launchEnv, stageTraceId, appId);
 
         String renderer = GPUInformation.getRenderer(null, null);
 

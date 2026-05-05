@@ -7253,11 +7253,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 + "enableOnLaunch=True";
     }
 
-    private void applyUpscalerEnvVars(boolean dxvkBackedRoute, String socClass) {
+    private void applyUpscalerEnvVars(boolean vulkanPrimaryRoute, String socClass) {
         String guardReason = "none";
         String normalizedSocClass = socClass == null || socClass.trim().isEmpty() ? "unknown" : socClass.trim();
         boolean upscalerEnabled = !UPSCALER_BACKEND_OFF.equals(upscalerBackend)
                 && !UPSCALER_EFFECT_NONE.equals(upscalerEffect);
+        if (upscalerEnabled && UPSCALER_BACKEND_LSFG.equals(upscalerBackend) && !vulkanPrimaryRoute) {
+            upscalerEnabled = false;
+            guardReason = "lsfg_requires_vulkan_primary_route";
+        }
         boolean frameGenerationRequested = upscalerFrameGeneration && upscalerEnabled;
         boolean frameGenerationBackendSupported = UPSCALER_BACKEND_LSFG.equals(upscalerBackend);
         boolean frameGenerationActive = frameGenerationRequested && frameGenerationBackendSupported;
@@ -7336,11 +7340,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         modeQuality = Math.max(0.20f, Math.min(1.20f, modeQuality * presetModeQualityMultiplier));
         modeBudgetMs = Math.max(4.0f, Math.min(14.0f, modeBudgetMs * presetModeBudgetMultiplier));
 
-        if (frameGenerationActive && !dxvkBackedRoute) {
+        if (frameGenerationActive && !vulkanPrimaryRoute) {
             frameGenerationActive = false;
-            if ("none".equals(guardReason)) {
-                guardReason = "framegen_requires_dxvk_route";
-            }
+            if ("none".equals(guardReason)) guardReason = "framegen_requires_vulkan_primary_route";
             lsfgDebugBridgeActive = false;
         }
         if (!frameGenerationActive) {
@@ -7356,6 +7358,28 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOrClearEnv("AERO_UPSCALER_SCALE_PERCENT", String.valueOf(upscalerScalePercent));
         setOrClearEnv("AERO_UPSCALER_SHARPNESS_PERCENT", String.valueOf(upscalerSharpnessPercent));
         setOrClearEnv("AERO_UPSCALER_DENOISE_PERCENT", String.valueOf(upscalerDenoisePercent));
+        boolean dxvkActiveWrapper = trimToEmpty(envVars.get("AERO_DXWRAPPER_ACTIVE")).contains("dxvk");
+        boolean vkd3dActiveWrapper = trimToEmpty(envVars.get("AERO_DXWRAPPER_ACTIVE")).contains("vkd3d")
+                || !trimToEmpty(envVars.get("VKD3D_FEATURE_LEVEL")).isEmpty();
+        String activeProviderLane = trimToEmpty(envVars.get("AERO_GRAPHICS_ACTIVE_PROVIDER_LANE"));
+        String vulkanRuntimeSource = trimToEmpty(envVars.get("AERO_VULKAN_RUNTIME_SOURCE"));
+        String galliumDriver = trimToEmpty(envVars.get("GALLIUM_DRIVER"));
+        boolean zinkRoute = "zink".equalsIgnoreCase(galliumDriver);
+        boolean vortekRoute = activeProviderLane.contains("vortek") || vulkanRuntimeSource.contains("vortek");
+        boolean aemaliRoute = activeProviderLane.contains("aemali") || vulkanRuntimeSource.contains("aemali");
+        boolean aepanvkRoute = activeProviderLane.contains("aepanvk") || vulkanRuntimeSource.contains("aepanvk");
+        boolean adrenotoolsRoute = activeProviderLane.contains("turnip") || activeProviderLane.contains("freedreno");
+        boolean virglRoute = activeProviderLane.contains("virgl") || vulkanRuntimeSource.contains("virgl");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_DXVK", dxvkActiveWrapper ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_VKD3D", vkd3dActiveWrapper ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_VULKAN_PRIMARY", vulkanPrimaryRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_ZINK", zinkRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_VORTEK", vortekRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_AEMALI", aemaliRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_AEPANVK", aepanvkRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_ADRENOTOOLS", adrenotoolsRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_ROUTE_VIRGL", virglRoute ? "1" : "0");
+        setOrClearEnv("AERO_UPSCALER_RUNTIME_IMAGEFS", environment != null && environment.getImageFs() != null ? environment.getImageFs().getRootDir().getAbsolutePath() : "");
         boolean requestedValidationLayer = upscalerEnabled && upscalerVulkanValidationLayer;
         Set<String> availableVkLayers = resolveAvailableVulkanLayerNames(envVars);
         boolean validationLayerAvailable = availableVkLayers.contains("VK_LAYER_KHRONOS_validation");
@@ -7518,6 +7542,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         "backend", upscalerBackend,
                         "backend_source", upscalerBackendSource,
                         "framegen_enabled", frameGenerationActive ? "1" : "0",
+                        "upscaler_enabled", upscalerEnabled ? "1" : "0",
+                        "vulkan_primary_route", vulkanPrimaryRoute ? "1" : "0",
+                        "dxvk_active_wrapper", dxvkActiveWrapper ? "1" : "0",
+                        "vkd3d_active_wrapper", vkd3dActiveWrapper ? "1" : "0",
+                        "zink_route", zinkRoute ? "1" : "0",
+                        "vortek_route", vortekRoute ? "1" : "0",
+                        "aemali_route", aemaliRoute ? "1" : "0",
+                        "aepanvk_route", aepanvkRoute ? "1" : "0",
+                        "adrenotools_route", adrenotoolsRoute ? "1" : "0",
+                        "virgl_route", virglRoute ? "1" : "0",
                         "framegen_mode", upscalerFramegenMode,
                         "source_chain", upscalerBackendSource + ">" + upscalerPresetSource + ">" + upscalerFramegenSource,
                         "preset_effective", effectivePreset,

@@ -3404,3 +3404,64 @@
 - Decision: follow user no-clone directive and use direct RAW donor file inspection; applied first infrastructure hardening in `FileUtils` (null-safe readString + URI line separator preservation).
 - Verification: source updated and static grep confirms new logic points.
 - Next step: continue RAW sweep for B/C/D classes and apply per-class transfers in same frontier.
+
+### Entry 22: Arm64EC EXE non-launch deep reflection kickoff
+- Goal: perform strict engineering reflection on user-reported `arm64ec` EXE non-launch failures with Black Diamond evidence discipline.
+- Context: user suspects FEX routing, but local app path still has multiple possible failure layers (`dependency presence`, command transport, runtime-model lane, emulator DLL selection).
+- Decision: opened full-chain investigation instead of single-layer blame; accepted FEX as high-probability component but rejected premature root-cause collapse.
+- Tradeoff: deeper evidence loop increases analysis time, but prevents false fixes that hide launcher/runtime contract defects.
+- Verification: roadmap updated with deterministic lane and external upstream anchors (FEX ARM64EC wiki, FEX release fixes, Hangover/HODLL selection behavior).
+- Next step: implement/collect explicit forensic signals for active emulator DLL lane and WinHandler command shape at launch time, then correlate with failing EXE class (x86 vs x64).
+### Entry 23: Arm64EC payload/version lane fix (image split aware)
+- Goal: remove a concrete app-side mismatch that could break `.exe` launches in arm64ec sessions despite installed FEX payloads.
+- Root cause: `extractEmulatorsDlls()` respected shortcut override for wowbox64 but ignored shortcut override for `fexcoreVersion`, causing stale/wrong FEX DLL lane when per-shortcut version diverged from container default.
+- Fix: apply shortcut `fexcoreVersion` override in the same normalization path; add deterministic forensic event for active arm64ec payload selection and a hard error marker for missing system32 resolution.
+- Tradeoff: extra forensic noise in logs, but materially stronger root-cause visibility for split-image/session-specific failures.
+- Verification: static source check + compile attempt (blocked by host JDK/Gradle class version incompatibility, not by source compile errors in changed file scope).
+### Entry 24: WinHandler packet-framing + HODLL/payload audit closure step
+- Goal: close the remaining uncertainty in the arm64ec `.exe` chain by proving command transport and payload presence at launch time.
+- Decision: instrumented `WinHandler.exec()` with deterministic packet-framing forensic event and empty-filename hard skip marker; added launch-stage payload audit for FEX/wowbox64/box64 artifacts in active imagefs.
+- Tradeoff: increased forensic event volume; accepted for Black Diamond evidence completeness and cross-layer causality.
+- Verification: source inspection confirms events emitted before send and before launch command build.
+- Next step: collect fresh device forensic bundle and correlate `WINHANDLER_EXEC_PACKET` + `LAUNCH_PAYLOAD_AUDIT` + `WINHANDLER_EMULATOR_FALLBACK` on failing vs passing EXE runs.
+### Entry 25: Global .exe launch-model hardening (all execution lanes)
+- Goal: move from passive diagnostics to active correctness for `.exe` launch model across arm64ec and non-arm64ec lanes.
+- Deep-search outcome: Windows/CreateProcess ambiguity with unquoted spaced executable paths is a real launch hazard; command splitting must not blindly break on first whitespace.
+- Fixes:
+  1. `WinHandler.splitCommand()` now attempts executable-boundary detection by known executable suffixes before fallback whitespace split.
+  2. launch path now enforces payload-lane validity (`fexcore` dual DLL contract, `wowbox64` DLL contract, `box64` binary contract) before dispatch.
+- Tradeoff: stricter preflight may fail fast on mis-staged payloads that previously failed silently later; accepted as Black Diamond correctness-first behavior.
+- Next step: device forensic closure run with mixed command shapes (quoted path, unquoted spaced path, cmd wrappers) and per-lane payload toggles.
+### Entry 26: imagefs-safe `.exe` dispatch + graphics wrapper reproducibility contract
+- Goal: close remaining launch-path ambiguities by making guest executable transport deterministic for spaced paths and by enforcing stable Vulkan/OpenGL wrapper defaults.
+- Decision:
+  1. normalize guest executable before wine/box64 command build (auto-quote unquoted executable tokens with spaces);
+  2. enforce launch-time graphics contract defaults (`DXVK_LOG_LEVEL`, `VKD3D_DEBUG`, `MESA_SHADER_CACHE_*`, `MESA_VK_WSI_PRESENT_MODE`) when unset;
+  3. emit unified forensic snapshot `GRAPHICS_RUNTIME_CONTRACT` for reproducibility.
+- Tradeoff: stricter defaults may override implicit driver behavior in undefined env states, but this is intentional for deterministic replay and donor-diff triage.
+- Next step: replay forensic comparison across wrapper stacks (`vortek`/`virgl`/turnip/opengl fallback) and verify no lane silently drifts from declared contract.
+### Entry 27: Forensic distribution/export/github-report hardening
+- Goal: tighten forensic capture distribution so imagefs/runtime process evidence is first-class in exported bundles and GitHub issue flow.
+- Decision: extend issue composer with image-pipeline log intake and generate a structured GitHub issue template artifact directly in bundle output.
+- Tradeoff: bundle size may increase, but evidence completeness for wrapper/image lanes is materially stronger.
+- Next step: align diagnostics UI buttons to surface direct "copy GitHub issue template" and "open bundle dir" actions in one tap path.
+### Entry 28: Doctoral self-audit over recent commits (logic-hole closure)
+- Scope: strict re-read of recent launch/forensics commits and local PR deltas under Black Diamond evidence discipline.
+- Found hole #1: `normalizeGuestExecutableForLaunch()` relied on `firstGuestToken()` and could not reliably quote unquoted spaced executable paths.
+- Fix #1: introduced suffix-aware boundary detector for launch normalization and quote insertion around executable segment only.
+- Found hole #2: image-pipeline forensic intake dedupe used copied-file map values, which do not represent source-path uniqueness.
+- Fix #2: switched dedupe to source absolute path set before copy.
+- Result: launch normalization and forensic artifact distribution now align better with deterministic closure goals.
+### Entry 29: LSFG route-guard closure for Vulkan/OpenGL split during emulation
+- Problem: prior logic could keep LSFG SR enabled even when route was not DXVK/Vulkan, while only framegen got disabled; this left a contract hole for OpenGL/non-DXVK lanes.
+- Fix: promote DXVK/Vulkan route to hard gate for LSFG backend itself, not just framegen.
+- Implementation: if LSFG selected and route is not DXVK-backed, force upscaler off and emit deterministic guard reason `lsfg_requires_dxvk_vulkan_route` with route/imagefs markers.
+- Impact: container/global settings remain intact but runtime execution now strictly follows declared graphics route ownership and avoids silent cross-route drift.
+### Entry 30: LSFG wrapper-agnostic Vulkan-primary correction
+- Audit finding: previous guard wording/telemetry could be misread as DXVK-only gate although runtime already computed broader `vulkanPrimaryRoute` (DXVK or dgVoodoo Vulkan-primary).
+- Correction: align variable semantics, guard reasons, and forensic markers to Vulkan-primary contract while still exposing DXVK-active marker separately.
+- Outcome: framegen/upscaler contract now consistent with requirement "works across wrappers" as long as wrapper route is Vulkan-primary, and still blocks OpenGL/non-Vulkan drift.
+### Entry 31: Cross-wrapper LSFG/Vulkan route matrix extension
+- Requirement closure: include VKD3D and broader driver/wrapper lanes (`vortek`, `adrenotools`, `virgl`, `zink`, `aemali`, `aepanvk`) in upscaler/framegen runtime observability.
+- Implementation: route flags derived from active wrapper/provider/runtime env and exported as `AERO_UPSCALER_ROUTE_*` markers + mirrored in `LSFG_CONFIG_EFFECTIVE` forensic payload.
+- Result: runtime can now be audited as matrix evidence instead of DXVK-only binary classification.

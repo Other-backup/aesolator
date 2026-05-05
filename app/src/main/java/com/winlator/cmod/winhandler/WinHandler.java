@@ -257,6 +257,21 @@ public class WinHandler {
         String[] parsed = splitCommand(command);
         String filename = parsed[0];
         String parameters = parsed[1];
+        if (filename.trim().isEmpty()) {
+            ForensicLogger.logEvent(
+                    activity,
+                    "error",
+                    "WINHANDLER_EXEC_SKIPPED",
+                    null,
+                    "winhandler",
+                    "winhandler_exec_skipped",
+                    ForensicLogger.fields(
+                            "reason", "empty_filename_after_split",
+                            "command_length", command.length()
+                    )
+            );
+            return;
+        }
 
         addAction(() -> {
             byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
@@ -273,6 +288,21 @@ public class WinHandler {
             packetBuffer.putInt(parametersBytes.length);
             packetBuffer.put(filenameBytes);
             packetBuffer.put(parametersBytes);
+            ForensicLogger.logEvent(
+                    activity,
+                    "info",
+                    "WINHANDLER_EXEC_PACKET",
+                    null,
+                    "winhandler",
+                    "winhandler_exec_packet",
+                    ForensicLogger.fields(
+                            "filename", filename,
+                            "filename_length", filenameBytes.length,
+                            "parameters_length", parametersBytes.length,
+                            "packet_size", packetSize,
+                            "uses_extended_packet", packetSize > SEND_PACKET_SIZE
+                    )
+            );
             sendPacket(CLIENT_PORT, packetBuffer);
         });
     }
@@ -292,12 +322,41 @@ public class WinHandler {
             }
         }
 
+        int executableBoundary = findExecutableBoundary(trimmed);
+        if (executableBoundary > 0 && executableBoundary < trimmed.length()) {
+            String filename = trimmed.substring(0, executableBoundary).trim();
+            String parameters = trimmed.substring(executableBoundary).trim();
+            if (!filename.isEmpty()) return new String[] {filename, parameters};
+        }
+
         int firstSpace = trimmed.indexOf(' ');
         if (firstSpace == -1) return new String[] {trimmed, ""};
         return new String[] {
                 trimmed.substring(0, firstSpace),
                 trimmed.substring(firstSpace + 1).trim()
         };
+    }
+
+    private static int findExecutableBoundary(String command) {
+        String lower = command.toLowerCase();
+        String[] executableSuffixes = {".exe", ".bat", ".cmd", ".com", ".msi", ".vbs", ".js"};
+        int bestBoundary = -1;
+        for (String suffix : executableSuffixes) {
+            int searchFrom = 0;
+            while (searchFrom >= 0 && searchFrom < lower.length()) {
+                int idx = lower.indexOf(suffix, searchFrom);
+                if (idx < 0) break;
+                int boundary = idx + suffix.length();
+                if (boundary == lower.length()) return boundary;
+                char next = lower.charAt(boundary);
+                if (Character.isWhitespace(next)) {
+                    if (bestBoundary < 0 || boundary < bestBoundary) bestBoundary = boundary;
+                    break;
+                }
+                searchFrom = idx + 1;
+            }
+        }
+        return bestBoundary;
     }
 
     private static int findClosingQuote(String value, int start) {

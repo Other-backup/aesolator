@@ -1569,3 +1569,31 @@ Reflective result from the latest clean-session batch:
 - 2026-05-04: Executed one-batch A/B/C/D transfer start by materializing all 24 donors; all clone attempts failed with `CONNECT tunnel failed, response 403`, so class-level transfer remains blocked by network egress policy. See `docs/DONOR_BATCH_ABCD_EXECUTION_2026-05-04.md`.
 
 - 2026-05-04: Switched to no-clone donor transfer fallback (RAW online file inspection) per user instruction; executed first A-lane code transfer in `FileUtils` null-safe string reads + URI line-break preservation.
+
+## 2026-05-04 — Arm64EC EXE launch failure deep-reflection lane (FEX/wow64 bridge)
+
+- New active user-reported tail: in `arm64ec` sessions `.exe` processes do not launch.
+- Black Diamond decision posture for this lane:
+  - `accept`: hypothesis that FEX bridge can be part of the failing path.
+  - `reject`: assuming FEX is root-cause before proving launcher/env/registry/runtime-model chain.
+  - `synthesize`: treat launch path as a full chain (`Container/Shortcut` selection -> dependency gate -> env export -> `WinHandler.exec()` transport -> Wine/Hangover DLL bridge selection).
+- Immediate forensic + source audit frontier:
+  1. Validate presence/version of `libarm64ecfex.dll` + `libwow64fex.dll` and registry/HODLL selection path.
+  2. Verify `WinHandler.exec()` payload framing for long quoted commands and parameter split edge-cases.
+  3. Correlate runtime lane with upstream FEX ARM64EC requirements (dual-build DLL model, wow64 allocation fixes, recent release regressions/fixes).
+  4. Confirm whether launch failures are x86-only, x64-only, or both inside same container.
+- External evidence anchors captured this pass:
+  - FEX ARM64EC docs confirm two distinct DLL lanes (WOW64 + ARM64EC) and strict build/runtime placement.
+  - Hangover/FEX reference confirms `libarm64ecfex.dll` default for x64 and `libwow64fex.dll` explicit for x86 path selection.
+  - Latest FEX release notes include recent wow64/arm64ec fixes and explicit wine-DLL artifact publication.
+- Next closure step: land deterministic runtime self-check + forensic markers for active ARM64EC DLL selection and exec route, then re-run with fresh device forensic bundle.
+- 2026-05-04: arm64ec payload plumbing fix landed in app code (`GuestProgramLauncherComponent`): shortcut-selected `fexcoreVersion` is now honored during payload extraction/refresh (previously only container-level value was used), plus forensic markers for selected versions/system32 path and explicit failure event when arm64ec system32 path is unresolved.
+- 2026-05-04: Extended root-cause closure lane with runtime packet/env tracing: `WinHandler.exec()` now emits packet-framing forensic data (`filename/lengths/extended-packet`), and launch path now logs `LAUNCH_PAYLOAD_AUDIT` for arm64ec+box64 artifacts (`wowbox64`, `libwow64fex.dll`, `libarm64ecfex.dll`, `/usr/local/bin/box64`, `/usr/bin/box64`) to close payload visibility across split-image lanes.
+- 2026-05-04: .exe launch model hardening expanded from observability to runtime enforcement: launch now validates selected execution lane before command dispatch (`fexcore` requires dual FEX DLL set, `wowbox64` requires `wowbox64.dll`, non-arm64ec requires at least one box64 binary) and aborts with forensic `LAUNCH_LANE_INVALID` + user-visible reason when payload contract is broken.
+- 2026-05-04: launch command model hardened for imagefs payload execution: guest executable normalization now auto-quotes unquoted spaced executable tokens before dispatch to wine/box64 lanes, reducing CreateProcess/WinHandler split ambiguity in `.exe` routes.
+- 2026-05-04: graphics wrapper reproducibility contract added to launch env assembly (`GRAPHICS_RUNTIME_CONTRACT`): strict defaults for DXVK/VKD3D/Mesa cache/WSI mode are enforced when missing and logged as one deterministic snapshot for Vulkan/OpenGL wrapper path correlation.
+- 2026-05-04: forensic issue-bundle lane hardened for Black Diamond imagefs/process ownership: bundle now captures image-pipeline logs (`imagefs/wrapper/vortek/virgl/adrenotools/aemali/aepanvk/opengl/vulkan` prefixes when present) and emits a ready-to-post `GITHUB_ISSUE_TEMPLATE.md` with reproducible summary/evidence checklist.
+- 2026-05-04: Post-commit doctoral self-audit closed two logic gaps in prior hardening: (1) `.exe` auto-quote lane now derives executable boundary from suffix-aware scan instead of first-token split (fixes unquoted spaced executable path handling); (2) image-pipeline forensic intake now deduplicates by source absolute path to avoid duplicate artifact copies across overlapping prefixes.
+- 2026-05-04: LSFG execution contract tightened for runtime imagefs emulation path: LSFG SR/FG is now hard-gated behind DXVK-backed Vulkan route (not only framegen), with explicit guard reason `lsfg_requires_dxvk_vulkan_route` and route markers exported (`AERO_UPSCALER_ROUTE_DXVK`, `AERO_UPSCALER_RUNTIME_IMAGEFS`) to eliminate OpenGL/non-DXVK accidental activation.
+- 2026-05-04: Corrected LSFG guard semantics after audit: gate now uses `vulkanPrimaryRoute` (covers `dxvk` and `dgvoodoo` Vulkan-primary lanes) instead of DXVK-only interpretation, with updated guard reason `lsfg_requires_vulkan_primary_route` and explicit markers `AERO_UPSCALER_ROUTE_VULKAN_PRIMARY` + `AERO_UPSCALER_ROUTE_DXVK`.
+- 2026-05-04: Expanded LSFG runtime-route telemetry surface to cover wrapper/driver matrix beyond DXVK (`VKD3D`, `vortek`, `adrenotools`, `virgl`, `zink`, `aemali`, `aepanvk`) via explicit env markers (`AERO_UPSCALER_ROUTE_*`) and forensic event fields, improving cross-wrapper framegen/upscaler reproducibility triage.
